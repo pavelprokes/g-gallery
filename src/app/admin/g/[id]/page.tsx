@@ -23,8 +23,15 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       status: true,
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: { sortOrder: "asc" },
-        select: { id: true, objectKey: true, fileName: true, width: true, height: true },
+        orderBy: [{ favorites: { _count: "desc" } }, { sortOrder: "asc" }],
+        select: {
+          id: true,
+          objectKey: true,
+          fileName: true,
+          width: true,
+          height: true,
+          _count: { select: { favorites: true } },
+        },
       },
       shareLinks: {
         orderBy: { createdAt: "desc" },
@@ -101,6 +108,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                 </div>
                 <p className="text-xs text-neutral-500">
                   {stats.views} zobr. · {stats.uniqueViewers} unik.
+                  {photo._count.favorites > 0 && (
+                    <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
+                  )}
                 </p>
               </li>
             );

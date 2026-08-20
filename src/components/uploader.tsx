@@ -44,12 +44,26 @@ async function presign(galleryId: string, files: File[]): Promise<PresignedUploa
   return data.uploads;
 }
 
+/** Dimensions drive the justified gallery layout; failure is non-fatal. */
+async function readDimensions(blob: Blob): Promise<{ width: number; height: number } | null> {
+  if (typeof createImageBitmap !== "function") return null;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
+  }
+}
+
 async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
   // GPS is stripped before the bytes ever leave the browser, and the CRC32 is
   // computed on the exact bytes that get stored so the future ZIP writer can
   // trust it.
   const body = await stripGpsFromFile(file);
   const crc32 = await crc32HexOfBlob(body);
+  const dimensions = await readDimensions(body);
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -70,6 +84,8 @@ async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
           etag: put.headers.get("etag") ?? "unknown",
           crc32,
           sizeBytes: body.size,
+          width: dimensions?.width,
+          height: dimensions?.height,
         }),
       });
       if (!confirm.ok) throw new Error(`confirm failed (${confirm.status})`);

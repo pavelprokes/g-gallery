@@ -262,10 +262,12 @@ gallery in one month.
 2. **Phase 1 — vertical slice**: schema (User/Gallery/Photo/ShareLink/Favorite + `crc32`, `sizeBytes`,
    `storageTier`, `status`) → better-auth (Google, admin role by email allowlist) → presign route →
    minimal uploader → gallery grid + lightbox via custom CF loader → share-link page. E2E smoke.
-3. **Phase 2 — delivery features**: expiry/password, favorites, per-photo download, robust uploader
-   (JIT presign, retry, resume, CRC32+GPS-strip worker), reconciliation job, keep-alive cron + backups,
-   **view tracking** (Viewer/ViewSession/ActivityEvent, sendBeacon photo views, admin per-gallery &
-   per-photo views + uniques), Vercel Analytics with beforeSend scrub.
+3. **Phase 2 — delivery features** — _mostly done_: ✅ expiry/password unlock (HMAC cookie bound to
+   the password hash), ✅ favorites + name prompt + viewer chips, ✅ per-photo download, ✅ justified
+   layout, ✅ uploader (JIT presign, retry, CRC32 + GPS strip + dimensions), ✅ ghost-upload
+   reconciliation cron, ✅ keep-alive cron, ✅ view tracking with admin per-gallery & per-photo
+   views/uniques, ✅ Vercel Analytics with beforeSend scrub. Remaining: **DB backups**, upload
+   resume-after-crash, orphan-object sweep via ListObjectsV2.
 4. **Phase 3 — activity & polish**: avatar strip + name prompt, reactions, owner Updates feed,
    Supabase Realtime presence ("viewing now"), Web Push + daily Resend digest, justified layout,
    virtual scroll, keyboard/swipe lightbox, IA lifecycle job.

@@ -1,9 +1,9 @@
 import "server-only";
 import { hashShareToken } from "@/lib/share-token";
+import { isUnlocked } from "@/lib/share-unlock";
 import { prisma } from "@/lib/db";
 
-export type ShareAccessDenial =
-  "NOT_FOUND" | "REVOKED" | "EXPIRED" | "PASSWORD_REQUIRED" | "PASSWORD_INVALID";
+export type ShareAccessDenial = "NOT_FOUND" | "REVOKED" | "EXPIRED" | "PASSWORD_REQUIRED";
 
 export type ShareAccess =
   { ok: true; shareLink: ResolvedShareLink } | { ok: false; reason: ShareAccessDenial };
@@ -16,19 +16,21 @@ export interface ResolvedShareLink {
   hasPassword: boolean;
 }
 
-/**
- * Server-side enforcement of link validity. Must be called on EVERY surface
- * that a share token can reach: the gallery page, the view beacon, favorites,
- * and downloads (docs/PLAN.md §4).
- *
- * Password verification is deliberately NOT done here — the page flow unlocks
- * a link once and carries a signed cookie; this function reports whether a
- * password is required so callers can gate on it.
- */
-export async function resolveShareLink(token: string): Promise<ShareAccess> {
-  if (!token || token.length > 128) return { ok: false, reason: "NOT_FOUND" };
+interface ShareLinkRecord {
+  id: string;
+  galleryId: string;
+  allowDownload: boolean;
+  allowReactions: boolean;
+  passwordHash: string | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  gallery: { status: string };
+}
 
-  const shareLink = await prisma.shareLink.findUnique({
+async function findShareLink(token: string): Promise<ShareLinkRecord | null> {
+  if (!token || token.length > 128) return null;
+
+  return prisma.shareLink.findUnique({
     where: { tokenHash: hashShareToken(token) },
     select: {
       id: true,
@@ -41,23 +43,60 @@ export async function resolveShareLink(token: string): Promise<ShareAccess> {
       gallery: { select: { status: true } },
     },
   });
+}
 
-  if (!shareLink || shareLink.gallery.status !== "PUBLISHED") {
-    return { ok: false, reason: "NOT_FOUND" };
-  }
-  if (shareLink.revokedAt) return { ok: false, reason: "REVOKED" };
-  if (shareLink.expiresAt && shareLink.expiresAt.getTime() < Date.now()) {
-    return { ok: false, reason: "EXPIRED" };
-  }
+function checkValidity(link: ShareLinkRecord | null): ShareAccessDenial | null {
+  if (!link || link.gallery.status !== "PUBLISHED") return "NOT_FOUND";
+  if (link.revokedAt) return "REVOKED";
+  if (link.expiresAt && link.expiresAt.getTime() < Date.now()) return "EXPIRED";
+  return null;
+}
 
+function toResolved(link: ShareLinkRecord): ResolvedShareLink {
   return {
-    ok: true,
-    shareLink: {
-      id: shareLink.id,
-      galleryId: shareLink.galleryId,
-      allowDownload: shareLink.allowDownload,
-      allowReactions: shareLink.allowReactions,
-      hasPassword: shareLink.passwordHash !== null,
-    },
+    id: link.id,
+    galleryId: link.galleryId,
+    allowDownload: link.allowDownload,
+    allowReactions: link.allowReactions,
+    hasPassword: link.passwordHash !== null,
   };
+}
+
+/**
+ * Full server-side gate for a share token: existence, publication state,
+ * revocation, expiry, AND the password unlock cookie.
+ *
+ * Must be called on EVERY surface a share token can reach — the gallery page,
+ * the activity beacon, favorites, and downloads (docs/PLAN.md §4). Anything
+ * that skips it is an unauthenticated hole into a private gallery.
+ */
+export async function resolveShareLink(token: string): Promise<ShareAccess> {
+  const link = await findShareLink(token);
+
+  const denial = checkValidity(link);
+  if (denial || !link) return { ok: false, reason: denial ?? "NOT_FOUND" };
+
+  if (link.passwordHash && !(await isUnlocked(link.id, link.passwordHash))) {
+    return { ok: false, reason: "PASSWORD_REQUIRED" };
+  }
+
+  return { ok: true, shareLink: toResolved(link) };
+}
+
+/**
+ * Password verification for the unlock form. Kept separate from
+ * `resolveShareLink` so the gate itself never takes a password argument and
+ * can't be accidentally bypassed by passing one.
+ */
+export async function verifySharePassword(
+  token: string,
+  password: string,
+): Promise<{ ok: true; shareLinkId: string; passwordHash: string } | { ok: false }> {
+  const link = await findShareLink(token);
+  if (checkValidity(link) || !link?.passwordHash) return { ok: false };
+
+  const { verifyPassword } = await import("@/lib/share-token");
+  if (!(await verifyPassword(password, link.passwordHash))) return { ok: false };
+
+  return { ok: true, shareLinkId: link.id, passwordHash: link.passwordHash };
 }

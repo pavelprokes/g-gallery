@@ -7,6 +7,43 @@
 
 const STORAGE_KEY = "gg.viewer";
 const OPT_OUT_KEY = "gg.viewer.optout";
+const NAME_KEY = "gg.viewer.name";
+const NAME_ASKED_KEY = "gg.viewer.nameAsked";
+
+/** The name the viewer volunteered, shown to others in the gallery. */
+export function getViewerName(): string | null {
+  try {
+    return window.localStorage.getItem(NAME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setViewerName(name: string): void {
+  try {
+    window.localStorage.setItem(NAME_KEY, name);
+    window.localStorage.setItem(NAME_ASKED_KEY, "1");
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** True once the viewer has answered or dismissed the name prompt. */
+export function hasAnsweredNamePrompt(): boolean {
+  try {
+    return window.localStorage.getItem(NAME_ASKED_KEY) === "1";
+  } catch {
+    return true; // no storage -> never nag
+  }
+}
+
+export function dismissNamePrompt(): void {
+  try {
+    window.localStorage.setItem(NAME_ASKED_KEY, "1");
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 export function hasOptedOut(): boolean {
   try {
