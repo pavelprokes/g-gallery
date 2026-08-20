@@ -1,0 +1,268 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// better-auth core models (admin plugin fields included) — keep in sync with
+// `npx @better-auth/cli generate` output when upgrading better-auth.
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String    @id
+  name           String
+  email          String    @unique
+  emailVerified  Boolean   @default(false)
+  image          String?
+  role           String?
+  banned         Boolean?  @default(false)
+  banReason      String?
+  banExpires     DateTime?
+  feedLastReadAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sessions          Session[]
+  accounts          Account[]
+  galleries         Gallery[]
+  pushSubscriptions PushSubscription[]
+
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  ipAddress      String?
+  userAgent      String?
+  impersonatedBy String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// Domain: galleries & photos
+// ---------------------------------------------------------------------------
+
+enum GalleryStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PhotoStatus {
+  PENDING // presigned URL issued, upload not confirmed
+  CONFIRMED // ETag checked in — visible in the gallery
+  FAILED
+}
+
+enum StorageTier {
+  STANDARD
+  INFREQUENT_ACCESS
+}
+
+model Gallery {
+  id            String        @id @default(cuid())
+  ownerId       String
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  eventDate     DateTime?
+  status        GalleryStatus @default(DRAFT)
+  coverPhotoId  String?
+  /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
+  storagePrefix String        @unique
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  /// Throttle for instant owner push notifications (≥30 min between pushes)
+  lastInstantPushAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  photos     Photo[]
+  shareLinks ShareLink[]
+  viewers    Viewer[]
+  events     ActivityEvent[]
+
+  @@index([ownerId, status])
+}
+
+model Photo {
+  id          String      @id @default(cuid())
+  galleryId   String
+  gallery     Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  /// Full R2 object key ("<storagePrefix>/<photo-id>.jpg")
+  objectKey   String      @unique
+  /// Original filename, used for ZIP entries and downloads
+  fileName    String
+  mimeType    String      @default("image/jpeg")
+  sizeBytes   Int?
+  /// CRC32 (hex) computed in the browser at upload — feeds the streaming ZIP writer
+  crc32       String?
+  etag        String?
+  width       Int?
+  height      Int?
+  takenAt     DateTime?
+  status      PhotoStatus @default(PENDING)
+  storageTier StorageTier @default(STANDARD)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  favorites Favorite[]
+  events    ActivityEvent[]
+
+  @@index([galleryId, status, sortOrder])
+}
+
+model ShareLink {
+  id             String    @id @default(cuid())
+  galleryId      String
+  gallery        Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the 128-bit share token — the raw token is never stored
+  tokenHash      String    @unique
+  label          String?
+  /// scrypt hash "salt:key"; null = no password
+  passwordHash   String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  allowDownload  Boolean   @default(true)
+  allowReactions Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  viewers Viewer[]
+
+  @@index([galleryId])
+}
+
+// ---------------------------------------------------------------------------
+// Activity & notifications (see docs/PLAN.md §8)
+// GDPR: no IPs stored; viewer identity is a first-party anonKey; everything
+// cascades away with the gallery; anonKey lifetime ≤ 13 months (cleanup job).
+// ---------------------------------------------------------------------------
+
+enum ActivityType {
+  GALLERY_VIEW
+  PHOTO_VIEW
+  REACTION
+  FAVORITE
+  DOWNLOAD
+  VISITOR_IDENTIFIED
+}
+
+model Viewer {
+  id          String     @id @default(cuid())
+  galleryId   String
+  gallery     Gallery    @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  shareLinkId String?
+  shareLink   ShareLink? @relation(fields: [shareLinkId], references: [id], onDelete: SetNull)
+  /// First-party localStorage UUID (crypto.randomUUID()) — the only viewer identifier
+  anonKey     String
+  /// Voluntarily entered via the "Kdo se dívá?" prompt — the Google Photos "join" moment
+  displayName String?
+  optedOut    Boolean    @default(false)
+  firstSeenAt DateTime   @default(now())
+  lastSeenAt  DateTime   @default(now())
+
+  sessions  ViewSession[]
+  favorites Favorite[]
+  events    ActivityEvent[]
+
+  @@unique([galleryId, anonKey])
+}
+
+model ViewSession {
+  id             String   @id @default(cuid())
+  viewerId       String
+  viewer         Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  galleryId      String
+  startedAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+
+  @@index([galleryId, startedAt])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  photoId   String
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([photoId, viewerId])
+}
+
+model ActivityEvent {
+  id        String       @id @default(cuid())
+  galleryId String
+  gallery   Gallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  photoId   String?
+  photo     Photo?       @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  viewerId  String?
+  viewer    Viewer?      @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  type      ActivityType
+  createdAt DateTime     @default(now())
+
+  @@index([galleryId, createdAt(sort: Desc)])
+  @@index([photoId, type, viewerId])
+}
+
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  lastSuccessAt DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+/// Single-row table written by the 3×/day PostgREST keep-alive cron (docs/PLAN.md §9)
+model Keepalive {
+  id       Int      @id @default(1)
+  pingedAt DateTime @default(now())
+}
