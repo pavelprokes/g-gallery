@@ -23,6 +23,10 @@ model User {
   banReason      String?
   banExpires     DateTime?
   feedLastReadAt DateTime?
+  /// Start of the last digest window actually emailed. Vercel documents cron
+  /// delivery as best effort — a run can be delivered twice — and the digest is
+  /// the one job where that would be visible to the recipient.
+  digestSentFor  DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

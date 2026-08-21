@@ -161,6 +161,9 @@ https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,for
 
 ## 7. Secrets
 
+The full list of what to paste into the Vercel dashboard — and which variables
+are needed at **build** time rather than run time — is **`docs/VERCEL-ENV.md`**.
+
 ```bash
 openssl rand -base64 32   # BETTER_AUTH_SECRET
 openssl rand -base64 32   # CRON_SECRET

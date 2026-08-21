@@ -1,7 +1,7 @@
 # g-gallery
 
-Photographer client-delivery gallery (Google-Photos-style UI). **`docs/PLAN.md` is the architecture
-authority** — every stack decision there was verified against official docs with sources; read it
+Photographer client-delivery gallery (Google-Photos-style UI). Production env vars live in
+**`docs/VERCEL-ENV.md`**. **`docs/PLAN.md` is the architecture authority** — every stack decision there was verified against official docs with sources; read it
 before changing architecture, storage, auth, or billing-relevant code.
 
 ## Commands

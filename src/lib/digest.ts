@@ -31,15 +31,41 @@ export interface DigestData {
   totalEvents: number;
 }
 
-/** Yesterday in Europe/Prague, which is when the owner thinks a day starts. */
+/**
+ * A zone's UTC offset at a given instant.
+ *
+ * Both sides are formatted the same way, so the sub-second precision both drop
+ * cancels out and the difference is exactly the offset. Taking the difference
+ * against the raw Date instead would fold the current milliseconds into the
+ * result — which is what made the window drift on every call.
+ */
+function zoneOffsetMs(at: Date, timeZone: string): number {
+  const asUtc = new Date(at.toLocaleString("en-US", { timeZone: "UTC" }));
+  const asZone = new Date(at.toLocaleString("en-US", { timeZone }));
+  return asZone.getTime() - asUtc.getTime();
+}
+
+/**
+ * Yesterday in Europe/Prague, which is when the owner thinks a day starts.
+ *
+ * Must be **stable for every instant within the same day**: the window doubles
+ * as the idempotency key for "have I already emailed this?", so a value that
+ * shifts by milliseconds between two invocations lets a duplicate cron delivery
+ * send the digest twice.
+ */
 export function digestWindow(now: Date): { since: Date; until: Date } {
-  const prague = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Prague" }));
-  const offsetMs = now.getTime() - prague.getTime();
+  const offset = zoneOffsetMs(now, "Europe/Prague");
 
-  const startOfToday = new Date(prague);
-  startOfToday.setHours(0, 0, 0, 0);
+  // Shift into Prague terms, then read the calendar date with UTC getters so
+  // the machine's own timezone never enters the calculation.
+  const shifted = new Date(now.getTime() + offset);
+  const midnightShifted = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate(),
+  );
 
-  const until = new Date(startOfToday.getTime() + offsetMs);
+  const until = new Date(midnightShifted - offset);
   const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
   return { since, until };
 }
@@ -146,21 +172,48 @@ export function renderDigest(
   return { subject, html, text };
 }
 
+export type DigestOutcome =
+  { skipped: true; reason: "no_activity" | "already_sent" } | ({ skipped: false } & MailResult);
+
 /** Sends the digest for one owner, or reports why it did not. */
 export async function sendDigest(
   ownerId: string,
   email: string,
   now: Date,
   baseUrl: string,
-): Promise<{ skipped: true; reason: "no_activity" } | ({ skipped: false } & MailResult)> {
+): Promise<DigestOutcome> {
   const { since, until } = digestWindow(now);
   const data = await collectDigest(ownerId, since, until);
 
   // A daily "nothing happened" email is how a sender gets filtered.
   if (data.totalEvents === 0) return { skipped: true, reason: "no_activity" };
 
+  // Vercel documents cron delivery as best effort: a scheduled run can be
+  // delivered twice. Every other job is naturally idempotent, but a second
+  // digest is visible in the recipient's inbox, so the window is CLAIMED with a
+  // conditional update rather than read-then-written — two concurrent
+  // invocations would both see a stale timestamp and both send.
+  const { count } = await prisma.user.updateMany({
+    where: {
+      id: ownerId,
+      OR: [{ digestSentFor: null }, { digestSentFor: { lt: since } }],
+    },
+    data: { digestSentFor: since },
+  });
+  if (count === 0) return { skipped: true, reason: "already_sent" };
+
   const { subject, html, text } = renderDigest(data, baseUrl);
   const result = await sendMail({ to: email, subject, html, text });
+
+  // Release the claim if the send failed, so the next run can retry rather than
+  // the day being silently lost.
+  if (!result.sent) {
+    await prisma.user.updateMany({
+      where: { id: ownerId, digestSentFor: since },
+      data: { digestSentFor: null },
+    });
+  }
+
   return { skipped: false, ...result };
 }
 

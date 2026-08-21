@@ -1,0 +1,115 @@
+# Vercel environment variables
+
+What to set in **Project → Settings → Environment Variables**, and which of it
+matters at build time rather than run time.
+
+Vercel never reads `.env.production.local` — that file is only a local copy to
+paste from, and what `pnpm build && pnpm start` uses if you want to run
+production mode on your machine. Anything still marked `TODO` there is not set.
+
+## Build time vs run time
+
+`NEXT_PUBLIC_*` variables are **inlined into the JavaScript bundle during the
+build**. Changing one in the dashboard does nothing until you redeploy — the old
+value is baked into the shipped code. Everything else is read at run time and
+takes effect on the next invocation.
+
+This bites hardest with `NEXT_PUBLIC_PHOTOS_BASE_URL`: get it wrong and every
+photo URL in the built bundle points at the wrong host, with no server-side
+error to notice.
+
+## Required — the app will not work without these
+
+| Variable                          | Scope     | Notes                                                                    |
+| --------------------------------- | --------- | ------------------------------------------------------------------------ |
+| `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`        |
+| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI               |
+| `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                |
+| `BETTER_AUTH_URL`                 | runtime   | `https://svatebni-fotograf-cechy.cz`                                     |
+| `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                  |
+| `GOOGLE_CLIENT_SECRET`            | runtime   |                                                                          |
+| `ADMIN_EMAILS`                    | runtime   | The only thing separating you from clients, who also sign in with Google |
+| `R2_ACCOUNT_ID`                   | runtime   |                                                                          |
+| `R2_ACCESS_KEY_ID`                | runtime   |                                                                          |
+| `R2_SECRET_ACCESS_KEY`            | runtime   |                                                                          |
+| `R2_BUCKET`                       | runtime   | `g-gallery`                                                              |
+| `R2_ENDPOINT`                     | runtime   | `https://<account>.eu.r2.cloudflarestorage.com` — note `.eu.`            |
+| `S3_REGION`                       | runtime   | `auto` — R2 accepts nothing else                                         |
+| `CRON_SECRET`                     | runtime   | See "Cron" below                                                         |
+| **`NEXT_PUBLIC_PHOTOS_BASE_URL`** | **build** | `https://photos.svatebni-fotograf-cechy.cz`                              |
+| **`NEXT_PUBLIC_IMAGE_TRANSFORM`** | **build** | `cloudflare`                                                             |
+
+### Google OAuth redirect URI
+
+better-auth mounts the callback at `/api/auth/callback/<provider>`. In Google
+Cloud console the production client needs, exactly:
+
+- Authorized redirect URI: `https://svatebni-fotograf-cechy.cz/api/auth/callback/google`
+- Authorized JavaScript origin: `https://svatebni-fotograf-cechy.cz`
+
+Any other shape gives `redirect_uri_mismatch`. The same client can serve local
+development as well — just add `http://localhost:3000/...` alongside.
+
+## Cron
+
+Setting `CRON_SECRET` is enough. Vercel
+[sends it automatically](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)
+as `Authorization: Bearer <value>` when it invokes a cron path, and every cron
+route checks precisely that. Nothing else needs configuring.
+
+Two things Vercel's own documentation warns about, both of which apply here:
+
+- **Cron jobs do not follow redirects.** `src/proxy.ts` only matches
+  `/admin/:path*`, so no cron path is ever redirected. Do not widen that matcher
+  without re-checking.
+- **Delivery is best effort**: a run can be missed, and a run can be delivered
+  **twice**. Every job is written to be idempotent so a double delivery is
+  harmless — see `src/lib/digest.ts`, which records the window it last sent so a
+  repeat invocation does not email the same digest again.
+
+The schedules in `vercel.json` run more than once a day, which requires **Pro**.
+Hobby allows one run per day and rejects anything more frequent at deploy time.
+
+## Optional — the feature degrades cleanly if unset
+
+| Variable                            | Scope     | Unset means                                                 |
+| ----------------------------------- | --------- | ----------------------------------------------------------- |
+| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503                       |
+| `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte            |
+| `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends |
+| `VAPID_PRIVATE_KEY`                 | runtime   |                                                             |
+| `VAPID_SUBJECT`                     | runtime   | `mailto:...`                                                |
+| `SMTP_URL`                          | runtime   | Digest is logged and skipped rather than failing the cron   |
+| `MAIL_FROM`                         | runtime   | Falls back to a Resend sandbox sender                       |
+| `NOTIFY_EMAIL_TO`                   | runtime   |                                                             |
+| `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write               |
+| `SUPABASE_SERVICE_ROLE_KEY`         | runtime   |                                                             |
+| **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing              |
+| **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** |                                                             |
+
+`RESEND_API_KEY` is deliberately **not** set: `src/lib/mailer.ts` prefers it when
+present, and production mail is meant to go through SES over SMTP
+(`docs/SETUP.md` §8).
+
+## Environments
+
+Set everything for **Production**. For **Preview**, either point at the same
+services or leave it unset and accept that preview deployments cannot sign in —
+what must not happen is a preview build writing to the production database with
+a different `BETTER_AUTH_URL`, which silently breaks the OAuth callback.
+
+`DIRECT_URL` is also needed by the GitHub Actions backup workflow, but as a
+repository secret (`BACKUP_DATABASE_URL`), not a Vercel variable —
+`docs/SETUP.md` §12.
+
+## Verifying after deploy
+
+```bash
+# Cron auth, without waiting for the schedule
+curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/keepalive
+
+# The custom loader is live: this must be a real transformed image, not a 404
+curl -sI "https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<key>"
+```
+
+Then walk `docs/SETUP.md` §10.
