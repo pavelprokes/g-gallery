@@ -27,6 +27,7 @@ import { FORMS, pluralize } from "@/lib/czech-plural";
 import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
+import { OfflineToggle } from "@/components/offline-toggle";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
@@ -813,7 +814,15 @@ export function GalleryView({
         />
       )}
 
-      <footer className="mt-10 border-t pt-4 text-xs text-neutral-500">
+      <footer className="mt-10 space-y-4 border-t pt-4 text-xs text-neutral-500">
+        {photos.length > 0 && (
+          <div className="rounded-lg border p-4">
+            <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+              Offline přístup
+            </p>
+            <OfflineToggle token={token} objectKeys={photos.map((photo) => photo.objectKey)} />
+          </div>
+        )}
         <p>
           Počítáme návštěvy galerie pomocí identifikátoru uloženého jen ve tvém prohlížeči — slouží
           k tvým oblíbeným fotkám a k tomu, aby se jedna návštěva nezapočítala vícekrát. Nepředáváme

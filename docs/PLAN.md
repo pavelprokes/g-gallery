@@ -286,11 +286,20 @@ gallery in one month.
    **Virtual scroll deferred** into `docs/TODO.md` §3 — infinite scroll with a stable order changes
    the data-fetching model from "all photos server-rendered" to cursor pagination, so anything
    built against the current model would be rewritten by it.
-5. **Phase 5 — E2E test suite**: deferred deliberately to the very end (`docs/TODO.md`) — the
-   routes, upload flow and share gating are still moving, so tests written earlier get rewritten.
+5. **Phase 4 — bulk download & offline**: ✅ Google-Photos-style selection (hover checkbox on
+   pointer devices, long-press on touch, shift-click ranges, carried into the open photo),
+   ✅ "Stáhnout vše" / "Stáhnout N fotek", ✅ HMAC-signed manifest minted by the app,
+   ✅ store-only streaming ZIP64 Worker with an exact Content-Length via `FixedLengthStream`,
+   ✅ single-photo download served with `Content-Disposition` (the `download` attribute is ignored
+   cross-origin, so this never worked before), ✅ offline galleries (opt-in per gallery; caches the
+   display-size variants this device requests, ~170 MB rather than the originals' 8 GB, plus the
+   page and the app's JS/CSS so it hydrates; `mode: "cors"` because opaque responses are padded to
+   ~7 MB each against quota). Deploying the Worker needs **Workers Paid $5/mo** — the Free plan
+   caps CPU at 10 ms per request. Remaining: watermark variants (feasibility + quota impact
+   unverified — needs its own spike).
+6. **Phase 5 — E2E test suite**: deferred deliberately to the very end (`docs/TODO.md` §0) — the
+   routes, upload flow and share gating kept moving, so tests written earlier would get rewritten.
    Unit tests (Vitest) continue as normal throughout.
-6. **Phase 4 (v2) — ZIP Worker** (adds Workers Paid $5/mo), watermark variants (feasibility + quota
-   impact unverified — needs its own spike).
 
 ## 12. Decisions (resolved 2026-08-20)
 

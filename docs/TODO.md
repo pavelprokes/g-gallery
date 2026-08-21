@@ -15,13 +15,13 @@ tests written against a moving surface get rewritten rather than run. Unit tests
 When it does happen, the path worth covering first is the one that has broken twice already:
 upload → confirm → publish → share link → view tracking.
 
-## 1. Offline access
+## 1. Offline access — **done 2026-08-21**
 
-Offline browsing of a gallery. Open questions before this can be scoped: which
-surface (client gallery, admin, both), what "offline" covers (already-viewed
-photos only, or a deliberate "make available offline" action), and how it
-interacts with share-link expiry and revocation — cached bytes on a device
-cannot be revoked, which is a privacy decision, not just a technical one.
+Opt-in per gallery, in the gallery footer. Pavel accepted the revocation
+trade-off: cached bytes on someone's device cannot truly be recalled. The
+service worker still drops a gallery's cache when the share page comes back
+403/404/410, which covers the honest case of a link being revoked while the
+viewer is online.
 
 ## 2. Ideas from the Hello Interview thread
 
