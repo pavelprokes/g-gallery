@@ -13,7 +13,6 @@ import {
   setViewerName,
   subscribeOptOut,
 } from "@/lib/viewer-id";
-import { originalUrl } from "@/lib/photo-url";
 import { PresenceStrip } from "@/components/presence-strip";
 import {
   clearSelection,
@@ -376,13 +375,24 @@ export function GalleryView({
       if (event.key === "Escape") setLightboxIndex(null);
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
+
+      // Space and S both toggle. Space is the reflex; S is there because Space
+      // is also "scroll" muscle memory and some keyboards make it awkward.
+      if (allowDownload && (event.key === " " || event.key.toLowerCase() === "s")) {
+        // Space would otherwise scroll the grid behind the dialog.
+        event.preventDefault();
+        const index = lightboxIndex;
+        const photo = index === null ? undefined : photos[index];
+        if (index !== null && photo) pick(index, photo.id, false);
+      }
     }
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxIndex, move]);
+  }, [allowDownload, lightboxIndex, move, photos, pick]);
 
   const active = lightboxIndex === null ? null : photos[lightboxIndex];
+  const activeSelected = active ? selection.ids.has(active.id) : false;
 
   return (
     <main className="mx-auto max-w-7xl p-4 sm:p-8">
@@ -431,7 +441,9 @@ export function GalleryView({
               >
                 {zipState === "preparing"
                   ? "Připravuji…"
-                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photo)}`}
+                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photo)}${
+                      selection.ids.size > 1 ? " (ZIP)" : ""
+                    }`}
               </button>
             </>
           ) : (
@@ -445,7 +457,11 @@ export function GalleryView({
                 onClick={() => void downloadZip([])}
                 className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
               >
-                {zipState === "preparing" ? "Připravuji…" : "Stáhnout vše (ZIP)"}
+                {zipState === "preparing"
+                  ? "Připravuji…"
+                  : photos.length > 1
+                    ? "Stáhnout vše (ZIP)"
+                    : "Stáhnout fotku"}
               </button>
             </>
           )}
@@ -587,9 +603,20 @@ export function GalleryView({
               alt={active.fileName}
               fill
               sizes="100vw"
-              className="object-contain"
+              className={`object-contain transition-all duration-200 ${
+                activeSelected ? "scale-[0.93]" : ""
+              }`}
               priority
             />
+            {activeSelected && (
+              // Inset ring rather than a border on the image: the image is
+              // object-contain, so a border would frame the letterboxing, not
+              // the photo.
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-4 rounded-lg ring-4 ring-blue-500/80 ring-inset"
+              />
+            )}
           </div>
 
           <button
@@ -614,14 +641,62 @@ export function GalleryView({
           >
             ›
           </button>
-          <button
-            type="button"
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 rounded-full bg-white/10 px-3 py-2 text-white"
-            aria-label="Zavřít"
+          <div
+            className="absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent p-4"
+            onClick={(event) => event.stopPropagation()}
           >
-            ✕
-          </button>
+            <button
+              type="button"
+              onClick={() => setLightboxIndex(null)}
+              className="rounded-full bg-white/10 px-3 py-2 text-white hover:bg-white/20"
+              aria-label="Zavřít"
+            >
+              ✕
+            </button>
+
+            {allowDownload && (
+              <button
+                type="button"
+                onClick={() => pick(lightboxIndex!, active.id, false)}
+                aria-pressed={activeSelected}
+                className={`flex items-center gap-2 rounded-full py-2 pr-4 pl-2 text-sm transition ${
+                  activeSelected
+                    ? "bg-blue-600 text-white"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs ${
+                    activeSelected ? "border-white bg-white text-blue-600" : "border-white/80"
+                  }`}
+                >
+                  ✓
+                </span>
+                {activeSelected ? "Vybráno" : "Vybrat"}
+              </button>
+            )}
+
+            <span className="ml-auto text-sm text-white/70 tabular-nums">
+              {lightboxIndex! + 1} / {photos.length}
+            </span>
+
+            {allowDownload && selection.ids.size > 0 && (
+              <>
+                <span className="text-sm text-white/70">
+                  {pluralize(selection.ids.size, FORMS.selected)}
+                </span>
+                <button
+                  type="button"
+                  disabled={zipState === "preparing"}
+                  onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
+                  className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+                >
+                  {zipState === "preparing" ? "Připravuji…" : "Stáhnout"}
+                </button>
+              </>
+            )}
+          </div>
 
           <div
             className="absolute bottom-4 flex items-center gap-3"
@@ -642,13 +717,14 @@ export function GalleryView({
               </>
             )}
             {allowDownload && (
-              <a
-                href={originalUrl(active.objectKey)}
-                download={active.fileName}
-                className="rounded-full bg-white/10 px-4 py-2 text-sm text-white"
+              <button
+                type="button"
+                disabled={zipState === "preparing"}
+                onClick={() => void downloadZip([active.id])}
+                className="rounded-full bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
               >
-                Stáhnout originál
-              </a>
+                {zipState === "preparing" ? "Připravuji…" : "Stáhnout originál"}
+              </button>
             )}
           </div>
         </div>

@@ -69,6 +69,29 @@ export default {
       });
     }
 
+    // One photo is served as that photo, not as a one-entry archive. This is
+    // also what fixes per-photo download: the browser ignores the `download`
+    // attribute cross-origin, so a plain link to R2 merely displays a 24 MB
+    // JPEG. Content-Disposition is the only thing that actually saves a file.
+    if (manifestEntries.length === 1) {
+      const only = manifestEntries[0]!;
+      const object = await env.PHOTOS.get(only.key);
+      if (!object) return new Response("Object not found", { status: 404 });
+
+      return new Response(object.body, {
+        headers: {
+          // R2 has the type because the presigned PUT signs it, but falling
+          // back to the extension keeps this correct for objects that arrived
+          // any other way.
+          "Content-Type": object.httpMetadata?.contentType ?? typeFromName(only.name),
+          "Content-Length": String(object.size),
+          "Content-Disposition": dispositionFor(only.name),
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
     const stream = zipStream(entries, async (index) => {
       const key = manifestEntries[index]!.key;
       const object = await env.PHOTOS.get(key);
@@ -97,7 +120,7 @@ export default {
         // Without it the browser shows an indeterminate spinner for 8 GB and
         // cannot tell a finished download from a truncated one.
         "Content-Length": String(total),
-        "Content-Disposition": `attachment; filename="${asciiName(archiveName)}"; filename*=UTF-8''${encodeURIComponent(archiveName)}`,
+        "Content-Disposition": dispositionFor(archiveName),
         // The manifest is single-use in spirit and short-lived; never cache.
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
@@ -105,6 +128,24 @@ export default {
     });
   },
 } satisfies ExportedHandler<Env>;
+
+const MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+function typeFromName(name: string): string {
+  const ext = name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+  return MIME[ext] ?? "application/octet-stream";
+}
+
+/** RFC 5987: an ASCII fallback plus the real UTF-8 name for clients that read it. */
+function dispositionFor(name: string): string {
+  return `attachment; filename="${asciiName(name)}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
 
 /** Fallback for clients that ignore RFC 5987's filename*. */
 function asciiName(name: string): string {

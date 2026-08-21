@@ -66,6 +66,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
   const names = uniqueNames(photos.map((photo) => photo.fileName));
   const manifest: Manifest = {
     galleryId: access.shareLink.galleryId,
+    // With one photo the Worker serves the file itself, so the archive name is
+    // unused — the entry's own name becomes the download name.
     archiveName: archiveNameFor(gallery?.title ?? "galerie", photos.length, photoIds.length > 0),
     entries: photos.map((photo, index) => ({
       key: photo.objectKey,
