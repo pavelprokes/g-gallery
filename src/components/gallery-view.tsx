@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   dismissNamePrompt,
   getOptOutServerSnapshot,
@@ -16,6 +16,16 @@ import {
 import { originalUrl } from "@/lib/photo-url";
 import { PresenceStrip } from "@/components/presence-strip";
 import {
+  clearSelection,
+  EMPTY_SELECTION,
+  isAllSelected,
+  selectAll,
+  selectedInOrder,
+  selectRange,
+  toggleOne,
+} from "@/lib/selection";
+import { FORMS, pluralize } from "@/lib/czech-plural";
+import {
   REACTION_EMOJI,
   REACTION_KINDS,
   REACTION_LABEL,
@@ -29,6 +39,9 @@ const SWIPE_THRESHOLD_PX = 50;
 
 /** Beyond this the gesture is a scroll, not a horizontal swipe. */
 const SWIPE_MAX_VERTICAL_PX = 80;
+
+/** Long press to enter selection mode on touch. Matches the platform feel. */
+const LONG_PRESS_MS = 450;
 
 export interface GalleryPhoto {
   id: string;
@@ -85,6 +98,14 @@ export function GalleryView({
   // Which reaction the name prompt interrupted, so it can be sent afterwards.
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const [selection, setSelection] = useState(EMPTY_SELECTION);
+  // Touch devices have no hover, so selection mode is entered by long-press —
+  // the same gesture Google Photos uses. Once on, every checkbox is visible.
+  const longPress = useRef<{ timer: number | null; fired: boolean }>({
+    timer: null,
+    fired: false,
+  });
+  const [zipState, setZipState] = useState<"idle" | "preparing" | "error">("idle");
 
   const optedOut = useSyncExternalStore(
     subscribeOptOut,
@@ -254,6 +275,70 @@ export function GalleryView({
     [favorites, sendFavorite],
   );
 
+  const photoIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
+  const selectionActive = allowDownload && selection.ids.size > 0;
+
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current.timer !== null) {
+      clearTimeout(longPress.current.timer);
+      longPress.current.timer = null;
+    }
+  }, []);
+
+  const pick = useCallback(
+    (index: number, id: string, shiftKey: boolean) => {
+      setSelection((prev) =>
+        shiftKey ? selectRange(prev, index, (i) => photoIds[i]) : toggleOne(prev, index, id),
+      );
+    },
+    [photoIds],
+  );
+
+  /**
+   * Asks the server for a signed manifest, then hands it to the ZIP worker.
+   *
+   * An empty selection means the whole gallery — the same request either way,
+   * so "Stáhnout vše" and "Stáhnout vybrané" cannot drift apart.
+   */
+  const downloadZip = useCallback(
+    async (ids: string[]) => {
+      setZipState("preparing");
+      try {
+        const response = await fetch(`/api/g/${encodeURIComponent(token)}/zip`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoIds: ids }),
+        });
+        if (!response.ok) {
+          setZipState("error");
+          return;
+        }
+
+        const { url, manifest } = (await response.json()) as { url: string; manifest: string };
+
+        // A form POST rather than fetch(): the response is gigabytes and must
+        // stream straight to disk, never through the page's memory.
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = url;
+        form.style.display = "none";
+        const field = document.createElement("input");
+        field.type = "hidden";
+        field.name = "manifest";
+        field.value = manifest;
+        form.append(field);
+        document.body.append(form);
+        form.submit();
+        form.remove();
+
+        setZipState("idle");
+      } catch {
+        setZipState("error");
+      }
+    },
+    [token],
+  );
+
   const openPhoto = useCallback(
     (index: number) => {
       setLightboxIndex(index);
@@ -312,6 +397,66 @@ export function GalleryView({
         </div>
       </header>
 
+      {allowDownload && photos.length > 0 && (
+        <div className="sticky top-0 z-30 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 dark:bg-neutral-950/90">
+          {selection.ids.size > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelection(clearSelection())}
+                aria-label="Zrušit výběr"
+                className="rounded-full border px-2 py-1 text-sm"
+              >
+                ✕
+              </button>
+              <span className="text-sm font-medium">
+                {pluralize(selection.ids.size, FORMS.selected)}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelection((prev) =>
+                    isAllSelected(prev, photoIds) ? clearSelection() : selectAll(photoIds),
+                  )
+                }
+                className="text-sm underline"
+              >
+                {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše"}
+              </button>
+              <button
+                type="button"
+                disabled={zipState === "preparing"}
+                onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
+                className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+              >
+                {zipState === "preparing"
+                  ? "Připravuji…"
+                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photo)}`}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-neutral-500">
+                Podrž fotku (nebo na ni najeď myší) a vyber, co chceš stáhnout.
+              </span>
+              <button
+                type="button"
+                disabled={zipState === "preparing"}
+                onClick={() => void downloadZip([])}
+                className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+              >
+                {zipState === "preparing" ? "Připravuji…" : "Stáhnout vše (ZIP)"}
+              </button>
+            </>
+          )}
+          {zipState === "error" && (
+            <span className="w-full text-xs text-red-600">
+              Stažení se nepodařilo připravit. Zkus to prosím znovu.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Justified rows: each tile grows in proportion to its aspect ratio, so
           a row fills the width exactly at a near-constant height. The zero-height
           spacers stop the final row from stretching its few photos. */}
@@ -321,23 +466,66 @@ export function GalleryView({
           return (
             <li
               key={photo.id}
-              className="relative h-36 sm:h-48 lg:h-52"
+              className="group relative h-36 select-none sm:h-48 lg:h-52"
               style={{ flexGrow: aspect, flexBasis: `${aspect * ROW_HEIGHT}px` }}
+              onTouchStart={() => {
+                if (!allowDownload) return;
+                longPress.current.fired = false;
+                longPress.current.timer = window.setTimeout(() => {
+                  longPress.current.fired = true;
+                  setSelection((prev) => toggleOne(prev, index, photo.id));
+                }, LONG_PRESS_MS);
+              }}
+              onTouchMove={() => cancelLongPress()}
+              onTouchEnd={() => cancelLongPress()}
+              onTouchCancel={() => cancelLongPress()}
+              // A long press otherwise raises the browser's "save image" sheet
+              // on top of the selection we just made.
+              onContextMenu={(event) => {
+                if (selectionActive) event.preventDefault();
+              }}
             >
               <button
                 type="button"
-                onClick={() => openPhoto(index)}
+                onClick={(event) => {
+                  // The long press already acted; the click it synthesises must
+                  // not toggle the same photo straight back off.
+                  if (longPress.current.fired) {
+                    longPress.current.fired = false;
+                    return;
+                  }
+                  // While a selection is active the tile extends it rather than
+                  // opening the lightbox — otherwise picking 40 photos means 40
+                  // precise taps on a small circle.
+                  if (selectionActive) {
+                    pick(index, photo.id, event.shiftKey);
+                    return;
+                  }
+                  openPhoto(index);
+                }}
                 className="relative block h-full w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900"
-                aria-label={`Otevřít ${photo.fileName}`}
+                aria-label={
+                  selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`
+                }
               >
                 <Image
                   src={photo.objectKey}
                   alt={photo.fileName}
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-cover transition-transform duration-200 hover:scale-105"
+                  className={`object-cover transition-transform duration-200 ${
+                    selection.ids.has(photo.id) ? "scale-90 rounded" : "hover:scale-105"
+                  }`}
                 />
               </button>
+              {allowDownload && (
+                <SelectCheck
+                  selected={selection.ids.has(photo.id)}
+                  pinned={selectionActive}
+                  onPick={(shiftKey) => pick(index, photo.id, shiftKey)}
+                  fileName={photo.fileName}
+                />
+              )}
               {allowReactions && (
                 <>
                   <HeartButton
@@ -522,6 +710,50 @@ function HeartButton({
     >
       <span aria-hidden>{active ? "♥" : "♡"}</span>
       {count > 0 && <span className="tabular-nums">{count}</span>}
+    </button>
+  );
+}
+
+/**
+ * The circular checkbox, top-left, as in Google Photos.
+ *
+ * Hidden until hover on pointer devices — 500 permanent circles would shout
+ * over the photos. Tailwind 4 gates `hover:` behind `(hover: hover)`, so on a
+ * phone the hover rule never fires and the checkbox appears only once
+ * selection mode has been entered by long press.
+ */
+function SelectCheck({
+  selected,
+  pinned,
+  onPick,
+  fileName,
+}: {
+  selected: boolean;
+  /** Selection mode is on, so every checkbox stays visible. */
+  pinned: boolean;
+  onPick: (shiftKey: boolean) => void;
+  fileName: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={selected}
+      aria-label={`Vybrat ${fileName}`}
+      // Stops the tile's own handler from also firing and opening the lightbox.
+      onClick={(event) => {
+        event.stopPropagation();
+        onPick(event.shiftKey);
+      }}
+      className={`absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs transition-opacity ${
+        selected
+          ? "border-white bg-blue-600 text-white opacity-100"
+          : `border-white/80 bg-black/25 text-transparent hover:bg-black/45 ${
+              pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            }`
+      }`}
+    >
+      ✓
     </button>
   );
 }

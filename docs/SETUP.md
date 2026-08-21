@@ -183,7 +183,69 @@ so this list is the only thing separating you from them.
 
 ---
 
-## 8. Post-setup verification
+## 8. Email — AWS SES over SMTP
+
+`src/lib/mailer.ts` picks a backend by which env var is set: `RESEND_API_KEY` wins if present,
+otherwise `SMTP_URL`, otherwise sending is skipped (logged, not fatal). Production uses AWS SES
+over SMTP — **`RESEND_API_KEY` stays unset in Vercel** so the SMTP branch is the one that runs.
+The verified sending domain (`svatebni-fotograf-cechy.cz`) is shared with the
+`svatebni-fotograf-cechy-2.0` project's AWS account.
+
+1. AWS Console → **SES** → confirm the region where the domain identity shows **Verified** under
+   **Identities**, and that the account is out of the sending **sandbox** (Account dashboard →
+   Sending statistics) — sandboxed accounts can only mail verified recipient addresses.
+2. **SES → SMTP settings → Create SMTP credentials** — creates an IAM user scoped to
+   `AmazonSesSendingAccess` and returns an **SMTP username/password** (different from a raw AWS
+   access key/secret). Reuse existing credentials rather than minting new ones if you want to keep
+   everything under one shared IAM user with the 2.0 project.
+3. Build the connection string — **percent-encode** the password (it sits inside a URL; `+`
+   becomes `%2B`, `/` becomes `%2F`):
+   ```
+   SMTP_URL=smtps://<smtp-user>:<url-encoded-smtp-pass>@email-smtp.<region>.amazonaws.com:465
+   MAIL_FROM="g-gallery <pavel@svatebni-fotograf-cechy.cz>"
+   ```
+4. Verify before relying on it:
+   ```bash
+   node -e "require('nodemailer').createTransport(process.env.SMTP_URL).verify().then(console.log).catch(console.error)"
+   ```
+
+SES bills à la carte at **$0.10 per 1,000 emails** ([pricing](https://aws.amazon.com/ses/pricing/)) —
+no free tier outside EC2-origin sending. At the digest's ~30 emails/month this is a fraction of a
+cent, so it doesn't move the cost table, it just trades Resend's free-tier headroom for one shared
+AWS bill across both projects.
+
+---
+
+## 9. ZIP download Worker (Workers Paid, $5/mo)
+
+The archive is streamed by a Cloudflare Worker, never by Vercel — a function there is billed for
+data transfer and for provisioned memory across the whole download, and dies at `maxDuration` long
+before 8 GB finishes. A Worker holding an HTTP response open has **no wall-clock limit** and reads
+R2 at zero egress (docs/PLAN.md §7).
+
+**Workers Paid is required.** Verified against the
+[limits page](https://developers.cloudflare.com/workers/platform/limits/): Free allows **10 ms CPU**
+per request, Paid 30 s (raisable to 5 min). Streaming is mostly I/O, but every chunk enqueued costs
+CPU and an 8 GB archive is far past 10 ms.
+
+```bash
+cd worker
+pnpm install --ignore-workspace          # its own install: Workers types clash with the app's DOM lib
+npx wrangler secret put ZIP_SIGNING_SECRET   # must match the app's .env byte for byte
+npx wrangler secret put APP_ORIGIN           # https://svatebni-fotograf-cechy.cz
+npx wrangler deploy
+```
+
+Then set `ZIP_WORKER_URL` in Vercel to the deployed Worker URL. Until both `ZIP_WORKER_URL` and
+`ZIP_SIGNING_SECRET` are set, the download buttons return a visible 503 rather than failing silently.
+
+Local development: `cp worker/.dev.vars.example worker/.dev.vars`, paste the app's secret, then
+`npx wrangler dev`. The local R2 binding is a simulation, so seed it first:
+`npx wrangler r2 object put "g-gallery/<key>" --file <file> --local`.
+
+---
+
+## 10. Post-setup verification
 
 - [ ] `https://svatebni-fotograf-cechy.cz` serves the app; `photos.` subdomain returns R2 objects
 - [ ] Sign in with Google → `/admin` loads (role = admin)
@@ -193,10 +255,15 @@ so this list is the only thing separating you from them.
 - [ ] Admin shows non-zero views / unique viewers after that visit
 - [ ] `curl -H "Authorization: Bearer $CRON_SECRET" .../api/cron/keepalive` → `{"ok":true}`
 - [ ] Vercel Analytics dashboard shows `/g/[token]` — **never** a real token
+- [ ] Daily digest / owner notification email actually lands (check the SES sending domain's
+      reputation dashboard too, since it's shared with the 2.0 project)
+- [ ] "Stáhnout vše (ZIP)" downloads an archive that opens in Finder/Explorer, with a real
+      progress bar (a missing `Content-Length` means the Worker fell back to chunked encoding)
+- [ ] Select a few photos → "Stáhnout N fotek" produces an archive with exactly those photos
 
 ---
 
-## 9. R2 lifecycle rule (Infrequent Access)
+## 11. R2 lifecycle rule (Infrequent Access)
 
 `/api/cron/lifecycle` records which originals are cold (`Photo.storageTier`), but R2 has no API to
 change an existing object's storage class — the transition itself is a **bucket lifecycle rule**,
@@ -211,7 +278,7 @@ saving would be cents.
 
 ---
 
-## 10. Database backup & restore
+## 12. Database backup & restore
 
 `.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=public` through the
 session pooler, restore-verified into a throwaway PostgreSQL 17 container, then stored in R2 under

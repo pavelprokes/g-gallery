@@ -1,0 +1,18 @@
+name = "g-gallery-zip"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Streaming an 8 GB archive is mostly I/O, but every chunk enqueued costs CPU.
+# The Free plan's 10 ms ceiling is nowhere near enough — this needs Workers Paid
+# (docs/SETUP.md §9).
+[limits]
+cpu_ms = 300000
+
+# Zero-egress reads straight from the bucket. Image bytes never touch Vercel
+# and never leave Cloudflare's network on the way in (CLAUDE.md invariant #1).
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "g-gallery"
+
+[observability]
+enabled = true

@@ -10,7 +10,7 @@ locally is the same code path that runs in production.
 | Supabase Postgres        | `postgres`      | **5433**  | Same major version (17)                   |
 | Cloudflare R2            | `minio`         | 9000      | S3-compatible: identical SigV4 presigning |
 | CF Image Transformations | `imgproxy`      | 8080      | Same Accept-header format negotiation     |
-| Resend                   | `mailpit`       | 1025      | Catches all outgoing mail                 |
+| AWS SES (SMTP)           | `mailpit`       | 1025      | Catches all outgoing mail                 |
 
 Consoles: MinIO <http://localhost:9001> (`gallerydev` / `gallerydev`) ·
 Mailpit inbox <http://localhost:8025>.

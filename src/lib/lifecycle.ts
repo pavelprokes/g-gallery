@@ -83,7 +83,7 @@ export function selectColdGalleries(
  * Only the `Photo.storageTier` column is written here. R2 exposes no
  * "change storage class" call for an existing object — the transition is
  * driven by a bucket lifecycle rule keyed on object age, configured once in
- * the dashboard (docs/SETUP.md §3). This job records what the bucket policy
+ * the dashboard (docs/SETUP.md §11). This job records what the bucket policy
  * will do so the admin and the cost model stay honest about it, and so a
  * future restore path knows which objects are slow to read.
  */

@@ -1,0 +1,5 @@
+# Local wrangler dev secrets (copy to .dev.vars, which is gitignored).
+# ZIP_SIGNING_SECRET must be byte-identical to the app's, or every manifest
+# fails verification with bad_signature.
+ZIP_SIGNING_SECRET="paste the value from the app's .env"
+APP_ORIGIN="http://localhost:3000"

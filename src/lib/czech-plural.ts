@@ -31,6 +31,7 @@ export const FORMS = {
   favorite: { one: "oblíbená", few: "oblíbené", many: "oblíbených" },
   download: { one: "stažení", few: "stažení", many: "stažení" },
   photo: { one: "fotka", few: "fotky", many: "fotek" },
+  selected: { one: "vybraná", few: "vybrané", many: "vybraných" },
   upload: {
     one: "nedokončené nahrávání",
     few: "nedokončená nahrávání",

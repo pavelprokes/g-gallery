@@ -183,9 +183,15 @@ grid impressions are not views). No third parties; all identity/logic server-sid
 2. **Web Push** — `web-push` npm lib + VAPID, no third party. iOS ≥ 16.4 requires the admin PWA
    added to Home Screen + permission via tap ([WebKit](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/));
    prune subscriptions on 404/410. Fired on new ViewSession (not heartbeats), throttled.
-3. **Daily digest** — Vercel cron 07:00 Europe/Prague → aggregate yesterday → Resend
-   (free: 3 000/mo, 100/day — [pricing](https://resend.com/pricing)); skip when empty. Email is the
-   reliable channel if the iOS PWA friction fails — treat it as primary, push as enhancement.
+3. **Daily digest** — Vercel cron 07:00 Europe/Prague → aggregate yesterday → **AWS SES over SMTP**
+   (à la carte, $0.10/1,000 emails, no free tier outside EC2-origin sending —
+   [pricing](https://aws.amazon.com/ses/pricing/)); skip when empty. `src/lib/mailer.ts` falls
+   through to SMTP when `RESEND_API_KEY` is unset, so no code depends on which provider is
+   configured. Chosen over Resend to share one verified sending domain
+   (`svatebni-fotograf-cechy.cz`) and one IAM-managed credential with the photographer's main site
+   (`svatebni-fotograf-cechy-2.0`) rather than running two mail providers for one business.
+   Email is the reliable channel if the iOS PWA friction fails — treat it as primary, push as
+   enhancement.
 
 **GDPR** (CNIL audience-measurement criteria as the strictest written benchmark —
 [sheet 16](https://www.cnil.fr/en/sheet-ndeg16-use-analytics-your-websites-and-applications)):
@@ -243,16 +249,16 @@ gallery in one month.
 
 ## 10. Cost model (marginal, on top of existing Vercel Pro)
 
-| Item                              | Year 1                       | Year 3        | Note                                                                                   |
-| --------------------------------- | ---------------------------- | ------------- | -------------------------------------------------------------------------------------- |
-| R2 Standard storage               | ~$0.75→1.65/mo               | ~$5.25/mo     | +$1.80/mo per retained year → **decide retention/IA policy before launch**; IA saves ⅓ |
-| Image Transformations             | $0 (occasionally $0.50–1.50) | same          | requires Images Paid enabled to avoid 9422 hard failure                                |
-| Workers Paid (ZIP)                | $5/mo                        | $5/mo         | hard dependency of the ZIP feature — deferrable to v2                                  |
-| Supabase / Vercel marginal        | $0                           | $0            | Realtime, cron, functions — all inside free/included quotas                            |
-| Notifications (web-push + Resend) | $0                           | $0            | VAPID self-hosted; digest ~30 emails/mo vs 3 000 free                                  |
-| Vercel Web Analytics              | ~$0                          | ~$0           | $0.03/1k events, absorbed by the $20 Pro credit; Spend alert set                       |
-| Domain                            | ~$10/yr                      | ~$10/yr       | if not already owned                                                                   |
-| **Total**                         | **~$1–7/mo**                 | **~$6–11/mo** | lower bound = ZIP deferred                                                             |
+| Item                               | Year 1                       | Year 3        | Note                                                                                   |
+| ---------------------------------- | ---------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| R2 Standard storage                | ~$0.75→1.65/mo               | ~$5.25/mo     | +$1.80/mo per retained year → **decide retention/IA policy before launch**; IA saves ⅓ |
+| Image Transformations              | $0 (occasionally $0.50–1.50) | same          | requires Images Paid enabled to avoid 9422 hard failure                                |
+| Workers Paid (ZIP)                 | $5/mo                        | $5/mo         | hard dependency of the ZIP feature — deferrable to v2                                  |
+| Supabase / Vercel marginal         | $0                           | $0            | Realtime, cron, functions — all inside free/included quotas                            |
+| Notifications (web-push + AWS SES) | ~$0                          | ~$0           | VAPID self-hosted; SES à la carte $0.10/1,000, ~30 emails/mo ≈ $0.003/mo               |
+| Vercel Web Analytics               | ~$0                          | ~$0           | $0.03/1k events, absorbed by the $20 Pro credit; Spend alert set                       |
+| Domain                             | ~$10/yr                      | ~$10/yr       | if not already owned                                                                   |
+| **Total**                          | **~$1–7/mo**                 | **~$6–11/mo** | lower bound = ZIP deferred                                                             |
 
 ## 11. Build phases
 
@@ -272,8 +278,8 @@ gallery in one month.
    **Phase 2 complete.**
 4. **Phase 3 — activity & polish**: ✅ avatar strip + name prompt, ✅ reactions (5-kind enum, one
    row per viewer+photo), ✅ owner Updates feed with unread badge, ✅ Web Push (VAPID, 30-min
-   per-gallery throttle, prunes 404/410) + ✅ daily digest (Resend in prod, SMTP/Mailpit locally,
-   skipped when empty), ✅ justified layout, ✅ keyboard + swipe lightbox.
+   per-gallery throttle, prunes 404/410) + ✅ daily digest (AWS SES over SMTP in prod, Mailpit
+   locally, skipped when empty), ✅ justified layout, ✅ keyboard + swipe lightbox.
    ✅ Supabase Realtime presence ("viewing now"; hashed topic, no-ops without the public env vars,
    counts people not connections), ✅ IA lifecycle job (monthly, publication age + 30-day
    recent-activity guard, never deletes). **Phase 3 complete.**

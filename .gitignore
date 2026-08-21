@@ -44,3 +44,7 @@ next-env.d.ts
 
 # prisma generated client
 /src/generated/
+
+# worker has its own install (Workers types conflict with the app DOM lib)
+/worker/node_modules
+/worker/.dev.vars
