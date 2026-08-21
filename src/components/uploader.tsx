@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
 import { matchResumeTargets, type PendingUpload } from "@/lib/upload-resume";
+import { FORMS, pluralize } from "@/lib/czech-plural";
 
 // Uploads go browser -> R2 directly; Vercel only signs (4.5MB body limit).
 // Presigning is just-in-time in small batches because presigned URLs expire in
@@ -201,10 +202,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
 
       {pendingRows.length > 0 && !running && (
         <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
-          <p className="font-medium">
-            {pendingRows.length}{" "}
-            {pendingRows.length === 1 ? "nedokončené nahrávání" : "nedokončených nahrávání"}
-          </p>
+          <p className="font-medium">{pluralize(pendingRows.length, FORMS.upload)}</p>
           <p className="mt-1 text-xs">
             Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené zbytky
             se po 24 hodinách uklidí samy.

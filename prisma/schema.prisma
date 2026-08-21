@@ -129,6 +129,7 @@ model Gallery {
   photos     Photo[]
   shareLinks ShareLink[]
   viewers    Viewer[]
+  sessions   ViewSession[]
   events     ActivityEvent[]
 
   @@index([ownerId, status])
@@ -225,6 +226,7 @@ model ViewSession {
   viewerId       String
   viewer         Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
   galleryId      String
+  gallery        Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   startedAt      DateTime @default(now())
   lastActivityAt DateTime @default(now())
 

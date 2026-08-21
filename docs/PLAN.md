@@ -270,9 +270,14 @@ gallery in one month.
    R2 with 30-day pruning, ✅ upload resume-after-crash (PENDING rows re-matched by name+size),
    ✅ orphan-object sweep via ListObjectsV2 (weekly, 24h age guard, live keys never candidates).
    **Phase 2 complete.**
-4. **Phase 3 — activity & polish**: avatar strip + name prompt, reactions, owner Updates feed,
-   Supabase Realtime presence ("viewing now"), Web Push + daily Resend digest, justified layout,
-   virtual scroll, keyboard/swipe lightbox, IA lifecycle job.
+4. **Phase 3 — activity & polish**: ✅ avatar strip + name prompt, ✅ reactions (5-kind enum, one
+   row per viewer+photo), ✅ owner Updates feed with unread badge, ✅ Web Push (VAPID, 30-min
+   per-gallery throttle, prunes 404/410) + ✅ daily digest (Resend in prod, SMTP/Mailpit locally,
+   skipped when empty), ✅ justified layout, ✅ keyboard + swipe lightbox.
+   Remaining: Supabase Realtime presence ("viewing now"), IA lifecycle job.
+   **Virtual scroll deferred** into `docs/TODO.md` §3 — infinite scroll with a stable order changes
+   the data-fetching model from "all photos server-rendered" to cursor pagination, so anything
+   built against the current model would be rewritten by it.
 5. **Phase 5 — E2E test suite**: deferred deliberately to the very end (`docs/TODO.md`) — the
    routes, upload flow and share gating are still moving, so tests written earlier get rewritten.
    Unit tests (Vitest) continue as normal throughout.

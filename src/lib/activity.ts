@@ -30,8 +30,15 @@ export interface ViewerCounts {
  * generated, which also powers their favorites. Viewers who opted out are
  * recognised and silently skipped.
  */
-export async function recordActivity(input: RecordViewInput): Promise<void> {
+export interface RecordResult {
+  /** True only when a genuinely new ViewSession began — never for a heartbeat. */
+  newSession: boolean;
+  viewerName: string | null;
+}
+
+export async function recordActivity(input: RecordViewInput): Promise<RecordResult> {
   const now = new Date();
+  let newSession = false;
 
   const viewer = await prisma.viewer.upsert({
     where: { galleryId_anonKey: { galleryId: input.galleryId, anonKey: input.anonKey } },
@@ -42,10 +49,10 @@ export async function recordActivity(input: RecordViewInput): Promise<void> {
       lastSeenAt: now,
     },
     update: { lastSeenAt: now },
-    select: { id: true, optedOut: true },
+    select: { id: true, optedOut: true, displayName: true },
   });
 
-  if (viewer.optedOut) return;
+  if (viewer.optedOut) return { newSession: false, viewerName: null };
 
   if (input.type === "GALLERY_VIEW") {
     const recent = await prisma.viewSession.findFirst({
@@ -63,12 +70,13 @@ export async function recordActivity(input: RecordViewInput): Promise<void> {
         where: { id: recent.id },
         data: { lastActivityAt: now },
       });
-      return;
+      return { newSession: false, viewerName: viewer.displayName };
     }
 
     await prisma.viewSession.create({
       data: { viewerId: viewer.id, galleryId: input.galleryId, lastActivityAt: now },
     });
+    newSession = true;
   }
 
   await prisma.activityEvent.create({
@@ -79,6 +87,8 @@ export async function recordActivity(input: RecordViewInput): Promise<void> {
       type: input.type,
     },
   });
+
+  return { newSession, viewerName: viewer.displayName };
 }
 
 /** Gallery-level totals for the admin dashboard. */

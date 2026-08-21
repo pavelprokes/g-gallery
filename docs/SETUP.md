@@ -55,24 +55,30 @@ npx wrangler r2 bucket create g-gallery --jurisdiction eu
 
 ```bash
 cat > cors.json <<'EOF'
-[
-  {
-    "AllowedOrigins": [
-      "https://svatebni-fotograf-cechy.cz",
-      "http://localhost:3000"
-    ],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["Content-Type", "Cache-Control"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3600
-  }
-]
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": ["https://svatebni-fotograf-cechy.cz", "http://localhost:3000"],
+        "methods": ["PUT"],
+        "headers": ["Content-Type", "Cache-Control"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
 EOF
 npx wrangler r2 bucket cors set g-gallery --file cors.json --jurisdiction eu
 ```
 
+> Wrangler's CORS file format wraps rules in a top-level `rules` array with a nested `allowed`
+> object (lowercase field names) — this differs from the dashboard's flat `AllowedOrigins`/
+> `AllowedMethods` JSON. `wrangler r2 bucket cors set` rejects the dashboard-style shape with
+> "must contain a 'rules' array".
+
 `Content-Type` **and** `Cache-Control` are signed into the presigned URL, so both must be in
-`AllowedHeaders` or uploads fail with 403/CORS. `ExposeHeaders: ETag` is what lets the uploader
+`allowed.headers` or uploads fail with 403/CORS. `exposeHeaders: ["ETag"]` is what lets the uploader
 confirm the upload.
 
 ### Custom domain

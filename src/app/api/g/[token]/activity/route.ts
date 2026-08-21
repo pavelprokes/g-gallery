@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { recordActivity } from "@/lib/activity";
+import { pushNewViewer } from "@/lib/push";
 import { resolveShareLink } from "@/lib/share-access";
 
 // Beacon target for the public gallery. Short-lived request/response only —
@@ -23,13 +24,20 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/a
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid_body" }, { status: 400 });
 
-  await recordActivity({
+  const result = await recordActivity({
     galleryId: access.shareLink.galleryId,
     shareLinkId: access.shareLink.id,
     anonKey: parsed.data.anonKey,
     photoId: parsed.data.photoId,
     type: parsed.data.type,
   });
+
+  // Only a genuinely new session is news; the 5-minute heartbeat is not.
+  // Awaited rather than fired-and-forgotten: a Vercel function can be frozen
+  // the moment the response is returned, killing an unawaited promise.
+  if (result.newSession) {
+    await pushNewViewer(access.shareLink.galleryId, result.viewerName);
+  }
 
   // sendBeacon ignores the body; keep the response minimal.
   return new NextResponse(null, { status: 204 });
