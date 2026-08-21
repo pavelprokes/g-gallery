@@ -138,7 +138,7 @@ model Photo {
   id          String      @id @default(cuid())
   galleryId   String
   gallery     Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  /// Full R2 object key ("<storagePrefix>/<photo-id>.jpg")
+  /// Full R2 object key ("<storagePrefix>/<random-uuid>.jpg")
   objectKey   String      @unique
   /// Original filename, used for ZIP entries and downloads
   fileName    String

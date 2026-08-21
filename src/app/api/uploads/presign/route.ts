@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -12,6 +13,15 @@ export const maxDuration = 15;
 
 const MAX_BATCH = 20;
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
+
+// Derived from the content type, which the schema below constrains — a user
+// supplied filename must never reach the object key.
+const EXTENSIONS: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/avif": ".avif",
+};
 
 const bodySchema = z.object({
   galleryId: z.string().min(1),
@@ -53,23 +63,26 @@ export async function POST(request: Request) {
 
   const uploads = await Promise.all(
     files.map(async (file) => {
-      const extension = file.fileName.split(".").pop()?.toLowerCase() ?? "jpg";
+      // The key is derived from a fresh random id, not from the row id, so the
+      // row can be inserted with its final objectKey in a single statement.
+      // Inserting a placeholder key and patching it afterwards raced on the
+      // unique index — every file in a batch collided on the same placeholder.
+      const extension = EXTENSIONS[file.contentType] ?? ".jpg";
+      const objectKey = `${gallery.storagePrefix}/${randomUUID()}${extension}`;
+
       // Rows are created PENDING and only become visible once the client
       // checks the ETag back in — this is what makes orphan reconciliation
       // possible (docs/PLAN.md §5).
       const photo = await prisma.photo.create({
         data: {
           galleryId: gallery.id,
-          objectKey: "", // set below, once the cuid is known
+          objectKey,
           fileName: file.fileName,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
         },
         select: { id: true },
       });
-
-      const objectKey = `${gallery.storagePrefix}/${photo.id}.${extension}`;
-      await prisma.photo.update({ where: { id: photo.id }, data: { objectKey } });
 
       return {
         photoId: photo.id,
