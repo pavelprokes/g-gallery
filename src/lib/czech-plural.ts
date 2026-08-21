@@ -31,6 +31,9 @@ export const FORMS = {
   favorite: { one: "oblíbená", few: "oblíbené", many: "oblíbených" },
   download: { one: "stažení", few: "stažení", many: "stažení" },
   photo: { one: "fotka", few: "fotky", many: "fotek" },
+  // Accusative: what follows a verb like "Stáhnout". Czech declines, so the
+  // nominative set above reads as broken there ("Stáhnout 1 fotka").
+  photoAccusative: { one: "fotku", few: "fotky", many: "fotek" },
   selected: { one: "vybraná", few: "vybrané", many: "vybraných" },
   upload: {
     one: "nedokončené nahrávání",

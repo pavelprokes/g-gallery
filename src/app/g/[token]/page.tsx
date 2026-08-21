@@ -46,6 +46,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
           fileName: true,
           width: true,
           height: true,
+          placeholder: true,
           _count: { select: { favorites: true } },
         },
       },
@@ -70,6 +71,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
         fileName: photo.fileName,
         width: photo.width,
         height: photo.height,
+        placeholder: photo.placeholder,
         favoriteCount: photo._count.favorites,
       }))}
       viewers={gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" }))}

@@ -150,6 +150,10 @@ model Photo {
   etag        String?
   width       Int?
   height      Int?
+  /// Average colour as "#rrggbb", computed in the browser at upload. Fills the
+  /// tile before any bytes arrive; 7 bytes per photo rather than the ~400 a
+  /// base64 blur placeholder would add to every page render.
+  placeholder String?
   takenAt     DateTime?
   status      PhotoStatus @default(PENDING)
   storageTier StorageTier @default(STANDARD)

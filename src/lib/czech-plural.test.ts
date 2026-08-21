@@ -32,6 +32,13 @@ describe("czechPlural", () => {
     expect(pluralize(9, FORMS.download)).toBe("9 stažení");
   });
 
+  it("declines into the accusative after a verb", () => {
+    // "Stáhnout 1 fotka" is broken Czech; the verb takes the accusative.
+    expect(pluralize(1, FORMS.photoAccusative)).toBe("1 fotku");
+    expect(pluralize(3, FORMS.photoAccusative)).toBe("3 fotky");
+    expect(pluralize(8, FORMS.photoAccusative)).toBe("8 fotek");
+  });
+
   it("formats count and word together", () => {
     expect(pluralize(4, FORMS.reaction)).toBe("4 reakce");
     expect(pluralize(5, FORMS.reaction)).toBe("5 reakcí");

@@ -48,3 +48,6 @@ next-env.d.ts
 # worker has its own install (Workers types conflict with the app DOM lib)
 /worker/node_modules
 /worker/.dev.vars
+
+# playwright-mcp scratch output
+/.playwright-mcp

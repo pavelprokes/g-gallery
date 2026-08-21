@@ -9,6 +9,11 @@ export const maxDuration = 15;
 const bodySchema = z.object({
   photoId: z.string().min(1),
   etag: z.string().min(1).max(256),
+  /** "#rrggbb" average colour for the tile placeholder; optional by design. */
+  placeholder: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/)
+    .nullish(),
   /** Lowercase hex CRC32 computed client-side — feeds the future ZIP writer. */
   crc32: z.string().regex(/^[0-9a-f]{8}$/),
   sizeBytes: z.number().int().positive(),
@@ -33,7 +38,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { photoId, etag, crc32, sizeBytes, width, height, takenAt } = parsed.data;
+  const { photoId, etag, crc32, sizeBytes, width, height, takenAt, placeholder } = parsed.data;
 
   const photo = await prisma.photo.findFirst({
     where: { id: photoId, gallery: { ownerId: session.user.id } },
@@ -50,6 +55,7 @@ export async function POST(request: Request) {
       sizeBytes,
       width,
       height,
+      placeholder: placeholder ?? undefined,
       takenAt: takenAt ? new Date(takenAt) : undefined,
     },
   });

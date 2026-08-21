@@ -32,20 +32,27 @@ adopting; treat as input, not as a specification — our constraints (20 galleri
 a year, Vercel + R2, no bytes through the app) differ sharply from a
 consumer-scale photo service, so most scale advice will not transfer.
 
-## 3. Infinite scroll with a stable order
+## 3. Infinite scroll with a stable order — **closed, not needed yet**
 
-Browse the library in an infinite scroll, fast loading, **stable and predictable
-order**. The stability requirement is the hard part: the current gallery orders
-by favourite count then `sortOrder`, so a favourite added mid-scroll reorders
-items underneath the user. Cursor pagination needs an immutable sort key.
+Measured before building anything: a 500-photo page is **223 kB of HTML over the
+wire** (brotli crushes the repeated URLs), and every tile below the fold is
+already lazy, so the browser does viewport prioritisation for free. The stable
+order this was asked for **already exists** on the client surface — the share
+page orders by `sortOrder, createdAt`; only the _admin_ grid sorts by favourite
+count, and that is Pavel's own view, not one a client scrolls while others
+favourite.
 
-## 4. Enlarged view with swipe between adjacent photos
+Reopen when galleries grow past a few thousand photos, or if a real device shows
+the DOM cost mattering. Building cursor pagination now would be work with no
+user-visible effect.
+
+## 4. Enlarged view with swipe between adjacent photos — **done 2026-08-21**
 
 Tap a photo to enlarge, swipe left/right between adjacent photos seamlessly.
 A lightbox with keyboard navigation exists; this adds touch gestures and
 neighbour prefetch so the next photo is already decoded when the swipe lands.
 
-## 5. Core loading steps
+## 5. Core loading steps — **done 2026-08-21**
 
 - **Index fetching** — metadata and tiny placeholders first, so the grid
   geometry is final before any photo bytes arrive (we already store

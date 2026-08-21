@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
 import { matchResumeTargets, type PendingUpload } from "@/lib/upload-resume";
+import { averageColorOf } from "@/lib/placeholder";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 
 // Uploads go browser -> R2 directly; Vercel only signs (4.5MB body limit).
@@ -72,6 +73,8 @@ async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
   const body = await stripGpsFromFile(file);
   const crc32 = await crc32HexOfBlob(body);
   const dimensions = await readDimensions(body);
+  // Cosmetic, so a failure here never blocks the upload.
+  const placeholder = await averageColorOf(body);
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -94,6 +97,7 @@ async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
           sizeBytes: body.size,
           width: dimensions?.width,
           height: dimensions?.height,
+          placeholder,
         }),
       });
       if (!confirm.ok) throw new Error(`confirm failed (${confirm.status})`);

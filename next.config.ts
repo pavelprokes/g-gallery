@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { DEVICE_SIZES, IMAGE_SIZES, QUALITY } from "./src/lib/image-sizes";
 
 const nextConfig: NextConfig = {
   images: {
@@ -7,11 +8,11 @@ const nextConfig: NextConfig = {
     loader: "custom",
     loaderFile: "./src/lib/image-loader.ts",
     // Deliberately trimmed srcset: each (photo × width × quality) combo is a
-    // billable unique transformation. Default Next.js sizes (16 widths) can
-    // 4× the quota burn (docs/PLAN.md §6).
-    deviceSizes: [640, 1080, 1920, 2560],
-    imageSizes: [384],
-    qualities: [82],
+    // billable unique transformation. The list lives in src/lib/image-sizes.ts
+    // because the lightbox prefetch has to agree with it exactly.
+    deviceSizes: [...DEVICE_SIZES],
+    imageSizes: [...IMAGE_SIZES],
+    qualities: [QUALITY],
   },
 };
 

@@ -24,6 +24,9 @@ import {
   toggleOne,
 } from "@/lib/selection";
 import { FORMS, pluralize } from "@/lib/czech-plural";
+import imageLoader from "@/lib/image-loader";
+import { fullWidthSrcSet } from "@/lib/image-sizes";
+import { placeholderStyle } from "@/lib/placeholder";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
@@ -48,8 +51,17 @@ export interface GalleryPhoto {
   fileName: string;
   width: number | null;
   height: number | null;
+  placeholder: string | null;
   favoriteCount: number;
 }
+
+/**
+ * How many tiles load eagerly. Everything else is lazy, which is what keeps a
+ * 500-photo gallery from fetching 500 images at once — but leaving the first
+ * row lazy too means the photos the viewer is actually looking at wait for the
+ * lazy-load trigger before they even start.
+ */
+const EAGER_TILES = 6;
 
 export interface GalleryViewer {
   id: string;
@@ -394,6 +406,55 @@ export function GalleryView({
   const active = lightboxIndex === null ? null : photos[lightboxIndex];
   const activeSelected = active ? selection.ids.has(active.id) : false;
 
+  /**
+   * Warms the next and previous photo while the current one is on screen.
+   *
+   * Without this every swipe is a cold fetch of 120 kB on a phone and up to
+   * 600 kB on a retina desktop, so the screen goes blank for as long as that
+   * takes — 500 times if the viewer works through the gallery.
+   *
+   * A <link rel="preload"> with imagesrcset/imagesizes rather than a computed
+   * URL: the browser then applies the same candidate-selection it will apply to
+   * the real <img>, so the byte range fetched is exactly the one that gets used.
+   * Guessing the width would risk warming a variant the browser ignores — the
+   * swipe would still stall AND the transformation would be billed twice.
+   */
+  useEffect(() => {
+    if (lightboxIndex === null || photos.length < 2) return;
+
+    const neighbours = [
+      photos[(lightboxIndex + 1) % photos.length],
+      photos[(lightboxIndex - 1 + photos.length) % photos.length],
+    ];
+
+    const links = neighbours
+      .filter((photo): photo is GalleryPhoto => photo !== undefined && photo.id !== active?.id)
+      .map((photo) => {
+        const link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.imageSrcset = fullWidthSrcSet(photo.objectKey, imageLoader);
+        link.imageSizes = "100vw";
+        // Deliberately NO crossOrigin. next/image renders a plain <img> with no
+        // crossorigin attribute, and a preload whose CORS mode differs from the
+        // eventual request is a cache MISS — the browser would fetch the photo
+        // twice, making the swipe no faster and doubling the billed transforms.
+        // Verified in a real browser: with crossOrigin="anonymous" set, the
+        // preload and the <img> disagreed.
+        //
+        // Chrome logs "preloaded but not used within a few seconds" when the
+        // viewer lingers on a photo. That is inherent to speculative prefetch
+        // and not a bug — the warning is the cost of the swipe being instant
+        // when they do move.
+        document.head.append(link);
+        return link;
+      });
+
+    return () => {
+      for (const link of links) link.remove();
+    };
+  }, [active?.id, lightboxIndex, photos]);
+
   return (
     <main className="mx-auto max-w-7xl p-4 sm:p-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -441,7 +502,7 @@ export function GalleryView({
               >
                 {zipState === "preparing"
                   ? "Připravuji…"
-                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photo)}${
+                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photoAccusative)}${
                       selection.ids.size > 1 ? " (ZIP)" : ""
                     }`}
               </button>
@@ -519,7 +580,10 @@ export function GalleryView({
                   }
                   openPhoto(index);
                 }}
-                className="relative block h-full w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900"
+                className="relative block h-full w-full overflow-hidden rounded"
+                // The tile carries the photo's own average colour, so the grid
+                // fills in with the picture's palette instead of grey holes.
+                style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
                 aria-label={
                   selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`
                 }
@@ -529,6 +593,7 @@ export function GalleryView({
                   alt={photo.fileName}
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  priority={index < EAGER_TILES}
                   className={`object-cover transition-transform duration-200 ${
                     selection.ids.has(photo.id) ? "scale-90 rounded" : "hover:scale-105"
                   }`}
@@ -580,6 +645,7 @@ export function GalleryView({
         >
           <div
             className="relative h-full w-full touch-pan-y"
+            style={{ backgroundColor: "transparent" }}
             onClick={(event) => event.stopPropagation()}
             onTouchStart={(event) => {
               const touch = event.touches[0];

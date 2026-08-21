@@ -50,3 +50,27 @@ export default function imageLoader({ src, width, quality }: ImageLoaderProps): 
       return `${base}/cdn-cgi/image/width=${width},quality=${q},format=auto,fit=scale-down/${src}`;
   }
 }
+
+/**
+ * A 1×1 PNG of the whole photo — the resize *is* the averaging.
+ *
+ * Lives next to the loader so the two cannot drift apart, but is deliberately
+ * not part of it: forcing a format would add another billable variant to the
+ * render path, and this is only ever called by the backfill script.
+ *
+ * Returns null when there is no transform host to do the work.
+ */
+export function averagingUrl(src: string): string | null {
+  const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL?.replace(/\/$/, "");
+  if (!base) return null;
+
+  switch (transformMode()) {
+    case "imgproxy":
+      // fit:1:1 bounds both axes, so any aspect ratio collapses to one pixel.
+      return `${base}/insecure/rs:fit:1:1/plain/${src}@png`;
+    case "none":
+      return null;
+    default:
+      return `${base}/cdn-cgi/image/width=1,height=1,fit=scale-down,format=png/${src}`;
+  }
+}
