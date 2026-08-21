@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
@@ -102,6 +103,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const update = useCallback((index: number, patch: Partial<Item>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -150,8 +152,11 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       }
 
       setRunning(false);
+      // Photos only become visible once the server flips them to CONFIRMED, so
+      // the grid above is stale until the Server Component re-renders.
+      router.refresh();
     },
-    [galleryId, update],
+    [galleryId, router, update],
   );
 
   const done = items.filter((i) => i.state === "done").length;
