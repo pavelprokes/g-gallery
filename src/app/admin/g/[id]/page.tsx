@@ -88,7 +88,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <Uploader galleryId={gallery.id} />
 
-      <ShareLinkPanel galleryId={gallery.id} shareLinks={gallery.shareLinks} />
+      <ShareLinkPanel
+        galleryId={gallery.id}
+        shareLinks={gallery.shareLinks}
+        published={gallery.status === "PUBLISHED"}
+      />
 
       <section>
         <h2 className="text-sm font-medium">Fotky — zobrazení a unikátní diváci</h2>

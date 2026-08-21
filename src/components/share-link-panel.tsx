@@ -15,9 +15,11 @@ interface ShareLinkRow {
 export function ShareLinkPanel({
   galleryId,
   shareLinks,
+  published,
 }: {
   galleryId: string;
   shareLinks: ShareLinkRow[];
+  published: boolean;
 }) {
   // The raw token exists only in this response — only its hash is stored, so
   // it can never be shown again after a reload.
@@ -37,6 +39,15 @@ export function ShareLinkPanel({
   return (
     <section className="rounded-lg border p-4">
       <h2 className="text-sm font-medium">Sdílené odkazy</h2>
+
+      {!published && (
+        // Every share surface refuses an unpublished gallery, so a link created
+        // now looks valid but 404s until the gallery is published.
+        <p className="mt-2 rounded border border-amber-400 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
+          Galerie zatím není publikovaná — odkazy vytvořené teď budou vracet 404, dokud ji
+          nepublikuješ.
+        </p>
+      )}
 
       <form action={submit} className="mt-3 flex flex-wrap items-end gap-3">
         <input type="hidden" name="galleryId" value={galleryId} />
@@ -71,6 +82,9 @@ export function ShareLinkPanel({
         <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
           <p className="font-medium">Odkaz zkopíruj teď — už se nikdy nezobrazí.</p>
           <code className="mt-1 block text-xs break-all">{freshUrl}</code>
+          {!published && (
+            <p className="mt-1 text-xs">Než ho pošleš, galerii publikuj — jinak vrací 404.</p>
+          )}
           <button
             type="button"
             className="mt-2 rounded border px-2 py-1 text-xs"
