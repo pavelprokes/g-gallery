@@ -14,6 +14,7 @@ import {
   subscribeOptOut,
 } from "@/lib/viewer-id";
 import { originalUrl } from "@/lib/photo-url";
+import { PresenceStrip } from "@/components/presence-strip";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
@@ -305,7 +306,10 @@ export function GalleryView({
           <h1 className="text-2xl font-semibold">{title}</h1>
           {eventDate && <p className="text-sm text-neutral-500">{eventDate}</p>}
         </div>
-        {viewers.length > 0 && <ViewerChips viewers={viewers} />}
+        <div className="flex items-center gap-3">
+          <PresenceStrip token={token} optedOut={optedOut} />
+          {viewers.length > 0 && <ViewerChips viewers={viewers} />}
+        </div>
       </header>
 
       {/* Justified rows: each tile grows in proportion to its aspect ratio, so

@@ -196,7 +196,22 @@ so this list is the only thing separating you from them.
 
 ---
 
-## 9. Database backup & restore
+## 9. R2 lifecycle rule (Infrequent Access)
+
+`/api/cron/lifecycle` records which originals are cold (`Photo.storageTier`), but R2 has no API to
+change an existing object's storage class — the transition itself is a **bucket lifecycle rule**,
+set once in the Cloudflare dashboard:
+
+> R2 → g-gallery → Settings → Object lifecycle rules → _Add rule_
+> Prefix `galleries/`, action **Transition to Infrequent Access**, after **180 days**.
+
+Keep the 180 days in step with `IA_AFTER_MONTHS` (default 6). The job's `?dryRun=1` reports what it
+would mark without writing. Nothing is ever deleted — a wedding gallery is irreplaceable and the
+saving would be cents.
+
+---
+
+## 10. Database backup & restore
 
 `.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=public` through the
 session pooler, restore-verified into a throwaway PostgreSQL 17 container, then stored in R2 under

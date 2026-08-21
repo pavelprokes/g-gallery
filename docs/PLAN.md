@@ -274,7 +274,9 @@ gallery in one month.
    row per viewer+photo), ✅ owner Updates feed with unread badge, ✅ Web Push (VAPID, 30-min
    per-gallery throttle, prunes 404/410) + ✅ daily digest (Resend in prod, SMTP/Mailpit locally,
    skipped when empty), ✅ justified layout, ✅ keyboard + swipe lightbox.
-   Remaining: Supabase Realtime presence ("viewing now"), IA lifecycle job.
+   ✅ Supabase Realtime presence ("viewing now"; hashed topic, no-ops without the public env vars,
+   counts people not connections), ✅ IA lifecycle job (monthly, publication age + 30-day
+   recent-activity guard, never deletes). **Phase 3 complete.**
    **Virtual scroll deferred** into `docs/TODO.md` §3 — infinite scroll with a stable order changes
    the data-fetching model from "all photos server-rendered" to cursor pagination, so anything
    built against the current model would be rewritten by it.

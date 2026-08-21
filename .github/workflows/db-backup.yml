@@ -83,7 +83,7 @@ jobs:
           # against a database that already has one — and --exit-on-error then
           # aborts the whole restore. Dropping it first is also what a real
           # restore into a fresh Supabase project has to do, so verifying this
-          # way exercises the actual recovery procedure (docs/SETUP.md §9).
+          # way exercises the actual recovery procedure (docs/SETUP.md §10).
           psql --host=localhost --port=5432 --username=postgres --dbname=verify \
             --command="drop schema public cascade;"
 
