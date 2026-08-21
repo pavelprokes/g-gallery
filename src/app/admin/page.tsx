@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
+import { BADGE_CAP, unreadCount } from "@/lib/feed";
 import { createGallery } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   const session = await getAdminSession();
   if (!session) redirect("/sign-in?next=/admin");
+
+  const unread = await unreadCount(session.user.id);
 
   const galleries = await prisma.gallery.findMany({
     where: { ownerId: session.user.id },
@@ -32,7 +35,17 @@ export default async function AdminPage() {
     <main className="mx-auto max-w-4xl p-8">
       <header className="flex items-baseline justify-between">
         <h1 className="text-2xl font-semibold">Galerie</h1>
-        <span className="text-sm text-neutral-500">{session.user.email}</span>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/updates" className="relative text-sm underline">
+            Aktivita
+            {unread > 0 && (
+              <span className="absolute -top-2 -right-4 rounded-full bg-rose-600 px-1.5 text-xs font-medium text-white tabular-nums">
+                {unread > BADGE_CAP ? `${BADGE_CAP}+` : unread}
+              </span>
+            )}
+          </Link>
+          <span className="text-sm text-neutral-500">{session.user.email}</span>
+        </div>
       </header>
 
       <form action={create} className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border p-4">
