@@ -38,9 +38,11 @@ Measured before building anything: a 500-photo page is **223 kB of HTML over the
 wire** (brotli crushes the repeated URLs), and every tile below the fold is
 already lazy, so the browser does viewport prioritisation for free. The stable
 order this was asked for **already exists** on the client surface — the share
-page orders by `sortOrder, createdAt`; only the _admin_ grid sorts by favourite
+page orders by `createdAt`; only the _admin_ grid sorts by favourite
 count, and that is Pavel's own view, not one a client scrolls while others
-favourite.
+favourite. (`sortOrder` itself was removed 2026-08-21 — see `docs/AUDIT.md`
+§3.5/§8 P2 — it was never written, so it never actually contributed to this
+ordering.)
 
 Reopen when galleries grow past a few thousand photos, or if a real device shows
 the DOM cost mattering. Building cursor pagination now would be work with no
@@ -67,3 +69,22 @@ Note the tension with the cost model: every distinct width/quality combination
 is a billable Cloudflare transformation (5,000 unique/month free), so adding a
 placeholder tier and a preview tier multiplies the variants per photo. Worth
 measuring against the current fixed set before committing.
+
+## 6. Readable URL slug — raised by Pavel 2026-08-21
+
+Want the share URL to carry a human-readable hint (e.g. `svatba-petra-a-jana-2026-08-12`)
+instead of only the opaque token (`/g/QpFM9K1v81FIbyxxTedBVA` today), built from
+`Gallery.title` **and** `Gallery.eventDate` — the date lives in its own field, not in the
+title, so the slug generator has to pull both.
+
+Proposed shape: `/g/{token}/{slug}` — slug trails the token in its own path segment the
+app never parses for resolution, so it stays purely cosmetic and the token stays the sole
+authority exactly as today. Putting the slug _before_ the token (`/g/{slug}-{token}`) was
+considered and rejected: `generateShareToken()` is base64url, which itself contains `-`
+and `_`, so splitting on a hyphen to recover the token would be ambiguous/unsafe.
+
+Open questions before building: generate the slug once at share-link creation (frozen even
+if the title changes later, like Notion/Figma) or derive it fresh on every request (always
+current, but a renamed gallery invalidates old bookmarks' _readability_, not their
+validity — the token still resolves either way); exact diacritics/casing normalization for
+Czech titles.
