@@ -19,7 +19,8 @@ services:
       POSTGRES_PASSWORD: g_gallery
       POSTGRES_DB: g_gallery
     ports:
-      - "5432:5432"
+      # 5433 on the host: 5432 is commonly taken by another local Postgres.
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -29,7 +30,7 @@ services:
       retries: 20
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: gallerydev
@@ -51,7 +52,7 @@ services:
   # One-shot: creates the bucket and makes objects publicly readable, matching
   # the R2 custom-domain setup where the gallery loads images directly.
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy
@@ -64,7 +65,7 @@ services:
       "
 
   imgproxy:
-    image: darthsim/imgproxy:latest
+    image: darthsim/imgproxy:v3.31
     depends_on:
       minio:
         condition: service_healthy
@@ -73,14 +74,18 @@ services:
       # no signing because transformations are bound to the zone.
       IMGPROXY_ALLOW_ORIGIN: "*"
       IMGPROXY_BASE_URL: http://minio:9000/g-gallery/
-      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
-      IMGPROXY_ENABLE_AVIF_DETECTION: "true"
+      # Content negotiation from the Accept header, standing in for
+      # Cloudflare's format=auto. NOTE: the old IMGPROXY_ENABLE_*_DETECTION
+      # names are silently IGNORED by current imgproxy — these are the ones
+      # that actually work.
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_AUTO_AVIF: "true"
       IMGPROXY_MAX_SRC_RESOLUTION: "80"
     ports:
       - "8080:8080"
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.30
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # web UI

@@ -16,6 +16,13 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset",
+    "docker:up": "docker compose up -d --wait",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && pnpm docker:up",
+    "docker:logs": "docker compose logs -f",
+    "smoke:storage": "tsx --conditions=react-server scripts/smoke-storage.ts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },
@@ -52,6 +59,7 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.11"
   },

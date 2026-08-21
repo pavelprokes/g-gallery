@@ -6,9 +6,13 @@ before changing architecture, storage, auth, or billing-relevant code.
 
 ## Commands
 
+- `pnpm docker:up` — local stack (Postgres :5433, MinIO :9000, imgproxy :8080, Mailpit :8025).
+  `cp .env.docker.example .env` on first run; see `docs/DEVELOPMENT.md`.
 - `pnpm dev` / `pnpm build` / `pnpm start` — Next.js 16 (Turbopack is default; never add webpack config)
 - `pnpm typecheck` · `pnpm lint` · `pnpm test` (Vitest, unit) · `pnpm test:e2e` (Playwright vs prod build)
-- `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:studio` — Prisma 7 (CLI reads `DIRECT_URL` via `prisma.config.ts`)
+- `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:reset` · `pnpm db:studio` —
+  Prisma 7 (CLI reads `DIRECT_URL` via `prisma.config.ts`)
+- `pnpm smoke:storage` — presign → PUT → public GET → transform → DELETE against the current `.env`
 
 ## Stack
 
@@ -20,7 +24,8 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
 
 1. **Image bytes and ZIPs never flow through Vercel** (functions, routes, or `/_next/image`).
    All `next/image` usage goes through the custom loader (`src/lib/image-loader.ts`); photo `src`
-   is the R2 object key, not a URL.
+   is the R2 object key, not a URL. The loader's transform backend is switchable via
+   `NEXT_PUBLIC_IMAGE_TRANSFORM` (`cloudflare` | `imgproxy` | `none`) — never bypass it.
 2. **Uploads**: browser → R2 presigned PUT only (Vercel has a hard 4.5 MB body limit). Client
    computes CRC32 + strips EXIF GPS before PUT; server records `etag`, flips `Photo.status`.
 3. **Auth**: route gating lives in `src/proxy.ts` (Next 16 — `middleware.ts` is deprecated and
@@ -42,3 +47,6 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
 - Vitest cannot render async Server Components — cover those with Playwright instead.
 - Generated Prisma client lives in `src/generated/prisma` (gitignored; `pnpm db:generate` after
   schema changes, runs automatically on install).
+- Local dev runs entirely on Docker (`compose.yaml`); container images are pinned, never `:latest`.
+- Standalone scripts importing `src/lib/*` need `tsx --conditions=react-server` (otherwise
+  `server-only` resolves to its throwing client build).

@@ -12,6 +12,8 @@ const schema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET: z.string().min(1),
   R2_ENDPOINT: z.url(),
+  // "auto" for R2; the local MinIO stand-in signs against a real region name.
+  S3_REGION: z.string().min(1).default("auto"),
   CRON_SECRET: z.string().min(1),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),

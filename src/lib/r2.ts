@@ -18,11 +18,15 @@ function r2Client(): AwsClient {
     accessKeyId: env.R2_ACCESS_KEY_ID,
     secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     service: "s3",
-    region: "auto",
+    // R2 only accepts "auto"; the local MinIO stand-in (compose.yaml) wants a
+    // real region name, so this is configurable rather than hardcoded.
+    region: env.S3_REGION,
   });
   return cachedClient;
 }
 
+// Path-style addressing (`{endpoint}/{bucket}/{key}`) — supported by R2 and
+// required by MinIO in its default single-host setup.
 function objectUrl(key: string): string {
   const env = serverEnv();
   // Each path segment is encoded separately so "/" in the key stays a separator.
