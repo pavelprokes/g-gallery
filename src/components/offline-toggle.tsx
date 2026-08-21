@@ -119,7 +119,12 @@ export function OfflineToggle({
   if (state === "checking") return null;
 
   if (state === "unsupported") {
-    return <Note>Tenhle prohlížeč offline galerie nepodporuje.</Note>;
+    return (
+      <>
+        <Note>Tenhle prohlížeč offline galerie nepodporuje.</Note>
+        <LiveRegion>Tenhle prohlížeč offline galerie nepodporuje.</LiveRegion>
+      </>
+    );
   }
 
   if (state === "no_space") {
@@ -130,6 +135,10 @@ export function OfflineToggle({
           {free !== null && `, volno je ${formatBytes(free)}`}.
         </Note>
         <Button onClick={() => setState("off")}>Zkusit znovu</Button>
+        <LiveRegion>
+          Nedostatek místa v úložišti. Galerie potřebuje zhruba {formatBytes(estimated)}
+          {free !== null && `, volno je ${formatBytes(free)}`}.
+        </LiveRegion>
       </div>
     );
   }
@@ -144,12 +153,20 @@ export function OfflineToggle({
           Stahuji do zařízení… {percent}%
           {progress && progress.bytes > 0 && ` · ${formatBytes(progress.bytes)}`}
         </p>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+        <div
+          role="progressbar"
+          aria-label="Stahování galerie pro offline přístup"
+          aria-valuenow={percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"
+        >
           <div
             className="h-full bg-neutral-900 transition-all dark:bg-neutral-100"
             style={{ width: `${percent}%` }}
           />
         </div>
+        <LiveRegion>Stahování zahájeno, {percent} %.</LiveRegion>
       </div>
     );
   }
@@ -167,6 +184,7 @@ export function OfflineToggle({
           znovu.
         </p>
         <Button onClick={() => void remove()}>Odstranit ze zařízení</Button>
+        <LiveRegion>Staženo, galerie je dostupná offline.</LiveRegion>
       </div>
     );
   }
@@ -176,6 +194,7 @@ export function OfflineToggle({
       <div className="space-y-2">
         <Note>Stažení se nepodařilo dokončit.</Note>
         <Button onClick={() => void start()}>Zkusit znovu</Button>
+        <LiveRegion>Stažení se nepodařilo.</LiveRegion>
       </div>
     );
   }
@@ -205,4 +224,15 @@ function Button({ onClick, children }: { onClick: () => void; children: React.Re
 
 function Note({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-neutral-500">{children}</p>;
+}
+
+// Visually hidden status announcement for screen readers. Mirrors whatever
+// Czech copy is already shown for the current state, so there's a single
+// source of truth for the wording — this just makes it audible to AT too.
+function LiveRegion({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="sr-only" aria-live="polite">
+      {children}
+    </span>
+  );
 }

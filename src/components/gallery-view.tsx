@@ -1,7 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   dismissNamePrompt,
   getOptOutServerSnapshot,
@@ -81,6 +89,53 @@ const FALLBACK_ASPECT = 1.5;
 function aspectOf(photo: GalleryPhoto): number {
   if (!photo.width || !photo.height) return FALLBACK_ASPECT;
   return photo.width / photo.height;
+}
+
+/**
+ * Traps Tab/Shift+Tab inside a modal container and restores focus to
+ * whatever was focused before it opened. Shared by the lightbox and the name
+ * prompt, which can each appear stacked over the grid.
+ */
+function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const restoreTarget =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const getFocusable = () =>
+      Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+
+    (getFocusable()[0] ?? container).focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const items = getFocusable();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    container.addEventListener("keydown", onKeyDown);
+    return () => {
+      container.removeEventListener("keydown", onKeyDown);
+      restoreTarget?.focus();
+    };
+  }, [active, containerRef]);
 }
 
 export function GalleryView({
@@ -385,6 +440,22 @@ export function GalleryView({
     if (lightboxIndex === null) return;
 
     function onKey(event: KeyboardEvent) {
+      // The name prompt can open on top of the lightbox (favoriting/reacting
+      // from inside it) and owns its own Escape handling — without this, its
+      // Escape bubbles here and closes the lightbox instead, orphaning the
+      // prompt on screen. Typing while it's open must never reach these
+      // shortcuts either, which is what previously toggled selection when a
+      // viewer's name started with "s".
+      if (namePromptFor) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      ) {
+        return;
+      }
+
       if (event.key === "Escape") setLightboxIndex(null);
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
@@ -402,10 +473,12 @@ export function GalleryView({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [allowDownload, lightboxIndex, move, photos, pick]);
+  }, [allowDownload, lightboxIndex, move, namePromptFor, photos, pick]);
 
   const active = lightboxIndex === null ? null : photos[lightboxIndex];
   const activeSelected = active ? selection.ids.has(active.id) : false;
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(lightboxRef, lightboxIndex !== null);
 
   /**
    * Warms the next and previous photo while the current one is on screen.
@@ -458,10 +531,19 @@ export function GalleryView({
 
   return (
     <main className="mx-auto max-w-7xl p-4 sm:p-8">
+      <div aria-live="polite" className="sr-only">
+        {selection.ids.size > 0 ? pluralize(selection.ids.size, FORMS.selected) : ""}
+      </div>
+      <div aria-live="polite" className="sr-only">
+        {zipState === "preparing" && "Připravuji stažení…"}
+        {zipState === "error" && "Stažení se nepodařilo připravit. Zkus to prosím znovu."}
+      </div>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
-          {eventDate && <p className="text-sm text-neutral-500">{eventDate}</p>}
+          {eventDate && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <PresenceStrip token={token} optedOut={optedOut} />
@@ -510,7 +592,7 @@ export function GalleryView({
             </>
           ) : (
             <>
-              <span className="text-sm text-neutral-500">
+              <span className="text-sm text-neutral-500 dark:text-neutral-400">
                 Podrž fotku (nebo na ni najeď myší) a vyber, co chceš stáhnout.
               </span>
               <button
@@ -593,7 +675,7 @@ export function GalleryView({
                   src={photo.objectKey}
                   alt={photo.fileName}
                   fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
                   priority={index < EAGER_TILES}
                   className={`object-cover transition-transform duration-200 ${
                     selection.ids.has(photo.id) ? "scale-90 rounded" : "hover:scale-105"
@@ -633,15 +715,19 @@ export function GalleryView({
       </ul>
 
       {photos.length === 0 && (
-        <p className="text-sm text-neutral-500">V galerii zatím nejsou žádné fotky.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          V galerii zatím nejsou žádné fotky.
+        </p>
       )}
 
       {active && (
         <div
+          ref={lightboxRef}
           role="dialog"
           aria-modal="true"
           aria-label={active.fileName}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
           onClick={() => setLightboxIndex(null)}
         >
           <div
@@ -814,7 +900,7 @@ export function GalleryView({
         />
       )}
 
-      <footer className="mt-10 space-y-4 border-t pt-4 text-xs text-neutral-500">
+      <footer className="mt-10 space-y-4 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
         {photos.length > 0 && (
           <div className="rounded-lg border p-4">
             <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
@@ -980,9 +1066,27 @@ function ViewerChips({ viewers }: { viewers: GalleryViewer[] }) {
 
 function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
   const [value, setValue] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(containerRef, true);
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="name-prompt-title"
+      tabIndex={-1}
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 outline-none"
+      onKeyDown={(event) => {
+        // Owns its own Escape rather than letting it bubble to a lightbox
+        // that might be open underneath — see the note in the lightbox's
+        // keydown handler above.
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          onSubmit("");
+        }
+      }}
+    >
       <form
         className="w-full max-w-sm space-y-3 rounded-lg bg-white p-5 dark:bg-neutral-900"
         onSubmit={(event) => {
@@ -990,15 +1094,16 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
           onSubmit(value.trim());
         }}
       >
-        <h2 className="text-lg font-semibold">Kdo se dívá?</h2>
-        <p className="text-sm text-neutral-500">
+        <h2 id="name-prompt-title" className="text-lg font-semibold">
+          Kdo se dívá?
+        </h2>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">
           Jméno uvidí ostatní u tvých oblíbených fotek. Můžeš ho i přeskočit.
         </p>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}
           maxLength={60}
-          autoFocus
           placeholder="Např. Petra"
           className="w-full rounded border px-3 py-2"
         />
