@@ -23,6 +23,7 @@
     "docker:reset": "docker compose down -v && pnpm docker:up",
     "docker:logs": "docker compose logs -f",
     "smoke:storage": "tsx --conditions=react-server scripts/smoke-storage.ts",
+    "auth:tables": "tsx --conditions=react-server scripts/dump-auth-tables.ts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },

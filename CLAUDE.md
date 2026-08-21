@@ -13,6 +13,9 @@ before changing architecture, storage, auth, or billing-relevant code.
 - `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:reset` · `pnpm db:studio` —
   Prisma 7 (CLI reads `DIRECT_URL` via `prisma.config.ts`)
 - `pnpm smoke:storage` — presign → PUT → public GET → transform → DELETE against the current `.env`
+- `pnpm auth:tables` — dump the table shape better-auth expects. **Use this, not
+  `@better-auth/cli generate`** — the published CLI lags the library (it emits a 1.4-era
+  schema against better-auth 1.7 and silently omits `Account.issuer`).
 
 ## Stack
 
