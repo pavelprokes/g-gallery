@@ -47,7 +47,9 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
 
 - Code, comments, commit messages: English. Conversation with the user: Czech.
 - Zod-validate every Route Handler input. Colocate unit tests as `*.test.ts(x)` next to source.
-- Vitest cannot render async Server Components — cover those with Playwright instead.
+- Vitest cannot render async Server Components. **Do not write Playwright/E2E tests** — they are
+  deferred to the very end by Pavel's decision (`docs/TODO.md`); cover what you can with unit tests
+  and say plainly what is left uncovered.
 - Generated Prisma client lives in `src/generated/prisma` (gitignored; `pnpm db:generate` after
   schema changes, runs automatically on install).
 - Local dev runs entirely on Docker (`compose.yaml`); container images are pinned, never `:latest`.

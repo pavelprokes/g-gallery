@@ -5,6 +5,16 @@ Nothing here is designed or estimated yet; the point of the list is that none of
 it gets lost. `docs/PLAN.md` stays the architecture authority — anything from
 here that we adopt gets folded into it with the same verification standard.
 
+## 0. E2E test suite — last, on Pavel's signal
+
+Playwright is installed and `pnpm test:e2e` exists, but **no E2E tests get written until Pavel says
+so**. Removed from Phases 1–4 and parked as Phase 5 in `docs/PLAN.md` on 2026-08-21. The reason is
+churn: routes, the upload flow and share gating have all changed under bug fixes this week, and
+tests written against a moving surface get rewritten rather than run. Unit tests continue as normal.
+
+When it does happen, the path worth covering first is the one that has broken twice already:
+upload → confirm → publish → share link → view tracking.
+
 ## 1. Offline access
 
 Offline browsing of a gallery. Open questions before this can be scoped: which

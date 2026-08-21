@@ -14,6 +14,20 @@ import {
   subscribeOptOut,
 } from "@/lib/viewer-id";
 import { originalUrl } from "@/lib/photo-url";
+import {
+  REACTION_EMOJI,
+  REACTION_KINDS,
+  REACTION_LABEL,
+  totalReactions,
+  type PhotoReactionState,
+  type ReactionKind,
+} from "@/lib/reactions-shared";
+
+/** Distance a touch must travel before it counts as a swipe, not a tap. */
+const SWIPE_THRESHOLD_PX = 50;
+
+/** Beyond this the gesture is a scroll, not a horizontal swipe. */
+const SWIPE_MAX_VERTICAL_PX = 80;
 
 export interface GalleryPhoto {
   id: string;
@@ -66,6 +80,10 @@ export function GalleryView({
     () => new Map(photos.map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<Map<string, PhotoReactionState>>(() => new Map());
+  // Which reaction the name prompt interrupted, so it can be sent afterwards.
+  const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const optedOut = useSyncExternalStore(
     subscribeOptOut,
@@ -126,6 +144,72 @@ export function GalleryView({
 
     return () => controller.abort();
   }, [allowReactions, token]);
+
+  // Reaction tallies are public, but "mine" is per-viewer, so this is fetched
+  // client-side for the same reason the hearts are.
+  useEffect(() => {
+    if (!allowReactions) return;
+    const anonKey = getViewerId();
+    const query = anonKey ? `?anonKey=${encodeURIComponent(anonKey)}` : "";
+
+    const controller = new AbortController();
+    void fetch(`/api/g/${encodeURIComponent(token)}/reaction${query}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : { reactions: {} }))
+      .then((data: { reactions: Record<string, PhotoReactionState> }) =>
+        setReactions(new Map(Object.entries(data.reactions))),
+      )
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [allowReactions, token]);
+
+  const sendReaction = useCallback(
+    async (photoId: string, kind: ReactionKind, displayName?: string) => {
+      const anonKey = getViewerId();
+      if (!anonKey) return;
+
+      const response = await fetch(`/api/g/${encodeURIComponent(token)}/reaction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anonKey, photoId, kind, displayName }),
+      });
+      if (!response.ok) return;
+
+      // The server is authoritative about the tally: two viewers reacting at
+      // once would otherwise leave each of them with their own stale count.
+      const data = (await response.json()) as {
+        mine: ReactionKind | null;
+        counts: Partial<Record<ReactionKind, number>>;
+      };
+      setReactions((prev) => new Map(prev).set(photoId, { counts: data.counts, mine: data.mine }));
+    },
+    [token],
+  );
+
+  const toggleReaction = useCallback(
+    (photoId: string, kind: ReactionKind) => {
+      const current = reactions.get(photoId)?.mine ?? null;
+      const next = current === kind ? null : kind;
+
+      // Optimistic: the picker responds to the tap, the counts follow.
+      setReactions((prev) => {
+        const entry = prev.get(photoId) ?? { counts: {}, mine: null };
+        return new Map(prev).set(photoId, { ...entry, mine: next });
+      });
+
+      // Same "join" moment as the heart — asked once, always skippable.
+      if (next && !getViewerName() && !hasAnsweredNamePrompt()) {
+        setNamePromptFor(photoId);
+        setPendingReaction(kind);
+        return;
+      }
+
+      void sendReaction(photoId, kind, getViewerName() ?? undefined);
+    },
+    [reactions, sendReaction],
+  );
 
   const sendFavorite = useCallback(
     async (photoId: string, favorite: boolean, displayName?: string) => {
@@ -251,12 +335,15 @@ export function GalleryView({
                 />
               </button>
               {allowReactions && (
-                <HeartButton
-                  active={favorites.has(photo.id)}
-                  count={counts.get(photo.id) ?? 0}
-                  onClick={() => toggleFavorite(photo.id)}
-                  className="absolute right-2 bottom-2"
-                />
+                <>
+                  <HeartButton
+                    active={favorites.has(photo.id)}
+                    count={counts.get(photo.id) ?? 0}
+                    onClick={() => toggleFavorite(photo.id)}
+                    className="absolute right-2 bottom-2"
+                  />
+                  <ReactionBadge state={reactions.get(photo.id)} />
+                </>
               )}
             </li>
           );
@@ -283,7 +370,26 @@ export function GalleryView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
           onClick={() => setLightboxIndex(null)}
         >
-          <div className="relative h-full w-full" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="relative h-full w-full touch-pan-y"
+            onClick={(event) => event.stopPropagation()}
+            onTouchStart={(event) => {
+              const touch = event.touches[0];
+              touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+            }}
+            onTouchEnd={(event) => {
+              const start = touchStart.current;
+              const touch = event.changedTouches[0];
+              touchStart.current = null;
+              if (!start || !touch) return;
+
+              const dx = touch.clientX - start.x;
+              // A mostly-vertical drag is a scroll attempt, not a swipe.
+              if (Math.abs(touch.clientY - start.y) > SWIPE_MAX_VERTICAL_PX) return;
+              if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+              move(dx < 0 ? 1 : -1);
+            }}
+          >
             <Image
               src={active.objectKey}
               alt={active.fileName}
@@ -330,12 +436,18 @@ export function GalleryView({
             onClick={(event) => event.stopPropagation()}
           >
             {allowReactions && (
-              <HeartButton
-                active={favorites.has(active.id)}
-                count={counts.get(active.id) ?? 0}
-                onClick={() => toggleFavorite(active.id)}
-                className="bg-white/10 text-white"
-              />
+              <>
+                <HeartButton
+                  active={favorites.has(active.id)}
+                  count={counts.get(active.id) ?? 0}
+                  onClick={() => toggleFavorite(active.id)}
+                  className="bg-white/10 text-white"
+                />
+                <ReactionBar
+                  state={reactions.get(active.id)}
+                  onPick={(kind) => toggleReaction(active.id, kind)}
+                />
+              </>
             )}
             {allowDownload && (
               <a
@@ -354,10 +466,15 @@ export function GalleryView({
         <NamePrompt
           onSubmit={(name) => {
             const photoId = namePromptFor;
+            const kind = pendingReaction;
             setNamePromptFor(null);
+            setPendingReaction(null);
             if (name) setViewerName(name);
             else dismissNamePrompt();
-            void sendFavorite(photoId, true, name || undefined);
+
+            // The prompt interrupts exactly one action; resume that one only.
+            if (kind) void sendReaction(photoId, kind, name || undefined);
+            else void sendFavorite(photoId, true, name || undefined);
           }}
         />
       )}
@@ -402,6 +519,59 @@ function HeartButton({
       <span aria-hidden>{active ? "♥" : "♡"}</span>
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>
+  );
+}
+
+/**
+ * The picker. Rendered in the lightbox only: on a grid tile it would compete
+ * with the heart for the same corner and turn a scroll into a mis-tap.
+ */
+function ReactionBar({
+  state,
+  onPick,
+}: {
+  state: PhotoReactionState | undefined;
+  onPick: (kind: ReactionKind) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 backdrop-blur-sm">
+      {REACTION_KINDS.map((kind) => {
+        const count = state?.counts[kind] ?? 0;
+        const mine = state?.mine === kind;
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onPick(kind)}
+            aria-pressed={mine}
+            aria-label={REACTION_LABEL[kind]}
+            title={REACTION_LABEL[kind]}
+            className={`flex items-center gap-1 rounded-full px-2 py-1 text-sm transition-transform ${
+              mine ? "scale-110 bg-white/25" : "hover:bg-white/15"
+            }`}
+          >
+            <span aria-hidden>{REACTION_EMOJI[kind]}</span>
+            {count > 0 && <span className="text-xs text-white tabular-nums">{count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Compact summary on a grid tile — the picker itself lives in the lightbox. */
+function ReactionBadge({ state }: { state: PhotoReactionState | undefined }) {
+  const total = totalReactions(state);
+  if (total === 0) return null;
+
+  // At most three distinct emoji, so a busy photo does not overflow the tile.
+  const kinds = REACTION_KINDS.filter((kind) => (state?.counts[kind] ?? 0) > 0).slice(0, 3);
+
+  return (
+    <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm">
+      <span aria-hidden>{kinds.map((kind) => REACTION_EMOJI[kind]).join("")}</span>
+      <span className="tabular-nums">{total}</span>
+    </span>
   );
 }
 

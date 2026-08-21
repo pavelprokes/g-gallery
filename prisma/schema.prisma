@@ -157,6 +157,7 @@ model Photo {
   updatedAt   DateTime    @updatedAt
 
   favorites Favorite[]
+  reactions Reaction[]
   events    ActivityEvent[]
 
   @@index([galleryId, status, sortOrder])
@@ -213,6 +214,7 @@ model Viewer {
 
   sessions  ViewSession[]
   favorites Favorite[]
+  reactions Reaction[]
   events    ActivityEvent[]
 
   @@unique([galleryId, anonKey])
@@ -238,6 +240,31 @@ model Favorite {
   createdAt DateTime @default(now())
 
   @@unique([photoId, viewerId])
+}
+
+/// Fixed set — an open emoji field would be a free-text channel from anonymous
+/// viewers into the owner's admin, and every value is a UI variant to design.
+enum ReactionKind {
+  LOVE
+  WOW
+  LAUGH
+  SAD
+  CLAP
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  photoId   String
+  photo     Photo        @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    Viewer       @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  kind      ReactionKind
+  createdAt DateTime     @default(now())
+
+  /// One reaction per viewer per photo: picking another kind replaces it,
+  /// which keeps the per-photo tally a count of people, not of clicks.
+  @@unique([photoId, viewerId])
+  @@index([photoId])
 }
 
 model ActivityEvent {

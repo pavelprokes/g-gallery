@@ -261,7 +261,7 @@ gallery in one month.
    only — no verification review needed), Supabase project, `.env` scheme.
 2. **Phase 1 — vertical slice**: schema (User/Gallery/Photo/ShareLink/Favorite + `crc32`, `sizeBytes`,
    `storageTier`, `status`) → better-auth (Google, admin role by email allowlist) → presign route →
-   minimal uploader → gallery grid + lightbox via custom CF loader → share-link page. E2E smoke.
+   minimal uploader → gallery grid + lightbox via custom CF loader → share-link page.
 3. **Phase 2 — delivery features** — _mostly done_: ✅ expiry/password unlock (HMAC cookie bound to
    the password hash), ✅ favorites + name prompt + viewer chips, ✅ per-photo download, ✅ justified
    layout, ✅ uploader (JIT presign, retry, CRC32 + GPS strip + dimensions), ✅ ghost-upload
@@ -273,7 +273,10 @@ gallery in one month.
 4. **Phase 3 — activity & polish**: avatar strip + name prompt, reactions, owner Updates feed,
    Supabase Realtime presence ("viewing now"), Web Push + daily Resend digest, justified layout,
    virtual scroll, keyboard/swipe lightbox, IA lifecycle job.
-5. **Phase 4 (v2) — ZIP Worker** (adds Workers Paid $5/mo), watermark variants (feasibility + quota
+5. **Phase 5 — E2E test suite**: deferred deliberately to the very end (`docs/TODO.md`) — the
+   routes, upload flow and share gating are still moving, so tests written earlier get rewritten.
+   Unit tests (Vitest) continue as normal throughout.
+6. **Phase 4 (v2) — ZIP Worker** (adds Workers Paid $5/mo), watermark variants (feasibility + quota
    impact unverified — needs its own spike).
 
 ## 12. Decisions (resolved 2026-08-20)

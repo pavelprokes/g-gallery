@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
+import { reactionTotals } from "@/lib/reactions";
 import { Uploader } from "@/components/uploader";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { publishGallery } from "../../actions";
@@ -48,9 +49,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   });
   if (!gallery) notFound();
 
-  const [counts, perPhoto] = await Promise.all([
+  const [counts, perPhoto, reactions] = await Promise.all([
     galleryCounts(gallery.id),
     photoCounts(gallery.id),
+    reactionTotals(gallery.id),
   ]);
 
   async function publish() {
@@ -114,6 +116,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   {stats.views} zobr. · {stats.uniqueViewers} unik.
                   {photo._count.favorites > 0 && (
                     <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
+                  )}
+                  {(reactions.get(photo.id) ?? 0) > 0 && (
+                    <span className="text-amber-600"> · {reactions.get(photo.id)} reakcí</span>
                   )}
                 </p>
               </li>
