@@ -303,8 +303,8 @@ gallery in one month.
 
 ## 12. Decisions (resolved 2026-08-20)
 
-1. **Domain**: `svatebni-fotograf-cechy.cz`, registered at Vedos.cz; app stays on Vercel.
-   Plan: keep registration at Vedos, **delegate nameservers to Cloudflare** (free zone — full-NS
+1. **Domain**: `svatebni-fotograf-cechy.cz`, registered at Wedos.cz; app stays on Vercel.
+   Plan: keep registration at Wedos, **delegate nameservers to Cloudflare** (free zone — full-NS
    delegation is required on the free plan; partial CNAME setup is Business-only). In the
    Cloudflare zone: apex/`www` → Vercel (per Vercel docs prefer **DNS-only/grey-cloud** records for
    the app to avoid double-proxying), `photos.svatebni-fotograf-cechy.cz` → R2 bucket custom domain

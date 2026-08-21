@@ -3,17 +3,17 @@
 Everything here is dashboard/CLI work that needs your accounts. Do it in order;
 step 2 depends on step 1 (DNS), and step 3's bucket setting is **immutable**.
 
-Domain: `svatebni-fotograf-cechy.cz` (registered at Vedos.cz).
+Domain: `svatebni-fotograf-cechy.cz` (registered at Wedos.cz).
 
 ---
 
 ## 1. Cloudflare zone + nameserver delegation
 
 1. Cloudflare dashboard → **Add a site** → `svatebni-fotograf-cechy.cz` → **Free** plan.
-2. Cloudflare imports existing DNS records. **Check them against Vedos before continuing** —
+2. Cloudflare imports existing DNS records. **Check them against Wedos before continuing** —
    especially `MX` records if mail runs on this domain. A missing MX record after delegation
    means mail stops arriving.
-3. Cloudflare shows two nameservers (e.g. `xxx.ns.cloudflare.com`). In the Vedos admin, replace
+3. Cloudflare shows two nameservers (e.g. `xxx.ns.cloudflare.com`). In the Wedos admin, replace
    the current NS records with those two.
    > Free plan requires **full nameserver delegation** — the partial/CNAME setup is Business-only.
 4. Wait for the zone to go **Active** (usually minutes, up to 24 h).
