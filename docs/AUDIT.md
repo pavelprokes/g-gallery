@@ -394,35 +394,55 @@ grid behind the modal. Not exercised in this session (no touch emulation availab
 
 ## 8. Fix order
 
-### P1 — before the next gallery ships to a client
+### P1 — before the next gallery ships to a client — **done 2026-08-21**
 
-1. Fix the lightbox `keydown` handler to ignore events whose target is a form control (§3.3),
+1. ✅ Fix the lightbox `keydown` handler to ignore events whose target is a form control (§3.3),
    and give `NamePrompt` real dialog semantics: `role="dialog"`, `aria-modal`, an Escape handler
    scoped to itself, focus trap, focus return on close (§3.3, §5.2).
-2. Lightbox focus trap: move focus into the dialog on open, trap Tab/Shift+Tab inside it, restore
-   focus to the originating tile on close (§5.1).
-3. Add a root background token and `color-scheme` declaration so `dark:` variants apply
+2. ✅ Lightbox focus trap: move focus into the dialog on open, trap Tab/Shift+Tab inside it,
+   restore focus to the originating tile on close (§5.1).
+3. ✅ Add a root background token and `color-scheme` declaration so `dark:` variants apply
    consistently across the whole page, not just the elements that opted in; darken
    `text-neutral-500` in dark contexts to clear 4.5:1 (§5.3).
-4. Add `aria-live="polite"` regions for selection count, ZIP state, and `OfflineToggle` state
+4. ✅ Add `aria-live="polite"` regions for selection count, ZIP state, and `OfflineToggle` state
    (§5.6).
-5. `noindex` meta + per-gallery `generateMetadata` (title/description) on `/g/[token]` (§3.10).
-6. Add `error.tsx`/`not-found.tsx` for the share route tree (§3.10).
-7. Fix the grid `sizes` attribute to respect the `max-w-7xl` cap (§3.1).
+5. ✅ `noindex` meta + per-gallery `generateMetadata` (title/description) on `/g/[token]` (§3.10).
+6. ✅ Add `error.tsx`/`not-found.tsx` for the share route tree (§3.10).
+7. ✅ Fix the grid `sizes` attribute to respect the `max-w-7xl` cap (§3.1).
 
-### P2 — next release
+Verified live in a browser, not just by reading the diff — every P1 item above plus a bug found
+in the process are in `git log` as `fix: accessibility audit P1 — focus trap, keyboard bug,
+noindex, contrast`.
 
-1. Rate-limit `unlockShareLink` (§3.8).
-2. Lightbox: seed the background with the tile's placeholder colour instead of `transparent`
+### P2 — next release — **done 2026-08-21**
+
+1. ✅ Rate-limit `unlockShareLink` (§3.8). Implemented per-`ShareLink` (not per-visitor — no
+   viewer identifier is involved, per the "never store viewer IPs" invariant): 5 consecutive
+   wrong passwords locks the link for 15 minutes, checked _before_ `verifyPassword` runs so the
+   scrypt CPU-amplification angle is actually closed, not just UI-throttled.
+2. ✅ Lightbox: seed the background with the tile's placeholder colour instead of `transparent`
    before the full image loads (§3.2); push a history entry on open so back/Escape close it
    symmetrically (§4.2).
-3. Arrow-key navigation across the grid with a roving `tabindex` (§5.5).
-4. `React.memo` the photo tile (§3.4).
-5. Reconcile `CLAUDE.md`'s argon2 claim with the actual scrypt implementation, and its "image
-   bytes never flow through Vercel" framing against the new SW-cached image bytes (still true —
-   they're cached from the CDN, not Vercel — but worth a clarifying line) (§3.8).
-6. Resolve `takenAt`/`sortOrder`: either fill them in (EXIF-date backfill, an admin reorder
-   action) or remove them and shrink the `Photo` index accordingly (§3.5).
+3. ✅ Arrow-key navigation across the grid with a roving `tabindex` (§5.5).
+4. ✅ `React.memo` the photo tile (§3.4) — the shared long-press ref moved to a local one per
+   tile in the process (a new `react-hooks/immutability` lint rule flags mutating a ref passed
+   down as a prop, and per-tile is also the more correct model).
+5. ✅ Reconciled `CLAUDE.md`'s argon2 claim with the actual scrypt implementation, and clarified
+   its "image bytes never flow through Vercel" invariant against the offline-galleries service
+   worker (§3.8).
+6. ✅ Resolved `takenAt`/`sortOrder`: removed both (project owner's call — cleanup over building
+   EXIF-date backfill or a reorder feature), and shrank the `Photo` index accordingly (§3.5).
+
+Verified live in a browser: rate-limit lockout confirmed against the DB after 5 failed attempts
+(and a 6th attempt with the _correct_ password still rejected while locked); lightbox
+back-button/close/Escape symmetry confirmed via `window.history`; roving tabindex confirmed via
+realistic-timing key dispatch. Found and fixed one real bug outside this list's original scope in
+the process: `OfflineToggle` computed its initial state from `offlineSupport()` (which reads
+`window`) inside a `useState` initializer, which runs differently on the server (no `window`) than
+on the client's pre-hydration first render (real `window`) — a straight SSR/CSR mismatch that threw
+an uncaught hydration error on every real page load, caught only because the page was actually
+loaded in a browser rather than trusted from typecheck/lint/test/build output. All in `git log` as
+`fix: accessibility audit P2 — rate limiting, lightbox history, roving nav`.
 
 ### P3 — once conditions change (see §7 for triggers)
 
