@@ -60,4 +60,31 @@ describe("imageLoader", () => {
       "/galleries/abc/p1.jpg?w=640",
     );
   });
+
+  describe("signed images (docs/PLAN.md §4.1 v2 hardening)", () => {
+    it("routes through the signing worker when the src carries a grant and the env var is set", () => {
+      vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://photos.example.cz");
+      vi.stubEnv("NEXT_PUBLIC_SIGNED_IMAGES_URL", "https://img.example.cz");
+      expect(
+        imageLoader({ src: "galleries/abc/p1.jpg?sig=abc.def&exp=123", width: 1080, quality: 82 }),
+      ).toBe("https://img.example.cz/img/galleries/abc/p1.jpg?w=1080&q=82&sig=abc.def&exp=123");
+    });
+
+    it("falls back to the unsigned URL when the worker env var is not set", () => {
+      vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://photos.example.cz");
+      expect(
+        imageLoader({ src: "galleries/abc/p1.jpg?sig=abc.def&exp=123", width: 1080, quality: 82 }),
+      ).toBe(
+        "https://photos.example.cz/cdn-cgi/image/width=1080,quality=82,format=auto,fit=scale-down/galleries/abc/p1.jpg",
+      );
+    });
+
+    it("falls back to the unsigned URL when the src carries no grant, even with the env var set", () => {
+      vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://photos.example.cz");
+      vi.stubEnv("NEXT_PUBLIC_SIGNED_IMAGES_URL", "https://img.example.cz");
+      expect(imageLoader({ src: "galleries/abc/p1.jpg", width: 1080, quality: 82 })).toBe(
+        "https://photos.example.cz/cdn-cgi/image/width=1080,quality=82,format=auto,fit=scale-down/galleries/abc/p1.jpg",
+      );
+    });
+  });
 });

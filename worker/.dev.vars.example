@@ -3,3 +3,10 @@
 # fails verification with bad_signature.
 ZIP_SIGNING_SECRET="paste the value from the app's .env"
 APP_ORIGIN="http://localhost:3000"
+# IMAGE_SIGNING_SECRET must be byte-identical to the app's IMAGE_SIGNING_SECRET.
+# Only needed once signed images (docs/PLAN.md §4.1 "v2 hardening") are deployed —
+# the app falls back to unsigned URLs when its own IMAGE_SIGNING_SECRET is unset.
+IMAGE_SIGNING_SECRET="paste the value from the app's .env"
+# The zone hostname Image Transformations run on — this Worker proxies to it,
+# it does not resize images itself.
+PHOTOS_ZONE_HOST="photos.svatebni-fotograf-cechy.cz"

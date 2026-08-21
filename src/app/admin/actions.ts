@@ -10,6 +10,7 @@ import {
   hashPassword,
   hashShareToken,
 } from "@/lib/share-token";
+import { gallerySlug } from "@/lib/gallery-slug";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3).
@@ -63,9 +64,13 @@ const createShareLinkSchema = z.object({
 
 /**
  * Returns the raw token exactly once — only its SHA-256 hash is persisted, so
- * it can never be recovered or displayed again.
+ * it can never be recovered or displayed again. The slug is frozen here too
+ * (docs/TODO.md §6): a later rename of the gallery doesn't reach links
+ * already handed out, matching Notion/Figma's own trade-off.
  */
-export async function createShareLink(formData: FormData): Promise<string> {
+export async function createShareLink(
+  formData: FormData,
+): Promise<{ token: string; slug: string }> {
   const session = await requireAdmin();
 
   const parsed = createShareLinkSchema.safeParse({
@@ -78,11 +83,12 @@ export async function createShareLink(formData: FormData): Promise<string> {
 
   const gallery = await prisma.gallery.findFirst({
     where: { id: parsed.data.galleryId, ownerId: session.user.id },
-    select: { id: true },
+    select: { id: true, title: true, eventDate: true },
   });
   if (!gallery) throw new Error("NOT_FOUND");
 
   const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, gallery.eventDate);
 
   await prisma.shareLink.create({
     data: {
@@ -93,11 +99,12 @@ export async function createShareLink(formData: FormData): Promise<string> {
       expiresAt: parsed.data.expiresInDays
         ? new Date(Date.now() + parsed.data.expiresInDays * 86_400_000)
         : null,
+      slug,
     },
   });
 
   revalidatePath(`/admin/g/${gallery.id}`);
-  return token;
+  return { token, slug };
 }
 
 /** Revoking is the only true way to cut off access to an already-shared link. */
@@ -116,4 +123,37 @@ export async function revokeShareLink(shareLinkId: string) {
   });
 
   revalidatePath(`/admin/g/${link.galleryId}`);
+}
+
+/** How long a trashed gallery is recoverable before the purge cron deletes it for good. */
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Moves a gallery to trash: hidden from the admin list, R2 objects untouched.
+ * Recoverable via {@link restoreGallery} until `purgeAt` passes.
+ */
+export async function trashGallery(galleryId: string) {
+  const session = await requireAdmin();
+
+  const now = new Date();
+  await prisma.gallery.updateMany({
+    where: { id: galleryId, ownerId: session.user.id },
+    data: { trashedAt: now, purgeAt: new Date(now.getTime() + TRASH_RETENTION_MS) },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/g/${galleryId}`);
+}
+
+/** Pulls a gallery back out of trash before the purge cron gets to it. */
+export async function restoreGallery(galleryId: string) {
+  const session = await requireAdmin();
+
+  await prisma.gallery.updateMany({
+    where: { id: galleryId, ownerId: session.user.id },
+    data: { trashedAt: null, purgeAt: null },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/g/${galleryId}`);
 }

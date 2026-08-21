@@ -4,10 +4,20 @@ import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
+import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
+import {
+  IMAGE_GRANT_TTL_SECONDS,
+  signImageAccess,
+  type SignedImageGrant,
+} from "@/lib/image-signing";
 
 // Dynamic by definition: token validity, expiry, revocation, and the password
 // unlock cookie are checked server-side on every request (docs/PLAN.md §4).
 export const dynamic = "force-dynamic";
+
+// The trailing [[...slug]] is cosmetic only (docs/TODO.md §6) — never parsed,
+// never part of resolution. `/g/{token}` and `/g/{token}/{anything}` resolve
+// identically; the slug just makes a copy-pasted or bookmarked URL readable.
 
 // Share links are unguessable but not access-controlled against crawlers, so
 // every gallery page must stay out of search indexes unconditionally. The
@@ -15,7 +25,9 @@ export const dynamic = "force-dynamic";
 // results between generateMetadata and the page render) and must never leak
 // a gallery's title for a token that fails to resolve (revoked, expired,
 // password-gated, or unknown) — fall back to a neutral placeholder instead.
-export async function generateMetadata(props: PageProps<"/g/[token]">): Promise<Metadata> {
+export async function generateMetadata(
+  props: PageProps<"/g/[token]/[[...slug]]">,
+): Promise<Metadata> {
   const { token } = await props.params;
 
   const access = await resolveShareLink(token);
@@ -35,7 +47,7 @@ export async function generateMetadata(props: PageProps<"/g/[token]">): Promise<
   };
 }
 
-export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) {
+export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {
   const { token } = await props.params;
 
   const access = await resolveShareLink(token);
@@ -64,9 +76,14 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
       id: true,
       title: true,
       eventDate: true,
+      storagePrefix: true,
+      // One extra row over the page size tells us whether a next page exists
+      // without a separate COUNT query — the same trick the cursor-paginated
+      // API route uses for every subsequent page.
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: PHOTOS_PAGE_SIZE + 1,
         select: {
           id: true,
           objectKey: true,
@@ -74,6 +91,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
           width: true,
           height: true,
           placeholder: true,
+          createdAt: true,
           _count: { select: { favorites: true } },
         },
       },
@@ -87,12 +105,20 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
   });
   if (!gallery) notFound();
 
+  const hasMore = gallery.photos.length > PHOTOS_PAGE_SIZE;
+  const page = hasMore ? gallery.photos.slice(0, PHOTOS_PAGE_SIZE) : gallery.photos;
+  const last = page.at(-1);
+  const initialCursor =
+    hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
+
+  const imageGrant = await mintImageGrant(gallery.storagePrefix);
+
   return (
     <GalleryView
       token={token}
       title={gallery.title}
       eventDate={gallery.eventDate?.toLocaleDateString("cs-CZ") ?? null}
-      photos={gallery.photos.map((photo) => ({
+      initialPhotos={page.map((photo) => ({
         id: photo.id,
         objectKey: photo.objectKey,
         fileName: photo.fileName,
@@ -101,9 +127,25 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
         placeholder: photo.placeholder,
         favoriteCount: photo._count.favorites,
       }))}
+      initialCursor={initialCursor}
+      imageGrant={imageGrant}
       viewers={gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" }))}
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
     />
   );
+}
+
+/**
+ * Signs image access for this gallery's whole `storagePrefix`, or returns
+ * `null` when signing isn't configured — the loader (`src/lib/image-loader.ts`)
+ * falls back to today's unsigned direct-CDN URLs either way, so this is safe
+ * to deploy before the signing Worker exists (docs/PLAN.md §4.1).
+ */
+async function mintImageGrant(storagePrefix: string): Promise<SignedImageGrant | null> {
+  const secret = process.env.IMAGE_SIGNING_SECRET;
+  if (!secret) return null;
+
+  const exp = Math.floor(Date.now() / 1000) + IMAGE_GRANT_TTL_SECONDS;
+  return { exp, sig: await signImageAccess({ prefix: storagePrefix, exp }, secret) };
 }

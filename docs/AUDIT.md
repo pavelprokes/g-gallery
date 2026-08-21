@@ -446,9 +446,39 @@ loaded in a browser rather than trusted from typecheck/lint/test/build output. A
 
 ### P3 — once conditions change (see §7 for triggers)
 
-1. Signed/short-lived image URLs + width allowlist (§3.7).
-2. Virtualization and cursor pagination (§6, §7).
-3. A real justified layout without cropping (§4.1, §7).
-4. Trash / soft delete, and wiring `deleteGalleryWithObjects()` to an actual admin action (§3.9).
-5. Broadcast for live reactions (§3.8, §7).
-6. Move the upload pipeline's CRC32/EXIF/decode work into a Web Worker (§3.6).
+Five of six triggered early — Pavel wanted the URL slug for readability regardless of scale, and
+asked for the other four alongside it rather than waiting for their individual thresholds.
+
+1. ✅ Signed/short-lived image URLs + width allowlist (§3.7) — **done 2026-08-21**. HMAC-signed
+   grant per gallery `storagePrefix` (`src/lib/image-signing.ts`, mirrors `zip-manifest.ts`'s
+   format), minted server-side with a 2-hour TTL and appended to `next/image` `src` as `?sig=&exp=`
+   (`src/lib/image-loader.ts`); a Worker `GET /img/{key}` (`worker/src/index.ts`) verifies the
+   grant, checks the key falls under the signed prefix, allowlists width/quality against
+   `image-sizes.ts`, and proxies to the zone's own Image Transformations. Degrades gracefully to
+   today's unsigned direct-CDN URLs when `IMAGE_SIGNING_SECRET` is unset, so it is safe to ship
+   ahead of the Worker route actually being deployed (`docs/SETUP.md` documents the deferred
+   deployment steps).
+2. ✅ Virtualization and cursor pagination (§6, §7) — **done 2026-08-21**. TanStack Query
+   (`useInfiniteQuery`) + TanStack Virtual (`useWindowVirtualizer`) over a new cursor-paginated
+   API route (`src/app/api/g/[token]/photos/route.ts`, keyset on `createdAt`+`id`, page size 60);
+   the server-rendered first page seeds `initialData` so there is no client refetch on load.
+3. ✅ A real justified layout without cropping (§4.1, §7) — **done 2026-08-21**. Greedy per-row
+   packing scaled to fill the container width exactly (`src/lib/justified-layout.ts`), replacing
+   the fixed-row-height `object-cover` grid — no crop, full aspect ratio preserved per tile.
+4. ✅ Trash / soft delete, and wiring `deleteGalleryWithObjects()` to an actual admin action
+   (§3.9) — **done 2026-08-21**. `Gallery.trashedAt`/`purgeAt`, a "Smazat" button in the admin
+   detail page with a confirm step, a "Koš" section on the admin list with a restore action and a
+   countdown to purge, and a daily cron (`/api/cron/purge-trash`) that calls the existing
+   `deleteGalleryWithObjects()` once `purgeAt` passes — 30-day recovery window.
+5. Move the upload pipeline's CRC32/EXIF/decode work into a Web Worker (§3.6) — still open.
+
+**New, added mid-session, not in the original audit:** a readable URL slug
+(`/g/{token}/{slug}`, e.g. `/g/xY82f.../svatba-anna-a-petr-2026-08-12`) built from the gallery
+title and `eventDate` (`src/lib/gallery-slug.ts`), frozen into `ShareLink.slug` at link-creation
+time and appended after the token — purely cosmetic, never parsed on resolution, so old links
+without a slug keep working unchanged. See `docs/TODO.md` §6 for why it sits after the token
+rather than before (the token's base64url alphabet includes `-`/`_`, which would make a
+slug-before-token boundary ambiguous).
+
+Broadcast for live reactions (§3.8, §7) remains the one originally-listed P3 item not done this
+round — its trigger (concurrent same-room viewing, e.g. a wedding slideshow) hasn't come up yet.

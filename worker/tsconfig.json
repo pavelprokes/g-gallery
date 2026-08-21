@@ -11,5 +11,11 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "../src/lib/zip64.ts", "../src/lib/zip-manifest.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../src/lib/zip64.ts",
+    "../src/lib/zip-manifest.ts",
+    "../src/lib/image-signing.ts",
+    "../src/lib/image-sizes.ts"
+  ]
 }

@@ -6,7 +6,8 @@ import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { Uploader } from "@/components/uploader";
 import { ShareLinkPanel } from "@/components/share-link-panel";
-import { publishGallery } from "../../actions";
+import { DeleteGalleryButton } from "@/components/delete-gallery-button";
+import { publishGallery, restoreGallery } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       id: true,
       title: true,
       status: true,
+      trashedAt: true,
       photos: {
         where: { status: "CONFIRMED" },
         orderBy: [{ favorites: { _count: "desc" } }, { createdAt: "asc" }],
@@ -62,6 +64,17 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-8">
+      {gallery.trashedAt && (
+        <div className="flex items-center justify-between rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <p>Tato galerie je v koši a bude po uplynutí lhůty natrvalo smazána.</p>
+          <form action={restoreGallery.bind(null, gallery.id)}>
+            <button type="submit" className="rounded border px-2 py-1 text-xs">
+              Obnovit
+            </button>
+          </form>
+        </div>
+      )}
+
       <header className="flex items-baseline justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{gallery.title}</h1>
@@ -69,13 +82,19 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             {gallery.status} · {gallery.photos.length} fotek
           </p>
         </div>
-        {gallery.status === "DRAFT" && (
-          <form action={publish}>
-            <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-              Publikovat
-            </button>
-          </form>
-        )}
+        <div className="flex items-center gap-2">
+          {gallery.status === "DRAFT" && (
+            <form action={publish}>
+              <button
+                type="submit"
+                className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+              >
+                Publikovat
+              </button>
+            </form>
+          )}
+          {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
+        </div>
       </header>
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">

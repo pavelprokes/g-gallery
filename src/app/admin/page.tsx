@@ -3,9 +3,16 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { BADGE_CAP, unreadCount } from "@/lib/feed";
-import { createGallery } from "./actions";
+import { createGallery, restoreGallery } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Whole days left before the purge cron permanently deletes this gallery. */
+function daysUntilPurge(purgeAt: Date): number {
+  return Math.max(0, Math.ceil((purgeAt.getTime() - Date.now()) / DAY_MS));
+}
 
 export default async function AdminPage() {
   const session = await getAdminSession();
@@ -13,17 +20,24 @@ export default async function AdminPage() {
 
   const unread = await unreadCount(session.user.id);
 
-  const galleries = await prisma.gallery.findMany({
-    where: { ownerId: session.user.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      eventDate: true,
-      _count: { select: { photos: true, viewers: true, events: true } },
-    },
-  });
+  const [galleries, trashed] = await Promise.all([
+    prisma.gallery.findMany({
+      where: { ownerId: session.user.id, trashedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        eventDate: true,
+        _count: { select: { photos: true, viewers: true, events: true } },
+      },
+    }),
+    prisma.gallery.findMany({
+      where: { ownerId: session.user.id, trashedAt: { not: null } },
+      orderBy: { trashedAt: "desc" },
+      select: { id: true, title: true, purgeAt: true },
+    }),
+  ]);
 
   async function create(formData: FormData) {
     "use server";
@@ -82,6 +96,36 @@ export default async function AdminPage() {
           </li>
         ))}
       </ul>
+
+      {trashed.length > 0 && (
+        <details className="mt-6 rounded-lg border">
+          <summary className="cursor-pointer p-4 text-sm font-medium text-neutral-500">
+            Koš ({trashed.length})
+          </summary>
+          <ul className="divide-y border-t">
+            {trashed.map((gallery) => {
+              const daysLeft = gallery.purgeAt ? daysUntilPurge(gallery.purgeAt) : 0;
+              return (
+                <li key={gallery.id} className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-neutral-500">{gallery.title}</p>
+                    <p className="text-xs text-neutral-400">
+                      {daysLeft > 0
+                        ? `Smazána natrvalo za ${daysLeft} ${daysLeft === 1 ? "den" : daysLeft < 5 ? "dny" : "dní"}`
+                        : "Bude smazána natrvalo brzy"}
+                    </p>
+                  </div>
+                  <form action={restoreGallery.bind(null, gallery.id)}>
+                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                      Obnovit
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
     </main>
   );
 }

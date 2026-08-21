@@ -3,7 +3,10 @@
 Everything here is dashboard/CLI work that needs your accounts. Do it in order;
 step 2 depends on step 1 (DNS), and step 3's bucket setting is **immutable**.
 
-Domain: `svatebni-fotograf-cechy.cz` (registered at Wedos.cz).
+Domain: `svatebni-fotograf-cechy.cz` (registered at Wedos.cz). The apex/`www` belong to the
+`svatebni-fotograf-cechy-20` marketing site — a separate Vercel project already using that domain.
+g-gallery cannot also claim the apex, so it lives on **`photos.svatebni-fotograf-cechy.cz`**
+instead; R2/Image Transformations moved to **`cdn.svatebni-fotograf-cechy.cz`** to make room.
 
 ---
 
@@ -20,21 +23,24 @@ Domain: `svatebni-fotograf-cechy.cz` (registered at Wedos.cz).
 
 ### DNS records after activation
 
-| Name        | Type                | Target                      | Proxy                      |
-| ----------- | ------------------- | --------------------------- | -------------------------- |
-| `@` / `www` | as Vercel instructs | Vercel                      | **DNS only** (grey cloud)  |
-| `photos`    | CNAME               | set automatically in step 3 | **Proxied** (orange cloud) |
+| Name        | Type                | Target                                         | Proxy                      |
+| ----------- | ------------------- | ---------------------------------------------- | -------------------------- |
+| `@` / `www` | unchanged           | already the marketing site's — leave untouched | unchanged                  |
+| `photos`    | as Vercel instructs | Vercel (g-gallery project)                     | **DNS only** (grey cloud)  |
+| `cdn`       | CNAME               | set automatically in step 3                    | **Proxied** (orange cloud) |
 
-⚠️ The app domain must stay **DNS-only**. Cloudflare-proxying it silently breaks Vercel Web
-Analytics unless `/_vercel/insights/*` is explicitly forwarded.
+⚠️ The app subdomain (`photos`) must stay **DNS-only**. Cloudflare-proxying it silently breaks
+Vercel Web Analytics unless `/_vercel/insights/*` is explicitly forwarded. Only `cdn` (R2/Image
+Transformations) should be proxied.
 
 ---
 
 ## 2. Vercel project
 
 1. Import the GitHub repo into the **Pro team** (Hobby forbids commercial use).
-2. Add the domain `svatebni-fotograf-cechy.cz`, follow Vercel's DNS instructions, and create those
-   records in Cloudflare as **DNS only**.
+2. Add the domain `photos.svatebni-fotograf-cechy.cz` (**not** the apex — that belongs to the
+   `svatebni-fotograf-cechy-20` project), follow Vercel's DNS instructions, and create that record
+   in Cloudflare as **DNS only**.
 3. Environment variables: copy every key from `.env.example` (values filled in by the steps below).
 4. Settings → **Spend Management**: lower the notification threshold from the $200 default (≈ $5).
 5. The cron in `vercel.json` (`0 */8 * * *` → `/api/cron/keepalive`) registers on first deploy.
@@ -59,7 +65,7 @@ cat > cors.json <<'EOF'
   "rules": [
     {
       "allowed": {
-        "origins": ["https://svatebni-fotograf-cechy.cz", "http://localhost:3000"],
+        "origins": ["https://photos.svatebni-fotograf-cechy.cz", "http://localhost:3000"],
         "methods": ["PUT"],
         "headers": ["Content-Type", "Cache-Control"]
       },
@@ -83,8 +89,9 @@ confirm the upload.
 
 ### Custom domain
 
-Bucket → **Settings → Public access → Custom domains** → add `photos.svatebni-fotograf-cechy.cz`.
-Never use the `r2.dev` URL — it is rate-limited and documented as non-production.
+Bucket → **Settings → Public access → Custom domains** → add `cdn.svatebni-fotograf-cechy.cz`
+(**not** `photos.` — that subdomain is the app itself, on Vercel). Never use the `r2.dev` URL — it
+is rate-limited and documented as non-production.
 
 ### API token
 
@@ -111,7 +118,7 @@ Note the `.eu.` — the jurisdiction endpoint differs from the default one.
 Verify after the first upload:
 
 ```
-https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<object-key>
+https://cdn.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<object-key>
 ```
 
 ---
@@ -126,9 +133,10 @@ https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,for
    test user (100 max) and their consent expires weekly.
 5. Skip the logo upload — it triggers optional brand verification for no benefit here.
 6. Credentials → **Create OAuth client ID** → Web application:
-   - Authorized JavaScript origins: `https://svatebni-fotograf-cechy.cz`, `http://localhost:3000`
+   - Authorized JavaScript origins: `https://photos.svatebni-fotograf-cechy.cz`,
+     `http://localhost:3000`
    - Authorized redirect URIs:
-     `https://svatebni-fotograf-cechy.cz/api/auth/callback/google`,
+     `https://photos.svatebni-fotograf-cechy.cz/api/auth/callback/google`,
      `http://localhost:3000/api/auth/callback/google`
 7. Fill `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 
@@ -136,21 +144,73 @@ https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,for
 
 ## 6. Supabase
 
-> This uses your **2nd and last** free project slot. No headroom remains for a staging database.
+> **Decision (2026-08-21):** shared the existing `byhiodbtosmmtuemldqe` project (the
+> `svatebni-fotograf-cechy-20` marketing site's booking/orders database) instead of spending the
+> **2nd and last free project slot** on a dedicated one. g-gallery is isolated in its own Postgres
+> **schema** (`g_gallery`) behind a **least-privilege role** (`g_gallery_app`) that can only touch
+> that schema — chosen over a separate project because the noisy-neighbor risk (shared connection
+> pool/CPU) was judged acceptable against burning the last free slot. If that trade stops being
+> acceptable, moving to a dedicated project later just means: new project, same schema/role setup
+> below, restore the last backup (§12) into it.
 
-1. New project, region **eu-central** (Frankfurt) — closest to CZ and matches the R2 EU jurisdiction.
-2. **Project Settings → Database → Connection string**, read the actual pooler hostname from the
-   dashboard (do not assume `aws-0` vs `aws-1`):
-   - `DATABASE_URL` — **Transaction** pooler, port `6543`, append `?pgbouncer=true`
-   - `DIRECT_URL` — **Session** pooler, port `5432` (IPv4, works from GitHub Actions; the direct
-     `db.<ref>.supabase.co` host is IPv6-only on the free tier)
-3. **Project Settings → API**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server-only!), and the
-   anon/publishable key for `NEXT_PUBLIC_SUPABASE_ANON_KEY` (needed in Phase 3 for Realtime).
-4. Run migrations:
-   ```bash
-   pnpm db:migrate
+1. **Create the schema and role** (run once, as the project's `postgres` superuser):
+   ```sql
+   create schema g_gallery;
+   create role g_gallery_app with login password '<generate one>';
+   grant usage, create on schema g_gallery to g_gallery_app;
+   alter default privileges in schema g_gallery grant all privileges on tables to g_gallery_app;
+   alter default privileges in schema g_gallery grant all privileges on sequences to g_gallery_app;
    ```
-5. Seed the keep-alive row (the cron PATCHes it, it must exist):
+   Verify isolation before trusting it: `select has_table_privilege('g_gallery_app', 'public.<a
+table from the other app>', 'SELECT');` must return `f`.
+2. **Connection strings** — Supavisor's pooler username for a custom role is `<role>.<project-ref>`
+   (undocumented but confirmed working; the dashboard only shows this for the default `postgres`
+   role). Add `?options=-c%20search_path%3Dg_gallery` — Prisma's multiSchema config (below)
+   schema-qualifies every query regardless, but raw connections (psql, backup workflow) need it:
+   - `DATABASE_URL` — **Transaction** pooler, port `6543`, `g_gallery_app.<project-ref>` user,
+     append `&pgbouncer=true`
+   - `DIRECT_URL` — **Session** pooler, port `5432`, same user (IPv4, works from GitHub Actions;
+     the direct `db.<ref>.supabase.co` host is IPv6-only on the free tier)
+3. **`prisma/schema.prisma`** needs `schemas = ["g_gallery"]` on the `datasource` block and
+   `@@schema("g_gallery")` on every model/enum — already done in this repo. No `previewFeatures`
+   flag needed; multiSchema is GA in Prisma 7.
+4. **Migrations**: `prisma migrate deploy`'s "is the database empty" check (`P3005`) scans the
+   _whole database_, not just the declared schema — it will always fail here because `public`
+   already has the other app's tables, even against a completely empty `g_gallery`. Baseline
+   instead of fighting it: apply each `prisma/migrations/*/migration.sql` directly
+   (`psql "$DIRECT_URL" -f migration.sql`, in order — the SQL is schema-agnostic, so it lands in
+   whatever `search_path` the connection string sets), then tell Prisma they're already done:
+   ```bash
+   for dir in prisma/migrations/*/; do
+     npx prisma migrate resolve --applied "$(basename "$dir")"
+   done
+   ```
+   After baselining, `prisma migrate deploy` reports `No pending migrations to apply` and works
+   normally for anything added later — this is a one-time cost of sharing a database, not a
+   recurring one.
+5. **Expose the schema to PostgREST** (Project Settings → Data API → Exposed schemas, or via the
+   Management API) — add `g_gallery` alongside whatever is already there (`public,graphql_public`
+   typically); **do not remove** the existing entries, that's the other app's API access.
+6. **Grant `service_role` access within `g_gallery`** (PostgREST's own Postgres role needs this
+   independently of `g_gallery_app` — Supabase auto-grants it on `public` but not on custom
+   schemas), run as `g_gallery_app` since it owns the tables:
+   ```sql
+   grant usage on schema g_gallery to service_role;
+   grant select, insert, update, delete on all tables in schema g_gallery to service_role;
+   alter default privileges in schema g_gallery grant select, insert, update, delete on tables to service_role;
+   ```
+   Deliberately **not** granted to `anon`/`authenticated` — the client never queries Postgres
+   tables directly through PostgREST, only through Next.js routes (Prisma) and Realtime channels.
+7. **`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`** — Project
+   Settings → API (or `supabase projects api-keys --project-ref <ref>`). Use the **legacy JWT-style**
+   keys (`anon`/`service_role`), not the newer `sb_publishable_…`/`sb_secret_…` ones — the keepalive
+   cron sends `SUPABASE_SERVICE_ROLE_KEY` as a raw `Authorization: Bearer` JWT to PostgREST, which
+   only understands the JWT format.
+8. `src/app/api/cron/keepalive/route.ts`'s PostgREST call sets `Content-Profile: g_gallery` — without
+   it, PostgREST targets its default schema (`public`) and the write silently 404s against the
+   wrong app's data instead of `g_gallery."Keepalive"`.
+9. Seed the keep-alive row (the cron PATCHes it, it must exist) — run as `g_gallery_app`, since the
+   superuser role doesn't own the table and can't write to it:
    ```sql
    insert into "Keepalive" (id) values (1) on conflict do nothing;
    alter table "Keepalive" enable row level security;
@@ -235,7 +295,7 @@ CPU and an 8 GB archive is far past 10 ms.
 cd worker
 pnpm install --ignore-workspace          # its own install: Workers types clash with the app's DOM lib
 npx wrangler secret put ZIP_SIGNING_SECRET   # must match the app's .env byte for byte
-npx wrangler secret put APP_ORIGIN           # https://svatebni-fotograf-cechy.cz
+npx wrangler secret put APP_ORIGIN           # https://photos.svatebni-fotograf-cechy.cz
 npx wrangler deploy
 ```
 
@@ -250,7 +310,7 @@ Local development: `cp worker/.dev.vars.example worker/.dev.vars`, paste the app
 
 ## 10. Post-setup verification
 
-- [ ] `https://svatebni-fotograf-cechy.cz` serves the app; `photos.` subdomain returns R2 objects
+- [ ] `https://photos.svatebni-fotograf-cechy.cz` serves the app; `cdn.` subdomain returns R2 objects
 - [ ] Sign in with Google → `/admin` loads (role = admin)
 - [ ] Create a gallery, upload 2–3 photos → they reach `CONFIRMED`
 - [ ] A `/cdn-cgi/image/...` URL returns a resized AVIF/WebP
@@ -283,7 +343,7 @@ saving would be cents.
 
 ## 12. Database backup & restore
 
-`.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=public` through the
+`.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=g_gallery` through the
 session pooler, restore-verified into a throwaway PostgreSQL 17 container, then stored in R2 under
 `backups/` with 30-day pruning. The Supabase free tier takes **no** backups, so this is the only
 copy that exists.
@@ -299,21 +359,28 @@ empty-but-valid dump fails loudly instead of passing.
 aws s3 ls s3://g-gallery/backups/ --endpoint-url "$R2_ENDPOINT"
 aws s3 cp s3://g-gallery/backups/backup-<stamp>.dump . --endpoint-url "$R2_ENDPOINT"
 
-# 2. Prepare the target. The dump carries `CREATE SCHEMA public`, so the target
-#    must not already have one — this step is mandatory, not tidiness.
-psql "$DIRECT_URL" -c 'drop schema public cascade;'
+# 2. Prepare the target. The dump carries `CREATE SCHEMA g_gallery`, so a
+#    schema left over from a previous restore attempt must go first — a fresh
+#    Supabase project or a first restore never has one, so this is a
+#    just-in-case, not a step that always does something.
+psql "$DIRECT_URL" -c 'drop schema if exists g_gallery cascade;'
 
 # 3. Restore
 pg_restore --dbname="$DIRECT_URL" --no-owner --no-privileges --exit-on-error backup-<stamp>.dump
 ```
+
+If restoring into a fresh Supabase project rather than back into the shared one, redo the
+`g_gallery_app` role and grants from `docs/SETUP.md` §6 first — the dump's `--no-owner
+--no-privileges` flags mean it does not recreate them.
 
 Two things the backup deliberately does **not** cover:
 
 - **Photo bytes.** Those live in R2 and are not dumped; R2 durability is the protection there. A DB
   restore without the bucket gives you rows pointing at objects that still exist — which is the
   normal disaster shape, since losing the database and the bucket are independent events.
-- **Supabase-owned schemas** (`auth`, `storage`, `realtime`). We do not use them and could not
-  restore them anyway; the app's identity data lives in `public` via better-auth.
+- **Everything outside `g_gallery`** — the `svatebni-fotograf-cechy-20` marketing site's own data in
+  `public`, and Supabase-owned schemas (`auth`, `storage`, `realtime`). Not this project's data to
+  back up or restore.
 
 A backup that stops running is worse than none, because you stop worrying about it. GitHub emails
 the repo owner when a scheduled workflow fails — do not filter those.
@@ -325,3 +392,9 @@ the repo owner when a scheduled workflow fails — do not filter those.
 - **Workers Paid ($5/mo)** — only when the ZIP download ships (v2).
 - **Uptime monitor** on `/api/cron/keepalive` — a silent cron failure starts the 7-day pause clock,
   and a paused DB takes sign-in down with it.
+- **Signed image URLs** (docs/PLAN.md §4.1 "v2 hardening") — code is in place
+  (`src/lib/image-signing.ts`, the `GET /img/{key}` route in `worker/src/index.ts`) and inert until
+  deployed: add a route on the ZIP Worker (or a sibling one) for `/img/*`, set `IMAGE_SIGNING_SECRET`
+  and `PHOTOS_ZONE_HOST` on the Worker (`worker/.dev.vars.example`) and `IMAGE_SIGNING_SECRET` +
+  `NEXT_PUBLIC_SIGNED_IMAGES_URL` in Vercel (`docs/VERCEL-ENV.md`). Until then every image URL stays
+  unsigned, today's behaviour — nothing breaks by deferring this.

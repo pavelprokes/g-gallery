@@ -6,8 +6,9 @@ import type { ImageLoaderProps } from "next/image";
 // through Vercel's /_next/image — zero image-optimization billing and zero
 // Vercel data transfer for image bytes (docs/PLAN.md §3, §6).
 //
-// Photo `src` is the OBJECT KEY (e.g. "galleries/<rand>/<id>.jpg").
-// Absolute URLs and root-relative paths (local/public assets) pass through.
+// Photo `src` is the OBJECT KEY (e.g. "galleries/<rand>/<id>.jpg"), optionally
+// followed by `?sig=&exp=` — see the signed-images block below. Absolute URLs
+// and root-relative paths (local/public assets) pass through.
 //
 // The transform backend is swappable so local dev can use the imgproxy
 // container from compose.yaml instead of a Cloudflare zone:
@@ -29,10 +30,28 @@ export default function imageLoader({ src, width, quality }: ImageLoaderProps): 
   }
 
   const q = quality ?? DEFAULT_QUALITY;
+  const [key, query] = src.split("?");
+
+  // docs/PLAN.md §4.1 "v2 hardening": when a gallery view minted a signed
+  // access grant (src/lib/image-signing.ts, src/app/g/[token]/.../page.tsx),
+  // every image request goes through the signing Worker instead of straight
+  // to the CDN transform, so a captured image URL stops working once the
+  // grant expires. Opt-in and backward compatible: without both the grant on
+  // `src` and this env var, nothing here changes.
+  const signedBase = process.env.NEXT_PUBLIC_SIGNED_IMAGES_URL?.replace(/\/$/, "");
+  if (signedBase && query) {
+    const params = new URLSearchParams(query);
+    const sig = params.get("sig");
+    const exp = params.get("exp");
+    if (sig && exp) {
+      return `${signedBase}/img/${key}?w=${width}&q=${q}&sig=${encodeURIComponent(sig)}&exp=${exp}`;
+    }
+  }
+
   const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL?.replace(/\/$/, "");
   if (!base) {
     // No delivery host configured: serve the raw object path.
-    return `/${src}?w=${width}`;
+    return `/${key}?w=${width}`;
   }
 
   switch (transformMode()) {
@@ -40,14 +59,14 @@ export default function imageLoader({ src, width, quality }: ImageLoaderProps): 
       // `rs:fit:W:0` bounds the width and leaves height free; imgproxy does not
       // enlarge by default, which matches Cloudflare's fit=scale-down. Format
       // negotiation comes from the Accept header (WEBP/AVIF detection is on).
-      return `${base}/insecure/rs:fit:${width}:0/q:${q}/plain/${src}`;
+      return `${base}/insecure/rs:fit:${width}:0/q:${q}/plain/${key}`;
     case "none":
-      return `${base}/${src}`;
+      return `${base}/${key}`;
     default:
       // Fixed, short parameter set — every extra combination is a billable
       // "unique transformation" (5,000/month allowance). Keep in sync with
       // images.deviceSizes/imageSizes/qualities in next.config.ts.
-      return `${base}/cdn-cgi/image/width=${width},quality=${q},format=auto,fit=scale-down/${src}`;
+      return `${base}/cdn-cgi/image/width=${width},quality=${q},format=auto,fit=scale-down/${key}`;
   }
 }
 

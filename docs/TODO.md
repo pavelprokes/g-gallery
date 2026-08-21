@@ -88,3 +88,58 @@ if the title changes later, like Notion/Figma) or derive it fresh on every reque
 current, but a renamed gallery invalidates old bookmarks' _readability_, not their
 validity — the token still resolves either way); exact diacritics/casing normalization for
 Czech titles.
+
+## 7. Free ZIP download (skip Workers Paid) — raised by Pavel 2026-08-21
+
+`docs/SETUP.md` §9 / `worker/` already ship a **live, on-the-fly** streaming ZIP Worker, but it
+needs **Workers Paid ($5/mo)** — Free's 10 ms CPU-per-invocation limit can't cover streaming an
+8 GB archive in one request/response (every chunk enqueued costs CPU, verified against
+[workers/platform/limits](https://developers.cloudflare.com/workers/platform/limits/) when this was
+first designed, `docs/PLAN.md` §12.2). Pavel's idea: most people download the **whole gallery**, not
+a hand-picked 90% of it — so pay the CPU cost once, in the background, instead of on every request.
+
+**Proposed shape**
+
+- **"Download all"**: pre-build the ZIP once, in the background, right after the last photo of a
+  batch confirms (or on publish) → store it as a plain R2 object → the button becomes a direct link
+  through `cdn.svatebni-fotograf-cechy.cz`, same as any photo. Zero Worker cost at request time —
+  R2 egress is already free, and it's a GET like any other.
+- **Partial selection**: drop the on-the-fly ZIP entirely for this case. Keep the per-photo download
+  that already shipped in Phase 2. Nobody is expected to zip-select 90% of an album by hand.
+
+**Building the ZIP for $0** — the actual open engineering problem is the background build itself,
+since it moves the same total CPU cost somewhere else rather than deleting it. Verified building
+blocks (2026-08-21):
+
+- **Cloudflare Queues has a free tier**: 10,000 operations/day, fixed 24 h retention (non-configurable
+  on Free) — [pricing](https://developers.cloudflare.com/queues/platform/pricing/). A 500-photo
+  gallery is ~500 messages; nowhere close to the cap.
+- **Workers Free supports Cron Triggers** (up to 5/account) as well as Queue consumers — either can
+  drive the background job without a live client waiting.
+- **R2 multipart upload** (`createMultipartUpload`/`uploadPart`/`completeMultipartUpload` on the R2
+  binding): 5 MiB minimum part size, **all parts except the last must be the same size** (not just
+  independently ≥5 MiB — this broke the original "one photo = one part" idea, since JPEGs vary in
+  size), max 10,000 parts, max 5 TiB object —
+  [docs](https://developers.cloudflare.com/r2/objects/multipart-objects/).
+- Consequence of the uniform-part-size rule: the builder needs a **rolling buffer spanning photo
+  boundaries** (write each photo's ZIP local-file-header + raw bytes into the buffer; whenever it
+  reaches a fixed part size — e.g. 8 MiB — cut and upload exactly that much, carry the remainder
+  forward), not a clean per-photo mapping. CRC32 + size are already captured at upload (`Photo.crc32`,
+  `Photo.sizeBytes`) specifically so the header can be written without re-reading the file, so this
+  part is unaffected.
+- Each invocation stays under the 10 ms CPU budget by processing a bounded slice of work, then
+  re-enqueuing a "continue" message. Queue messages cap at 128 KB — far too small to carry a
+  multi-MB pending buffer between invocations — so the leftover buffer has to live as a temporary R2
+  object (`_tmp/zip-build/<galleryId>/pending.bin` or similar) that each invocation reads, appends
+  to, and rewrites; only the small cursor state (which photo index, how many bytes pending) goes in
+  the queue message itself.
+
+**Open questions before building**
+
+- Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild
+  on every publish action, or only on explicit admin request ("prepare download")?
+- Failure/retry: an interrupted multipart upload needs an explicit `abortMultipartUpload` (R2 lists
+  incomplete multipart uploads and does **not** auto-expire them), or storage leaks silently.
+- Does this **replace** `worker/`'s live ZIP entirely, or stay alongside it as a fallback for
+  galleries too large/urgent to wait for a background build?
+- Cleanup: pruning old pre-built ZIPs when a gallery is re-built or archived.

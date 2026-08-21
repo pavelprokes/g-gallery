@@ -69,6 +69,59 @@ export async function deleteGalleryWithObjects(galleryId: string, ownerId: strin
   await prisma.gallery.delete({ where: { id: gallery.id } });
 }
 
+export interface PurgeCandidate {
+  id: string;
+  ownerId: string;
+  title: string;
+}
+
+/**
+ * Which trashed galleries are past their purge deadline. Pure and exported so
+ * the one rule that matters — `purgeAt` must be set and in the past — is
+ * covered by tests rather than by inspection.
+ */
+export function selectPurgeCandidates(
+  galleries: { id: string; ownerId: string; title: string; purgeAt: Date | null }[],
+  now: Date,
+): PurgeCandidate[] {
+  return galleries
+    .filter((gallery) => gallery.purgeAt !== null && gallery.purgeAt <= now)
+    .map(({ id, ownerId, title }) => ({ id, ownerId, title }));
+}
+
+export interface PurgeResult {
+  purged: number;
+  failures: string[];
+}
+
+/**
+ * Permanently deletes every trashed gallery whose recovery window has
+ * elapsed — R2 objects first, then the row (via {@link deleteGalleryWithObjects}).
+ * A failure on one gallery does not stop the rest of the run.
+ */
+export async function purgeTrashedGalleries(now = new Date()): Promise<PurgeResult> {
+  const galleries = await prisma.gallery.findMany({
+    where: { purgeAt: { not: null } },
+    select: { id: true, ownerId: true, title: true, purgeAt: true },
+  });
+
+  const candidates = selectPurgeCandidates(galleries, now);
+
+  const failures: string[] = [];
+  let purged = 0;
+
+  for (const candidate of candidates) {
+    try {
+      await deleteGalleryWithObjects(candidate.id, candidate.ownerId);
+      purged += 1;
+    } catch (error) {
+      failures.push(`${candidate.title}: ${(error as Error).message}`);
+    }
+  }
+
+  return { purged, failures };
+}
+
 /**
  * Every object lives under this prefix, so one listing covers the whole app
  * and nothing outside it (backups, for instance) is ever a deletion candidate.

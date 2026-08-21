@@ -29,8 +29,8 @@ export function ShareLinkPanel({
   async function submit(formData: FormData) {
     setPending(true);
     try {
-      const token = await createShareLink(formData);
-      setFreshUrl(`${window.location.origin}/g/${token}`);
+      const { token, slug } = await createShareLink(formData);
+      setFreshUrl(`${window.location.origin}/g/${token}/${slug}`);
     } finally {
       setPending(false);
     }

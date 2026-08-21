@@ -5,6 +5,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // Shared Supabase project (the wedding site's booking/orders data lives in
+  // `public`) — g-gallery gets its own schema so migrations, RLS, and the
+  // Prisma client never touch anything outside it.
+  schemas  = ["g_gallery"]
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +40,7 @@ model User {
   pushSubscriptions PushSubscription[]
 
   @@map("user")
+  @@schema("g_gallery")
 }
 
 model Session {
@@ -52,6 +57,7 @@ model Session {
 
   @@index([userId])
   @@map("session")
+  @@schema("g_gallery")
 }
 
 model Account {
@@ -77,6 +83,7 @@ model Account {
   @@unique([issuer, accountId])
   @@index([userId])
   @@map("account")
+  @@schema("g_gallery")
 }
 
 model Verification {
@@ -89,6 +96,7 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+  @@schema("g_gallery")
 }
 
 // ---------------------------------------------------------------------------
@@ -99,17 +107,20 @@ enum GalleryStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+  @@schema("g_gallery")
 }
 
 enum PhotoStatus {
   PENDING // presigned URL issued, upload not confirmed
   CONFIRMED // ETag checked in — visible in the gallery
   FAILED
+  @@schema("g_gallery")
 }
 
 enum StorageTier {
   STANDARD
   INFREQUENT_ACCESS
+  @@schema("g_gallery")
 }
 
 model Gallery {
@@ -125,6 +136,10 @@ model Gallery {
   storagePrefix     String        @unique
   publishedAt       DateTime?
   archivedAt        DateTime?
+  /// Set when the gallery is moved to trash from the admin UI; null means it is live
+  trashedAt         DateTime?
+  /// Deadline for permanent deletion (trashedAt + 30 days) — the purge cron deletes past this
+  purgeAt           DateTime?
   /// Throttle for instant owner push notifications (≥30 min between pushes)
   lastInstantPushAt DateTime?
   createdAt         DateTime      @default(now())
@@ -137,6 +152,7 @@ model Gallery {
   events     ActivityEvent[]
 
   @@index([ownerId, status])
+  @@schema("g_gallery")
 }
 
 model Photo {
@@ -168,6 +184,7 @@ model Photo {
   events    ActivityEvent[]
 
   @@index([galleryId, status])
+  @@schema("g_gallery")
 }
 
 model ShareLink {
@@ -187,11 +204,16 @@ model ShareLink {
   failedUnlockAttempts Int       @default(0)
   /// Set once failedUnlockAttempts hits the threshold; unlock is refused (no scrypt call) until this passes
   unlockLockedUntil    DateTime?
+  /// Readable URL hint frozen at creation from title+eventDate (docs/TODO.md §6) —
+  /// cosmetic only, never resolves anything; tokenHash is still the sole authority.
+  /// Null on links created before this existed — `/g/{token}` alone still works.
+  slug                 String?
   createdAt            DateTime  @default(now())
 
   viewers Viewer[]
 
   @@index([galleryId])
+  @@schema("g_gallery")
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +229,7 @@ enum ActivityType {
   FAVORITE
   DOWNLOAD
   VISITOR_IDENTIFIED
+  @@schema("g_gallery")
 }
 
 model Viewer {
@@ -229,6 +252,7 @@ model Viewer {
   events    ActivityEvent[]
 
   @@unique([galleryId, anonKey])
+  @@schema("g_gallery")
 }
 
 model ViewSession {
@@ -241,6 +265,7 @@ model ViewSession {
   lastActivityAt DateTime @default(now())
 
   @@index([galleryId, startedAt])
+  @@schema("g_gallery")
 }
 
 model Favorite {
@@ -252,6 +277,7 @@ model Favorite {
   createdAt DateTime @default(now())
 
   @@unique([photoId, viewerId])
+  @@schema("g_gallery")
 }
 
 /// Fixed set — an open emoji field would be a free-text channel from anonymous
@@ -262,6 +288,7 @@ enum ReactionKind {
   LAUGH
   SAD
   CLAP
+  @@schema("g_gallery")
 }
 
 model Reaction {
@@ -277,6 +304,7 @@ model Reaction {
   /// which keeps the per-photo tally a count of people, not of clicks.
   @@unique([photoId, viewerId])
   @@index([photoId])
+  @@schema("g_gallery")
 }
 
 model ActivityEvent {
@@ -292,6 +320,7 @@ model ActivityEvent {
 
   @@index([galleryId, createdAt(sort: Desc)])
   @@index([photoId, type, viewerId])
+  @@schema("g_gallery")
 }
 
 model PushSubscription {
@@ -303,10 +332,12 @@ model PushSubscription {
   auth          String
   lastSuccessAt DateTime?
   createdAt     DateTime  @default(now())
+  @@schema("g_gallery")
 }
 
 /// Single-row table written by the 3×/day PostgREST keep-alive cron (docs/PLAN.md §9)
 model Keepalive {
   id       Int      @id @default(1)
   pingedAt DateTime @default(now())
+  @@schema("g_gallery")
 }

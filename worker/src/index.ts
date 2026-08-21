@@ -1,8 +1,12 @@
 import { archiveSize, zipStream, type ZipEntry } from "../../src/lib/zip64";
 import { verifyManifest } from "../../src/lib/zip-manifest";
+import { keyInGrant, verifyImageAccess } from "../../src/lib/image-signing";
+import { ALL_WIDTHS, QUALITY } from "../../src/lib/image-sizes";
 
 /**
- * Streams a gallery as a ZIP, straight out of R2.
+ * Streams a gallery as a ZIP, straight out of R2, and — once this Worker is
+ * put in front of the image path (docs/PLAN.md §4.1 "v2 hardening") —
+ * proxies signed image requests to the zone's Image Transformations.
  *
  * This exists because the archive must never pass through Vercel: a function
  * there is billed for data transfer and for provisioned memory across the whole
@@ -11,19 +15,29 @@ import { verifyManifest } from "../../src/lib/zip-manifest";
  * open has no wall-clock limit and reads R2 at zero egress.
  *
  * It holds no session and talks to no database. All it trusts is an HMAC-signed
- * manifest minted by the app, which is where the share link, its expiry and its
- * password were actually checked.
+ * manifest or grant minted by the app, which is where the share link, its
+ * expiry and its password were actually checked.
  */
 
 interface Env {
   PHOTOS: R2Bucket;
   ZIP_SIGNING_SECRET: string;
-  /** Origin allowed to submit the form, e.g. https://svatebni-fotograf-cechy.cz */
+  /** Origin allowed to submit the form, e.g. https://photos.svatebni-fotograf-cechy.cz */
   APP_ORIGIN: string;
+  /** Secret shared with `IMAGE_SIGNING_SECRET` in the app (src/lib/image-signing.ts). */
+  IMAGE_SIGNING_SECRET: string;
+  /** The zone hostname Image Transformations run on, e.g. photos.svatebni-fotograf-cechy.cz —
+   * this Worker proxies to it rather than resizing itself. */
+  PHOTOS_ZONE_HOST: string;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname.startsWith("/img/")) {
+      return handleSignedImage(url, env);
+    }
+
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
     }
@@ -128,6 +142,53 @@ export default {
     });
   },
 } satisfies ExportedHandler<Env>;
+
+/**
+ * `GET /img/{key}?w=&q=&sig=&exp=` — verifies the grant, then proxies to the
+ * zone's own Image Transformations rather than resizing here. `exp` in the
+ * query is informational only (a fresh cache key when a grant is renewed);
+ * the only trustworthy expiry is the one inside the verified `sig` token.
+ */
+async function handleSignedImage(url: URL, env: Env): Promise<Response> {
+  const key = decodeURIComponent(url.pathname.slice("/img/".length));
+  const sig = url.searchParams.get("sig");
+  const width = Number(url.searchParams.get("w"));
+  const quality = Number(url.searchParams.get("q"));
+
+  if (!key || !sig) return new Response("Missing key or signature", { status: 400 });
+
+  const verified = await verifyImageAccess(sig, env.IMAGE_SIGNING_SECRET);
+  if (!verified.ok) {
+    // 410 for an expired grant, matching the ZIP manifest's convention: the
+    // client should ask the app for a fresh one, not treat the link as dead.
+    return new Response(verified.reason, { status: verified.reason === "expired" ? 410 : 403 });
+  }
+  if (!keyInGrant(key, verified.grant)) {
+    return new Response("Key outside grant", { status: 403 });
+  }
+
+  // Variant-parameter abuse (docs/PLAN.md §4.2): only the widths and quality
+  // the app itself ever requests are allowed, regardless of what a viewer's
+  // browser DevTools could otherwise ask this endpoint for.
+  if (!ALL_WIDTHS.includes(width as (typeof ALL_WIDTHS)[number])) {
+    return new Response("Width not allowed", { status: 400 });
+  }
+  if (quality !== QUALITY) return new Response("Quality not allowed", { status: 400 });
+
+  const transformUrl = `https://${env.PHOTOS_ZONE_HOST}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=scale-down/${key}`;
+  const upstream = await fetch(transformUrl, { cf: { cacheEverything: true } });
+
+  // A new Response so the upstream's own headers (some of which came from
+  // R2/cdn-cgi and aren't meant for the browser) don't leak through verbatim.
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: {
+      "Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
 
 const MIME: Record<string, string> = {
   jpg: "image/jpeg",

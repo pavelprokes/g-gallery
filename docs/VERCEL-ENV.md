@@ -7,6 +7,11 @@ Vercel never reads `.env.production.local` — that file is only a local copy to
 paste from, and what `pnpm build && pnpm start` uses if you want to run
 production mode on your machine. Anything still marked `TODO` there is not set.
 
+The Vercel project for this app gets the domain **`photos.svatebni-fotograf-cechy.cz`**, not the
+apex — the apex/`www` already belong to the separate `svatebni-fotograf-cechy-20` project
+(marketing site). R2/Image Transformations moved to `cdn.svatebni-fotograf-cechy.cz` to free up
+`photos` for the app.
+
 ## Build time vs run time
 
 `NEXT_PUBLIC_*` variables are **inlined into the JavaScript bundle during the
@@ -20,34 +25,35 @@ error to notice.
 
 ## Required — the app will not work without these
 
-| Variable                          | Scope     | Notes                                                                    |
-| --------------------------------- | --------- | ------------------------------------------------------------------------ |
-| `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`        |
-| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI               |
-| `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                |
-| `BETTER_AUTH_URL`                 | runtime   | `https://svatebni-fotograf-cechy.cz`                                     |
-| `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                  |
-| `GOOGLE_CLIENT_SECRET`            | runtime   |                                                                          |
-| `ADMIN_EMAILS`                    | runtime   | The only thing separating you from clients, who also sign in with Google |
-| `R2_ACCOUNT_ID`                   | runtime   |                                                                          |
-| `R2_ACCESS_KEY_ID`                | runtime   |                                                                          |
-| `R2_SECRET_ACCESS_KEY`            | runtime   |                                                                          |
-| `R2_BUCKET`                       | runtime   | `g-gallery`                                                              |
-| `R2_ENDPOINT`                     | runtime   | `https://<account>.eu.r2.cloudflarestorage.com` — note `.eu.`            |
-| `S3_REGION`                       | runtime   | `auto` — R2 accepts nothing else                                         |
-| `CRON_SECRET`                     | runtime   | See "Cron" below                                                         |
-| **`NEXT_PUBLIC_PHOTOS_BASE_URL`** | **build** | `https://photos.svatebni-fotograf-cechy.cz`                              |
-| **`NEXT_PUBLIC_IMAGE_TRANSFORM`** | **build** | `cloudflare`                                                             |
+| Variable                          | Scope     | Notes                                                                      |
+| --------------------------------- | --------- | -------------------------------------------------------------------------- |
+| `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`          |
+| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI                 |
+| `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                  |
+| `BETTER_AUTH_URL`                 | runtime   | `https://photos.svatebni-fotograf-cechy.cz` — **not** the apex, see below  |
+| `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                    |
+| `GOOGLE_CLIENT_SECRET`            | runtime   |                                                                            |
+| `ADMIN_EMAILS`                    | runtime   | The only thing separating you from clients, who also sign in with Google   |
+| `R2_ACCOUNT_ID`                   | runtime   |                                                                            |
+| `R2_ACCESS_KEY_ID`                | runtime   |                                                                            |
+| `R2_SECRET_ACCESS_KEY`            | runtime   |                                                                            |
+| `R2_BUCKET`                       | runtime   | `g-gallery`                                                                |
+| `R2_ENDPOINT`                     | runtime   | `https://<account>.eu.r2.cloudflarestorage.com` — note `.eu.`              |
+| `S3_REGION`                       | runtime   | `auto` — R2 accepts nothing else                                           |
+| `CRON_SECRET`                     | runtime   | See "Cron" below                                                           |
+| **`NEXT_PUBLIC_PHOTOS_BASE_URL`** | **build** | `https://cdn.svatebni-fotograf-cechy.cz` — the R2/Images host, not the app |
+| **`NEXT_PUBLIC_IMAGE_TRANSFORM`** | **build** | `cloudflare`                                                               |
 
 ### Google OAuth redirect URI
 
 better-auth mounts the callback at `/api/auth/callback/<provider>`. In Google
 Cloud console the production client needs, exactly:
 
-- Authorized redirect URI: `https://svatebni-fotograf-cechy.cz/api/auth/callback/google`
-- Authorized JavaScript origin: `https://svatebni-fotograf-cechy.cz`
+- Authorized redirect URI: `https://photos.svatebni-fotograf-cechy.cz/api/auth/callback/google`
+- Authorized JavaScript origin: `https://photos.svatebni-fotograf-cechy.cz`
 
-Any other shape gives `redirect_uri_mismatch`. The same client can serve local
+Any other shape gives `redirect_uri_mismatch`. The apex domain does **not** work here — it belongs
+to the separate `svatebni-fotograf-cechy-20` marketing site. The same client can serve local
 development as well — just add `http://localhost:3000/...` alongside.
 
 ## Cron
@@ -72,20 +78,25 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 
 ## Optional — the feature degrades cleanly if unset
 
-| Variable                            | Scope     | Unset means                                                 |
-| ----------------------------------- | --------- | ----------------------------------------------------------- |
-| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503                       |
-| `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte            |
-| `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends |
-| `VAPID_PRIVATE_KEY`                 | runtime   |                                                             |
-| `VAPID_SUBJECT`                     | runtime   | `mailto:...`                                                |
-| `SMTP_URL`                          | runtime   | Digest is logged and skipped rather than failing the cron   |
-| `MAIL_FROM`                         | runtime   | Falls back to a Resend sandbox sender                       |
-| `NOTIFY_EMAIL_TO`                   | runtime   |                                                             |
-| `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write               |
-| `SUPABASE_SERVICE_ROLE_KEY`         | runtime   |                                                             |
-| **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing              |
-| **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** |                                                             |
+| Variable                            | Scope     | Unset means                                                                                 |
+| ----------------------------------- | --------- | ------------------------------------------------------------------------------------------- |
+| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503                                                       |
+| `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte                                            |
+| `IMAGE_SIGNING_SECRET`              | runtime   | Image URLs stay unsigned (today's behaviour); must match the Worker secret of the same name |
+| **`NEXT_PUBLIC_SIGNED_IMAGES_URL`** | **build** | Same — the loader never routes through the signing Worker without it                        |
+| `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends                                 |
+| `VAPID_PRIVATE_KEY`                 | runtime   |                                                                                             |
+| `VAPID_SUBJECT`                     | runtime   | `mailto:...`                                                                                |
+| `SMTP_URL`                          | runtime   | Digest is logged and skipped rather than failing the cron                                   |
+| `MAIL_FROM`                         | runtime   | Falls back to a Resend sandbox sender                                                       |
+| `NOTIFY_EMAIL_TO`                   | runtime   |                                                                                             |
+| `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write                                               |
+| `SUPABASE_SERVICE_ROLE_KEY`         | runtime   | **Legacy JWT-style key**, not `sb_secret_…` — PostgREST needs a JWT                         |
+| **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing                                              |
+| **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** | Legacy JWT-style key, same reason                                                           |
+
+Shared Supabase project (`docs/SETUP.md` §6) — the service role only has access to the `g_gallery`
+schema, granted explicitly; it cannot read the marketing site's own data in `public`.
 
 `RESEND_API_KEY` is deliberately **not** set: `src/lib/mailer.ts` prefers it when
 present, and production mail is meant to go through SES over SMTP
@@ -109,7 +120,7 @@ repository secret (`BACKUP_DATABASE_URL`), not a Vercel variable —
 curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/keepalive
 
 # The custom loader is live: this must be a real transformed image, not a 404
-curl -sI "https://photos.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<key>"
+curl -sI "https://cdn.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<key>"
 ```
 
 Then walk `docs/SETUP.md` §10.

@@ -12,6 +12,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { QueryClient, QueryClientProvider, useInfiniteQuery } from "@tanstack/react-query";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
   dismissNamePrompt,
   getOptOutServerSnapshot,
@@ -37,7 +39,9 @@ import { FORMS, pluralize } from "@/lib/czech-plural";
 import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
+import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import { OfflineToggle } from "@/components/offline-toggle";
+import type { SignedImageGrant } from "@/lib/image-signing";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
@@ -66,14 +70,6 @@ export interface GalleryPhoto {
   favoriteCount: number;
 }
 
-/**
- * How many tiles load eagerly. Everything else is lazy, which is what keeps a
- * 500-photo gallery from fetching 500 images at once — but leaving the first
- * row lazy too means the photos the viewer is actually looking at wait for the
- * lazy-load trigger before they even start.
- */
-const EAGER_TILES = 6;
-
 export interface GalleryViewer {
   id: string;
   displayName: string;
@@ -82,8 +78,23 @@ export interface GalleryViewer {
 /** Heartbeat cadence while the tab is visible; also keeps Supabase awake. */
 const HEARTBEAT_MS = 5 * 60 * 1000;
 
-/** Target row height the justified layout aims for (see `flexBasis` below). */
-const ROW_HEIGHT = 200;
+/**
+ * Target row height a justified row aims for before being scaled to fill the
+ * container width exactly (src/lib/justified-layout.ts) — scaled down on a
+ * narrow container so a two-column phone grid gets Google-Photos-sized
+ * tiles instead of the desktop target stretched over a much smaller width,
+ * which would need every tile far taller than the phone's own screen is wide.
+ */
+function targetRowHeight(containerWidth: number): number {
+  if (containerWidth < 500) return 120;
+  if (containerWidth < 900) return 160;
+  return 220;
+}
+
+/** Gap between tiles, both within a row and between rows — the layout
+ * algorithm and the row's own flex gap must agree, or rows would overlap
+ * or leave a seam. */
+const GAP = 8;
 
 /** Photos uploaded before dimensions were captured fall back to 3:2. */
 const FALLBACK_ASPECT = 1.5;
@@ -91,6 +102,14 @@ const FALLBACK_ASPECT = 1.5;
 function aspectOf(photo: GalleryPhoto): number {
   if (!photo.width || !photo.height) return FALLBACK_ASPECT;
   return photo.width / photo.height;
+}
+
+/** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
+ * one was minted — the loader parses it back off (src/lib/image-loader.ts).
+ * Without a grant this is the object key untouched, today's behaviour. */
+function srcFor(objectKey: string, grant: SignedImageGrant | null): string {
+  if (!grant) return objectKey;
+  return `${objectKey}?sig=${encodeURIComponent(grant.sig)}&exp=${grant.exp}`;
 }
 
 /**
@@ -140,27 +159,61 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
   }, [active, containerRef]);
 }
 
-export function GalleryView({
-  token,
-  title,
-  eventDate,
-  photos,
-  viewers,
-  allowDownload,
-  allowReactions,
-}: {
+interface PhotosPage {
+  items: GalleryPhoto[];
+  nextCursor: string | null;
+}
+
+async function fetchPhotosPage(
+  token: string,
+  cursor: string | null,
+  signal: AbortSignal,
+): Promise<PhotosPage> {
+  const url = `/api/g/${encodeURIComponent(token)}/photos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) throw new Error(`failed to fetch photos page (${response.status})`);
+  return (await response.json()) as PhotosPage;
+}
+
+/** One `QueryClient` per gallery view, created once — this is the only
+ * surface in the app using TanStack Query, so there is no reason for a
+ * layout-level provider every other route would carry for nothing. */
+export function GalleryView(props: GalleryViewProps) {
+  const [queryClient] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GalleryViewInner {...props} />
+    </QueryClientProvider>
+  );
+}
+
+interface GalleryViewProps {
   token: string;
   title: string;
   eventDate: string | null;
-  photos: GalleryPhoto[];
+  initialPhotos: GalleryPhoto[];
+  initialCursor: string | null;
+  imageGrant: SignedImageGrant | null;
   viewers: GalleryViewer[];
   allowDownload: boolean;
   allowReactions: boolean;
-}) {
+}
+
+function GalleryViewInner({
+  token,
+  title,
+  eventDate,
+  initialPhotos,
+  initialCursor,
+  imageGrant,
+  viewers,
+  allowDownload,
+  allowReactions,
+}: GalleryViewProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState<Map<string, number>>(
-    () => new Map(photos.map((p) => [p.id, p.favoriteCount])),
+    () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
   const [reactions, setReactions] = useState<Map<string, PhotoReactionState>>(() => new Map());
@@ -176,6 +229,22 @@ export function GalleryView({
     getOptOutServerSnapshot,
   );
   const reportedPhotos = useRef(new Set<string>());
+
+  // Cursor-paginated timeline (docs/AUDIT.md §6/§7 reopening threshold —
+  // this is that reopening). Seeded with the server-rendered first page so
+  // there is no client fetch for the initial paint.
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["gallery-photos", token],
+    queryFn: ({ pageParam, signal }) => fetchPhotosPage(token, pageParam, signal),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialData: {
+      pages: [{ items: initialPhotos, nextCursor: initialCursor }],
+      pageParams: [null],
+    },
+  });
+
+  const photos = useMemo(() => data.pages.flatMap((page) => page.items), [data]);
 
   const report = useCallback(
     (type: "GALLERY_VIEW" | "PHOTO_VIEW", photoId?: string) => {
@@ -341,22 +410,120 @@ export function GalleryView({
   const photoIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
   const selectionActive = allowDownload && selection.ids.size > 0;
 
-  // Roving tabindex: only one tile is a Tab stop at a time, and arrow keys
-  // move it — without this, a 500-photo gallery is ~1,500 sequential Tab
-  // presses before reaching the footer.
+  // --- Justified, virtualized grid ------------------------------------
+  const listRef = useRef<HTMLUListElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  /**
+   * Both read together, from the same observer, on purpose: `offsetTop` is
+   * not itself observable (ResizeObserver only reports the *size* of the
+   * element it watches), but everything that can move the list's top offset
+   * — the header/toolbar wrapping to another line, the toolbar's own content
+   * changing between the idle and selection-active layouts — happens at the
+   * exact same viewport-width breakpoints that change the list's own width.
+   * Recomputing only one of the two on resize is what silently misaligns
+   * every row a moment later.
+   */
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const sync = () => {
+      setContainerWidth(el.getBoundingClientRect().width);
+      setScrollMargin(el.offsetTop);
+    };
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    // The observer's own first callback covers the initial size, but not a
+    // later offsetTop shift caused by sibling content changing height
+    // without the list itself resizing (selection toggling the toolbar).
+    sync();
+    return () => observer.disconnect();
+  }, [selectionActive]);
+
+  const rows = useMemo<JustifiedRow<GalleryPhoto>[]>(() => {
+    if (containerWidth <= 0) return [];
+    return justifyRows(
+      photos.map((photo) => ({ item: photo, aspect: aspectOf(photo) })),
+      containerWidth,
+      targetRowHeight(containerWidth),
+      GAP,
+    );
+  }, [photos, containerWidth]);
+
+  const rowVirtualizer = useWindowVirtualizer({
+    count: rows.length + (hasNextPage ? 1 : 0),
+    estimateSize: (index) => rows[index]?.height ?? targetRowHeight(containerWidth),
+    overscan: 4,
+    scrollMargin,
+    gap: GAP,
+  });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    const lastVisible = virtualRows.at(-1);
+    if (!lastVisible) return;
+    if (lastVisible.index >= rows.length - 1 && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [virtualRows, rows.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Roving tabindex over a *virtualized* list: the target tile may not be
+  // mounted yet, so moving to it is scroll-then-focus, not just focus. See
+  // the effect below that watches `pendingFocusIndex`.
   const [rovingIndex, setRovingIndex] = useState(0);
-  const tileRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
+  const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+
+  const rowIndexForPhoto = useMemo(() => {
+    const map = new Map<number, number>();
+    rows.forEach((row, rowIndex) => {
+      let seen = 0;
+      for (let i = 0; i < rowIndex; i += 1) seen += rows[i]!.items.length;
+      row.items.forEach((_, offset) => map.set(seen + offset, rowIndex));
+    });
+    return map;
+  }, [rows]);
 
   const onTileFocus = useCallback((index: number) => setRovingIndex(index), []);
+
+  const moveRoving = useCallback(
+    (nextIndex: number) => {
+      if (nextIndex < 0 || nextIndex >= photos.length) return;
+      setRovingIndex(nextIndex);
+      const existing = tileRefs.current.get(nextIndex);
+      if (existing) {
+        existing.focus();
+        return;
+      }
+      const rowIndex = rowIndexForPhoto.get(nextIndex);
+      if (rowIndex !== undefined) rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+      setPendingFocusIndex(nextIndex);
+    },
+    [photos.length, rowIndexForPhoto, rowVirtualizer],
+  );
+
+  useEffect(() => {
+    if (pendingFocusIndex === null) return;
+    const el = tileRefs.current.get(pendingFocusIndex);
+    if (el) {
+      el.focus();
+      setPendingFocusIndex(null);
+    }
+  }, [pendingFocusIndex, virtualRows]);
 
   const onGridKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLUListElement>) => {
       const deltas: Partial<Record<string, number>> = {
         ArrowRight: 1,
-        ArrowDown: 1,
         ArrowLeft: -1,
-        ArrowUp: -1,
       };
+      const rowStep = rows.find((r) => r.items.some((i) => photoIds[rovingIndex] === i.item.id))
+        ?.items.length;
+      if (event.key === "ArrowDown" && rowStep) deltas.ArrowDown = rowStep;
+      if (event.key === "ArrowUp" && rowStep) deltas.ArrowUp = -rowStep;
+
       const delta = deltas[event.key];
       if (delta === undefined && event.key !== "Home" && event.key !== "End") return;
       if (photos.length === 0) return;
@@ -369,10 +536,9 @@ export function GalleryView({
             ? photos.length - 1
             : Math.min(Math.max(rovingIndex + (delta ?? 0), 0), photos.length - 1);
 
-      setRovingIndex(next);
-      tileRefs.current[next]?.focus();
+      moveRoving(next);
     },
-    [photos.length, rovingIndex],
+    [photos.length, photoIds, rovingIndex, rows, moveRoving],
   );
 
   const pick = useCallback(
@@ -388,7 +554,8 @@ export function GalleryView({
    * Asks the server for a signed manifest, then hands it to the ZIP worker.
    *
    * An empty selection means the whole gallery — the same request either way,
-   * so "Stáhnout vše" and "Stáhnout vybrané" cannot drift apart.
+   * so "Stáhnout vše" and "Stáhnout vybrané" cannot drift apart, and it works
+   * regardless of how much of the paginated grid has loaded client-side.
    */
   const downloadZip = useCallback(
     async (ids: string[]) => {
@@ -554,7 +721,7 @@ export function GalleryView({
         const link = document.createElement("link");
         link.rel = "preload";
         link.as = "image";
-        link.imageSrcset = fullWidthSrcSet(photo.objectKey, imageLoader);
+        link.imageSrcset = fullWidthSrcSet(srcFor(photo.objectKey, imageGrant), imageLoader);
         link.imageSizes = "100vw";
         // Deliberately NO crossOrigin. next/image renders a plain <img> with no
         // crossorigin attribute, and a preload whose CORS mode differs from the
@@ -574,7 +741,7 @@ export function GalleryView({
     return () => {
       for (const link of links) link.remove();
     };
-  }, [active?.id, lightboxIndex, photos]);
+  }, [active?.id, lightboxIndex, photos, imageGrant]);
 
   return (
     <main className="mx-auto max-w-7xl p-4 sm:p-8">
@@ -622,7 +789,7 @@ export function GalleryView({
                 }
                 className="text-sm underline"
               >
-                {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše"}
+                {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše načtené"}
               </button>
               <button
                 type="button"
@@ -664,40 +831,83 @@ export function GalleryView({
         </div>
       )}
 
-      {/* Justified rows: each tile grows in proportion to its aspect ratio, so
-          a row fills the width exactly at a near-constant height. The zero-height
-          spacers stop the final row from stretching its few photos. */}
-      <ul className="flex flex-wrap gap-2" aria-label="Fotky v galerii" onKeyDown={onGridKeyDown}>
-        {photos.map((photo, index) => (
-          <PhotoTile
-            key={photo.id}
-            photo={photo}
-            index={index}
-            tabbable={index === rovingIndex}
-            selectionActive={selectionActive}
-            selected={selection.ids.has(photo.id)}
-            allowDownload={allowDownload}
-            allowReactions={allowReactions}
-            isFavorite={favorites.has(photo.id)}
-            favoriteCount={counts.get(photo.id) ?? 0}
-            reactionState={reactions.get(photo.id)}
-            onPick={pick}
-            onOpen={openPhoto}
-            onToggleFavorite={toggleFavorite}
-            onFocus={onTileFocus}
-            buttonRef={(el) => {
-              tileRefs.current[index] = el;
-            }}
-          />
-        ))}
-        {Array.from({ length: 6 }, (_, index) => (
-          <li
-            key={`spacer-${index}`}
-            aria-hidden
-            className="h-0"
-            style={{ flexGrow: FALLBACK_ASPECT, flexBasis: `${FALLBACK_ASPECT * ROW_HEIGHT}px` }}
-          />
-        ))}
+      {/* Real justified layout (src/lib/justified-layout.ts): every row is
+          scaled to fill the width exactly at its own computed height, so no
+          photo is cropped. Virtualized by row via useWindowVirtualizer — the
+          page itself scrolls, not a boxed inner panel, matching the rest of
+          the app. */}
+      <ul
+        ref={listRef}
+        className="relative flex flex-col"
+        style={{ height: rowVirtualizer.getTotalSize() }}
+        aria-label="Fotky v galerii"
+        onKeyDown={onGridKeyDown}
+      >
+        {virtualRows.map((virtualRow) => {
+          const row = rows[virtualRow.index];
+          if (!row) {
+            return (
+              <li
+                key="loading"
+                aria-hidden
+                className="absolute top-0 left-0 flex w-full items-center justify-center text-sm text-neutral-400"
+                style={{
+                  height: virtualRow.size,
+                  transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
+                }}
+              >
+                Načítám další fotky…
+              </li>
+            );
+          }
+
+          let indexOffset = 0;
+          for (let i = 0; i < virtualRow.index; i += 1) indexOffset += rows[i]!.items.length;
+
+          return (
+            <li
+              key={row.items[0]?.item.id ?? virtualRow.index}
+              className="absolute top-0 left-0 flex w-full"
+              style={{
+                height: virtualRow.size,
+                gap: GAP,
+                transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
+              }}
+            >
+              {row.items.map((entry, offset) => {
+                const index = indexOffset + offset;
+                const photo = entry.item;
+                return (
+                  <PhotoTile
+                    key={photo.id}
+                    photo={photo}
+                    src={srcFor(photo.objectKey, imageGrant)}
+                    width={entry.width}
+                    height={entry.height}
+                    index={index}
+                    priority={virtualRow.index === 0}
+                    tabbable={index === rovingIndex}
+                    selectionActive={selectionActive}
+                    selected={selection.ids.has(photo.id)}
+                    allowDownload={allowDownload}
+                    allowReactions={allowReactions}
+                    isFavorite={favorites.has(photo.id)}
+                    favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
+                    reactionState={reactions.get(photo.id)}
+                    onPick={pick}
+                    onOpen={openPhoto}
+                    onToggleFavorite={toggleFavorite}
+                    onFocus={onTileFocus}
+                    buttonRef={(el) => {
+                      if (el) tileRefs.current.set(index, el);
+                      else tileRefs.current.delete(index);
+                    }}
+                  />
+                );
+              })}
+            </li>
+          );
+        })}
       </ul>
 
       {photos.length === 0 && (
@@ -738,7 +948,7 @@ export function GalleryView({
             }}
           >
             <Image
-              src={active.objectKey}
+              src={srcFor(active.objectKey, imageGrant)}
               alt={active.fileName}
               fill
               sizes="100vw"
@@ -818,6 +1028,7 @@ export function GalleryView({
 
             <span className="ml-auto text-sm text-white/70 tabular-nums">
               {lightboxIndex! + 1} / {photos.length}
+              {hasNextPage && "+"}
             </span>
 
             {allowDownload && selection.ids.size > 0 && (
@@ -845,7 +1056,7 @@ export function GalleryView({
               <>
                 <HeartButton
                   active={favorites.has(active.id)}
-                  count={counts.get(active.id) ?? 0}
+                  count={counts.get(active.id) ?? active.favoriteCount}
                   onClick={() => toggleFavorite(active.id)}
                   className="bg-white/10 text-white"
                 />
@@ -914,7 +1125,11 @@ export function GalleryView({
 
 interface PhotoTileProps {
   photo: GalleryPhoto;
+  src: string;
+  width: number;
+  height: number;
   index: number;
+  priority: boolean;
   tabbable: boolean;
   selectionActive: boolean;
   selected: boolean;
@@ -938,7 +1153,11 @@ interface PhotoTileProps {
  */
 const PhotoTile = memo(function PhotoTile({
   photo,
+  src,
+  width,
+  height,
   index,
+  priority,
   tabbable,
   selectionActive,
   selected,
@@ -953,7 +1172,6 @@ const PhotoTile = memo(function PhotoTile({
   onFocus,
   buttonRef,
 }: PhotoTileProps) {
-  const aspect = aspectOf(photo);
   // Local to this tile, not shared — a touch gesture and the synthetic click
   // that follows it always target the same DOM node, so there is no reason
   // for this to live in the parent (and mutating a ref passed down as a prop
@@ -971,9 +1189,9 @@ const PhotoTile = memo(function PhotoTile({
   }, []);
 
   return (
-    <li
-      className="group relative h-36 select-none sm:h-48 lg:h-52"
-      style={{ flexGrow: aspect, flexBasis: `${aspect * ROW_HEIGHT}px` }}
+    <div
+      className="group relative shrink-0 select-none"
+      style={{ width, height }}
       onTouchStart={() => {
         if (!allowDownload) return;
         longPress.current.fired = false;
@@ -1019,11 +1237,14 @@ const PhotoTile = memo(function PhotoTile({
         aria-label={selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`}
       >
         <Image
-          src={photo.objectKey}
+          src={src}
           alt={photo.fileName}
           fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
-          priority={index < EAGER_TILES}
+          sizes={`${Math.ceil(width)}px`}
+          priority={priority}
+          // A real justified layout — object-contain would letterbox a tile
+          // sized to the photo's own aspect ratio, so `fill` + the exact
+          // rendered box is enough; no crop, no letterbox.
           className={`object-cover transition-transform duration-200 ${
             selected ? "scale-90 rounded" : "hover:scale-105"
           }`}
@@ -1048,7 +1269,7 @@ const PhotoTile = memo(function PhotoTile({
           <ReactionBadge state={reactionState} />
         </>
       )}
-    </li>
+    </div>
   );
 });
 
