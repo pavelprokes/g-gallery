@@ -163,6 +163,18 @@ openssl rand -base64 32   # CRON_SECRET
 `ADMIN_EMAILS` decides who gets the admin role on first sign-in. Clients sign in with Google too,
 so this list is the only thing separating you from them.
 
+### GitHub Actions secrets (for the backup workflow)
+
+`Settings → Secrets and variables → Actions`:
+
+| Secret                 | Value                                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| `BACKUP_DATABASE_URL`  | the **session** pooler URL (`:5432`) — same as `DIRECT_URL` |
+| `R2_ACCESS_KEY_ID`     | R2 API token key id                                         |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret                                         |
+| `R2_ENDPOINT`          | `https://<account-id>.eu.r2.cloudflarestorage.com`          |
+| `R2_BUCKET`            | `g-gallery`                                                 |
+
 ---
 
 ## 8. Post-setup verification
@@ -178,10 +190,47 @@ so this list is the only thing separating you from them.
 
 ---
 
+## 9. Database backup & restore
+
+`.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=public` through the
+session pooler, restore-verified into a throwaway PostgreSQL 17 container, then stored in R2 under
+`backups/` with 30-day pruning. The Supabase free tier takes **no** backups, so this is the only
+copy that exists.
+
+The restore is part of the job on purpose — a dump nobody has ever restored is not a backup. The
+verification asserts the tables the app cannot start without and prints the row counts, so an
+empty-but-valid dump fails loudly instead of passing.
+
+### Restoring
+
+```bash
+# 1. Fetch the dump you want (they are named backup-<ISO8601>.dump)
+aws s3 ls s3://g-gallery/backups/ --endpoint-url "$R2_ENDPOINT"
+aws s3 cp s3://g-gallery/backups/backup-<stamp>.dump . --endpoint-url "$R2_ENDPOINT"
+
+# 2. Prepare the target. The dump carries `CREATE SCHEMA public`, so the target
+#    must not already have one — this step is mandatory, not tidiness.
+psql "$DIRECT_URL" -c 'drop schema public cascade;'
+
+# 3. Restore
+pg_restore --dbname="$DIRECT_URL" --no-owner --no-privileges --exit-on-error backup-<stamp>.dump
+```
+
+Two things the backup deliberately does **not** cover:
+
+- **Photo bytes.** Those live in R2 and are not dumped; R2 durability is the protection there. A DB
+  restore without the bucket gives you rows pointing at objects that still exist — which is the
+  normal disaster shape, since losing the database and the bucket are independent events.
+- **Supabase-owned schemas** (`auth`, `storage`, `realtime`). We do not use them and could not
+  restore them anyway; the app's identity data lives in `public` via better-auth.
+
+A backup that stops running is worse than none, because you stop worrying about it. GitHub emails
+the repo owner when a scheduled workflow fails — do not filter those.
+
+---
+
 ## Deferred to later phases
 
-- **Weekly DB backup** (Free tier has none): GitHub Actions running `supabase db dump` via the
-  session pooler, stored **outside** Cloudflare.
 - **Workers Paid ($5/mo)** — only when the ZIP download ships (v2).
 - **Uptime monitor** on `/api/cron/keepalive` — a silent cron failure starts the 7-day pause clock,
   and a paused DB takes sign-in down with it.

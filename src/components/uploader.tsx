@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
+import { matchResumeTargets, type PendingUpload } from "@/lib/upload-resume";
 
 // Uploads go browser -> R2 directly; Vercel only signs (4.5MB body limit).
 // Presigning is just-in-time in small batches because presigned URLs expire in
@@ -27,16 +28,21 @@ interface PresignedUpload {
   headers: Record<string, string>;
 }
 
-async function presign(galleryId: string, files: File[]): Promise<PresignedUpload[]> {
+async function presign(
+  galleryId: string,
+  files: File[],
+  resumeIds: (string | undefined)[],
+): Promise<PresignedUpload[]> {
   const response = await fetch("/api/uploads/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       galleryId,
-      files: files.map((f) => ({
+      files: files.map((f, i) => ({
         fileName: f.name,
         contentType: f.type || "image/jpeg",
         sizeBytes: f.size,
+        resumePhotoId: resumeIds[i],
       })),
     }),
   });
@@ -102,8 +108,26 @@ async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
 export function Uploader({ galleryId }: { galleryId: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
+  const [pendingRows, setPendingRows] = useState<PendingUpload[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // Rows left behind by an interrupted upload. Re-picking those exact files
+  // reuses the rows instead of creating a second set (src/lib/upload-resume.ts).
+  const loadPending = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/uploads/pending?galleryId=${galleryId}`);
+      if (!response.ok) return;
+      const data = (await response.json()) as { pending: PendingUpload[] };
+      setPendingRows(data.pending);
+    } catch {
+      // Resume is an affordance, not a requirement — a failure here is silent.
+    }
+  }, [galleryId]);
+
+  useEffect(() => {
+    void loadPending();
+  }, [loadPending]);
 
   const update = useCallback((index: number, patch: Partial<Item>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -114,11 +138,19 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       setItems(files.map((file) => ({ file, state: "pending" as const })));
       setRunning(true);
 
+      // Computed once for the whole selection: each pending row may be claimed
+      // by only one file, which a per-batch match could not guarantee.
+      const resumeIds = matchResumeTargets(files, pendingRows);
+
       for (let offset = 0; offset < files.length; offset += PRESIGN_BATCH) {
         const batch = files.slice(offset, offset + PRESIGN_BATCH);
         let targets: PresignedUpload[];
         try {
-          targets = await presign(galleryId, batch);
+          targets = await presign(
+            galleryId,
+            batch,
+            resumeIds.slice(offset, offset + PRESIGN_BATCH),
+          );
         } catch (error) {
           batch.forEach((_, i) =>
             update(offset + i, { state: "error", error: (error as Error).message }),
@@ -155,8 +187,9 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       // Photos only become visible once the server flips them to CONFIRMED, so
       // the grid above is stale until the Server Component re-renders.
       router.refresh();
+      void loadPending();
     },
-    [galleryId, router, update],
+    [galleryId, loadPending, pendingRows, router, update],
   );
 
   const done = items.filter((i) => i.state === "done").length;
@@ -165,6 +198,27 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   return (
     <section className="rounded-lg border p-4">
       <h2 className="text-sm font-medium">Nahrát fotky</h2>
+
+      {pendingRows.length > 0 && !running && (
+        <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <p className="font-medium">
+            {pendingRows.length}{" "}
+            {pendingRows.length === 1 ? "nedokončené nahrávání" : "nedokončených nahrávání"}
+          </p>
+          <p className="mt-1 text-xs">
+            Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené zbytky
+            se po 24 hodinách uklidí samy.
+          </p>
+          <ul className="mt-2 max-h-24 overflow-y-auto text-xs text-neutral-600 dark:text-neutral-400">
+            {pendingRows.map((row) => (
+              <li key={row.id}>
+                {row.fileName}
+                {row.sizeBytes !== null && ` · ${(row.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <input
         ref={inputRef}

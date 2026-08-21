@@ -266,8 +266,10 @@ gallery in one month.
    the password hash), ✅ favorites + name prompt + viewer chips, ✅ per-photo download, ✅ justified
    layout, ✅ uploader (JIT presign, retry, CRC32 + GPS strip + dimensions), ✅ ghost-upload
    reconciliation cron, ✅ keep-alive cron, ✅ view tracking with admin per-gallery & per-photo
-   views/uniques, ✅ Vercel Analytics with beforeSend scrub. Remaining: **DB backups**, upload
-   resume-after-crash, orphan-object sweep via ListObjectsV2.
+   views/uniques, ✅ Vercel Analytics with beforeSend scrub, ✅ restore-verified daily DB backup to
+   R2 with 30-day pruning, ✅ upload resume-after-crash (PENDING rows re-matched by name+size),
+   ✅ orphan-object sweep via ListObjectsV2 (weekly, 24h age guard, live keys never candidates).
+   **Phase 2 complete.**
 4. **Phase 3 — activity & polish**: avatar strip + name prompt, reactions, owner Updates feed,
    Supabase Realtime presence ("viewing now"), Web Push + daily Resend digest, justified layout,
    virtual scroll, keyboard/swipe lightbox, IA lifecycle job.
@@ -287,7 +289,8 @@ gallery in one month.
    without re-reading 6 GB per gallery.
 3. **Images Paid**: **enable up front** — $0 in normal months, overage pennies, no 9422 breakage.
 4. **Retention**: originals move to **Infrequent Access** N months after delivery (default N=6,
-   configurable); nothing is deleted. `Photo.storageTier` drives it; lifecycle job in Phase 2.
+   configurable); nothing is deleted. `Photo.storageTier` drives it; lifecycle job in **Phase 3**
+   (this said Phase 2 until 2026-08-21 — the phase list always had it in Phase 3).
    Cost effect: long-run storage growth drops from ~$1.80 to ~$1.20 per month per retained year.
 
 Marginal cost with these decisions: **~$1–2/mo in year 1** (+$5/mo later if/when ZIP ships).

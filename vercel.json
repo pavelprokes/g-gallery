@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/reconcile",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile?sweep=1",
+      "schedule": "0 5 * * 0"
     }
   ]
 }

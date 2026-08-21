@@ -68,6 +68,76 @@ export function presignedPutHeaders(contentType: string): Record<string, string>
   };
 }
 
+export interface StoredObject {
+  key: string;
+  sizeBytes: number;
+  lastModified: Date;
+}
+
+/**
+ * ListObjectsV2 over a prefix, following continuation tokens.
+ *
+ * S3 caps a page at 1000 keys, so a full year of galleries needs several
+ * round trips; the caller gets everything or an error, never a silent
+ * truncation — a partial listing would make the orphan sweep delete live
+ * objects it simply had not seen.
+ */
+export async function listObjects(prefix: string): Promise<StoredObject[]> {
+  const env = serverEnv();
+  const base = `${env.R2_ENDPOINT.replace(/\/$/, "")}/${env.R2_BUCKET}`;
+  const objects: StoredObject[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const url = new URL(base);
+    url.searchParams.set("list-type", "2");
+    url.searchParams.set("prefix", prefix);
+    url.searchParams.set("max-keys", "1000");
+    if (continuationToken) url.searchParams.set("continuation-token", continuationToken);
+
+    const response = await r2Client().fetch(url.toString(), { method: "GET" });
+    if (!response.ok) {
+      throw new Error(`ListObjectsV2 failed for "${prefix}": ${response.status}`);
+    }
+
+    const xml = await response.text();
+    for (const match of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      const block = match[1] ?? "";
+      const key = block.match(/<Key>([\s\S]*?)<\/Key>/)?.[1];
+      if (!key) continue;
+      objects.push({
+        key: decodeXmlText(key),
+        sizeBytes: Number(block.match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0),
+        lastModified: new Date(block.match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] ?? 0),
+      });
+    }
+
+    const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
+    continuationToken = truncated
+      ? decodeXmlText(
+          xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] ?? "",
+        )
+      : undefined;
+
+    // A truncated page with no token would loop forever.
+    if (truncated && !continuationToken) {
+      throw new Error(`ListObjectsV2 truncated without a continuation token for "${prefix}"`);
+    }
+  } while (continuationToken);
+
+  return objects;
+}
+
+/** S3 escapes these five in element text; keys legitimately contain them. */
+function decodeXmlText(value: string): string {
+  return value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .replaceAll("&amp;", "&");
+}
+
 /** Delete an object (gallery cleanup / reconciliation of orphans). */
 export async function deleteObject(key: string): Promise<void> {
   const response = await r2Client().fetch(objectUrl(key), { method: "DELETE" });

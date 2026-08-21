@@ -1,0 +1,158 @@
+name: DB backup
+
+# The Supabase free tier takes no backups at all, so this is the only copy of
+# the database that exists (docs/PLAN.md §9). It dumps, verifies the dump by
+# restoring it, then stores it in R2 — a backup that has never been restored is
+# not a backup, so the restore is part of the job rather than a later hope.
+
+on:
+  schedule:
+    # 03:20 UTC daily, deliberately off the hour to avoid the runner rush.
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      # Restore target. Same major as production so `pg_restore` exercises the
+      # real thing rather than a version that happens to be lenient.
+      verify:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: verify
+          POSTGRES_DB: verify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Install PostgreSQL 17 client
+        # The runner ships an older client, and pg_dump refuses to dump a
+        # server newer than itself.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump
+        env:
+          # Session pooler (:5432), not the transaction pooler — pg_dump needs
+          # a real session for its consistent snapshot.
+          PGURL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$PGURL" ]; then
+            echo "::error::BACKUP_DATABASE_URL is not set"
+            exit 1
+          fi
+          STAMP=$(date -u +%Y-%m-%dT%H%M%SZ)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # Custom format: restorable selectively and compressed already.
+          # --no-owner/--no-privileges so it restores into any role.
+          # --schema=public: auth/storage/realtime belong to Supabase roles, and
+          # including them would fail on permissions and break the restore.
+          pg_dump "$PGURL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --schema=public \
+            --file="backup-$STAMP.dump"
+          ls -lh "backup-$STAMP.dump"
+
+      - name: Verify by restoring
+        env:
+          PGPASSWORD: verify
+        run: |
+          # `pg_dump --schema=public` emits `CREATE SCHEMA public`, which fails
+          # against a database that already has one — and --exit-on-error then
+          # aborts the whole restore. Dropping it first is also what a real
+          # restore into a fresh Supabase project has to do, so verifying this
+          # way exercises the actual recovery procedure (docs/SETUP.md §9).
+          psql --host=localhost --port=5432 --username=postgres --dbname=verify \
+            --command="drop schema public cascade;"
+
+          pg_restore \
+            --host=localhost --port=5432 --username=postgres --dbname=verify \
+            --no-owner --no-privileges --exit-on-error \
+            "backup-$STAMP.dump"
+
+          # A dump that restores but is empty would pass silently, so assert on
+          # the tables the app cannot run without.
+          for table in user account session Gallery Photo ShareLink; do
+            psql --host=localhost --port=5432 --username=postgres --dbname=verify \
+              --tuples-only --no-align \
+              --command="select to_regclass('public.\"$table\"');" \
+              | grep -q . || { echo "::error::table $table missing from the dump"; exit 1; }
+          done
+
+          PHOTOS=$(psql --host=localhost --port=5432 --username=postgres --dbname=verify \
+            --tuples-only --no-align --command='select count(*) from "Photo";')
+          GALLERIES=$(psql --host=localhost --port=5432 --username=postgres --dbname=verify \
+            --tuples-only --no-align --command='select count(*) from "Gallery";')
+          echo "restored: $GALLERIES galleries, $PHOTOS photos"
+          echo "PHOTOS=$PHOTOS" >> "$GITHUB_ENV"
+          echo "GALLERIES=$GALLERIES" >> "$GITHUB_ENV"
+
+      - name: Upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # R2 rejects the trailing checksums newer aws-cli adds by default.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          # The backups/ prefix is deliberately outside galleries/, which is the
+          # only prefix the orphan sweep ever lists (src/lib/reconcile.ts).
+          aws s3 cp "backup-$STAMP.dump" "s3://$R2_BUCKET/backups/backup-$STAMP.dump" \
+            --endpoint-url "$R2_ENDPOINT"
+
+      - name: Prune backups older than 30 days
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          CUTOFF=$(date -u -d '30 days ago' +%Y-%m-%d)
+          echo "pruning backups before $CUTOFF"
+          aws s3 ls "s3://$R2_BUCKET/backups/" --endpoint-url "$R2_ENDPOINT" \
+            | awk '{print $4}' | grep -E '^backup-' | while read -r name; do
+              stamp=${name#backup-}
+              day=${stamp%%T*}
+              if [[ "$day" < "$CUTOFF" ]]; then
+                echo "  removing $name"
+                aws s3 rm "s3://$R2_BUCKET/backups/$name" --endpoint-url "$R2_ENDPOINT"
+              fi
+            done
+
+      - name: Summary
+        run: |
+          {
+            echo "### DB backup"
+            echo
+            echo "- dump: \`backup-$STAMP.dump\` ($(du -h "backup-$STAMP.dump" | cut -f1))"
+            echo "- restore verified into PostgreSQL 17"
+            echo "- contents: $GALLERIES galleries, $PHOTOS photos"
+          } >> "$GITHUB_STEP_SUMMARY"
