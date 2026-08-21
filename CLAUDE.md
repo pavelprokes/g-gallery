@@ -28,7 +28,9 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
 1. **Image bytes and ZIPs never flow through Vercel** (functions, routes, or `/_next/image`).
    All `next/image` usage goes through the custom loader (`src/lib/image-loader.ts`); photo `src`
    is the R2 object key, not a URL. The loader's transform backend is switchable via
-   `NEXT_PUBLIC_IMAGE_TRANSFORM` (`cloudflare` | `imgproxy` | `none`) — never bypass it.
+   `NEXT_PUBLIC_IMAGE_TRANSFORM` (`cloudflare` | `imgproxy` | `none`) — never bypass it. This is
+   about the _path_ bytes travel: the offline-galleries service worker (`public/sw.js`) caching
+   CDN-fetched images client-side in Cache Storage does not violate it.
 2. **Uploads**: browser → R2 presigned PUT only (Vercel has a hard 4.5 MB body limit). Client
    computes CRC32 + strips EXIF GPS before PUT; server records `etag`, flips `Photo.status`.
 3. **Auth**: route gating lives in `src/proxy.ts` (Next 16 — `middleware.ts` is deprecated and
@@ -37,7 +39,8 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
 4. **Next 16 idioms**: `await props.params` / `await searchParams` / `await cookies()` always;
    `revalidateTag(tag, 'max')` (single-arg form is a TS error); parallel route slots need `default.tsx`.
 5. **Share links**: raw tokens are never stored — DB keeps `tokenHash` (SHA-256); passwords use
-   argon2; expiry/revocation is enforced server-side on every surface (page, presign, beacon, download).
+   scrypt (Node built-in, avoids a native argon2 dependency on Vercel); expiry/revocation is
+   enforced server-side on every surface (page, presign, beacon, download).
 6. **No long-lived connections from Vercel** (SSE/WebSocket) — realtime belongs to Supabase Realtime.
 7. **Privacy**: never store viewer IPs; viewer identity is a first-party `anonKey` only;
    share tokens must never reach Vercel Analytics (server-side `track` with `galleryId`, beforeSend scrub).

@@ -9,7 +9,9 @@ export interface UnlockState {
 
 /**
  * Unlock a password-protected share link. Deliberately vague on failure so the
- * form can't be used to probe which links exist.
+ * form can't be used to probe which links exist — this also covers the
+ * rate-limited-lockout case (`verifySharePassword`) with the same message,
+ * so a failed attempt never reveals whether the link is now locked out.
  */
 export async function unlockShareLink(
   _previous: UnlockState,
@@ -21,7 +23,7 @@ export async function unlockShareLink(
   if (!token || !password) return { error: "Zadej heslo." };
 
   const result = await verifySharePassword(token, password);
-  if (!result.ok) return { error: "Nesprávné heslo." };
+  if (!result.ok) return { error: "Nesprávné heslo. Zkus to prosím později." };
 
   await setUnlockCookie(result.shareLinkId, result.passwordHash);
   return {};

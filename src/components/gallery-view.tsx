@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  memo,
   type RefObject,
   useCallback,
   useEffect,
@@ -166,12 +168,6 @@ export function GalleryView({
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const [selection, setSelection] = useState(EMPTY_SELECTION);
-  // Touch devices have no hover, so selection mode is entered by long-press —
-  // the same gesture Google Photos uses. Once on, every checkbox is visible.
-  const longPress = useRef<{ timer: number | null; fired: boolean }>({
-    timer: null,
-    fired: false,
-  });
   const [zipState, setZipState] = useState<"idle" | "preparing" | "error">("idle");
 
   const optedOut = useSyncExternalStore(
@@ -345,12 +341,39 @@ export function GalleryView({
   const photoIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
   const selectionActive = allowDownload && selection.ids.size > 0;
 
-  const cancelLongPress = useCallback(() => {
-    if (longPress.current.timer !== null) {
-      clearTimeout(longPress.current.timer);
-      longPress.current.timer = null;
-    }
-  }, []);
+  // Roving tabindex: only one tile is a Tab stop at a time, and arrow keys
+  // move it — without this, a 500-photo gallery is ~1,500 sequential Tab
+  // presses before reaching the footer.
+  const [rovingIndex, setRovingIndex] = useState(0);
+  const tileRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const onTileFocus = useCallback((index: number) => setRovingIndex(index), []);
+
+  const onGridKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLUListElement>) => {
+      const deltas: Partial<Record<string, number>> = {
+        ArrowRight: 1,
+        ArrowDown: 1,
+        ArrowLeft: -1,
+        ArrowUp: -1,
+      };
+      const delta = deltas[event.key];
+      if (delta === undefined && event.key !== "Home" && event.key !== "End") return;
+      if (photos.length === 0) return;
+
+      event.preventDefault();
+      const next =
+        event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? photos.length - 1
+            : Math.min(Math.max(rovingIndex + (delta ?? 0), 0), photos.length - 1);
+
+      setRovingIndex(next);
+      tileRefs.current[next]?.focus();
+    },
+    [photos.length, rovingIndex],
+  );
 
   const pick = useCallback(
     (index: number, id: string, shiftKey: boolean) => {
@@ -436,6 +459,35 @@ export function GalleryView({
     [photos, report],
   );
 
+  const active = lightboxIndex === null ? null : photos[lightboxIndex];
+  const activeSelected = active ? selection.ids.has(active.id) : false;
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  const isLightboxOpen = lightboxIndex !== null;
+  useFocusTrap(lightboxRef, isLightboxOpen);
+
+  /**
+   * One history entry per open lightbox, not per photo browsed inside it, so
+   * the hardware/gesture back button on Android closes the lightbox instead
+   * of leaving the gallery entirely. Every close path calls `history.back()`
+   * rather than clearing the index directly (see `closeLightbox` below), so
+   * opening and closing stay symmetric — popstate is the single place the
+   * index actually becomes null.
+   */
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    window.history.pushState({ galleryLightbox: true }, "");
+  }, [isLightboxOpen]);
+
+  useEffect(() => {
+    function onPopState() {
+      setLightboxIndex(null);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const closeLightbox = useCallback(() => window.history.back(), []);
+
   useEffect(() => {
     if (lightboxIndex === null) return;
 
@@ -456,7 +508,7 @@ export function GalleryView({
         return;
       }
 
-      if (event.key === "Escape") setLightboxIndex(null);
+      if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
 
@@ -473,12 +525,7 @@ export function GalleryView({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [allowDownload, lightboxIndex, move, namePromptFor, photos, pick]);
-
-  const active = lightboxIndex === null ? null : photos[lightboxIndex];
-  const activeSelected = active ? selection.ids.has(active.id) : false;
-  const lightboxRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(lightboxRef, lightboxIndex !== null);
+  }, [allowDownload, closeLightbox, lightboxIndex, move, namePromptFor, photos, pick]);
 
   /**
    * Warms the next and previous photo while the current one is on screen.
@@ -620,90 +667,29 @@ export function GalleryView({
       {/* Justified rows: each tile grows in proportion to its aspect ratio, so
           a row fills the width exactly at a near-constant height. The zero-height
           spacers stop the final row from stretching its few photos. */}
-      <ul className="flex flex-wrap gap-2">
-        {photos.map((photo, index) => {
-          const aspect = aspectOf(photo);
-          return (
-            <li
-              key={photo.id}
-              className="group relative h-36 select-none sm:h-48 lg:h-52"
-              style={{ flexGrow: aspect, flexBasis: `${aspect * ROW_HEIGHT}px` }}
-              onTouchStart={() => {
-                if (!allowDownload) return;
-                longPress.current.fired = false;
-                longPress.current.timer = window.setTimeout(() => {
-                  longPress.current.fired = true;
-                  setSelection((prev) => toggleOne(prev, index, photo.id));
-                }, LONG_PRESS_MS);
-              }}
-              onTouchMove={() => cancelLongPress()}
-              onTouchEnd={() => cancelLongPress()}
-              onTouchCancel={() => cancelLongPress()}
-              // A long press otherwise raises the browser's "save image" sheet
-              // on top of the selection we just made.
-              onContextMenu={(event) => {
-                if (selectionActive) event.preventDefault();
-              }}
-            >
-              <button
-                type="button"
-                onClick={(event) => {
-                  // The long press already acted; the click it synthesises must
-                  // not toggle the same photo straight back off.
-                  if (longPress.current.fired) {
-                    longPress.current.fired = false;
-                    return;
-                  }
-                  // While a selection is active the tile extends it rather than
-                  // opening the lightbox — otherwise picking 40 photos means 40
-                  // precise taps on a small circle.
-                  if (selectionActive) {
-                    pick(index, photo.id, event.shiftKey);
-                    return;
-                  }
-                  openPhoto(index);
-                }}
-                className="relative block h-full w-full overflow-hidden rounded"
-                // The tile carries the photo's own average colour, so the grid
-                // fills in with the picture's palette instead of grey holes.
-                style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
-                aria-label={
-                  selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`
-                }
-              >
-                <Image
-                  src={photo.objectKey}
-                  alt={photo.fileName}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
-                  priority={index < EAGER_TILES}
-                  className={`object-cover transition-transform duration-200 ${
-                    selection.ids.has(photo.id) ? "scale-90 rounded" : "hover:scale-105"
-                  }`}
-                />
-              </button>
-              {allowDownload && (
-                <SelectCheck
-                  selected={selection.ids.has(photo.id)}
-                  pinned={selectionActive}
-                  onPick={(shiftKey) => pick(index, photo.id, shiftKey)}
-                  fileName={photo.fileName}
-                />
-              )}
-              {allowReactions && (
-                <>
-                  <HeartButton
-                    active={favorites.has(photo.id)}
-                    count={counts.get(photo.id) ?? 0}
-                    onClick={() => toggleFavorite(photo.id)}
-                    className="absolute right-2 bottom-2"
-                  />
-                  <ReactionBadge state={reactions.get(photo.id)} />
-                </>
-              )}
-            </li>
-          );
-        })}
+      <ul className="flex flex-wrap gap-2" aria-label="Fotky v galerii" onKeyDown={onGridKeyDown}>
+        {photos.map((photo, index) => (
+          <PhotoTile
+            key={photo.id}
+            photo={photo}
+            index={index}
+            tabbable={index === rovingIndex}
+            selectionActive={selectionActive}
+            selected={selection.ids.has(photo.id)}
+            allowDownload={allowDownload}
+            allowReactions={allowReactions}
+            isFavorite={favorites.has(photo.id)}
+            favoriteCount={counts.get(photo.id) ?? 0}
+            reactionState={reactions.get(photo.id)}
+            onPick={pick}
+            onOpen={openPhoto}
+            onToggleFavorite={toggleFavorite}
+            onFocus={onTileFocus}
+            buttonRef={(el) => {
+              tileRefs.current[index] = el;
+            }}
+          />
+        ))}
         {Array.from({ length: 6 }, (_, index) => (
           <li
             key={`spacer-${index}`}
@@ -728,11 +714,11 @@ export function GalleryView({
           aria-label={active.fileName}
           tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
-          onClick={() => setLightboxIndex(null)}
+          onClick={closeLightbox}
         >
           <div
             className="relative h-full w-full touch-pan-y"
-            style={{ backgroundColor: "transparent" }}
+            style={{ backgroundColor: placeholderStyle(active.placeholder) }}
             onClick={(event) => event.stopPropagation()}
             onTouchStart={(event) => {
               const touch = event.touches[0];
@@ -800,7 +786,7 @@ export function GalleryView({
           >
             <button
               type="button"
-              onClick={() => setLightboxIndex(null)}
+              onClick={closeLightbox}
               className="rounded-full bg-white/10 px-3 py-2 text-white hover:bg-white/20"
               aria-label="Zavřít"
             >
@@ -925,6 +911,146 @@ export function GalleryView({
     </main>
   );
 }
+
+interface PhotoTileProps {
+  photo: GalleryPhoto;
+  index: number;
+  tabbable: boolean;
+  selectionActive: boolean;
+  selected: boolean;
+  allowDownload: boolean;
+  allowReactions: boolean;
+  isFavorite: boolean;
+  favoriteCount: number;
+  reactionState: PhotoReactionState | undefined;
+  onPick: (index: number, id: string, shiftKey: boolean) => void;
+  onOpen: (index: number) => void;
+  onToggleFavorite: (photoId: string) => void;
+  onFocus: (index: number) => void;
+  buttonRef: (el: HTMLButtonElement | null) => void;
+}
+
+/**
+ * Memoized so a state change anywhere else in the gallery (a favorite on a
+ * different photo, the selection toolbar, the lightbox) doesn't re-render
+ * every other tile — only the primitives a specific tile actually depends on
+ * are passed in, and every callback is a stable top-level reference.
+ */
+const PhotoTile = memo(function PhotoTile({
+  photo,
+  index,
+  tabbable,
+  selectionActive,
+  selected,
+  allowDownload,
+  allowReactions,
+  isFavorite,
+  favoriteCount,
+  reactionState,
+  onPick,
+  onOpen,
+  onToggleFavorite,
+  onFocus,
+  buttonRef,
+}: PhotoTileProps) {
+  const aspect = aspectOf(photo);
+  // Local to this tile, not shared — a touch gesture and the synthetic click
+  // that follows it always target the same DOM node, so there is no reason
+  // for this to live in the parent (and mutating a ref passed down as a prop
+  // is against the rules-of-hooks lint now enforced here).
+  const longPress = useRef<{ timer: number | null; fired: boolean }>({
+    timer: null,
+    fired: false,
+  });
+
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current.timer !== null) {
+      clearTimeout(longPress.current.timer);
+      longPress.current.timer = null;
+    }
+  }, []);
+
+  return (
+    <li
+      className="group relative h-36 select-none sm:h-48 lg:h-52"
+      style={{ flexGrow: aspect, flexBasis: `${aspect * ROW_HEIGHT}px` }}
+      onTouchStart={() => {
+        if (!allowDownload) return;
+        longPress.current.fired = false;
+        longPress.current.timer = window.setTimeout(() => {
+          longPress.current.fired = true;
+          onPick(index, photo.id, false);
+        }, LONG_PRESS_MS);
+      }}
+      onTouchMove={cancelLongPress}
+      onTouchEnd={cancelLongPress}
+      onTouchCancel={cancelLongPress}
+      // A long press otherwise raises the browser's "save image" sheet on top
+      // of the selection we just made.
+      onContextMenu={(event) => {
+        if (selectionActive) event.preventDefault();
+      }}
+    >
+      <button
+        ref={buttonRef}
+        type="button"
+        tabIndex={tabbable ? 0 : -1}
+        onFocus={() => onFocus(index)}
+        onClick={(event) => {
+          // The long press already acted; the click it synthesises must not
+          // toggle the same photo straight back off.
+          if (longPress.current.fired) {
+            longPress.current.fired = false;
+            return;
+          }
+          // While a selection is active the tile extends it rather than
+          // opening the lightbox — otherwise picking 40 photos means 40
+          // precise taps on a small circle.
+          if (selectionActive) {
+            onPick(index, photo.id, event.shiftKey);
+            return;
+          }
+          onOpen(index);
+        }}
+        className="relative block h-full w-full overflow-hidden rounded"
+        // The tile carries the photo's own average colour, so the grid fills
+        // in with the picture's palette instead of grey holes.
+        style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
+        aria-label={selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`}
+      >
+        <Image
+          src={photo.objectKey}
+          alt={photo.fileName}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 320px"
+          priority={index < EAGER_TILES}
+          className={`object-cover transition-transform duration-200 ${
+            selected ? "scale-90 rounded" : "hover:scale-105"
+          }`}
+        />
+      </button>
+      {allowDownload && (
+        <SelectCheck
+          selected={selected}
+          pinned={selectionActive}
+          onPick={(shiftKey) => onPick(index, photo.id, shiftKey)}
+          fileName={photo.fileName}
+        />
+      )}
+      {allowReactions && (
+        <>
+          <HeartButton
+            active={isFavorite}
+            count={favoriteCount}
+            onClick={() => onToggleFavorite(photo.id)}
+            className="absolute right-2 bottom-2"
+          />
+          <ReactionBadge state={reactionState} />
+        </>
+      )}
+    </li>
+  );
+});
 
 function HeartButton({
   active,

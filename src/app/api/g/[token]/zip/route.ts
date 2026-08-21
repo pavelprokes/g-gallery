@@ -50,7 +50,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
       status: "CONFIRMED",
       ...(photoIds.length > 0 ? { id: { in: photoIds } } : {}),
     },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    orderBy: { createdAt: "asc" },
     select: { id: true, objectKey: true, fileName: true, sizeBytes: true, crc32: true },
   });
 

@@ -24,7 +24,37 @@ interface ShareLinkRecord {
   passwordHash: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
+  failedUnlockAttempts: number;
+  unlockLockedUntil: Date | null;
   gallery: { status: string };
+}
+
+// After this many consecutive wrong-password attempts, the link is locked out.
+export const UNLOCK_ATTEMPT_LIMIT = 5;
+// Length of the lockout once the limit is hit.
+export const UNLOCK_LOCKOUT_MS = 15 * 60 * 1000;
+
+/**
+ * Pure computation of the next failed-attempt state after a wrong password,
+ * split out from `verifySharePassword` so the threshold/lockout arithmetic is
+ * unit-testable without a database. `now` is injected for testability.
+ */
+export function nextFailedUnlockState(
+  currentAttempts: number,
+  currentLockedUntil: Date | null,
+  now: number = Date.now(),
+): { failedUnlockAttempts: number; unlockLockedUntil: Date | null } {
+  const attempts = currentAttempts + 1;
+  return {
+    failedUnlockAttempts: attempts,
+    unlockLockedUntil:
+      attempts >= UNLOCK_ATTEMPT_LIMIT ? new Date(now + UNLOCK_LOCKOUT_MS) : currentLockedUntil,
+  };
+}
+
+/** Pure check: is the link currently within an active lockout window? */
+export function isUnlockLocked(unlockLockedUntil: Date | null, now: number = Date.now()): boolean {
+  return unlockLockedUntil !== null && unlockLockedUntil.getTime() > now;
 }
 
 async function findShareLink(token: string): Promise<ShareLinkRecord | null> {
@@ -40,6 +70,8 @@ async function findShareLink(token: string): Promise<ShareLinkRecord | null> {
       passwordHash: true,
       expiresAt: true,
       revokedAt: true,
+      failedUnlockAttempts: true,
+      unlockLockedUntil: true,
       gallery: { select: { status: true } },
     },
   });
@@ -87,6 +119,13 @@ export async function resolveShareLink(token: string): Promise<ShareAccess> {
  * Password verification for the unlock form. Kept separate from
  * `resolveShareLink` so the gate itself never takes a password argument and
  * can't be accidentally bypassed by passing one.
+ *
+ * Rate-limited per ShareLink (not per visitor — no viewer identifier is ever
+ * involved, per CLAUDE.md's "never store viewer IPs" invariant): after
+ * `UNLOCK_ATTEMPT_LIMIT` consecutive wrong passwords, the link is locked out
+ * for `UNLOCK_LOCKOUT_MS` and further attempts are rejected *before* touching
+ * `verifyPassword` — that's what actually kills the scrypt CPU-amplification
+ * angle, not just the UX throttle.
  */
 export async function verifySharePassword(
   token: string,
@@ -95,8 +134,21 @@ export async function verifySharePassword(
   const link = await findShareLink(token);
   if (checkValidity(link) || !link?.passwordHash) return { ok: false };
 
+  if (isUnlockLocked(link.unlockLockedUntil)) return { ok: false };
+
   const { verifyPassword } = await import("@/lib/share-token");
-  if (!(await verifyPassword(password, link.passwordHash))) return { ok: false };
+  if (!(await verifyPassword(password, link.passwordHash))) {
+    await prisma.shareLink.update({
+      where: { id: link.id },
+      data: nextFailedUnlockState(link.failedUnlockAttempts, link.unlockLockedUntil),
+    });
+    return { ok: false };
+  }
+
+  await prisma.shareLink.update({
+    where: { id: link.id },
+    data: { failedUnlockAttempts: 0, unlockLockedUntil: null },
+  });
 
   return { ok: true, shareLinkId: link.id, passwordHash: link.passwordHash };
 }

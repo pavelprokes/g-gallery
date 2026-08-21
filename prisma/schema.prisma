@@ -113,22 +113,22 @@ enum StorageTier {
 }
 
 model Gallery {
-  id            String        @id @default(cuid())
-  ownerId       String
-  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  eventDate     DateTime?
-  status        GalleryStatus @default(DRAFT)
-  coverPhotoId  String?
+  id                String        @id @default(cuid())
+  ownerId           String
+  owner             User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  eventDate         DateTime?
+  status            GalleryStatus @default(DRAFT)
+  coverPhotoId      String?
   /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
-  storagePrefix String        @unique
-  publishedAt   DateTime?
-  archivedAt    DateTime?
+  storagePrefix     String        @unique
+  publishedAt       DateTime?
+  archivedAt        DateTime?
   /// Throttle for instant owner push notifications (≥30 min between pushes)
   lastInstantPushAt DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   photos     Photo[]
   shareLinks ShareLink[]
@@ -158,10 +158,8 @@ model Photo {
   /// tile before any bytes arrive; 7 bytes per photo rather than the ~400 a
   /// base64 blur placeholder would add to every page render.
   placeholder String?
-  takenAt     DateTime?
   status      PhotoStatus @default(PENDING)
   storageTier StorageTier @default(STANDARD)
-  sortOrder   Int         @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -169,23 +167,27 @@ model Photo {
   reactions Reaction[]
   events    ActivityEvent[]
 
-  @@index([galleryId, status, sortOrder])
+  @@index([galleryId, status])
 }
 
 model ShareLink {
-  id             String    @id @default(cuid())
-  galleryId      String
-  gallery        Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  id                   String    @id @default(cuid())
+  galleryId            String
+  gallery              Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   /// SHA-256 of the 128-bit share token — the raw token is never stored
-  tokenHash      String    @unique
-  label          String?
+  tokenHash            String    @unique
+  label                String?
   /// scrypt hash "salt:key"; null = no password
-  passwordHash   String?
-  expiresAt      DateTime?
-  revokedAt      DateTime?
-  allowDownload  Boolean   @default(true)
-  allowReactions Boolean   @default(true)
-  createdAt      DateTime  @default(now())
+  passwordHash         String?
+  expiresAt            DateTime?
+  revokedAt            DateTime?
+  allowDownload        Boolean   @default(true)
+  allowReactions       Boolean   @default(true)
+  /// Consecutive wrong-password unlock attempts; resets to 0 on success (anti-brute-force)
+  failedUnlockAttempts Int       @default(0)
+  /// Set once failedUnlockAttempts hits the threshold; unlock is refused (no scrypt call) until this passes
+  unlockLockedUntil    DateTime?
+  createdAt            DateTime  @default(now())
 
   viewers Viewer[]
 

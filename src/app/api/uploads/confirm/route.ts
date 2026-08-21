@@ -19,7 +19,6 @@ const bodySchema = z.object({
   sizeBytes: z.number().int().positive(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
-  takenAt: z.iso.datetime().optional(),
 });
 
 export async function POST(request: Request) {
@@ -38,7 +37,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { photoId, etag, crc32, sizeBytes, width, height, takenAt, placeholder } = parsed.data;
+  const { photoId, etag, crc32, sizeBytes, width, height, placeholder } = parsed.data;
 
   const photo = await prisma.photo.findFirst({
     where: { id: photoId, gallery: { ownerId: session.user.id } },
@@ -56,7 +55,6 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
-      takenAt: takenAt ? new Date(takenAt) : undefined,
     },
   });
 

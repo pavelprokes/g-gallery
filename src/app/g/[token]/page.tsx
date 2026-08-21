@@ -66,7 +66,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]">) 
       eventDate: true,
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        orderBy: { createdAt: "asc" },
         select: {
           id: true,
           objectKey: true,

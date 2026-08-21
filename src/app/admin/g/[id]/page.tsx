@@ -24,7 +24,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       status: true,
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: [{ favorites: { _count: "desc" } }, { sortOrder: "asc" }],
+        orderBy: [{ favorites: { _count: "desc" } }, { createdAt: "asc" }],
         select: {
           id: true,
           objectKey: true,

@@ -30,21 +30,25 @@ export function OfflineToggle({
   token: string;
   objectKeys: readonly string[];
 }) {
-  // Support is knowable at first render, so it belongs in the initial state
-  // rather than in an effect that immediately re-renders.
-  const [state, setState] = useState<State>(() =>
-    offlineSupport().supported ? "checking" : "unsupported",
-  );
+  // `offlineSupport()` reads `window`, so it can't run in the initializer:
+  // the server has no `window` and would compute "unsupported" while the
+  // client's first (pre-hydration) pass has a real one and would compute
+  // "checking" — a straight SSR/CSR content mismatch. Both sides start at
+  // "checking" (renders nothing) and the real answer arrives after mount.
+  const [state, setState] = useState<State>("checking");
   const [progress, setProgress] = useState<OfflineProgress | null>(null);
   const [free, setFree] = useState<number | null>(null);
   const [estimated, setEstimated] = useState(0);
   const keyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!offlineSupport().supported) return;
-
     let cancelled = false;
     void (async () => {
+      if (!offlineSupport().supported) {
+        if (!cancelled) setState("unsupported");
+        return;
+      }
+
       const key = await cacheKeyForToken(token);
       if (cancelled) return;
       keyRef.current = key;
