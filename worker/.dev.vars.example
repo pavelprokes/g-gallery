@@ -9,4 +9,4 @@ APP_ORIGIN="http://localhost:3000"
 IMAGE_SIGNING_SECRET="paste the value from the app's .env"
 # The zone hostname Image Transformations run on — this Worker proxies to it,
 # it does not resize images itself.
-PHOTOS_ZONE_HOST="photos.svatebni-fotograf-cechy.cz"
+PHOTOS_ZONE_HOST="cdn.svatebni-fotograf-cechy.cz"

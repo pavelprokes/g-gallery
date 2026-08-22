@@ -35,6 +35,7 @@ export const FORMS = {
   // nominative set above reads as broken there ("Stáhnout 1 fotka").
   photoAccusative: { one: "fotku", few: "fotky", many: "fotek" },
   selected: { one: "vybraná", few: "vybrané", many: "vybraných" },
+  day: { one: "den", few: "dny", many: "dní" },
   upload: {
     one: "nedokončené nahrávání",
     few: "nedokončená nahrávání",

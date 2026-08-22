@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { BADGE_CAP, unreadCount } from "@/lib/feed";
+import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,7 @@ export default async function AdminPage() {
                     <p className="font-medium text-neutral-500">{gallery.title}</p>
                     <p className="text-xs text-neutral-400">
                       {daysLeft > 0
-                        ? `Smazána natrvalo za ${daysLeft} ${daysLeft === 1 ? "den" : daysLeft < 5 ? "dny" : "dní"}`
+                        ? `Smazána natrvalo za ${pluralize(daysLeft, FORMS.day)}`
                         : "Bude smazána natrvalo brzy"}
                     </p>
                   </div>

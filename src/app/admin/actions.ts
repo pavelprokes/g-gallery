@@ -129,30 +129,63 @@ export async function revokeShareLink(shareLinkId: string) {
 const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * Moves a gallery to trash: hidden from the admin list, R2 objects untouched.
- * Recoverable via {@link restoreGallery} until `purgeAt` passes.
+ * Moves a gallery to trash: hidden from the admin list, R2 objects untouched,
+ * and every share link that was still live gets cut off immediately — trash
+ * is meant to stop access, not just admin-list visibility, and every already
+ * -issued link stays otherwise-valid (`status` untouched) for the whole
+ * recovery window. Recoverable via {@link restoreGallery} until `purgeAt`
+ * passes. `revokedAt` is stamped with the same instant as `trashedAt` so
+ * `restoreGallery` can tell these apart from links revoked independently
+ * beforehand, which must stay dead.
  */
 export async function trashGallery(galleryId: string) {
   const session = await requireAdmin();
 
   const now = new Date();
-  await prisma.gallery.updateMany({
-    where: { id: galleryId, ownerId: session.user.id },
-    data: { trashedAt: now, purgeAt: new Date(now.getTime() + TRASH_RETENTION_MS) },
-  });
+  await prisma.$transaction([
+    prisma.gallery.updateMany({
+      where: { id: galleryId, ownerId: session.user.id },
+      data: { trashedAt: now, purgeAt: new Date(now.getTime() + TRASH_RETENTION_MS) },
+    }),
+    prisma.shareLink.updateMany({
+      where: { galleryId, gallery: { ownerId: session.user.id }, revokedAt: null },
+      data: { revokedAt: now },
+    }),
+  ]);
 
   revalidatePath("/admin");
   revalidatePath(`/admin/g/${galleryId}`);
 }
 
-/** Pulls a gallery back out of trash before the purge cron gets to it. */
+/**
+ * Pulls a gallery back out of trash before the purge cron gets to it, and
+ * un-revokes exactly the share links {@link trashGallery} revoked — matched
+ * by `revokedAt` equalling the gallery's own `trashedAt`, so a link the owner
+ * had already revoked before trashing (a different timestamp) stays revoked.
+ */
 export async function restoreGallery(galleryId: string) {
   const session = await requireAdmin();
 
-  await prisma.gallery.updateMany({
+  const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, ownerId: session.user.id },
-    data: { trashedAt: null, purgeAt: null },
+    select: { trashedAt: true },
   });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  await prisma.$transaction([
+    prisma.gallery.updateMany({
+      where: { id: galleryId, ownerId: session.user.id },
+      data: { trashedAt: null, purgeAt: null },
+    }),
+    ...(gallery.trashedAt
+      ? [
+          prisma.shareLink.updateMany({
+            where: { galleryId, revokedAt: gallery.trashedAt },
+            data: { revokedAt: null },
+          }),
+        ]
+      : []),
+  ]);
 
   revalidatePath("/admin");
   revalidatePath(`/admin/g/${galleryId}`);

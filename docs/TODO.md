@@ -5,15 +5,17 @@ Nothing here is designed or estimated yet; the point of the list is that none of
 it gets lost. `docs/PLAN.md` stays the architecture authority — anything from
 here that we adopt gets folded into it with the same verification standard.
 
-## 0. E2E test suite — last, on Pavel's signal
+## 0. E2E test suite — **started 2026-08-21, on Pavel's signal**
 
-Playwright is installed and `pnpm test:e2e` exists, but **no E2E tests get written until Pavel says
-so**. Removed from Phases 1–4 and parked as Phase 5 in `docs/PLAN.md` on 2026-08-21. The reason is
-churn: routes, the upload flow and share gating have all changed under bug fixes this week, and
-tests written against a moving surface get rewritten rather than run. Unit tests continue as normal.
+Was deferred until Pavel said so; he did, once the P3 batch (§6 slug, signed image URLs,
+virtualization, justified layout, trash) was implemented. First suite lives in `e2e/` and covers
+the unauthenticated share-gallery viewer flow (`e2e/gallery-view.spec.ts`, 5 cases, seeded against
+local Docker Postgres, green on chromium + mobile-safari).
 
-When it does happen, the path worth covering first is the one that has broken twice already:
-upload → confirm → publish → share link → view tracking.
+Still open: the admin upload → confirm → publish → share-link-creation flow — the path that has
+broken twice already — needs a signed-in session, and this repo has no test-auth bypass yet. A
+real Google OAuth test account or a documented bypass is a prerequisite before that flow can be
+covered; not attempted yet.
 
 ## 1. Offline access — **done 2026-08-21**
 

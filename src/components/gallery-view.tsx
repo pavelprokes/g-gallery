@@ -610,11 +610,25 @@ function GalleryViewInner({
     [photos, report],
   );
 
+  /**
+   * `photos` is only the pages TanStack Query has fetched so far — the grid's
+   * own scroll-triggered fetch (below) never fires while the lightbox is the
+   * only thing visible. Wrapping modulo `photos.length` here would silently
+   * loop back to photo 1 at the end of the loaded page, hiding every photo
+   * past it. Instead: at the boundary, kick off the next page and hold in
+   * place — the button's `disabled` state (below) reflects that a fetch is
+   * in flight so it doesn't read as unresponsive.
+   */
   const move = useCallback(
     (delta: number) => {
       setLightboxIndex((current) => {
         if (current === null) return current;
-        const next = (current + delta + photos.length) % photos.length;
+        const requested = current + delta;
+        if (requested >= photos.length) {
+          if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+          return current;
+        }
+        const next = requested < 0 ? photos.length - 1 : requested;
         const photo = photos[next];
         if (photo && !reportedPhotos.current.has(photo.id)) {
           reportedPhotos.current.add(photo.id);
@@ -623,7 +637,7 @@ function GalleryViewInner({
         return next;
       });
     },
-    [photos, report],
+    [photos, report, hasNextPage, isFetchingNextPage, fetchNextPage],
   );
 
   const active = lightboxIndex === null ? null : photos[lightboxIndex];
@@ -711,7 +725,10 @@ function GalleryViewInner({
     if (lightboxIndex === null || photos.length < 2) return;
 
     const neighbours = [
-      photos[(lightboxIndex + 1) % photos.length],
+      // No forward neighbour to preload past the last loaded photo — the
+      // next page hasn't landed yet (see `move`, above), so there's nothing
+      // to warm and wrapping to photos[0] would preload the wrong photo.
+      lightboxIndex + 1 < photos.length ? photos[lightboxIndex + 1] : undefined,
       photos[(lightboxIndex - 1 + photos.length) % photos.length],
     ];
 
@@ -985,7 +1002,8 @@ function GalleryViewInner({
               event.stopPropagation();
               move(1);
             }}
-            className="absolute right-4 rounded-full bg-white/10 px-4 py-3 text-white"
+            disabled={lightboxIndex! >= photos.length - 1 && !hasNextPage}
+            className="absolute right-4 rounded-full bg-white/10 px-4 py-3 text-white disabled:opacity-40"
             aria-label="Další"
           >
             ›

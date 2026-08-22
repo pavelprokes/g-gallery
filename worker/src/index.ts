@@ -26,7 +26,7 @@ interface Env {
   APP_ORIGIN: string;
   /** Secret shared with `IMAGE_SIGNING_SECRET` in the app (src/lib/image-signing.ts). */
   IMAGE_SIGNING_SECRET: string;
-  /** The zone hostname Image Transformations run on, e.g. photos.svatebni-fotograf-cechy.cz —
+  /** The zone hostname Image Transformations run on, e.g. cdn.svatebni-fotograf-cechy.cz —
    * this Worker proxies to it rather than resizing itself. */
   PHOTOS_ZONE_HOST: string;
 }
@@ -180,11 +180,16 @@ async function handleSignedImage(url: URL, env: Env): Promise<Response> {
 
   // A new Response so the upstream's own headers (some of which came from
   // R2/cdn-cgi and aren't meant for the browser) don't leak through verbatim.
+  // A transient upstream failure (R2 object briefly missing during a
+  // re-upload, a transform-quota error) must never get the 1-year immutable
+  // treatment — that would pin the broken response client- and edge-side
+  // until the grant's TTL rotates the URL, which a viewer's browser cache
+  // (keyed on the full URL, sig included) won't do on its own.
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
       "Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": upstream.ok ? "public, max-age=31536000, immutable" : "no-store",
       "X-Content-Type-Options": "nosniff",
     },
   });
