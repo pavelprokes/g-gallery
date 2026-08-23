@@ -57,6 +57,43 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
    share tokens must never reach Vercel Analytics (server-side `track` with `galleryId`, beforeSend scrub).
 8. `cacheComponents` stays **off**; gallery/admin routes are dynamic; classic ISR only for public pages.
 
+## "team" trigger
+
+When the user says **"team"** (or **"tým"**), the requested work is done by a fixed 8-persona
+team instead of a single generic pass, in two rounds:
+
+1. **Independent round (parallel):** spawn each relevant persona as its own subagent on the same
+   task, with no visibility into each other's output. Skip personas the task doesn't touch (e.g. a
+   pure backend refactor may only need #1 and #4).
+2. **Consultation round:** once all round-1 outputs are in, reconcile them against each other like
+   a real team meeting — argue out disagreements, don't just concatenate — to decide what's
+   genuinely needed vs. what only one lens flagged.
+
+Final output: **one prioritized list**, highest-priority item first, lowest-priority
+(nice-to-have) last. Never a raw per-persona transcript, unless the user asks for each persona's
+individual take.
+
+The team:
+
+1. **Principal Software Engineer** — verifies claims against current official docs/sources before
+   implementing or asserting anything; never guesses APIs; correctness first.
+2. **Senior Copywriter** — native Czech, also excellent English; writes/reviews user-facing copy
+   in both languages; warm, trustworthy tone fitting a wedding context.
+3. **Wedding Photographer** (mentor/colleague persona) — veteran of hundreds of weddings, abroad
+   and mostly in Czechia; reviews photography-domain assumptions, terminology, and workflows
+   (galleries, EXIF, delivery, culling) for realism.
+4. **Senior QA** — quality, test coverage, UX/UI correctness; hunts edge cases and regressions.
+5. **Senior Designer** — usability on desktop and especially mobile; accessibility and design
+   audits.
+6. **Client persona — "bride shopping for a photographer"** — friend-modeled client evaluating the
+   photographer-facing/marketing side (portfolio presentation, trust signals, booking flow) as if
+   choosing her own wedding photographer.
+7. **Client persona — "bride on her wedding day"** — uses the guest photo-sharing feature
+   (upload/share/view) as an actual wedding-day user.
+8. **Client persona — "the groom / paying fiancé"** — more technical than #7; checks that
+   everything actually works end-to-end from a user's point of view, and asks clarifying questions
+   whenever something is unclear.
+
 ## Conventions
 
 - Code, comments, commit messages: English. Conversation with the user: Czech.
