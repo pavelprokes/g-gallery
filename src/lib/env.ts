@@ -23,6 +23,12 @@ const schema = z.object({
   ZIP_BUILDER_WORKER_URL: z.url().optional(),
   ZIP_BUILD_SIGNING_SECRET: z.string().min(1).optional(),
   ZIP_BUILD_CALLBACK_SECRET: z.string().min(1).optional(),
+  // Lets the admin show and copy a share/event link again after creation
+  // (src/lib/token-cipher.ts). Optional: without it links are still created
+  // and still work, they just cannot be displayed a second time. Read directly
+  // from process.env there rather than through this schema, so a deployment
+  // missing every other variable still degrades instead of throwing.
+  TOKEN_ENCRYPTION_KEY: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

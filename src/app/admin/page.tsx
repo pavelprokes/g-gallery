@@ -5,7 +5,9 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { BADGE_CAP, unreadCount } from "@/lib/feed";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
-import { EventCreatePanel } from "@/components/event-create-panel";
+import { AdminCreateBar } from "@/components/admin-create-bar";
+import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
+import { decryptToken } from "@/lib/token-cipher";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,8 @@ export default async function AdminPage() {
         title: true,
         eventDate: true,
         venue: true,
+        slug: true,
+        tokenCipher: true,
         _count: { select: { galleries: true } },
       },
     }),
@@ -66,7 +70,7 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto max-w-4xl p-8">
       <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Galerie</h1>
+        <h1 className="text-2xl font-semibold">Přehled</h1>
         <div className="flex items-center gap-4">
           <Link href="/admin/updates" className="relative text-sm underline">
             Aktivita
@@ -80,46 +84,44 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      <form action={create} className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border p-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Název
-          <input name="title" required maxLength={200} className="rounded border px-2 py-1" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Datum akce
-          <input name="eventDate" type="date" className="rounded border px-2 py-1" />
-        </label>
-        <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-          Vytvořit
-        </button>
-      </form>
-
-      <div className="mt-6">
-        <EventCreatePanel />
-      </div>
+      <AdminCreateBar createGalleryAction={create} />
 
       {events.length > 0 && (
-        <ul className="mt-4 divide-y rounded-lg border">
-          {events.map((event) => (
-            <li key={event.id} className="flex items-center justify-between p-4">
-              <div>
-                <Link href={`/admin/e/${event.id}`} className="font-medium hover:underline">
-                  {event.title}
-                </Link>
-                <p className="text-xs text-neutral-500">
-                  Svatba · {event._count.galleries} galerií
-                  {event.venue && ` · ${event.venue}`}
-                </p>
-              </div>
-              <span className="text-xs text-neutral-400">
-                {event.eventDate?.toLocaleDateString("cs-CZ") ?? "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <h2 className="mt-8 text-sm font-medium text-neutral-500">Svatby</h2>
+          <ul className="mt-2 divide-y rounded-lg border">
+            {events.map((event) => {
+              const token = decryptToken(event.tokenCipher);
+              return (
+                <li key={event.id} className="space-y-2 p-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div>
+                      <Link href={`/admin/e/${event.id}`} className="font-medium hover:underline">
+                        {event.title}
+                      </Link>
+                      <p className="text-xs text-neutral-500">
+                        {event._count.galleries} galerií
+                        {event.venue && ` · ${event.venue}`}
+                      </p>
+                    </div>
+                    <span className="text-xs text-neutral-400">
+                      {event.eventDate?.toLocaleDateString("cs-CZ") ?? "—"}
+                    </span>
+                  </div>
+                  {token ? (
+                    <CopyableLink href={`/s/${token}/${event.slug}`} />
+                  ) : (
+                    <UnrecoverableLink reason="Adresu už nelze zobrazit — svatba vznikla dřív, než se odkazy ukládaly čitelně." />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
-      <ul className="mt-6 divide-y rounded-lg border">
+      <h2 className="mt-8 text-sm font-medium text-neutral-500">Galerie</h2>
+      <ul className="mt-2 divide-y rounded-lg border">
         {galleries.length === 0 && (
           <li className="p-4 text-sm text-neutral-500">Zatím žádná galerie.</li>
         )}

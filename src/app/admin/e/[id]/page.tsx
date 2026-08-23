@@ -10,8 +10,15 @@ import {
   trashEvent,
 } from "../../actions";
 import { isCardVisible } from "@/lib/event-cards";
+import { decryptToken } from "@/lib/token-cipher";
+import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
+import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 
 export const dynamic = "force-dynamic";
+
+/** Shown where a link would be, when the ciphertext cannot be read back. */
+const NO_LINK =
+  "Adresu už nelze zobrazit — vznikla dřív, než se odkazy ukládaly čitelně. Vytvoř nový odkaz.";
 
 /**
  * One wedding page in the admin (docs/GUEST-GALLERIES.md §2).
@@ -20,9 +27,6 @@ export const dynamic = "force-dynamic";
  * a live share link and whether it is listed here are independent, and the
  * common mistake — assuming un-listing revokes access — is exactly what the
  * layout has to make impossible to believe.
- *
- * The wedding URL is not shown: only the token's hash is stored, so it exists
- * exactly once, right after creation, on the admin list page.
  */
 export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) {
   const session = await getAdminSession();
@@ -38,6 +42,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
       eventDate: true,
       venue: true,
       slug: true,
+      tokenCipher: true,
       trashedAt: true,
       galleries: {
         orderBy: [{ position: "asc" }, { title: "asc" }],
@@ -55,7 +60,14 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           shareLinks: {
             where: { revokedAt: null },
             orderBy: { createdAt: "desc" },
-            select: { id: true, label: true, allowUpload: true, createdAt: true },
+            select: {
+              id: true,
+              label: true,
+              allowUpload: true,
+              slug: true,
+              tokenCipher: true,
+              createdAt: true,
+            },
           },
         },
       },
@@ -69,6 +81,8 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
     select: { id: true, title: true },
   });
 
+  const eventToken = decryptToken(event.tokenCipher);
+  const eventUrl = eventToken ? `/s/${eventToken}/${event.slug}` : null;
   const now = new Date();
 
   return (
@@ -76,7 +90,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
       <header className="flex items-start justify-between gap-4">
         <div>
           <Link href="/admin" className="text-sm text-neutral-500 underline">
-            ← Galerie
+            ← Přehled
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">{event.title}</h1>
           <p className="text-sm text-neutral-500">
@@ -93,7 +107,19 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
       </header>
 
       <section className="rounded-lg border p-4">
-        <h2 className="text-sm font-medium">Galerie na této svatbě</h2>
+        <h2 className="text-sm font-medium">Adresa svatby</h2>
+        <p className="mt-1 mb-2 text-xs text-neutral-500">
+          Tohle dáš na QR ceduli. Vede sem každá připojená galerie a adresa se nemění, ani když
+          galerie přibývají.
+        </p>
+        {eventUrl ? <CopyableLink href={eventUrl} /> : <UnrecoverableLink reason={NO_LINK} />}
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium">Galerie na této svatbě</h2>
+          <span className="text-xs text-neutral-500">{event.galleries.length}</span>
+        </div>
         <p className="mt-1 text-xs text-neutral-500">
           „Na stránce“ řídí jen kartu na rozcestníku. Vlastní odkaz galerie tím nezaniká — kdo ho
           dostal, chodí dál.
@@ -101,7 +127,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
 
         <ul className="mt-4 divide-y">
           {event.galleries.length === 0 && (
-            <li className="py-3 text-sm text-neutral-500">Zatím žádná galerie.</li>
+            <li className="py-3 text-sm text-neutral-500">Zatím žádná galerie. Přidej ji níže.</li>
           )}
           {event.galleries.map((gallery) => {
             const visible = isCardVisible(
@@ -117,28 +143,76 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               },
               now,
             );
+            const cardUrl =
+              eventToken && gallery.eventKey
+                ? `/s/${eventToken}/${event.slug}/${gallery.eventKey}`
+                : null;
 
             return (
-              <li key={gallery.id} className="space-y-2 py-3">
+              <li key={gallery.id} className="space-y-3 py-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <div>
                     <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
                       {gallery.title}
                     </Link>
                     <p className="text-xs text-neutral-500">
-                      <code>{gallery.eventKey ?? "—"}</code> · {gallery._count.photos} fotek ·{" "}
-                      {gallery.status}
+                      {gallery._count.photos} fotek · {gallery.status}
                     </p>
                   </div>
                   <span
                     className={
                       visible
-                        ? "text-xs text-emerald-700 dark:text-emerald-400"
-                        : "text-xs text-neutral-500"
+                        ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                        : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-900"
                     }
                   >
                     {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
                   </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-neutral-500">Ze stránky svatby</p>
+                  {cardUrl ? (
+                    <CopyableLink href={cardUrl} />
+                  ) : (
+                    <UnrecoverableLink
+                      reason={
+                        eventToken
+                          ? "Galerie nemá klíč — odpoj ji a přidej znovu."
+                          : "Nejdřív je potřeba zobrazitelná adresa svatby."
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-neutral-500">
+                    Vlastní odkazy galerie — pošli je někomu, kdo nemá vidět zbytek svatby
+                  </p>
+                  {gallery.shareLinks.length === 0 && (
+                    <p className="text-xs text-neutral-500">
+                      Žádný živý odkaz. Vytvoř ho v detailu galerie.
+                    </p>
+                  )}
+                  {gallery.shareLinks.map((link) => {
+                    const token = decryptToken(link.tokenCipher);
+                    const note = [
+                      link.label ?? link.createdAt.toLocaleDateString("cs-CZ"),
+                      link.allowUpload ? "hosté nahrávají" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    return token ? (
+                      <CopyableLink
+                        key={link.id}
+                        href={`/g/${token}/${link.slug ?? ""}`}
+                        note={note}
+                      />
+                    ) : (
+                      <UnrecoverableLink key={link.id} reason={`${note} — ${NO_LINK}`} />
+                    );
+                  })}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -183,8 +257,9 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                 </div>
 
                 {gallery.listedOnEvent && !gallery.eventLinkId && (
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    Karta nemá odkaz, přes který by pustila dovnitř — hostům se nezobrazí.
+                  <p className="rounded border border-amber-400 bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                    Karta nemá odkaz, přes který by pustila dovnitř — hostům se nezobrazí. Vyber ho
+                    výše u „Karta vede přes“.
                   </p>
                 )}
               </li>
@@ -193,29 +268,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
         </ul>
       </section>
 
-      {unattached.length > 0 && (
-        <section className="rounded-lg border p-4">
-          <h2 className="text-sm font-medium">Přidat galerii</h2>
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-              await attachGalleryToEvent(event.id, String(formData.get("galleryId")));
-            }}
-            className="mt-3 flex flex-wrap items-end gap-3"
-          >
-            <select name="galleryId" className="rounded border px-2 py-1 text-sm">
-              {unattached.map((gallery) => (
-                <option key={gallery.id} value={gallery.id}>
-                  {gallery.title}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-              Přidat
-            </button>
-          </form>
-        </section>
-      )}
+      <NewGalleryInEvent eventId={event.id} unattached={unattached} attach={attachGalleryToEvent} />
     </main>
   );
 }

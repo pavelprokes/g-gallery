@@ -373,11 +373,10 @@ own 30-day trash window on top, swept by the same daily cron.
   page exists.
 - **`loadGalleryViewData`** (`src/lib/shared-gallery.ts`) is now shared by `/g/` and `/s/`, so the
   two surfaces cannot drift on ordering, page size or which photos count as visible.
-- **Admin**: create a wedding (its URL is revealed exactly once, like a share link), attach and
-  detach galleries, the listing switch, and the picker for which share link a card grants through.
-  Attaching freezes the `eventKey`, for the same reason a share link's slug is frozen.
-  The page warns when a gallery is listed but has no designated link — the one state that silently
-  produces no card.
+- **Admin**: create a wedding, attach and detach galleries, the listing switch, and the picker for
+  which share link a card grants through. Attaching freezes the `eventKey`, for the same reason a
+  share link's slug is frozen. The page warns when a gallery is listed but has no designated link —
+  the one state that silently produces no card.
 - **Trash and purge**: a wedding page gets the same 30-day window as a gallery and is swept by the
   same daily cron. Trashing it does _not_ trash the galleries; they are the photographer's work and
   outlive the page that listed them.
@@ -385,6 +384,26 @@ own 30-day trash window on top, swept by the same daily cron.
   rule is a five-way conjunction whose failure is silent). `e2e/wedding-page.spec.ts` covers the
   canonical redirect, that an un-listed gallery has no card _and_ is refused by key without
   redirecting, the two-card rozcestník, and the single-gallery inline render keeping its `/s/` URL.
+
+### Admin, reworked (2026-08-23)
+
+Links are no longer shown once and then lost. `ShareLink.tokenCipher` and `Event.tokenCipher` keep
+the token AES-256-GCM encrypted next to its hash (`src/lib/token-cipher.ts`, CLAUDE.md invariant 5
+revised) so every address can be displayed and copied at any time. Resolution is unchanged: still
+by hash, never by ciphertext.
+
+- **`/admin`** — two buttons rather than two permanently open forms: _+ Nová svatba_ and
+  _+ Samostatná galerie_. Weddings are listed with their address and a copy control.
+- **`/admin/e/{id}`** — the wedding's own address at the top, then per gallery: the card address
+  (`/s/{token}/{slug}/{key}`) _and_ the gallery's own `/g/` links, each copyable, so it is obvious
+  which one to send to whom. Plus the listing switch, the card-link picker and detach.
+- **`+ Nová galerie` inside a wedding** creates it, attaches it, publishes it and wires a share
+  link as the card's route in one step — the sequence where the old flow silently produced no card.
+  It is created **not listed**: everything is ready, but nothing reaches the rozcestník until
+  someone presses _Zobrazit na stránce_. A new gallery must not publish itself to eighty people as
+  a side effect of being created.
+- A row whose token predates the ciphertext (or a deployment without `TOKEN_ENCRYPTION_KEY`) says
+  so plainly instead of showing a broken link.
 
 ### Guest self-delete (2026-08-23)
 

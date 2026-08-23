@@ -41,9 +41,13 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
    re-verifies the session (`auth.api.getSession`) — Server Actions are public POST endpoints.
 4. **Next 16 idioms**: `await props.params` / `await searchParams` / `await cookies()` always;
    `revalidateTag(tag, 'max')` (single-arg form is a TS error); parallel route slots need `default.tsx`.
-5. **Share links**: raw tokens are never stored — DB keeps `tokenHash` (SHA-256); passwords use
-   scrypt (Node built-in, avoids a native argon2 dependency on Vercel); expiry/revocation is
-   enforced server-side on every surface (page, presign, beacon, download).
+5. **Share links**: `tokenHash` (SHA-256) is the **only** thing access resolves by — nothing is
+   ever looked up by a raw token. Since 2026-08-23 the token is _also_ stored AES-256-GCM encrypted
+   (`tokenCipher`, key in `TOKEN_ENCRYPTION_KEY`, never in the DB) **for display in the admin
+   only**, so a link can be copied again instead of existing for one render
+   (`src/lib/token-cipher.ts`). Passwords stay one-way (scrypt — Node built-in, avoids a native
+   argon2 dependency on Vercel). Expiry/revocation is enforced server-side on every surface (page,
+   presign, beacon, download).
 6. **No long-lived connections from Vercel** (SSE/WebSocket) — realtime belongs to Supabase Realtime.
 7. **Privacy**: never store viewer IPs; viewer identity is a first-party `anonKey` only;
    share tokens must never reach Vercel Analytics (server-side `track` with `galleryId`, beforeSend scrub).

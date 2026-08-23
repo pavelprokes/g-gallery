@@ -12,6 +12,7 @@ import {
 } from "@/lib/share-token";
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
 import { deleteObject } from "@/lib/r2";
+import { encryptToken } from "@/lib/token-cipher";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3).
@@ -70,10 +71,11 @@ const createShareLinkSchema = z.object({
 });
 
 /**
- * Returns the raw token exactly once — only its SHA-256 hash is persisted, so
- * it can never be recovered or displayed again. The slug is frozen here too
- * (docs/TODO.md §6): a later rename of the gallery doesn't reach links
- * already handed out, matching Notion/Figma's own trade-off.
+ * Returns the raw token, and also stores it encrypted so the admin can show it
+ * again later (`src/lib/token-cipher.ts`). Access still resolves only by the
+ * SHA-256 hash. The slug is frozen here too (docs/TODO.md §6): a later rename
+ * of the gallery doesn't reach links already handed out, matching
+ * Notion/Figma's own trade-off.
  */
 export async function createShareLink(
   formData: FormData,
@@ -102,6 +104,7 @@ export async function createShareLink(
     data: {
       galleryId: gallery.id,
       tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
       label: parsed.data.label,
       passwordHash: parsed.data.password ? await hashPassword(parsed.data.password) : null,
       expiresAt: parsed.data.expiresInDays
@@ -249,10 +252,10 @@ const createEventSchema = z.object({
 });
 
 /**
- * Returns the raw event token exactly once — like a share link, only its
- * SHA-256 is persisted, so it can never be recovered or displayed again.
- * This is a *different secret* from any gallery's share token, which is what
- * keeps a forwarded gallery link from exposing the wedding page.
+ * A *different secret* from any gallery's share token — that separation is what
+ * keeps a forwarded gallery link from exposing the wedding page. Stored
+ * encrypted alongside its hash so the address can be shown and copied from the
+ * admin at any time.
  */
 export async function createEvent(
   formData: FormData,
@@ -277,6 +280,7 @@ export async function createEvent(
       eventDate,
       venue: parsed.data.venue,
       tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
       slug,
     },
     select: { id: true },
@@ -436,4 +440,56 @@ export async function restoreEvent(eventId: string) {
   });
 
   revalidatePath("/admin");
+}
+
+/**
+ * Creates a gallery already wired into a wedding page: attached, published, and
+ * with a share link the card grants through.
+ *
+ * Doing all four steps by hand is where the flow used to go wrong — a gallery
+ * created, attached and listed, but with no designated link, produces no card
+ * and no error. Here the only remaining step is the deliberate one.
+ *
+ * It is created **not listed**. Everything is ready, but nothing appears on the
+ * rozcestník until someone presses "Zobrazit na stránce" — in a product whose
+ * whole point is that the couple decides what is shared, a new gallery must not
+ * publish itself to eighty people as a side effect of being created.
+ */
+export async function createGalleryForEvent(eventId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, ownerId: session.user.id },
+    select: { id: true },
+  });
+  if (!event) throw new Error("NOT_FOUND");
+
+  const galleryId = await createGallery(formData);
+  await attachGalleryToEvent(event.id, galleryId);
+  await publishGallery(galleryId);
+
+  const gallery = await prisma.gallery.findFirstOrThrow({
+    where: { id: galleryId },
+    select: { title: true, eventDate: true },
+  });
+
+  const token = generateShareToken();
+  const link = await prisma.shareLink.create({
+    data: {
+      galleryId,
+      tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
+      slug: gallerySlug(gallery.title, gallery.eventDate),
+      allowUpload: formData.get("allowUpload") ? true : false,
+      label: formData.get("allowUpload") ? "Pro hosty" : "Pro pár",
+    },
+    select: { id: true },
+  });
+
+  await prisma.gallery.update({
+    where: { id: galleryId },
+    data: { eventLinkId: link.id, listedOnEvent: false },
+  });
+
+  revalidatePath(`/admin/e/${event.id}`);
 }
