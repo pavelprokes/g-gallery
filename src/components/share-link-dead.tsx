@@ -1,15 +1,42 @@
+import Link from "next/link";
+import { ContactLine, DeadEnd } from "@/components/dead-end";
+
 /**
- * What a revoked or expired link shows. Deliberately identical for both:
- * telling a visitor which one it was would let anyone holding an old link
- * probe whether it was cut off deliberately or simply ran out.
+ * A share link that resolved but is no longer open: expired, or revoked.
+ *
+ * Both read identically on purpose. Telling them apart would say whether the
+ * photographer cut somebody off deliberately, which is nobody else's business.
  */
-export function ShareLinkDead({ what = "Odkaz" }: { what?: string }) {
+export function ShareLinkDead() {
   return (
-    <main className="flex min-h-dvh items-center justify-center p-8 text-center">
-      <div>
-        <h1 className="text-xl font-semibold">{what} už není platný</h1>
-        <p className="mt-2 text-sm text-neutral-500">Požádej fotografa o nový odkaz na galerii.</p>
-      </div>
-    </main>
+    <DeadEnd
+      title="Odkaz už neplatí"
+      lead="Galerie tu byla, ale přístup přes tenhle odkaz skončil."
+      hint="Novomanželé nebo fotograf ti můžou poslat nový."
+      action={<ContactLine />}
+    />
+  );
+}
+
+/**
+ * One gallery on a wedding page that is no longer listed, reached from a stale
+ * card or a bookmark.
+ *
+ * The way back is offered here and nowhere else: this visitor arrived on a URL
+ * that already contains the wedding's token, so the link gives them nothing
+ * they were not holding. A `/g/` link never contains it, which is why the
+ * component above offers no such thing.
+ */
+export function EventPartGone({ backHref, eventTitle }: { backHref: string; eventTitle: string }) {
+  return (
+    <DeadEnd
+      title="Tahle část už tu není"
+      lead="Fotograf ji ze stránky svatby sundal. Zbytek tam ale pořád je."
+      action={
+        <Link href={backHref} className="rounded-lg border px-4 py-2 text-sm">
+          ← {eventTitle}
+        </Link>
+      }
+    />
   );
 }

@@ -102,6 +102,6 @@ test.describe("share gallery viewer", () => {
 
   test("an unknown token shows the branded not-found page, not a 404 shell", async ({ page }) => {
     await page.goto("/g/this-token-does-not-exist/anything");
-    await expect(page.getByRole("heading", { name: "Galerie nenalezena" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tenhle odkaz nikam nevede" })).toBeVisible();
   });
 });

@@ -146,7 +146,7 @@ export function GuestUploader({
         // saw the bar go back to how it was has no idea whether it worked, and
         // the honest answer is that it did not.
         console.error("[g-gallery/upload] could not start:", error);
-        setFatal("Nahrávání se nepodařilo spustit. Zkuste to prosím znovu.");
+        setFatal("Nahrávání se nepodařilo spustit. Zkus to prosím znovu.");
         setRunning(false);
       } finally {
         setPreparing(0);
@@ -236,7 +236,7 @@ export function GuestUploader({
             <div className="mb-2">
               <p className="text-sm">
                 {resuming ? "Dokončuji nahrávání" : "Nahrávám"} {done} z {items.length} · displej
-                nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíte.
+                nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíš.
                 {resuming && (
                   <button
                     type="button"
@@ -315,13 +315,13 @@ export function GuestUploader({
           </div>
 
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-            Nahráním potvrzujete, že fotky můžete sdílet. Nechcete některou v albu?{" "}
+            Nahráním potvrzuješ, že fotky můžeš sdílet. Nechceš některou v albu?{" "}
             {takedownEmail ? (
               <a href={`mailto:${takedownEmail}`} className="underline">
-                Napište nám
+                Napiš nám
               </a>
             ) : (
-              "Řekněte novomanželům, smažou ji hned"
+              "Řekni novomanželům, smažou ji hned"
             )}
             .
           </p>
@@ -347,7 +347,7 @@ function NameAsk({ onSubmit }: { onSubmit: (name: string) => void }) {
       >
         <h2 className="text-lg font-medium">Komu za ně poděkovat?</h2>
         <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          Napište křestní jméno — objeví se u vašich fotek. Nechat prázdné je taky v pořádku.
+          Napiš křestní jméno — objeví se u tvých fotek. Nechat prázdné je taky v pořádku.
         </p>
         <input
           autoFocus
@@ -378,23 +378,23 @@ function guestRejectionMessage(rejection: UploadRejection): string {
   switch (rejection.code) {
     case "unsupported_type":
       if (rejection.detail.reason === "heic") {
-        return "Tenhle formát (HEIC) zatím neumíme. V Nastavení → Fotoaparát → Formáty přepněte na „Nejkompatibilnější“ a zkuste to znovu.";
+        return "Tenhle formát (HEIC) zatím neumíme. V Nastavení → Fotoaparát → Formáty přepni na „Nejkompatibilnější“ a zkus to znovu.";
       }
       if (rejection.detail.reason === "video") {
         return "Videa zatím nepřijímáme, jen fotky.";
       }
-      return "Tenhle typ souboru neumíme. Zkuste jinou fotku.";
+      return "Tenhle typ souboru neumíme. Zkus jinou fotku.";
     case "file_too_large":
       return "Fotka je moc velká.";
     case "quota_exceeded":
       return rejection.detail.reason === "VIEWER_FULL"
-        ? "Máte tu už hodně fotek — víc jich zatím přidat nejde. Díky!"
-        : "Album je zatím plné. Dejte prosím vědět novomanželům.";
+        ? "Máš tu už hodně fotek — víc jich zatím přidat nejde. Díky!"
+        : "Album je zatím plné. Dej prosím vědět novomanželům.";
     case "upload_denied":
       return rejection.detail.reason === "PASSWORD_REQUIRED"
-        ? "Načtěte prosím stránku znovu a zadejte heslo."
+        ? "Načti prosím stránku znovu a zadej heslo."
         : "Album už nové fotky nepřijímá.";
     default:
-      return "Nahrávání se nepovedlo. Zkuste to prosím znovu, až budete mít lepší signál.";
+      return "Nahrávání se nepovedlo. Zkus to prosím znovu, až budeš mít lepší signál.";
   }
 }

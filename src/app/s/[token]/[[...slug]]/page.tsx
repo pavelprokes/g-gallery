@@ -6,7 +6,7 @@ import { compositeToken } from "@/lib/event-token";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
-import { ShareLinkDead } from "@/components/share-link-dead";
+import { EventPartGone } from "@/components/share-link-dead";
 import { EventHub } from "@/components/event-hub";
 
 // Same reasons as the gallery route: the token's validity, the listing
@@ -65,9 +65,16 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
 
   if (requestedKey && !card) {
     // Reached from a stale card or a bookmark after the gallery was un-listed.
-    // Deliberately does NOT redirect to the wedding page it came from: someone
-    // holding only a gallery link must never be handed the event token.
-    return <ShareLinkDead what="Tahle část" />;
+    // Deliberately does NOT *redirect* — the visitor stays where they landed —
+    // but the way back is offered, which is safe precisely here: this URL
+    // already carries the wedding's token, so the link hands over nothing they
+    // were not already holding. A `/g/` link never carries it.
+    return (
+      <EventPartGone
+        backHref={`/s/${encodeURIComponent(token)}/${event.slug}`}
+        eventTitle={event.title}
+      />
+    );
   }
 
   if (!card) return <EventHub event={event} eventToken={token} />;
@@ -76,7 +83,12 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
   const access = await resolveShareLink(galleryToken);
   if (!access.ok) {
     if (access.reason === "PASSWORD_REQUIRED") return <SharePasswordForm token={galleryToken} />;
-    return <ShareLinkDead what="Tahle část" />;
+    return (
+      <EventPartGone
+        backHref={`/s/${encodeURIComponent(token)}/${event.slug}`}
+        eventTitle={event.title}
+      />
+    );
   }
 
   const data = await loadGalleryViewData(access.shareLink);

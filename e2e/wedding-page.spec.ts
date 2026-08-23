@@ -58,7 +58,7 @@ test.describe("wedding page", () => {
   }) => {
     await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}/kompletni`);
 
-    await expect(page.getByText("Tahle část už není platný")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tahle část už tu není" })).toBeVisible();
     // Crucially it stays put: redirecting to the hub would hand the event token
     // to someone who only ever had a link to one gallery.
     await expect(page).toHaveURL(`/s/${seed.weddingToken}/${seed.weddingSlug}/kompletni`);
@@ -98,6 +98,6 @@ test.describe("wedding page", () => {
   test("an unknown wedding token shows the branded not-found page", async ({ page }) => {
     const response = await page.goto("/s/definitely-not-a-real-token/whatever");
     expect(response?.status()).toBe(404);
-    await expect(page.getByRole("heading", { name: "Stránka nenalezena" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tenhle odkaz nikam nevede" })).toBeVisible();
   });
 });
