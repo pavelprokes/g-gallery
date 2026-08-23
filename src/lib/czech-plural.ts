@@ -31,11 +31,19 @@ export const FORMS = {
   favorite: { one: "oblíbená", few: "oblíbené", many: "oblíbených" },
   download: { one: "stažení", few: "stažení", many: "stažení" },
   photo: { one: "fotka", few: "fotky", many: "fotek" },
+  gallery: { one: "galerie", few: "galerie", many: "galerií" },
   // Accusative: what follows a verb like "Stáhnout". Czech declines, so the
   // nominative set above reads as broken there ("Stáhnout 1 fotka").
   photoAccusative: { one: "fotku", few: "fotky", many: "fotek" },
   selected: { one: "vybraná", few: "vybrané", many: "vybraných" },
   day: { one: "den", few: "dny", many: "dní" },
+  visit: { one: "návštěva", few: "návštěvy", many: "návštěv" },
+  // The adjective declines with the noun, so the whole phrase is one form set.
+  repeatVisit: {
+    one: "opakovaná návštěva",
+    few: "opakované návštěvy",
+    many: "opakovaných návštěv",
+  },
   upload: {
     one: "nedokončené nahrávání",
     few: "nedokončená nahrávání",

@@ -13,6 +13,7 @@ import {
 import { isCardVisible } from "@/lib/event-cards";
 import { decryptToken } from "@/lib/token-cipher";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
+import { CoverThumb } from "@/components/admin/cover-thumb";
 import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 import { EventSettings } from "@/components/event-settings";
 import { Alert } from "@/components/ui/alert";
@@ -22,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { eventCrumbs } from "@/lib/admin-breadcrumbs";
+import { FORMS, pluralize } from "@/lib/czech-plural";
+import { GALLERY_STATUS } from "@/lib/gallery-status";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +68,15 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           trashedAt: true,
           eventLinkId: true,
           eventLink: { select: { revokedAt: true, expiresAt: true } },
-          _count: { select: { photos: true } },
+          _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
+          // Its cover — the newest confirmed photo, same rule as the wedding
+          // page and the overview (src/components/admin/cover-thumb.tsx).
+          photos: {
+            where: { status: "CONFIRMED" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 1,
+            select: { objectKey: true, thumbObjectKey: true, placeholder: true },
+          },
           shareLinks: {
             where: { revokedAt: null },
             orderBy: { createdAt: "desc" },
@@ -180,18 +191,22 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
 
             return (
               <li key={gallery.id} className="space-y-3 py-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
-                      {gallery.title}
-                    </Link>
-                    <p className="text-admin-muted text-xs dark:text-neutral-400">
-                      {gallery._count.photos} fotek · {gallery.status}
-                    </p>
+                <div className="flex items-start gap-3">
+                  <CoverThumb cover={gallery.photos[0] ?? null} />
+                  <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <div className="min-w-0">
+                      <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
+                        {gallery.title}
+                      </Link>
+                      <p className="text-admin-muted text-xs dark:text-neutral-400">
+                        {pluralize(gallery._count.photos, FORMS.photo)} ·{" "}
+                        {GALLERY_STATUS[gallery.status].label}
+                      </p>
+                    </div>
+                    <Badge tone={visible ? "success" : "muted"}>
+                      {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
+                    </Badge>
                   </div>
-                  <Badge tone={visible ? "success" : "muted"}>
-                    {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
-                  </Badge>
                 </div>
 
                 <div className="space-y-1.5">
