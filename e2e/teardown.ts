@@ -1,5 +1,6 @@
-/** Deletes the gallery `e2e/seed.ts` created — cascades to its photos and
- * share link. Same `tsx --conditions=react-server` requirement as seed.ts. */
+/** Deletes everything the E2E user owns — galleries cascade to their photos
+ * and share links, events to nothing but themselves. Same
+ * `tsx --conditions=react-server` requirement as seed.ts. */
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,22 +10,10 @@ async function main() {
   const seedPath = path.join(__dirname, ".seed.json");
   if (!fs.existsSync(seedPath)) return;
 
-  const seed = JSON.parse(fs.readFileSync(seedPath, "utf8")) as {
-    galleryId: string;
-    guestGalleryId?: string;
-    weddingGalleryIds?: string[];
-    soloGalleryIds?: string[];
-  };
-
-  const galleryIds = [
-    seed.galleryId,
-    seed.guestGalleryId,
-    ...(seed.weddingGalleryIds ?? []),
-    ...(seed.soloGalleryIds ?? []),
-  ].filter((id): id is string => Boolean(id));
-
-  await prisma.gallery.deleteMany({ where: { id: { in: galleryIds } } });
-  // Events own no R2 objects and their galleries are already gone by here.
+  // Everything the seed and the specs created belongs to the one E2E user, so
+  // sweeping by owner is both simpler and safer than tracking ids — a gallery
+  // a test created (a guest upload, a new wedding) would otherwise be missed.
+  await prisma.gallery.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
   await prisma.event.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
   fs.unlinkSync(seedPath);
 

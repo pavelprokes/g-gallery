@@ -228,16 +228,28 @@ applies.
   feature free: see §7.
 - Capture straight from the camera via `<input capture>` next to the normal file picker.
 
-## 7. Moderation
+## 7. Taking a photo back (moderation deferred)
 
-Two modes, chosen by the couple per gallery:
+**Pavel, 2026-08-23: no moderation for now — a guest just needs to be able to delete their own
+photos.** So the private-collection mode and the approve-first workflow stay unbuilt, and what
+shipped instead is the smallest thing that solves the real problem:
 
-- **Visible immediately** (default) — the shared-screen effect that makes people upload more.
-- **Private collection** — guests upload, only the couple sees it until the gallery is opened.
-  FotoDrop sells this as "soukromý sběr"; it is one boolean.
+- **A guest can delete a photo they uploaded**, from the lightbox, with no time limit
+  (`/api/g/[token]/mine`). Every condition is checked server-side: the photo must be in this
+  gallery, must be a guest upload, and must be attributed to _this_ `anonKey`. Nobody gains any
+  power over anybody else's photo, which is precisely why this is not moderation.
+- **The photographer can delete any single photo** from the admin (`deletePhoto`). That is the
+  backstop for anything a guest will not remove themselves.
 
-Either way the couple can hide or delete a photo themselves, immediately. Snapshare requires an
-email to support for this; that is the bar to clear, and it is low.
+No time window on the guest's own deletion. OnlineSvatba uses six hours; a window would mostly
+produce a "this can no longer be deleted" message, which is a worse thing to read than the deletion
+is a thing to allow.
+
+**Still unbuilt, and worth knowing before a real wedding:** a guest photo is visible to everyone the
+moment it lands, and stays visible until somebody deletes it. There is no approve-first mode and no
+hide. If that turns out to matter on the night, the original two modes are still the right shape —
+_visible immediately_ (default) versus _private collection_, one boolean, the way FotoDrop sells it
+as "soukromý sběr".
 
 ## 8. Quotas and abuse
 
@@ -255,8 +267,15 @@ Non-negotiable before this ships:
 
 Cloudflare Image Transformations bill per unique transformation, 5 000/month free. 800 guest
 photos × 3 variants = 2 400 — **one wedding eats half the monthly allowance**, and two weddings in
-one month put us over. Hence the client-generated thumbnail in §6: the grid is served from
-uploaded 512 px derivatives, and a transformation is only spent when someone actually opens a photo
+one month put us over.
+
+**Pavel, 2026-08-23: the free 5 000 is enough for now.** The client-generated thumbnail is
+therefore no longer a prerequisite for pointing a QR code at this — it drops out of F3's critical
+path and becomes an optimisation to reach for when a month actually has two weddings in it. The
+number to watch is the transformations counter in the Cloudflare dashboard, not the R2 bill:
+storage and egress are unaffected either way, since guest photos are small next to the
+photographer's 12 MB exports. When it does get built the shape is unchanged — the grid is served
+from uploaded 512 px derivatives, and a transformation is only spent when someone opens a photo
 full-screen. R2 storage and egress are unaffected (egress is free, and guest photos are small
 relative to the photographer's 12 MB exports).
 
@@ -300,8 +319,8 @@ F1–F4 are the minimum that can run a real wedding.
 | F0  | Close §11 decisions                                                                                                                                                                                                                                                   | 0.5 d    |
 | F1  | Guest uploads: `ShareLink.allowUpload`, second branch in presign/confirm, `Photo.source`, `uploadedByViewerId`, quotas, migration — **done 2026-08-23**, see below                                                                                                    | 3–4 d    |
 | F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below | 2–3 d    |
-| F3  | Mobile reality: client-side 512 px thumbnail, upload queue surviving screen lock and app switch, HEIC detection with a readable message, honest progress state                                                                                                        | 2–3 d    |
-| F4  | Moderation: private-collection mode, hide/delete in admin, grouping by author, consent line, take-down page                                                                                                                                                           | 2 d      |
+| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state. HEIC refusal and the client-side skip shipped in F1; the 512 px thumbnail dropped out of scope — see §9                                                                     | 1–2 d    |
+| F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                    | —        |
 | F5  | Projection: `/s/{token}/{slug}/show` — fullscreen, live via Supabase Realtime, burn-in guard, reconnect behaviour                                                                                                                                                     | 1–2 d    |
 | F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path), real-device matrix, trial run on a small event                                                                                                   | 2 d      |
 | F7  | Printable QR graphics                                                                                                                                                                                                                                                 | separate |
@@ -367,11 +386,17 @@ own 30-day trash window on top, swept by the same daily cron.
   canonical redirect, that an un-listed gallery has no card _and_ is refused by key without
   redirecting, the two-card rozcestník, and the single-gallery inline render keeping its `/s/` URL.
 
-Not in F1 and still open before this is safe to point a QR code at: moderation and the
-private-collection mode (F4), the client-side 512 px thumbnail that keeps the transformation bill
-at zero (F3, §9), and an upload queue that survives a locked screen (F3). The progress copy says
-"nechte prosím stránku otevřenou" for exactly that reason — it will be a lie the moment F3 lands,
-and should be changed then.
+### Guest self-delete (2026-08-23)
+
+`GET /api/g/[token]/mine` lists the ids this `anonKey` uploaded; `DELETE` removes one, taking the
+R2 object with it and dropping any pre-built ZIP back to PENDING. The affordance is a button in the
+lightbox, shown only for the viewer's own photos, and the set refreshes after an upload so a shot
+can be taken back straight away. E2E covers both halves: a guest deletes what they added, and a
+photo somebody else added shows no delete button at all.
+
+Still open before pointing a QR code at a real wedding: an upload queue that survives a locked
+screen (F3). The progress copy says "nechte prosím stránku otevřenou" for exactly that reason — it
+will be a lie the moment F3 lands, and should be changed then.
 
 ## 12. Test focus
 
@@ -397,17 +422,20 @@ Written down because none of it is caught by unit tests:
    readable message at the ceiling.
 3. **Visible immediately or after the wedding?** The couple's choice per gallery; default visible
    immediately.
-4. **PIN on a single gallery?** Not in v1 — gallery state covers the real cases without a new
+4. **Moderation?** Not now (Pavel, 2026-08-23). A guest deleting their own photo covers the real
+   case and the photographer's per-photo delete is the backstop; approve-first stays designed but
+   unbuilt (§7).
+5. **PIN on a single gallery?** Not in v1 — gallery state covers the real cases without a new
    surface. When it is built: per-viewer lockout instead of per-link, never on the guest gallery.
    See §5.
-5. **Who flips what the hub shows?** For v1, the photographer, on the couple's request. A co-host
+6. **Who flips what the hub shows?** For v1, the photographer, on the couple's request. A co-host
    token is a _write_ capability in a URL — a different security class from today's read links. If
    it is built later: forced password, shorter expiry, reversible operations only (hide, never
    purge), every action written to `ActivityEvent`, re-verified server-side per action
    (invariant 3).
-6. **Retention?** One year from the event date, then Infrequent Access and a notice to the couple.
+7. **Retention?** One year from the event date, then Infrequent Access and a notice to the couple.
    `src/lib/lifecycle.ts` already does the mechanism; this is configuration.
-7. **Liability for a guest's photo?** Consent line at upload, take-down contact in the footer,
+8. **Liability for a guest's photo?** Consent line at upload, take-down contact in the footer,
    deletion in the couple's hands. Cheap now, expensive retrofitted.
 
 ## 14. Deliberately out of scope

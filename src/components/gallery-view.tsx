@@ -177,6 +177,22 @@ async function fetchPhotosPage(
   return (await response.json()) as PhotosPage;
 }
 
+/** Ids of the photos this viewer uploaded. Empty on any failure: the delete
+ * affordance is a convenience, and a network blip must not look like an error
+ * in a gallery someone is just browsing. */
+async function fetchMyPhotoIds(
+  token: string,
+  anonKey: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  return fetch(`/api/g/${encodeURIComponent(token)}/mine?anonKey=${encodeURIComponent(anonKey)}`, {
+    signal,
+  })
+    .then((response) => (response.ok ? response.json() : { photoIds: [] }))
+    .then((data: { photoIds: string[] }) => data.photoIds)
+    .catch(() => []);
+}
+
 /** One `QueryClient` per gallery view, created once — this is the only
  * surface in the app using TanStack Query, so there is no reason for a
  * layout-level provider every other route would carry for nothing. */
@@ -240,6 +256,11 @@ function GalleryViewInner({
     () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
+  // Photos this viewer uploaded — the only ones they may take back
+  // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
+  // server-rendered.
+  const [mine, setMine] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [reactions, setReactions] = useState<Map<string, PhotoReactionState>>(() => new Map());
   // Which reaction the name prompt interrupted, so it can be sent afterwards.
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
@@ -326,6 +347,19 @@ function GalleryViewInner({
 
     return () => controller.abort();
   }, [allowReactions, token]);
+
+  // Which photos are this viewer's own uploads. Only fetched where uploading
+  // was possible at all — on a read-only link nobody has anything to take back.
+  useEffect(() => {
+    if (!allowUpload) return;
+    const anonKey = getViewerId();
+    if (!anonKey) return;
+
+    const controller = new AbortController();
+    void fetchMyPhotoIds(token, anonKey, controller.signal).then((ids) => setMine(new Set(ids)));
+
+    return () => controller.abort();
+  }, [allowUpload, token]);
 
   // Reaction tallies are public, but "mine" is per-viewer, so this is fetched
   // client-side for the same reason the hearts are.
@@ -719,6 +753,43 @@ function GalleryViewInner({
 
   const closeLightbox = useCallback(() => window.history.back(), []);
 
+  /**
+   * Takes back one of this viewer's own uploads. Irreversible, so it asks —
+   * a plain `confirm()`, matching the rest of this codebase's dependency-free
+   * UI. The server re-checks that the photo really is theirs; this is the
+   * affordance, not the authorisation.
+   */
+  const deleteMine = useCallback(
+    async (photoId: string) => {
+      const anonKey = getViewerId();
+      if (!anonKey) return;
+      if (!confirm("Smazat tuhle fotku z alba? Tohle už nejde vzít zpět.")) return;
+
+      setDeleting(true);
+      try {
+        const query = new URLSearchParams({ anonKey, photoId });
+        const response = await fetch(
+          `/api/g/${encodeURIComponent(token)}/mine?${query.toString()}`,
+          { method: "DELETE" },
+        );
+        if (!response.ok) return;
+
+        setMine((prev) => {
+          const next = new Set(prev);
+          next.delete(photoId);
+          return next;
+        });
+        // The grid is a cached query; the row is gone server-side, so refetch
+        // rather than splicing it out of every page by hand.
+        closeLightbox();
+        await queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+      } finally {
+        setDeleting(false);
+      }
+    },
+    [closeLightbox, queryClient, token],
+  );
+
   useEffect(() => {
     if (lightboxIndex === null) return;
 
@@ -1103,6 +1174,17 @@ function GalleryViewInner({
               ✕
             </button>
 
+            {mine.has(active.id) && (
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void deleteMine(active.id)}
+                className="rounded-full bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+              >
+                {deleting ? "Mažu…" : "Smazat mou fotku"}
+              </button>
+            )}
+
             {allowDownload && (
               <button
                 type="button"
@@ -1223,8 +1305,12 @@ function GalleryViewInner({
       {allowUpload && (
         <GuestUploader
           token={token}
-          onUploaded={() => {
-            void queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+          onUploaded={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+            // Newly uploaded photos are deletable straight away, so the
+            // "mine" set has to catch up with what just landed.
+            const anonKey = getViewerId();
+            if (anonKey) setMine(new Set(await fetchMyPhotoIds(token, anonKey)));
           }}
         />
       )}

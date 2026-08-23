@@ -36,7 +36,7 @@ export function GuestUploader({
 }: {
   token: string;
   /** Called once a run added at least one photo, so the grid can refetch. */
-  onUploaded: () => void;
+  onUploaded: () => void | Promise<void>;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
@@ -91,7 +91,7 @@ export function GuestUploader({
       if (landed > 0) {
         // Photos are only visible once the server flipped them to CONFIRMED,
         // so the grid is stale until it refetches.
-        onUploaded();
+        void onUploaded();
         // Asked only once, and only after photos actually landed — never
         // before, when the one thing between a guest and their upload should
         // be the file picker.

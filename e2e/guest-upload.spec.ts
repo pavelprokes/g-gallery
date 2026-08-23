@@ -18,6 +18,8 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   uploadToken: string;
   uploadSlug: string;
   readOnlyToken: string;
+  selfDeleteToken: string;
+  selfDeleteSlug: string;
 };
 
 /** A real, decodable 1×1 JPEG: the client strips EXIF, CRC32s and decodes it. */
@@ -62,6 +64,48 @@ test.describe("guest uploads", () => {
     // Greater-than, not exactly one more: both browser projects upload into
     // this same gallery in parallel, so an exact count is a race, not a fact.
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBeGreaterThan(before);
+  });
+
+  test("a guest can take back a photo they uploaded, and only that one", async ({ page }) => {
+    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+
+    const before = await tileCount(page);
+
+    await page.locator('input[type="file"]:not([capture])').setInputFiles({
+      name: "omylem.jpg",
+      mimeType: "image/jpeg",
+      buffer: ONE_PIXEL_JPEG,
+    });
+    await expect(page.getByText("Nahráno. Uvidí to všichni na svatbě.")).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole("button", { name: "Přeskočit" }).click();
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before + 1);
+
+    // Newest first, so the photo just uploaded is the first tile.
+    const grid = page.getByRole("list", { name: "Fotky v galerii" });
+    await grid.locator('button[aria-label^="Otevřít"]').first().click();
+
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Smazat mou fotku" }).click();
+
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before);
+  });
+
+  test("a photo someone else uploaded offers no delete button", async ({ page }) => {
+    // A fresh browser context has its own anonKey, so the seeded photos in this
+    // gallery belong to nobody it knows — exactly the state of a guest looking
+    // at somebody else's shot.
+    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+
+    const grid = page.getByRole("list", { name: "Fotky v galerii" });
+    await expect
+      .poll(() => grid.locator('button[aria-label^="Otevřít"]').count())
+      .toBeGreaterThan(0);
+    await grid.locator('button[aria-label^="Otevřít"]').last().click();
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Smazat mou fotku" })).toHaveCount(0);
   });
 
   test("a read-only link to the same gallery offers no way to upload", async ({ page }) => {

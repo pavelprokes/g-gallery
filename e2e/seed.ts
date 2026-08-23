@@ -127,6 +127,12 @@ async function main() {
     2,
   );
 
+  // Its own wedding+gallery so deleting inside it cannot disturb the counts the
+  // other specs assert on. Seeded with photos nobody's anonKey owns, which is
+  // what "somebody else's photo" looks like to a fresh browser context.
+  const selfDelete = await makeWedding(user.id, "Klára a Tomáš", "Mlýn Kamenice");
+  await makeEventGallery(user.id, selfDelete.id, "Od hostů", "od-hostu", true, 2, true);
+
   const solo = await makeWedding(user.id, "Eliška a Honza", "Zámek Loučeň");
   const soloGallery = await makeEventGallery(user.id, solo.id, "Od hostů", "od-hostu", true, 2);
 
@@ -147,6 +153,8 @@ async function main() {
       soloWeddingToken: solo.token,
       soloWeddingSlug: solo.slug,
       soloGalleryIds: [soloGallery],
+      selfDeleteToken: selfDelete.token,
+      selfDeleteSlug: selfDelete.slug,
     }),
   );
 
@@ -178,6 +186,7 @@ async function makeEventGallery(
   eventKey: string,
   listedOnEvent: boolean,
   photos: number,
+  allowUpload = false,
 ): Promise<string> {
   const gallery = await prisma.gallery.create({
     data: {
@@ -214,6 +223,7 @@ async function makeEventGallery(
       galleryId: gallery.id,
       tokenHash: hashShareToken(generateShareToken()),
       slug: gallerySlug(title, null),
+      allowUpload,
     },
     select: { id: true },
   });

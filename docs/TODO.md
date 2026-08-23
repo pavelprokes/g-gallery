@@ -145,4 +145,7 @@ carries it as Phase 6.
 messages, per-photo delete, and an E2E suite that drives a real file through presign → PUT →
 confirm. **F2 (the wedding page) implemented the same day** — `Event` with its own token, the
 `/s/` route, admin CRUD, and trash/purge at the wedding level. `docs/GUEST-GALLERIES.md` §11 has
-the as-built notes for both. F3 (mobile reality: client thumbnails, upload queue, HEIC) is next.
+the as-built notes for both. Guest self-delete followed the same day; **moderation is deferred on
+Pavel's call**, and the free 5 000 Cloudflare transformations are accepted as enough for now, which
+takes the client-side thumbnail off F3's critical path. What is left before a real wedding is the
+upload queue surviving a locked screen.
