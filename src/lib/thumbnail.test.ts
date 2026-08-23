@@ -3,21 +3,33 @@ import { isThumbKey, THUMB_MAX_PX, thumbKeyFor, thumbSize } from "./thumbnail";
 
 describe("thumbKeyFor", () => {
   it("sits beside the original, inside the same gallery prefix", () => {
-    expect(thumbKeyFor("galleries/abc123/photo-1.jpg")).toBe("galleries/abc123/photo-1.thumb.webp");
+    expect(thumbKeyFor("galleries/abc123/photo-1.jpg", "webp")).toBe(
+      "galleries/abc123/photo-1.thumb.webp",
+    );
+    expect(thumbKeyFor("galleries/abc123/photo-1.jpg", "jpeg")).toBe(
+      "galleries/abc123/photo-1.thumb.jpg",
+    );
   });
 
   it("handles every extension the upload path accepts", () => {
     for (const ext of ["jpg", "png", "webp", "avif"]) {
-      expect(thumbKeyFor(`galleries/a/b.${ext}`)).toBe("galleries/a/b.thumb.webp");
+      expect(thumbKeyFor(`galleries/a/b.${ext}`, "webp")).toBe("galleries/a/b.thumb.webp");
     }
   });
 
   it("does not mistake a dot in a directory for an extension", () => {
-    expect(thumbKeyFor("galleries/v1.2/photo")).toBe("galleries/v1.2/photo.thumb.webp");
+    expect(thumbKeyFor("galleries/v1.2/photo", "webp")).toBe("galleries/v1.2/photo.thumb.webp");
+  });
+
+  it("gives the two formats different keys, so one never overwrites the other", () => {
+    expect(thumbKeyFor("galleries/a/b.jpg", "webp")).not.toBe(
+      thumbKeyFor("galleries/a/b.jpg", "jpeg"),
+    );
   });
 
   it("round-trips with isThumbKey, and an original never looks like one", () => {
-    expect(isThumbKey(thumbKeyFor("galleries/a/b.jpg"))).toBe(true);
+    expect(isThumbKey(thumbKeyFor("galleries/a/b.jpg", "webp"))).toBe(true);
+    expect(isThumbKey(thumbKeyFor("galleries/a/b.jpg", "jpeg"))).toBe(true);
     expect(isThumbKey("galleries/a/b.jpg")).toBe(false);
     expect(isThumbKey("galleries/a/b.webp")).toBe(false);
   });

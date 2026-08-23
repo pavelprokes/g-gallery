@@ -62,9 +62,8 @@ export interface PresignedUpload {
   objectKey: string;
   url: string;
   headers: Record<string, string>;
-  /** Where a grid thumbnail may go, if this browser can make one. */
-  thumbUrl?: string;
-  thumbHeaders?: Record<string, string>;
+  /** Where a grid thumbnail may go, one signed target per format. */
+  thumbTargets?: Partial<Record<"webp" | "jpeg", { url: string; headers: Record<string, string> }>>;
 }
 
 function credentialFields(credentials: UploadCredentials): Record<string, unknown> {
@@ -178,7 +177,7 @@ async function uploadOne(
   const placeholder = await averageColorOf(body);
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
-  const thumbnail = target.thumbUrl ? await makeThumbnail(body) : null;
+  const thumbnail = target.thumbTargets ? await makeThumbnail(body) : null;
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -193,17 +192,18 @@ async function uploadOne(
 
       // Best-effort and deliberately after the original: the photo is what
       // matters, and a failed thumbnail must never cost someone their upload.
-      let thumbStored = false;
-      if (thumbnail && target.thumbUrl) {
+      let thumbStored: "webp" | "jpeg" | null = null;
+      const thumbTarget = thumbnail && target.thumbTargets?.[thumbnail.format];
+      if (thumbnail && thumbTarget) {
         try {
-          const thumbPut = await fetch(target.thumbUrl, {
+          const thumbPut = await fetch(thumbTarget.url, {
             method: "PUT",
-            headers: target.thumbHeaders,
-            body: thumbnail,
+            headers: thumbTarget.headers,
+            body: thumbnail.blob,
           });
-          thumbStored = thumbPut.ok;
+          if (thumbPut.ok) thumbStored = thumbnail.format;
         } catch {
-          thumbStored = false;
+          thumbStored = null;
         }
       }
 

@@ -21,8 +21,8 @@ const commonSchema = {
   sizeBytes: z.number().int().positive(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
-  /** The browser managed to upload a grid thumbnail alongside the original. */
-  thumb: z.boolean().optional(),
+  /** Which grid thumbnail the browser managed to upload, if any. */
+  thumb: z.enum(["webp", "jpeg"]).nullish(),
 };
 
 // Same two callers as the presign route. The share token is re-verified here
@@ -104,8 +104,9 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
-      // Derived from the key we issued, never from anything the client sent.
-      thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey) : null,
+      // Derived from the key we issued: the client only says which format it
+      // managed, never where to write it.
+      thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,
     },
   });
 

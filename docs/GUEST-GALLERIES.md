@@ -260,15 +260,32 @@ Cloudflare Image Transformations bill per unique transformation, 5 000/month fre
 photos × 3 variants = 2 400 — **one wedding eats half the monthly allowance**, and two weddings in
 one month put us over.
 
-**Pavel, 2026-08-23: the free 5 000 is enough for now.** The client-generated thumbnail is
-therefore no longer a prerequisite for pointing a QR code at this — it drops out of F3's critical
-path and becomes an optimisation to reach for when a month actually has two weddings in it. The
-number to watch is the transformations counter in the Cloudflare dashboard, not the R2 bill:
-storage and egress are unaffected either way, since guest photos are small next to the
-photographer's 12 MB exports. When it does get built the shape is unchanged — the grid is served
-from uploaded 512 px derivatives, and a transformation is only spent when someone opens a photo
-full-screen. R2 storage and egress are unaffected (egress is free, and guest photos are small
-relative to the photographer's 12 MB exports).
+**Built 2026-08-23.** The grid is served from a 512 px derivative the uploading browser produced,
+so a transformation is only spent when someone opens a photo full-screen. Measured on the local
+stack: a 148 kB photo yields a 32 kB thumbnail.
+
+- **Resampling is pica** (`src/lib/thumbnail.ts`), **dynamically imported**. Scaling 4000 px
+  straight to 512 px with one `drawImage` aliases badly on exactly what a wedding is full of —
+  lace, foliage, hair — and pica resamples properly in a worker. Verified in the browser that the
+  chunk loads on the first upload and not before: DOM ready at 137 ms, pica fetched at 28.9 s when
+  a file was picked. The ~14 kB is paid only by people who actually upload, never by the eighty
+  who just look.
+- **The native shortcut is a dead end**, which is why the library earns its place:
+  `createImageBitmap`'s `resizeWidth` / `resizeQuality` are [unsupported in
+  Safari](https://caniuse.com/createimagebitmap), and pica
+  [disables that path by default](https://github.com/nodeca/pica) even where it exists because the
+  result depends on the browser.
+- **Every step degrades rather than fails**: no pica → plain canvas with smoothing; no WebP →
+  JPEG; nothing at all → null, and the photo uploads exactly as before while the grid falls back to
+  a Cloudflare transformation. No device ends up worse off than before this existed.
+- **Two signed targets per photo**, `.thumb.webp` and `.thumb.jpg`, both in the presign response
+  the client already waited for. A signed PUT is bound to one content type, so offering only WebP
+  would have meant no thumbnail at all on a browser that cannot encode it.
+- A plain `<canvas>` rather than `OffscreenCanvas`: Safari only got the latter in 16.4, and this
+  should reach as many phones as possible.
+- The key is derived from the one the server issued; the client only reports _which format_ it
+  managed, never where to write it. R2 storage and egress are unaffected (egress is free, and guest photos are small
+  relative to the photographer's 12 MB exports).
 
 ## 10. Privacy and law
 

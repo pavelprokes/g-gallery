@@ -8,7 +8,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { classifyContentType } from "@/lib/upload-content-types";
 import { GUEST_MAX_FILE_BYTES, checkGuestQuota } from "@/lib/guest-quota";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
-import { THUMB_CONTENT_TYPE, thumbKeyFor } from "@/lib/thumbnail";
+import { THUMB_CONTENT_TYPES, thumbKeyFor } from "@/lib/thumbnail";
 
 // A Route Handler, not a Server Action: the uploader presigns files
 // just-in-time in parallel batches, and Server Actions are queued
@@ -242,9 +242,19 @@ export async function POST(request: Request) {
  * cannot make a thumbnail simply never uses it.
  */
 async function thumbTarget(objectKey: string) {
-  const thumbKey = thumbKeyFor(objectKey);
+  // Both formats are signed up front, in the response the client already
+  // waited for. A signed PUT is bound to one content type, so offering only
+  // WebP would silently mean no thumbnail at all on a browser that cannot
+  // encode it; two signatures cost nothing and remove that hole.
+  const [webp, jpeg] = await Promise.all([
+    presignPut(thumbKeyFor(objectKey, "webp"), THUMB_CONTENT_TYPES.webp),
+    presignPut(thumbKeyFor(objectKey, "jpeg"), THUMB_CONTENT_TYPES.jpeg),
+  ]);
+
   return {
-    thumbUrl: await presignPut(thumbKey, THUMB_CONTENT_TYPE),
-    thumbHeaders: presignedPutHeaders(THUMB_CONTENT_TYPE),
+    thumbTargets: {
+      webp: { url: webp, headers: presignedPutHeaders(THUMB_CONTENT_TYPES.webp) },
+      jpeg: { url: jpeg, headers: presignedPutHeaders(THUMB_CONTENT_TYPES.jpeg) },
+    },
   };
 }
