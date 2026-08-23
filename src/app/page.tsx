@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
 
@@ -104,25 +105,6 @@ const HIGHLIGHTS: { title: string; body: string; icon: typeof DownloadIcon }[] =
   },
 ];
 
-/** A labelled placeholder for a real screenshot/photo — swap the box for a real <Image> later. */
-function ImagePlaceholder({
-  aspect,
-  label,
-  className = "",
-}: {
-  aspect: string;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`flex ${aspect} border-brand-border bg-brand-tint items-center justify-center rounded-xl border-2 border-dashed p-4 text-center dark:border-neutral-700 dark:bg-neutral-900 ${className}`}
-    >
-      <p className="text-sm text-neutral-500 dark:text-neutral-400">{label}</p>
-    </div>
-  );
-}
-
 export default function Home() {
   const faqJsonLd = {
     "@context": "https://schema.org",
@@ -162,10 +144,14 @@ export default function Home() {
             ← Zpět na svatebni-fotograf-cechy.cz
           </a>
         </div>
-        <ImagePlaceholder
-          aspect="aspect-[9/16]"
-          label="Screenshot: galerie na iPhonu"
-          className="mx-auto w-full max-w-56 sm:max-w-none"
+        <Image
+          src="/iphone-mockup.webp"
+          alt="Mřížka svatebních fotek v galerii na iPhonu"
+          width={1000}
+          height={2073}
+          sizes="(max-width: 640px) 14rem, 40vw"
+          priority
+          className="mx-auto h-auto w-full max-w-56 sm:max-w-none"
         />
       </header>
 
@@ -275,7 +261,14 @@ export default function Home() {
           vlastní fotky přímo tam, kde skončí i ty od fotografa.
         </p>
         <div className="mt-4 grid gap-6 sm:grid-cols-[1fr_1.3fr] sm:items-start">
-          <ImagePlaceholder aspect="aspect-[4/3]" label="Foto: QR kód na kartičce u fotokoutku" />
+          <Image
+            src="/qr-sign-table.webp"
+            alt="Cedulka s QR kódem na svatební tabuli, mezi svícny a talíři"
+            width={900}
+            height={600}
+            sizes="(max-width: 640px) 100vw, 40vw"
+            className="aspect-[3/2] rounded-xl object-cover"
+          />
           <ul className="space-y-3">
             {GUEST_TIPS.map((tip) => (
               <li key={tip} className="flex gap-2 text-sm text-neutral-700 dark:text-neutral-300">

@@ -920,7 +920,7 @@ function GalleryViewInner({
   }, [active?.id, lightboxIndex, photos, imageGrant]);
 
   return (
-    <main className="mx-auto max-w-7xl p-4 sm:p-8">
+    <main className="mx-auto max-w-[1600px] p-8 sm:p-16">
       <div aria-live="polite" className="sr-only">
         {selection.ids.size > 0 ? pluralize(selection.ids.size, FORMS.selected) : ""}
       </div>
@@ -995,7 +995,7 @@ function GalleryViewInner({
       )}
 
       {allowDownload && photos.length > 0 && selection.ids.size > 0 && (
-        <div className="sticky top-0 z-30 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 dark:bg-neutral-950/90">
+        <div className="sticky top-0 z-30 -mx-8 mb-4 flex flex-wrap items-center gap-3 border-b bg-white/90 px-8 py-3 backdrop-blur sm:-mx-16 sm:px-16 dark:bg-neutral-950/90">
           <button
             type="button"
             onClick={() => setSelection(clearSelection())}

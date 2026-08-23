@@ -59,3 +59,7 @@ next-env.d.ts
 
 # playwright-mcp scratch output
 /.playwright-mcp
+
+# source/working files for marketing images (Affinity Photo projects, AI-generation
+# outputs) — only the finished asset in public/ is meant to ship
+/graphic/
