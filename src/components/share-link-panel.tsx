@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createShareLink, revokeShareLink } from "@/app/admin/actions";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
@@ -24,10 +25,17 @@ export function ShareLinkPanel({
   galleryId,
   shareLinks,
   published,
+  hostedByEvent = false,
 }: {
   galleryId: string;
   shareLinks: ShareLinkRow[];
   published: boolean;
+  /**
+   * When this gallery belongs to a wedding page, the printable sign belongs
+   * there instead (docs/GUEST-GALLERIES.md §2/F7): the event address survives
+   * galleries coming and going, a gallery's own `/g/` link does not.
+   */
+  hostedByEvent?: boolean;
 }) {
   // The raw token exists only in this response — only its hash is stored, so
   // it can never be shown again after a reload.
@@ -125,6 +133,14 @@ export function ShareLinkPanel({
               ) : (
                 <UnrecoverableLink reason="Adresu už nelze zobrazit — vznikla dřív, než se odkazy ukládaly čitelně. Vytvoř nový." />
               ))}
+            {!link.revokedAt && link.allowUpload && !link.passwordHash && !hostedByEvent && (
+              <Link
+                href={`/admin/g/${galleryId}/sign?linkId=${link.id}`}
+                className={buttonClasses("secondary", "sm")}
+              >
+                Cedulka k tisku
+              </Link>
+            )}
           </li>
         ))}
       </ul>

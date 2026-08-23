@@ -16,7 +16,7 @@ import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 import { EventSettings } from "@/components/event-settings";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -127,7 +127,19 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           Tohle dáš na QR ceduli. Vede sem každá připojená galerie a adresa se nemění, ani když
           galerie přibývají.
         </p>
-        {eventUrl ? <CopyableLink href={eventUrl} /> : <UnrecoverableLink reason={NO_LINK} />}
+        {eventUrl ? (
+          <>
+            <CopyableLink href={eventUrl} />
+            <Link
+              href={`/admin/e/${event.id}/sign`}
+              className={`mt-2 inline-block ${buttonClasses("secondary", "sm")}`}
+            >
+              Cedulka k tisku
+            </Link>
+          </>
+        ) : (
+          <UnrecoverableLink reason={NO_LINK} />
+        )}
       </Card>
 
       <Card as="section">

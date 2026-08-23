@@ -159,3 +159,12 @@ check on confirm), and the physical half of F6 (real-device matrix, small-weddin
 Pricing is decided too — bundled free with a full-day package, not a standalone paid product.
 Still deferred, not reopened: moderation, the PIN (dropped, not deferred — see §5), a co-host login
 for the couple, and video.
+
+**F7 (printable QR signage) implemented 2026-08-23, third pass** — one fixed A6 sign, two copy
+variants, server-rendered QR (`qrcode`, `src/lib/qr.ts`), generated from either a wedding's `/s/`
+address (`/admin/e/[id]/sign`, the stable one) or a standalone gallery's own `/g/` link
+(`/admin/g/[id]/sign`), refused for a link that isn't upload-ready rather than silently generated.
+`docs/GUEST-GALLERIES.md` §11 has the as-built notes. **Same pass, explicit scope call: the
+physical half of F6 (real-device matrix, small-wedding trial run) is out of this first version** —
+not dropped, just no longer scheduled as part of this batch; see `docs/GUEST-GALLERIES.md` §16.
+Moderation, co-host access and video remain deferred, unchanged.

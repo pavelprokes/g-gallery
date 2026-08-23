@@ -34,7 +34,7 @@ detail (390 Kč/year renewal once there's something to renew) live in
 | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Live projection during the party                          | Build it — Supabase Realtime is already wired (`src/lib/realtime-channel.ts`) |
 | Moderation / private collection                           | Build it — it is the couple's veto and it is cheap                            |
-| Printable QR signage (GuestPix ships 180 Canva templates) | Real selling point, separate piece of work, out of this batch                 |
+| Printable QR signage (GuestPix ships 180 Canva templates) | Real selling point — **built 2026-08-23**, one fixed design not 180 templates |
 | Face recognition ("find yourself")                        | Skip — no value at 78 guests, and biometrics under GDPR is its own project    |
 | Guestbook / RSVP / seating                                | Skip — turns the QR into a wedding portal, which is not our business          |
 | Video                                                     | Deferred, see §9                                                              |
@@ -333,17 +333,17 @@ uploading their own work.
 Estimates are person-days for one developer and assume nothing already built gets reworked.
 F1–F4 are the minimum that can run a real wedding.
 
-| #   | Scope                                                                                                                                                                                                                                                                 | Est.     |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| F0  | Close §11 decisions                                                                                                                                                                                                                                                   | 0.5 d    |
-| F1  | Guest uploads: `ShareLink.allowUpload`, second branch in presign/confirm, `Photo.source`, `uploadedByViewerId`, quotas, migration — **done 2026-08-23**, see below                                                                                                    | 3–4 d    |
-| F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below | 2–3 d    |
-| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state — **done 2026-08-23**, see below                                                                                                                                             | 1–2 d    |
-| F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                    | —        |
-| F5  | Projection: fullscreen, live, no controls — **done 2026-08-23**, see below                                                                                                                                                                                            | 1–2 d    |
-| F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path), real-device matrix, trial run on a small event                                                                                                   | 2 d      |
-| F7  | Printable QR graphics                                                                                                                                                                                                                                                 | separate |
-| F8  | Video                                                                                                                                                                                                                                                                 | separate |
+| #   | Scope                                                                                                                                                                                                                                                                                                                                | Est.     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| F0  | Close §11 decisions                                                                                                                                                                                                                                                                                                                  | 0.5 d    |
+| F1  | Guest uploads: `ShareLink.allowUpload`, second branch in presign/confirm, `Photo.source`, `uploadedByViewerId`, quotas, migration — **done 2026-08-23**, see below                                                                                                                                                                   | 3–4 d    |
+| F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below                                                                | 2–3 d    |
+| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state — **done 2026-08-23**, see below                                                                                                                                                                                                            | 1–2 d    |
+| F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                                                                                   | —        |
+| F5  | Projection: fullscreen, live, no controls — **done 2026-08-23**, see below                                                                                                                                                                                                                                                           | 1–2 d    |
+| F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path) — **e2e done 2026-08-23**. The physical half (real-device matrix, trial run on a small event) is **out of scope for this first version** (Pavel, 2026-08-23, third pass) — not dropped, just not blocking launch | 2 d      |
+| F7  | Printable QR graphics — **done 2026-08-23**, see below                                                                                                                                                                                                                                                                               | separate |
+| F8  | Video                                                                                                                                                                                                                                                                                                                                | separate |
 
 Lifecycle, trash and purge operate on a gallery (`src/lib/lifecycle.ts`); the wedding page got its
 own 30-day trash window on top, swept by the same daily cron.
@@ -471,9 +471,51 @@ lightbox, shown only for the viewer's own photos, and the set refreshes after an
 can be taken back straight away. E2E covers both halves: a guest deletes what they added, and a
 photo somebody else added shows no delete button at all.
 
-Nothing from the original F1–F3 scope is left open. What remains is deliberately deferred:
-moderation (§7), the client-side thumbnail (§9), a co-host login for the couple (§13.6), printable
-QR graphics (F7) and video (F8). The separate PIN was **dropped** — see §5.
+Nothing from the original F1–F3 scope is left open. What remains deliberately out of this first
+version: moderation (§7), a co-host login for the couple (§13.6), the real-device matrix and small-
+wedding trial run (F6's physical half), and video (F8). The separate PIN was **dropped** — see §5.
+(The client-side thumbnail, §9, is _not_ on this list — it shipped the same day as F1, see below;
+an earlier version of this paragraph said otherwise and was stale.)
+
+### F7, as built (2026-08-23)
+
+Printable QR signage the photographer generates from the admin and prints for the wedding
+(`docs/GUEST-GALLERIES-RESEARCH.md` §10/§11 first proposed it; round-1 team review — engineer,
+copywriter, wedding photographer, QA, designer, and a groom/paying-client persona — refined the
+spec before building).
+
+- **One fixed A6 card, two copy variants**, not GuestPix's 180 templates — a flat card, not a
+  fold-over tent, kept deliberately simple for v1. "Na stůl" (short, the workhorse — one per table)
+  and "Do fotokoutku" (longer, a single hero piece), both gender-neutral by construction
+  (`src/components/printable-sign.tsx`): the artifact's original draft used a gendered participle
+  ("co jsi vyfotil/a"), which a printed object can never patch after the fact the way an app string
+  can, so it was rewritten out.
+- **QR generation is server-side and dependency-free of any client JS** — `qrcode`'s `toString`
+  (`src/lib/qr.ts`) returns SVG synchronously from a Server Component. Pure black on white with a
+  4-module quiet zone, not a brand tint: round-1 findings agreed low contrast under evening
+  reception lighting is a real scan-reliability risk, not worth trading for branding on the one
+  element with no room for ambiguity.
+- **Two entry points, not one**, because a printed sign's stability differs by what it points at
+  (docs/GUEST-GALLERIES.md §2): `/admin/e/{id}/sign` always encodes the **event's** own `/s/`
+  address — the stable one, since galleries come and go under it — while `/admin/g/{id}/sign`
+  encodes a **standalone** gallery's own `/g/` link and is hidden from the admin UI once a gallery
+  is attached to an event (`ShareLinkPanel`'s `hostedByEvent` prop), so the event address is what
+  gets printed for anything actually part of a wedding.
+- **Generation is refused, not silently offered, for an ineligible link** — round-1 QA findings:
+  no `allowUpload`, a revoked link, or (docs/GUEST-GALLERIES.md §5's own rule — never put a
+  password on the guest-upload link) a password-protected link each get an explanatory `Alert`
+  instead of a sign that would fail silently on the wedding night. The event-level sign still
+  generates even with zero upload-ready galleries yet (printing ahead of the first gallery being
+  published is the whole point of a stable address) but shows a live readiness line —
+  round-1 groom-persona finding: trusting a print run needs a "vede na: X · nahrávání zapnuto"
+  confirmation, not a blind QR.
+- **`window.print()` + `@media print`**, not a generated PDF — the browser already does this for
+  free, and every photographer already knows "print → save as PDF" from other web tools.
+- **`src/lib/sign-url.ts`, unit-tested**: the URL a sign encodes has no fallback and no error
+  surfaces to anyone until the wedding (round-1 QA's top concern), so the path-building logic for
+  both the gallery and event shapes is tested on its own, separate from the QR library itself.
+- **Not done**: a fold-over tent format, brand/logo customization, and a real phone scan-test before
+  first use — all explicitly out of scope for this pass, same as the rest of this section.
 
 ## 12. Test focus
 
@@ -552,7 +594,8 @@ Decided:
   requests, and a server-side check that `confirm`'s declared `sizeBytes` matches the R2 object.
   Admin-configurable quota overrides stay out — the hardcoded constants are fine for now.
 - ✅ **F6, the physical half**: a real-device matrix (iPhone HEIC, old Android/Chrome) and a trial
-  run on a small real wedding before the first paid one.
+  run on a small real wedding before the first paid one. _(Superseded 2026-08-23, third pass — see
+  §16: pushed out of this first version, not dropped.)_
 - ✅ **Pricing** (`docs/GUEST-GALLERIES-RESEARCH.md` §11): bundled free with a full-day package.
   Not sold as a standalone product.
 
@@ -572,3 +615,21 @@ Decided:
   retries it rather than ending the run.
 - Both surface a Czech message in `guest-uploader.tsx`; both are unit-tested
   (`guest-quota.test.ts`).
+
+## 16. Follow-up decisions (2026-08-23, third pass)
+
+F7 built (§11 has the as-built notes). Pavel's instruction this pass: build F7, and put everything
+else still open on this document's list into this first version's TODO explicitly, rather than
+leaving it ambiguous whether it is scheduled or dropped.
+
+- ✅ **F6, the physical half, pushed out of this first version.** The real-device matrix (iPhone
+  HEIC, old Android/Chrome) and the small-wedding trial run — §15 had this as "decided: do it before
+  the first paid wedding" — are **not** happening as part of this batch. Not dropped: still the
+  right thing to do before real guests use this at scale, just not a blocker for shipping F7 or
+  anything else in this document. Whoever picks this back up should re-read §12 first.
+- Reaffirmed, unchanged: moderation stays **dropped** (§7, §13.4), a co-host login for the couple
+  stays **deferred** (§13.6), video stays **deferred** (§14). None of these were reopened this
+  pass — they were already out of scope, this just makes the "first version" boundary explicit
+  in one place instead of scattered across three sections.
+- Not started, and out of this pass too: a fold-over tent sign format and brand/logo customization
+  for the sign (round-1 F7 findings flagged both as reasonable v2 refinements, not v1 requirements).

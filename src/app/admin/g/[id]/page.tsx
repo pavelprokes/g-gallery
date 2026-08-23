@@ -33,6 +33,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       description: true,
       status: true,
       trashedAt: true,
+      eventId: true,
       photos: {
         where: { status: "CONFIRMED" },
         orderBy: [{ favorites: { _count: "desc" } }, { createdAt: "asc" }],
@@ -134,6 +135,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
         })}
         published={gallery.status === "PUBLISHED"}
+        hostedByEvent={gallery.eventId !== null}
       />
 
       <section>
