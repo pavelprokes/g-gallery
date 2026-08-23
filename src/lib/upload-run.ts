@@ -40,6 +40,8 @@ export class UploadRejection extends Error {
       | "file_too_large"
       | "upload_denied"
       | "unauthorized"
+      | "rate_limited"
+      | "size_mismatch"
       | "network",
     readonly detail: {
       reason?: string;
@@ -47,6 +49,7 @@ export class UploadRejection extends Error {
       remaining?: number;
       maxBytes?: number;
       status?: number;
+      retryAfterSeconds?: number;
     } = {},
   ) {
     super(code);
@@ -112,6 +115,7 @@ async function rejectionFrom(response: Response): Promise<UploadRejection> {
     fileName?: string;
     remaining?: number;
     maxBytes?: number;
+    retryAfterSeconds?: number;
   } | null;
 
   const code = body?.error;
@@ -120,7 +124,9 @@ async function rejectionFrom(response: Response): Promise<UploadRejection> {
     code === "quota_exceeded" ||
     code === "file_too_large" ||
     code === "upload_denied" ||
-    code === "unauthorized"
+    code === "unauthorized" ||
+    code === "rate_limited" ||
+    code === "size_mismatch"
   ) {
     return new UploadRejection(code, { ...body, status: response.status });
   }

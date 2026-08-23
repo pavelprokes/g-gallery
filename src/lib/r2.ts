@@ -146,3 +146,19 @@ export async function deleteObject(key: string): Promise<void> {
     throw new Error(`R2 delete failed for ${key}: ${response.status}`);
   }
 }
+
+/**
+ * The actual byte count R2 holds for a key, from `Content-Length` on a HEAD —
+ * ground truth against a client's declared `sizeBytes` at confirm
+ * (docs/GUEST-GALLERIES.md §15). `null` when the object is not there at all,
+ * which a caller should treat the same as a mismatch.
+ */
+export async function headObject(key: string): Promise<{ sizeBytes: number } | null> {
+  const response = await r2Client().fetch(objectUrl(key), { method: "HEAD" });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`R2 head failed for ${key}: ${response.status}`);
+  }
+  const contentLength = response.headers.get("content-length");
+  return { sizeBytes: contentLength ? Number(contentLength) : 0 };
+}

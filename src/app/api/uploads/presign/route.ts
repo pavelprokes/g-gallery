@@ -6,7 +6,12 @@ import type { PhotoStatus } from "@/generated/prisma/enums";
 import { presignPut, presignedPutHeaders } from "@/lib/r2";
 import { requireAdmin } from "@/lib/auth-guard";
 import { classifyContentType } from "@/lib/upload-content-types";
-import { GUEST_MAX_FILE_BYTES, checkGuestQuota } from "@/lib/guest-quota";
+import {
+  GUEST_MAX_FILE_BYTES,
+  GUEST_RATE_LIMIT_WINDOW_MS,
+  checkGuestQuota,
+  checkGuestRateLimit,
+} from "@/lib/guest-quota";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { THUMB_CONTENT_TYPES, thumbKeyFor } from "@/lib/thumbnail";
 
@@ -135,7 +140,8 @@ export async function POST(request: Request) {
     // PENDING rows count too: presigning is what creates the row, so counting
     // only CONFIRMED uploads would leave an unbounded presign path open.
     const counted: PhotoStatus[] = ["PENDING", "CONFIRMED"];
-    const [galleryUsed, viewerUsed] = await Promise.all([
+    const rateWindowStart = new Date(Date.now() - GUEST_RATE_LIMIT_WINDOW_MS);
+    const [galleryUsed, viewerUsed, recentCount] = await Promise.all([
       prisma.photo.count({
         where: { galleryId: target.galleryId, source: "GUEST", status: { in: counted } },
       }),
@@ -144,7 +150,21 @@ export async function POST(request: Request) {
             where: { uploadedByViewerId: target.viewerId, status: { in: counted } },
           })
         : Promise.resolve(0),
+      // Unattributed (opted-out) viewers cannot be rate-limited individually —
+      // the per-gallery file cap is still what bounds them.
+      target.viewerId
+        ? prisma.photo.count({
+            where: { uploadedByViewerId: target.viewerId, createdAt: { gte: rateWindowStart } },
+          })
+        : Promise.resolve(0),
     ]);
+
+    if (target.viewerId && !checkGuestRateLimit({ recentCount, requested: files.length })) {
+      return NextResponse.json(
+        { error: "rate_limited", retryAfterSeconds: GUEST_RATE_LIMIT_WINDOW_MS / 1000 },
+        { status: 429 },
+      );
+    }
 
     // Resumed files re-use rows that are already counted, so charging the
     // quota for them again would make a retry fail where the first try passed.
