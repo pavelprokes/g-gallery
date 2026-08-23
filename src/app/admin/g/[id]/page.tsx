@@ -10,6 +10,7 @@ import { decryptToken } from "@/lib/token-cipher";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
+import { GallerySettings } from "@/components/gallery-settings";
 import { publishGallery, restoreGallery } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     select: {
       id: true,
       title: true,
+      eventDate: true,
+      description: true,
       status: true,
       trashedAt: true,
       photos: {
@@ -90,7 +93,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             {gallery.status} · {gallery.photos.length} fotek
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <GallerySettings
+            galleryId={gallery.id}
+            title={gallery.title}
+            eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
+            description={gallery.description}
+          />
           {gallery.status === "DRAFT" && (
             <form action={publish}>
               <button

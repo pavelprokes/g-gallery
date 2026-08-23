@@ -601,3 +601,48 @@ export async function unpublishGallery(galleryId: string) {
   revalidatePath(`/admin/g/${gallery.id}`);
   if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
 }
+
+const updateGallerySchema = z.object({
+  title: z.string().min(1).max(200),
+  eventDate: z.string().optional(),
+  description: z.string().max(2000).optional(),
+});
+
+/**
+ * Renames a gallery, or fixes its date or description.
+ *
+ * Two things are deliberately **not** recomputed, for the same reason as
+ * {@link updateEvent}: `ShareLink.slug` (docs/TODO.md §6) and `Gallery.eventKey`
+ * are frozen at creation. Both may already be in somebody's inbox or on printed
+ * signage, and neither resolves anything — the token does. A stale segment
+ * looks slightly wrong; a changed URL breaks.
+ */
+export async function updateGallery(galleryId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const parsed = updateGallerySchema.safeParse({
+    title: formData.get("title"),
+    eventDate: formData.get("eventDate") || undefined,
+    description: formData.get("description") || undefined,
+  });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: galleryId, ownerId: session.user.id },
+    select: { id: true, eventId: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: {
+      title: parsed.data.title,
+      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+      description: parsed.data.description ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/g/${gallery.id}`);
+  revalidatePath("/admin");
+  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+}

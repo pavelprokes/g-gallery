@@ -58,6 +58,28 @@ Any other shape gives `redirect_uri_mismatch`. The apex domain does **not** work
 to the separate `svatebni-fotograf-cechy-20` marketing site. The same client can serve local
 development as well — just add `http://localhost:3000/...` alongside.
 
+## Migrations
+
+`pnpm build` is `prisma generate && next build`. **Nothing runs `prisma migrate deploy`**, and
+adding it to the build script is worse than it looks: preview deployments share the production
+environment variables, so every pull request would migrate the production database.
+
+So the order on every deploy that carries a schema change is: **migrate first, merge second.**
+Vercel deploys on push to `main`, and code that reaches production before its columns do makes
+every page 500.
+
+```bash
+# the URL is only in .env.production.local, which is gitignored
+export DIRECT_URL="$(grep '^DIRECT_URL=' .env.production.local | cut -d= -f2- | tr -d '"')"
+
+pnpm exec prisma migrate status   # read-only: what is pending
+pnpm exec prisma migrate deploy   # apply
+```
+
+Migrating ahead of the deploy is only safe while migrations stay **additive** — new tables, new
+nullable columns, new columns with defaults. The running production code ignores what it does not
+know about. A migration that drops or narrows a column has to be split across two deploys instead.
+
 ## Cron
 
 Setting `CRON_SECRET` is enough. Vercel
