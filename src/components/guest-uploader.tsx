@@ -395,7 +395,7 @@ function guestRejectionMessage(rejection: UploadRejection): string {
         ? "Načti prosím stránku znovu a zadej heslo."
         : "Album už nové fotky nepřijímá.";
     case "rate_limited":
-      return "Nahráváte hodně najednou — dejte tomu chvíli a zkuste to znovu.";
+      return "Posíláš je hodně najednou — dej tomu chvilku a zkus to znovu.";
     case "size_mismatch":
       return "Fotka se nepřenesla celá. Zkoušíme to znovu.";
     default:

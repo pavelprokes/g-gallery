@@ -58,7 +58,13 @@ export class UploadRejection extends Error {
 }
 
 /** Codes that end the whole run: retrying the next batch would fail identically. */
-const FATAL_CODES = new Set(["quota_exceeded", "upload_denied", "unauthorized"]);
+// `rate_limited` belongs here even though the ceiling clears on its own: the
+// retry backoff tops out around three seconds against a sixty-second window,
+// so retrying only burns the remaining files against a limit that has not
+// moved. Ending the run and saying so is the honest outcome — the guest picks
+// the photos again in a minute. `size_mismatch` is deliberately NOT fatal: a
+// truncated PUT is exactly what a retry fixes.
+const FATAL_CODES = new Set(["quota_exceeded", "upload_denied", "unauthorized", "rate_limited"]);
 
 export interface PresignedUpload {
   photoId: string;
