@@ -78,7 +78,11 @@ test.describe("guest uploads", () => {
   }, testInfo) => {
     await page.goto(selfDeleteUrl(testInfo.project.name));
 
-    const before = await tileCount(page);
+    // Wait for the seeded photos to render before counting. Reading the count
+    // straight after goto() catches an empty grid and turns every later
+    // assertion into a race — which is exactly how this test first failed.
+    const SEEDED = 2;
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED);
 
     await page.locator('input[type="file"]:not([capture])').setInputFiles({
       name: "omylem.jpg",
@@ -89,7 +93,7 @@ test.describe("guest uploads", () => {
       timeout: 30_000,
     });
     await page.getByRole("button", { name: "Přeskočit" }).click();
-    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before + 1);
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED + 1);
 
     // Newest first, so the photo just uploaded is the first tile.
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
@@ -98,7 +102,9 @@ test.describe("guest uploads", () => {
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Smazat mou fotku" }).click();
 
-    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before);
+    // Back to the seeded photos: the guest's own upload is gone, the two that
+    // were never theirs are untouched.
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED);
   });
 
   test("a photo someone else uploaded offers no delete button", async ({ page }, testInfo) => {

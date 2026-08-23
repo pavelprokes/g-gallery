@@ -184,32 +184,23 @@ is refused where the request landed. It deliberately does _not_ redirect to the 
 would hand the event token to someone who only ever held a link to one gallery, which is exactly
 the separation this whole design exists to keep.
 
-## 5. PIN on a single gallery — deferred, deliberately
+## 5. PIN on a single gallery — dropped, the password already does it
 
-Locking one gallery behind a PIN is a **social brake, not access control**: the token is already
-unguessable, so a PIN does not protect against guessing — it protects against careless forwarding.
-That is a real function, but it has to be named honestly, since a four-digit code written on a card
-and pasted into a family group chat has been forwarded too.
+**Resolved 2026-08-23 (Pavel): the share-link password covers this, so no separate PIN is built.**
 
-Three things must be settled before it can be switched on:
+"Show this gallery to some people, not all" was the one case a listing switch could not express,
+and it turns out not to need a new primitive. `ShareLink.passwordHash` has existed since Phase 2:
+create a second link for that gallery, give it a password, and hand out the link and the password
+together. If the wedding-page card should be gated too, point `eventLinkId` at the protected link
+and everyone arriving via the card meets the password form.
 
-- **Never on the guest gallery.** One extra number between a guest and their photo costs
-  participation, and participation is the only metric that matters here.
-- **The lockout counter is currently per link.** `failedUnlockAttempts` and `unlockLockedUntil` are
-  columns on `ShareLink` (`src/lib/share-access.ts`), so five wrong tries lock the link for
-  _everyone_. Harmless for a client gallery two people visit; at a wedding with eighty guests it is
-  a self-inflicted denial of service, triggered by the first uncle without his reading glasses.
-  The counter has to move to the viewer (`anonKey`) before any PIN ships.
-- **Four digits is 10 000 combinations.** Under today's lockout an attack takes weeks rather than
-  minutes, which is not the same as safe. Either a longer code, or a per-viewer counter plus a
-  per-gallery ceiling — preferably both.
-
-**Gallery state covers the real cases more cheaply**: draft / published / withdrawn. "We are not
-sharing the full set yet" and "we changed our minds" are both just the card not being on the event
-page — no PIN, no lockout, no new surface to test. The PIN is reserved for the one case state
-cannot express: _show it to some, not all_. When that comes up, it gets built properly — reusing
-`src/lib/share-unlock.ts` (whose signature is derived from the stored hash, so changing the PIN
-invalidates every outstanding cookie) generalised from a link id to a scope id.
+What that inherits, and why it is fine here: the lockout counter
+(`failedUnlockAttempts` / `unlockLockedUntil`) lives on the `ShareLink`, so five wrong attempts
+lock the link for **everyone** holding it. For a link given to a handful of people — which is
+exactly the "not all" case — that is harmless. It would have been a self-inflicted denial of
+service on a link eighty guests use, which is why a PIN on the _guest_ gallery was never the idea.
+So: **never put a password on the guest-upload link**, and if a password ever does end up on a
+many-viewer link, move that counter to the viewer (`anonKey`) first.
 
 ## 6. Guest upload path
 
@@ -321,7 +312,7 @@ F1–F4 are the minimum that can run a real wedding.
 | F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below | 2–3 d    |
 | F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state — **done 2026-08-23**, see below                                                                                                                                             | 1–2 d    |
 | F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                    | —        |
-| F5  | Projection: `/s/{token}/{slug}/show` — fullscreen, live via Supabase Realtime, burn-in guard, reconnect behaviour                                                                                                                                                     | 1–2 d    |
+| F5  | Projection: fullscreen, live, no controls — **done 2026-08-23**, see below                                                                                                                                                                                            | 1–2 d    |
 | F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path), real-device matrix, trial run on a small event                                                                                                   | 2 d      |
 | F7  | Printable QR graphics                                                                                                                                                                                                                                                 | separate |
 | F8  | Video                                                                                                                                                                                                                                                                 | separate |
@@ -427,6 +418,23 @@ by hash, never by ciphertext.
 - A resumed run shows _Zahodit zbytek_ for anyone who abandoned it on purpose. Requests already in
   flight finish; there is nothing to gain from abandoning bytes that are nearly there.
 
+### F5 projection, as built (2026-08-23)
+
+One **Projekce** button in the gallery header (not in the lightbox — Pavel's call), and from then
+on there is nothing to operate. It runs fullscreen, holds a screen wake lock so the projector does
+not sleep, and its only affordance is a way out (Escape, or a click).
+
+- **Crossfade, not a src swap.** Two layers stay mounted and the incoming photo is placed in the
+  hidden one a full interval before it is shown, so it is decoded by the time it fades in. A single
+  `<img>` whose `src` changes flashes white on a slow connection, and on a five-metre screen that
+  is the one thing everybody notices.
+- **Live.** It refetches every 30 s, and a photo it has not shown yet goes next — so a guest's shot
+  reaches the screen seconds after they upload it, which is the entire reason to project rather
+  than hand someone a slideshow file. Once every photo has had its turn the pass restarts.
+- **No controls on purpose.** Arrows, a counter or a scrubber on a screen nobody stands next to are
+  only things for a guest to poke at. The E2E asserts the dialog contains exactly one button.
+- 6 s per photo, 1.2 s fade, both constants at the top of `src/components/slideshow.tsx`.
+
 ### Guest self-delete (2026-08-23)
 
 `GET /api/g/[token]/mine` lists the ids this `anonKey` uploaded; `DELETE` removes one, taking the
@@ -436,8 +444,8 @@ can be taken back straight away. E2E covers both halves: a guest deletes what th
 photo somebody else added shows no delete button at all.
 
 Nothing from the original F1–F3 scope is left open. What remains is deliberately deferred:
-moderation (§7), the client-side thumbnail (§9), the PIN (§5), a co-host login for the couple
-(§13.6), live projection (F5), printable QR graphics (F7) and video (F8).
+moderation (§7), the client-side thumbnail (§9), a co-host login for the couple (§13.6), printable
+QR graphics (F7) and video (F8). The separate PIN was **dropped** — see §5.
 
 ## 12. Test focus
 
@@ -466,9 +474,10 @@ Written down because none of it is caught by unit tests:
 4. **Moderation?** Not now (Pavel, 2026-08-23). A guest deleting their own photo covers the real
    case and the photographer's per-photo delete is the backstop; approve-first stays designed but
    unbuilt (§7).
-5. **PIN on a single gallery?** Not in v1 — gallery state covers the real cases without a new
-   surface. When it is built: per-viewer lockout instead of per-link, never on the guest gallery.
-   See §5.
+5. **PIN on a single gallery?** Dropped entirely. The share-link password has done this since
+   Phase 2: a second, password-protected link is exactly "show it to some, not all". Never put a
+   password on the guest-upload link — the lockout counter is per link, so it would let one guest
+   lock out the whole wedding. See §5.
 6. **Who flips what the hub shows?** For v1, the photographer, on the couple's request. A co-host
    token is a _write_ capability in a URL — a different security class from today's read links. If
    it is built later: forced password, shorter expiry, reversible operations only (hide, never
