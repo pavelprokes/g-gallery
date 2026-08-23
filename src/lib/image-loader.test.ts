@@ -88,3 +88,48 @@ describe("imageLoader", () => {
     });
   });
 });
+
+describe("browser-made thumbnails", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("serves a thumbnail straight from the bucket — no transformation billed", () => {
+    vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://cdn.example.com");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "cloudflare");
+
+    const url = imageLoader({
+      src: "galleries/abc/photo-1.thumb.webp",
+      width: 384,
+      quality: 82,
+    });
+
+    expect(url).toBe("https://cdn.example.com/galleries/abc/photo-1.thumb.webp");
+    expect(url).not.toContain("cdn-cgi");
+  });
+
+  it("routes a thumbnail through imgproxy locally, where the base is not the bucket", () => {
+    vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "http://localhost:8080");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "imgproxy");
+
+    const url = imageLoader({
+      src: "galleries/abc/photo-1.thumb.webp",
+      width: 384,
+      quality: 82,
+    });
+
+    // Taking the bucket shortcut here would produce a URL imgproxy cannot
+    // serve — a dead image in local dev and on a phone testing over the LAN.
+    expect(url).toContain("/plain/");
+  });
+
+  it("still transforms the original, so a photo without a thumbnail is unaffected", () => {
+    vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://cdn.example.com");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "cloudflare");
+
+    const url = imageLoader({ src: "galleries/abc/photo-1.jpg", width: 384, quality: 82 });
+
+    expect(url).toContain("cdn-cgi");
+    expect(url).toContain("galleries/abc/photo-1.jpg");
+  });
+});

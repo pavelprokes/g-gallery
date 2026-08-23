@@ -51,6 +51,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
     select: {
       id: true,
       objectKey: true,
+      thumbObjectKey: true,
       fileName: true,
       width: true,
       height: true,
@@ -68,6 +69,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
     items: page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
       fileName: photo.fileName,
       width: photo.width,
       height: photo.height,

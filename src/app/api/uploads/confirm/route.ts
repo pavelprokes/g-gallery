@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
+import { thumbKeyFor } from "@/lib/thumbnail";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -20,6 +21,8 @@ const commonSchema = {
   sizeBytes: z.number().int().positive(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
+  /** The browser managed to upload a grid thumbnail alongside the original. */
+  thumb: z.boolean().optional(),
 };
 
 // Same two callers as the presign route. The share token is re-verified here
@@ -47,9 +50,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { photoId, etag, crc32, sizeBytes, width, height, placeholder } = parsed.data;
+  const { photoId, etag, crc32, sizeBytes, width, height, placeholder, thumb } = parsed.data;
 
-  let photo: { id: string; galleryId: string } | null;
+  let photo: { id: string; galleryId: string; objectKey: string } | null;
 
   if ("shareToken" in parsed.data) {
     const access = await resolveGuestUpload(parsed.data.shareToken, parsed.data.anonKey ?? null);
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
         status: "PENDING",
         uploadedByViewerId: access.context.viewerId,
       },
-      select: { id: true, galleryId: true },
+      select: { id: true, galleryId: true, objectKey: true },
     });
   } else {
     let session;
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
 
     photo = await prisma.photo.findFirst({
       where: { id: photoId, gallery: { ownerId: session.user.id } },
-      select: { id: true, galleryId: true },
+      select: { id: true, galleryId: true, objectKey: true },
     });
   }
 
@@ -101,6 +104,8 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
+      // Derived from the key we issued, never from anything the client sent.
+      thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey) : null,
     },
   });
 

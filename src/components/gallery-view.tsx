@@ -71,6 +71,8 @@ const LONG_PRESS_MS = 450;
 export interface GalleryPhoto {
   id: string;
   objectKey: string;
+  /** Browser-made 512 px WebP, when the uploading device could produce one. */
+  thumbObjectKey: string | null;
   fileName: string;
   width: number | null;
   height: number | null;
@@ -1066,7 +1068,12 @@ function GalleryViewInner({
                   <PhotoTile
                     key={photo.id}
                     photo={photo}
-                    src={srcFor(photo.objectKey, imageGrant)}
+                    // The grid prefers the browser-made thumbnail: already the
+                    // right size, so it costs no Cloudflare transformation
+                    // (docs/GUEST-GALLERIES.md §9). Null on photos uploaded by a
+                    // device that could not make one, which fall back to the
+                    // transformed original exactly as before.
+                    src={srcFor(photo.thumbObjectKey ?? photo.objectKey, imageGrant)}
                     width={entry.width}
                     height={entry.height}
                     index={index}

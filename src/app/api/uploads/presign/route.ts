@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { classifyContentType } from "@/lib/upload-content-types";
 import { GUEST_MAX_FILE_BYTES, checkGuestQuota } from "@/lib/guest-quota";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
+import { THUMB_CONTENT_TYPE, thumbKeyFor } from "@/lib/thumbnail";
 
 // A Route Handler, not a Server Action: the uploader presigns files
 // just-in-time in parallel batches, and Server Actions are queued
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
           objectKey: resumedKey,
           url: await presignPut(resumedKey, file.contentType),
           headers: presignedPutHeaders(file.contentType),
+          ...(await thumbTarget(resumedKey)),
         };
       }
 
@@ -224,9 +226,25 @@ export async function POST(request: Request) {
         objectKey,
         url: await presignPut(objectKey, file.contentType),
         headers: presignedPutHeaders(file.contentType),
+        ...(await thumbTarget(objectKey)),
       };
     }),
   );
 
   return NextResponse.json({ uploads });
+}
+
+/**
+ * A second signed PUT for the grid thumbnail the browser may produce
+ * (docs/GUEST-GALLERIES.md §9). Always offered, never required: the key is
+ * derived here rather than accepted from the client — a client-named key is a
+ * client-chosen write location inside the gallery's prefix — and a client that
+ * cannot make a thumbnail simply never uses it.
+ */
+async function thumbTarget(objectKey: string) {
+  const thumbKey = thumbKeyFor(objectKey);
+  return {
+    thumbUrl: await presignPut(thumbKey, THUMB_CONTENT_TYPE),
+    thumbHeaders: presignedPutHeaders(THUMB_CONTENT_TYPE),
+  };
 }

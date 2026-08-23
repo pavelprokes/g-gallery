@@ -275,6 +275,11 @@ model Photo {
   placeholder        String?
   status             PhotoStatus @default(PENDING)
   storageTier        StorageTier @default(STANDARD)
+  /// A 512 px WebP the uploading browser produced, stored beside the original
+  /// (docs/GUEST-GALLERIES.md §9). Null whenever the device could not make one
+  /// — the grid then falls back to a Cloudflare transformation, exactly as
+  /// before this existed. Derived from `objectKey`, never client-supplied.
+  thumbObjectKey     String?
   /// OWNER unless a guest uploaded it through a share link with allowUpload.
   source             PhotoSource @default(OWNER)
   /// Which viewer added it, for attribution and for the per-guest quota.
