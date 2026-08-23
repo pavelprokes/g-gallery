@@ -1,9 +1,14 @@
 name: DB backup
 
 # The Supabase free tier takes no backups at all, so this is the only copy of
-# the database that exists (docs/PLAN.md §9). It dumps, verifies the dump by
-# restoring it, then stores it in R2 — a backup that has never been restored is
-# not a backup, so the restore is part of the job rather than a later hope.
+# g-gallery's data that exists (docs/PLAN.md §9). It dumps, verifies the dump
+# by restoring it, then stores it in R2 — a backup that has never been
+# restored is not a backup, so the restore is part of the job rather than a
+# later hope.
+#
+# This Supabase project is shared with the svatebni-fotograf-cechy-20
+# marketing site (docs/SETUP.md §6) — the dump is scoped to the `g_gallery`
+# schema only, so this workflow never touches that project's own data.
 
 on:
   schedule:
@@ -65,13 +70,16 @@ jobs:
           echo "STAMP=$STAMP" >> "$GITHUB_ENV"
           # Custom format: restorable selectively and compressed already.
           # --no-owner/--no-privileges so it restores into any role.
-          # --schema=public: auth/storage/realtime belong to Supabase roles, and
-          # including them would fail on permissions and break the restore.
+          # --schema=g_gallery: this Supabase project is shared with the
+          # svatebni-fotograf-cechy-20 marketing site (its own data lives in
+          # `public`, out of scope here) plus Supabase-managed auth/storage/
+          # realtime schemas — dumping only g_gallery keeps this backup to
+          # exactly what g-gallery owns.
           pg_dump "$PGURL" \
             --format=custom \
             --no-owner \
             --no-privileges \
-            --schema=public \
+            --schema=g_gallery \
             --file="backup-$STAMP.dump"
           ls -lh "backup-$STAMP.dump"
 
@@ -79,14 +87,10 @@ jobs:
         env:
           PGPASSWORD: verify
         run: |
-          # `pg_dump --schema=public` emits `CREATE SCHEMA public`, which fails
-          # against a database that already has one — and --exit-on-error then
-          # aborts the whole restore. Dropping it first is also what a real
-          # restore into a fresh Supabase project has to do, so verifying this
-          # way exercises the actual recovery procedure (docs/SETUP.md §12).
-          psql --host=localhost --port=5432 --username=postgres --dbname=verify \
-            --command="drop schema public cascade;"
-
+          # `pg_dump --schema=g_gallery` emits `CREATE SCHEMA g_gallery`, and a
+          # fresh postgres:17-alpine container never has that schema (unlike
+          # `public`, which every Postgres database creates by default) — so
+          # unlike a public-schema dump, no pre-restore drop is needed here.
           pg_restore \
             --host=localhost --port=5432 --username=postgres --dbname=verify \
             --no-owner --no-privileges --exit-on-error \
@@ -97,14 +101,14 @@ jobs:
           for table in user account session Gallery Photo ShareLink; do
             psql --host=localhost --port=5432 --username=postgres --dbname=verify \
               --tuples-only --no-align \
-              --command="select to_regclass('public.\"$table\"');" \
+              --command="select to_regclass('g_gallery.\"$table\"');" \
               | grep -q . || { echo "::error::table $table missing from the dump"; exit 1; }
           done
 
           PHOTOS=$(psql --host=localhost --port=5432 --username=postgres --dbname=verify \
-            --tuples-only --no-align --command='select count(*) from "Photo";')
+            --tuples-only --no-align --command='select count(*) from g_gallery."Photo";')
           GALLERIES=$(psql --host=localhost --port=5432 --username=postgres --dbname=verify \
-            --tuples-only --no-align --command='select count(*) from "Gallery";')
+            --tuples-only --no-align --command='select count(*) from g_gallery."Gallery";')
           echo "restored: $GALLERIES galleries, $PHOTOS photos"
           echo "PHOTOS=$PHOTOS" >> "$GITHUB_ENV"
           echo "GALLERIES=$GALLERIES" >> "$GITHUB_ENV"

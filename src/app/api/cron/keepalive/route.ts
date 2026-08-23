@@ -32,6 +32,9 @@ export async function GET(request: Request) {
         Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=minimal",
+        // Keepalive lives in the g_gallery schema, not PostgREST's default
+        // "public" — this Supabase project is shared with another app.
+        "Content-Profile": "g_gallery",
       },
       body: JSON.stringify({ pingedAt: new Date().toISOString() }),
     });

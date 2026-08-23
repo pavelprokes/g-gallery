@@ -72,24 +72,17 @@ is a billable Cloudflare transformation (5,000 unique/month free), so adding a
 placeholder tier and a preview tier multiplies the variants per photo. Worth
 measuring against the current fixed set before committing.
 
-## 6. Readable URL slug — raised by Pavel 2026-08-21
+## 6. Readable URL slug — **done 2026-08-21**
 
-Want the share URL to carry a human-readable hint (e.g. `svatba-petra-a-jana-2026-08-12`)
-instead of only the opaque token (`/g/QpFM9K1v81FIbyxxTedBVA` today), built from
-`Gallery.title` **and** `Gallery.eventDate` — the date lives in its own field, not in the
-title, so the slug generator has to pull both.
+Share URL now carries a human-readable hint (e.g. `svatba-petra-a-jana-2026-08-12`) alongside the
+opaque token: `/g/{token}/{slug}` (`src/lib/gallery-slug.ts`). Built from `Gallery.title` **and**
+`Gallery.eventDate`. Slug trails the token in its own path segment the app never parses for
+resolution, so it stays purely cosmetic and the token remains the sole authority.
 
-Proposed shape: `/g/{token}/{slug}` — slug trails the token in its own path segment the
-app never parses for resolution, so it stays purely cosmetic and the token stays the sole
-authority exactly as today. Putting the slug _before_ the token (`/g/{slug}-{token}`) was
-considered and rejected: `generateShareToken()` is base64url, which itself contains `-`
-and `_`, so splitting on a hyphen to recover the token would be ambiguous/unsafe.
-
-Open questions before building: generate the slug once at share-link creation (frozen even
-if the title changes later, like Notion/Figma) or derive it fresh on every request (always
-current, but a renamed gallery invalidates old bookmarks' _readability_, not their
-validity — the token still resolves either way); exact diacritics/casing normalization for
-Czech titles.
+Open questions resolved: the slug is **frozen at share-link creation** (stored on `ShareLink`, not
+recomputed per request) — a later rename doesn't invalidate an already-sent link, same trade-off
+Notion/Figma make. Diacritics: NFD-normalized and stripped (`svatba-petra-a-jana`, not
+`svatba-petřa-a-jana`).
 
 ## 7. Free ZIP download (skip Workers Paid) — raised by Pavel 2026-08-21
 
