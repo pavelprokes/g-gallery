@@ -24,14 +24,39 @@ export interface JustifiedRow<T> {
 }
 
 /** `aspect` must be `width / height`, already known (Photo.width/height are
- * captured at upload — see `docs/AUDIT.md` §2). */
+ * captured at upload — see `docs/AUDIT.md` §2).
+ *
+ * `itemsPerRow`, when given, replaces the greedy aspect-sum packing with a
+ * fixed row length (still uncropped, still scaled to fill the width exactly)
+ * — a phone-sized viewport where an adaptive row would otherwise land on 3+
+ * narrow tiles gets a steady 2-column grid instead, matching the reference
+ * client apps (Google/Apple Photos) use on a phone. */
 export function justifyRows<T>(
   items: readonly { item: T; aspect: number }[],
   containerWidth: number,
   targetRowHeight: number,
   gap: number,
+  itemsPerRow?: number,
 ): JustifiedRow<T>[] {
   if (containerWidth <= 0 || items.length === 0) return [];
+
+  if (itemsPerRow && itemsPerRow > 0) {
+    const rows: JustifiedRow<T>[] = [];
+    for (let i = 0; i < items.length; i += itemsPerRow) {
+      const chunk = items.slice(i, i + itemsPerRow);
+      const partial = chunk.length < itemsPerRow;
+      const aspectSum = chunk.reduce((sum, entry) => sum + entry.aspect, 0);
+      const height = partial
+        ? targetRowHeight
+        : (containerWidth - gap * (chunk.length - 1)) / aspectSum;
+      rows.push({
+        items: chunk.map((entry) => ({ item: entry.item, width: entry.aspect * height, height })),
+        height,
+        partial,
+      });
+    }
+    return rows;
+  }
 
   const rows: JustifiedRow<T>[] = [];
   let row: { item: T; aspect: number }[] = [];

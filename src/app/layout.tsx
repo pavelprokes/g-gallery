@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppAnalytics } from "@/components/analytics";
+import { bitterFont } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="cs">
-      <body>
+      <body className={bitterFont.variable}>
         {children}
         <AppAnalytics />
       </body>

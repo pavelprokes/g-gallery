@@ -12,6 +12,9 @@ import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { publishGallery, restoreGallery } from "../../actions";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -76,14 +79,14 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-8">
       {gallery.trashedAt && (
-        <div className="flex items-center justify-between rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+        <Alert className="flex items-center justify-between">
           <p>Tato galerie je v koši a bude po uplynutí lhůty natrvalo smazána.</p>
           <form action={restoreGallery.bind(null, gallery.id)}>
-            <button type="submit" className="rounded border px-2 py-1 text-xs">
+            <Button type="submit" variant="secondary" size="sm">
               Obnovit
-            </button>
+            </Button>
           </form>
-        </div>
+        </Alert>
       )}
 
       <header className="flex items-baseline justify-between">
@@ -102,12 +105,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           />
           {gallery.status === "DRAFT" && (
             <form action={publish}>
-              <button
-                type="submit"
-                className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
-              >
-                Publikovat
-              </button>
+              <Button type="submit">Publikovat</Button>
             </form>
           )}
           {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
@@ -184,9 +182,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border p-4">
+    <Card>
       <p className="text-2xl font-semibold tabular-nums">{value}</p>
       <p className="text-xs text-neutral-500">{label}</p>
-    </div>
+    </Card>
   );
 }

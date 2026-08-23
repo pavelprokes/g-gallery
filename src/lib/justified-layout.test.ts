@@ -71,4 +71,41 @@ describe("justifyRows", () => {
     // items, so 500 items should land well under 200 rows.
     expect(rows.length).toBeLessThan(200);
   });
+
+  describe("with a fixed itemsPerRow (mobile 2-column grid)", () => {
+    it("groups every full row to exactly itemsPerRow items regardless of aspect ratio", () => {
+      const aspects = [1.5, 0.8, 1.2, 2.0, 1.0, 0.9];
+      const rows = justifyRows(items(aspects), 400, TARGET, GAP, 2);
+      expect(rows).toHaveLength(3);
+      for (const row of rows) expect(row.items).toHaveLength(2);
+    });
+
+    it("still never crops: rendered aspect ratio matches source", () => {
+      const aspects = [1.5, 0.8, 1.2, 2.0, 1.0, 0.9, 1.3];
+      const rows = justifyRows(items(aspects), 400, TARGET, GAP, 2);
+      for (const row of rows) {
+        for (const rendered of row.items) {
+          const source = aspects[Number(String(rendered.item).slice(1))]!;
+          expect(rendered.width / rendered.height).toBeCloseTo(source, 5);
+        }
+      }
+    });
+
+    it("scales every full row's width to exactly fill the container", () => {
+      const aspects = [1.5, 0.8, 1.2, 2.0];
+      const rows = justifyRows(items(aspects), 400, TARGET, GAP, 2);
+      for (const row of rows.filter((r) => !r.partial)) {
+        const total = row.items.reduce((sum, i) => sum + i.width, 0) + GAP * (row.items.length - 1);
+        expect(total).toBeCloseTo(400, 3);
+      }
+    });
+
+    it("marks a leftover row shorter than itemsPerRow as partial, at target height", () => {
+      const rows = justifyRows(items([1.5, 0.8, 1.2]), 400, TARGET, GAP, 2);
+      expect(rows).toHaveLength(2);
+      expect(rows[1]!.partial).toBe(true);
+      expect(rows[1]!.height).toBe(TARGET);
+      expect(rows[1]!.items).toHaveLength(1);
+    });
+  });
 });

@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+/*
+ * Brand tokens mirrored from svatebni-fotograf-cechy-2.0/style/theme.ts so the client-facing
+ * gallery matches the photographer's main site. See docs referenced in the design-unification
+ * plan for the source values.
+ */
+@theme {
+  --color-brand-ink: #34190e; /* mainColor — dark text, headings */
+  --color-brand-primary: #825238; /* primaryColor — brand terracotta CTA */
+  --color-brand-primary-dark: #69422d; /* brownColor — hover/active */
+  --color-brand-border: #dfc8bf; /* lightBrownColor — borders, muted fills, dark-bg accents */
+  --color-brand-tint: #fdf8f5; /* warm near-white card background */
+}
+
+/*
+ * Guest-facing brand font (Bitter, set via next/font in src/lib/fonts.ts). Intentionally NOT
+ * wired into Tailwind's --font-sans — the admin portal keeps the system sans-serif stack. A
+ * plain class rather than a Tailwind @theme font token: Tailwind v4 only auto-generates
+ * font-family utilities for its reserved --font-sans/--font-serif/--font-mono theme keys, not
+ * arbitrary custom ones, so a --font-brand theme key silently produced no .font-brand utility.
+ * Applied per guest-facing route layout (src/app/g/layout.tsx, src/app/s/layout.tsx).
+ */
+.font-brand {
+  font-family: var(--font-bitter), ui-serif, Georgia, "Times New Roman", serif;
+}
+
 :root {
   color-scheme: light dark;
 }
@@ -51,7 +76,7 @@ button:disabled,
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-blue-500);
+  outline: 2px solid var(--color-brand-primary-dark);
   outline-offset: 2px;
 }
 

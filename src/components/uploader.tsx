@@ -10,6 +10,8 @@ import {
   UploadRejection,
   type UploadItemState,
 } from "@/lib/upload-run";
+import { Alert } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 
 // The transport lives in src/lib/upload-run.ts, shared with the guest uploader
 // (docs/GUEST-GALLERIES.md §6) — this component is the photographer's UI over it.
@@ -79,17 +81,17 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const failed = items.filter((i) => i.state === "error").length;
 
   return (
-    <section className="rounded-lg border p-4">
+    <Card as="section">
       <h2 className="text-sm font-medium">Nahrát fotky</h2>
 
       {fatal && (
-        <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+        <Alert tone="danger" className="mt-3">
           {fatal}
-        </p>
+        </Alert>
       )}
 
       {pendingRows.length > 0 && !running && (
-        <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+        <Alert className="mt-3">
           <p className="font-medium">{pluralize(pendingRows.length, FORMS.upload)}</p>
           <p className="mt-1 text-xs">
             Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené zbytky
@@ -103,7 +105,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               </li>
             ))}
           </ul>
-        </div>
+        </Alert>
       )}
 
       <input
@@ -145,7 +147,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
           )}
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 

@@ -15,6 +15,9 @@ import { decryptToken } from "@/lib/token-cipher";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 import { EventSettings } from "@/components/event-settings";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -110,24 +113,24 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               venue={event.venue}
             />
             <form action={trashEvent.bind(null, event.id)}>
-              <button type="submit" className="rounded border px-3 py-1.5 text-sm text-red-600">
+              <Button type="submit" variant="destructive">
                 Do koše
-              </button>
+              </Button>
             </form>
           </div>
         </div>
       </header>
 
-      <section className="rounded-lg border p-4">
+      <Card as="section">
         <h2 className="text-sm font-medium">Adresa svatby</h2>
         <p className="mt-1 mb-2 text-xs text-neutral-500">
           Tohle dáš na QR ceduli. Vede sem každá připojená galerie a adresa se nemění, ani když
           galerie přibývají.
         </p>
         {eventUrl ? <CopyableLink href={eventUrl} /> : <UnrecoverableLink reason={NO_LINK} />}
-      </section>
+      </Card>
 
-      <section className="rounded-lg border p-4">
+      <Card as="section">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium">Galerie na této svatbě</h2>
           <span className="text-xs text-neutral-500">{event.galleries.length}</span>
@@ -229,9 +232,9 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
 
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   <form action={setGalleryListed.bind(null, gallery.id, !gallery.listedOnEvent)}>
-                    <button type="submit" className="rounded border px-2 py-1">
+                    <Button type="submit" variant="secondary" size="sm">
                       {gallery.listedOnEvent ? "Skrýt ze stránky" : "Zobrazit na stránce"}
-                    </button>
+                    </Button>
                   </form>
 
                   <form
@@ -246,7 +249,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                     <select
                       name="shareLinkId"
                       defaultValue={gallery.eventLinkId ?? ""}
-                      className="rounded border px-2 py-1"
+                      className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
                     >
                       <option value="">— žádný —</option>
                       {gallery.shareLinks.map((link) => (
@@ -256,54 +259,56 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                         </option>
                       ))}
                     </select>
-                    <button type="submit" className="rounded border px-2 py-1">
+                    <Button type="submit" variant="secondary" size="sm">
                       Uložit
-                    </button>
+                    </Button>
                   </form>
 
                   {event.galleries.length > 1 && (
                     <span className="flex items-center gap-1">
                       <form action={moveGalleryInEvent.bind(null, gallery.id, "up")}>
-                        <button
+                        <Button
                           type="submit"
+                          variant="secondary"
+                          size="sm"
                           disabled={index === 0}
                           aria-label="Posunout nahoru"
-                          className="rounded border px-2 py-1 disabled:opacity-30"
                         >
                           ↑
-                        </button>
+                        </Button>
                       </form>
                       <form action={moveGalleryInEvent.bind(null, gallery.id, "down")}>
-                        <button
+                        <Button
                           type="submit"
+                          variant="secondary"
+                          size="sm"
                           disabled={index === event.galleries.length - 1}
                           aria-label="Posunout dolů"
-                          className="rounded border px-2 py-1 disabled:opacity-30"
                         >
                           ↓
-                        </button>
+                        </Button>
                       </form>
                     </span>
                   )}
 
                   <form action={detachGalleryFromEvent.bind(null, gallery.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-red-600">
+                    <Button type="submit" variant="destructive" size="sm">
                       Odebrat ze svatby
-                    </button>
+                    </Button>
                   </form>
                 </div>
 
                 {gallery.listedOnEvent && !gallery.eventLinkId && (
-                  <p className="rounded border border-amber-400 bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                  <Alert compact>
                     Karta nemá odkaz, přes který by pustila dovnitř — hostům se nezobrazí. Vyber ho
                     výše u „Karta vede přes“.
-                  </p>
+                  </Alert>
                 )}
               </li>
             );
           })}
         </ul>
-      </section>
+      </Card>
 
       <NewGalleryInEvent eventId={event.id} unattached={unattached} attach={attachGalleryToEvent} />
     </main>

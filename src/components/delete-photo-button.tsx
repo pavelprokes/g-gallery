@@ -1,6 +1,7 @@
 "use client";
 
 import { deletePhoto } from "@/app/admin/actions";
+import { Button } from "@/components/ui/button";
 
 /**
  * Removes one photo for good. The couple's veto over a guest upload runs
@@ -17,9 +18,9 @@ export function DeletePhotoButton({ photoId }: { photoId: string }) {
         if (!confirm("Smazat fotku? Tohle už nejde vzít zpět.")) event.preventDefault();
       }}
     >
-      <button type="submit" className="text-xs text-red-600 underline">
+      <Button type="submit" variant="destructive" size="sm">
         Smazat
-      </button>
+      </Button>
     </form>
   );
 }

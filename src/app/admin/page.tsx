@@ -8,6 +8,7 @@ import { createGallery, restoreGallery, restoreEvent } from "./actions";
 import { AdminCreateBar } from "@/components/admin-create-bar";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { decryptToken } from "@/lib/token-cipher";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -161,9 +162,9 @@ export default async function AdminPage() {
                     </p>
                   </div>
                   <form action={restoreEvent.bind(null, event.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                    <Button type="submit" variant="secondary" size="sm">
                       Obnovit
-                    </button>
+                    </Button>
                   </form>
                 </li>
               );
@@ -191,9 +192,9 @@ export default async function AdminPage() {
                     </p>
                   </div>
                   <form action={restoreGallery.bind(null, gallery.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                    <Button type="submit" variant="secondary" size="sm">
                       Obnovit
-                    </button>
+                    </Button>
                   </form>
                 </li>
               );

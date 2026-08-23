@@ -5,6 +5,7 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { ownerFeed, markFeedRead, type FeedEntry } from "@/lib/feed";
 import { REACTION_EMOJI } from "@/lib/reactions-shared";
 import { PushToggle } from "@/components/push-toggle";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +32,13 @@ export default async function UpdatesPage() {
         </Link>
       </header>
 
-      <div className="rounded-lg border p-4">
+      <Card>
         <p className="text-sm font-medium">Upozornění na návštěvu</p>
         <p className="mt-1 mb-3 text-xs text-neutral-500">
           Nejvýš jedno za 30 minut na galerii. Denní souhrn chodí e-mailem vždy.
         </p>
         <PushToggle />
-      </div>
+      </Card>
 
       {entries.length === 0 ? (
         <p className="text-sm text-neutral-500">
