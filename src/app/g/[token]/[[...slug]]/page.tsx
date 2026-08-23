@@ -77,6 +77,9 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       title: true,
       eventDate: true,
       storagePrefix: true,
+      // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
+      zipStatus: true,
+      zipObjectKey: true,
       // One extra row over the page size tells us whether a next page exists
       // without a separate COUNT query — the same trick the cursor-paginated
       // API route uses for every subsequent page.
@@ -113,11 +116,24 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
 
   const imageGrant = await mintImageGrant(gallery.storagePrefix);
 
+  // The finished archive is a plain CDN link — no Worker involved at
+  // download time (docs/TODO.md §7). Built server-side since
+  // NEXT_PUBLIC_PHOTOS_BASE_URL is the same public, build-time value the
+  // custom image loader already uses.
+  const archiveZipUrl =
+    gallery.zipStatus === "READY" && gallery.zipObjectKey && process.env.NEXT_PUBLIC_PHOTOS_BASE_URL
+      ? `${process.env.NEXT_PUBLIC_PHOTOS_BASE_URL.replace(/\/$/, "")}/${gallery.zipObjectKey
+          .split("/")
+          .map(encodeURIComponent)
+          .join("/")}`
+      : null;
+
   return (
     <GalleryView
       token={token}
       title={gallery.title}
       eventDate={gallery.eventDate?.toLocaleDateString("cs-CZ") ?? null}
+      archiveZipUrl={archiveZipUrl}
       initialPhotos={page.map((photo) => ({
         id: photo.id,
         objectKey: photo.objectKey,

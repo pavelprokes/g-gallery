@@ -197,6 +197,12 @@ interface GalleryViewProps {
   viewers: GalleryViewer[];
   allowDownload: boolean;
   allowReactions: boolean;
+  /** Pre-built "download all" archive (docs/TODO.md §7), if one is ready — a
+   * plain CDN link, not a Worker request. Null covers every other state
+   * (never built, still building, or invalidated by a newer upload) equally;
+   * the UI doesn't distinguish them, since there is nothing the viewer can
+   * do about any of those besides wait. */
+  archiveZipUrl: string | null;
 }
 
 function GalleryViewInner({
@@ -209,6 +215,7 @@ function GalleryViewInner({
   viewers,
   allowDownload,
   allowReactions,
+  archiveZipUrl,
 }: GalleryViewProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -838,18 +845,34 @@ function GalleryViewInner({
               <span className="text-sm text-neutral-500 dark:text-neutral-400">
                 Podrž fotku (nebo na ni najeď myší) a vyber, co chceš stáhnout.
               </span>
-              <button
-                type="button"
-                disabled={zipState === "preparing"}
-                onClick={() => void downloadZip([])}
-                className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-              >
-                {zipState === "preparing"
-                  ? "Připravuji…"
-                  : photos.length > 1
-                    ? "Stáhnout vše (ZIP)"
-                    : "Stáhnout fotku"}
-              </button>
+              {photos.length > 1 && archiveZipUrl ? (
+                // A pre-built archive (docs/TODO.md §7) is a plain CDN link —
+                // no signed manifest, no Worker request, just a download.
+                <a
+                  href={archiveZipUrl}
+                  className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white dark:bg-white dark:text-neutral-900"
+                >
+                  Stáhnout vše (ZIP)
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled={zipState === "preparing" || photos.length > 1}
+                  onClick={() => void downloadZip([])}
+                  title={
+                    photos.length > 1
+                      ? "Archiv se připravuje na pozadí — zkus to znovu za pár minut."
+                      : undefined
+                  }
+                  className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+                >
+                  {zipState === "preparing"
+                    ? "Připravuji…"
+                    : photos.length > 1
+                      ? "Archiv se připravuje…"
+                      : "Stáhnout fotku"}
+                </button>
+              )}
             </>
           )}
           {zipState === "error" && (

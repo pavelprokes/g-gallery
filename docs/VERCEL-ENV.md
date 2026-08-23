@@ -80,8 +80,11 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 
 | Variable                            | Scope     | Unset means                                                                                 |
 | ----------------------------------- | --------- | ------------------------------------------------------------------------------------------- |
-| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503                                                       |
+| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503 (live Worker, not deployed — docs/SETUP.md §9)        |
 | `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte                                            |
+| `ZIP_BUILDER_WORKER_URL`            | runtime   | `/api/cron/zip-build` no-ops; galleries never get a pre-built archive (docs/SETUP.md §10)   |
+| `ZIP_BUILD_SIGNING_SECRET`          | runtime   | Same. Must match the builder Worker's secret of the same name                               |
+| `ZIP_BUILD_CALLBACK_SECRET`         | runtime   | Same — also gates `/api/internal/zip-callback`, so the builder can't report a status either |
 | `IMAGE_SIGNING_SECRET`              | runtime   | Image URLs stay unsigned (today's behaviour); must match the Worker secret of the same name |
 | **`NEXT_PUBLIC_SIGNED_IMAGES_URL`** | **build** | Same — the loader never routes through the signing Worker without it                        |
 | `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends                                 |
@@ -111,7 +114,7 @@ a different `BETTER_AUTH_URL`, which silently breaks the OAuth callback.
 
 `DIRECT_URL` is also needed by the GitHub Actions backup workflow, but as a
 repository secret (`BACKUP_DATABASE_URL`), not a Vercel variable —
-`docs/SETUP.md` §12.
+`docs/SETUP.md` §13.
 
 ## Verifying after deploy
 
@@ -123,4 +126,4 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/keepalive
 curl -sI "https://cdn.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format=auto/<key>"
 ```
 
-Then walk `docs/SETUP.md` §10.
+Then walk `docs/SETUP.md` §11.

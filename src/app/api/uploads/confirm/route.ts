@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
   const photo = await prisma.photo.findFirst({
     where: { id: photoId, gallery: { ownerId: session.user.id } },
-    select: { id: true },
+    select: { id: true, galleryId: true },
   });
   if (!photo) return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
 
@@ -56,6 +56,17 @@ export async function POST(request: Request) {
       height,
       placeholder: placeholder ?? undefined,
     },
+  });
+
+  // A new photo means any pre-built "download all" archive (docs/TODO.md §7)
+  // no longer matches the gallery's contents. NONE stays NONE (nobody has
+  // asked for a zip yet); anything else drops back to PENDING so the cron
+  // rebuilds it. A build already in flight is left running — the callback
+  // fences on zipUploadId, so a build that finishes after this update is
+  // simply ignored as stale rather than served as current.
+  await prisma.gallery.updateMany({
+    where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
+    data: { zipStatus: "PENDING" },
   });
 
   return NextResponse.json({ ok: true });

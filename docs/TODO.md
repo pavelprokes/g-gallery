@@ -84,50 +84,43 @@ recomputed per request) — a later rename doesn't invalidate an already-sent li
 Notion/Figma make. Diacritics: NFD-normalized and stripped (`svatba-petra-a-jana`, not
 `svatba-petřa-a-jana`).
 
-## 7. Free ZIP download (skip Workers Paid) — raised by Pavel 2026-08-21
+## 7. Free ZIP download (skip Workers Paid) — **done 2026-08-23**
 
-`docs/SETUP.md` §9 / `worker/` already ship a **live, on-the-fly** streaming ZIP Worker, but it
-needs **Workers Paid ($5/mo)** — Free's 10 ms CPU-per-invocation limit can't cover streaming an
-8 GB archive in one request/response (every chunk enqueued costs CPU, verified against
-[workers/platform/limits](https://developers.cloudflare.com/workers/platform/limits/) when this was
-first designed, `docs/PLAN.md` §12.2). Pavel's idea: most people download the **whole gallery**, not
-a hand-picked 90% of it — so pay the CPU cost once, in the background, instead of on every request.
+`docs/SETUP.md` §9 / `worker/` ship a **live, on-the-fly** streaming ZIP Worker, but it needs
+**Workers Paid ($5/mo)** — Free's 10 ms CPU-per-invocation limit can't cover streaming an 8 GB
+archive in one request/response. Pavel wanted genuine pay-per-use instead of a flat monthly
+minimum; a cross-cloud alternative (AWS Lambda, Google Cloud Run) was considered and rejected —
+Lambda is structurally disqualified (streamed-response bandwidth is throttled to 2 MB/s past the
+first 6 MB, so an 8 GB archive needs ~66 minutes against a 15-minute hard timeout — not a pricing
+question), and a third cloud platform for one rarely-used feature is operational overhead a
+same-account free-tier design avoids entirely.
 
-**Proposed shape**
+**Shipped as `zip-builder-worker/`** — a second, separate Cloudflare Worker deployment (deliberately
+_not_ added to `worker/`, since that script's `[limits] cpu_ms` override would force this one onto
+Workers Paid too):
 
-- **"Download all"**: pre-build the ZIP once, in the background, right after the last photo of a
-  batch confirms (or on publish) → store it as a plain R2 object → the button becomes a direct link
-  through `cdn.svatebni-fotograf-cechy.cz`, same as any photo. Zero Worker cost at request time —
-  R2 egress is already free, and it's a GET like any other.
-- **Partial selection**: drop the on-the-fly ZIP entirely for this case. Keep the per-photo download
-  that already shipped in Phase 2. Nobody is expected to zip-select 90% of an album by hand.
-
-**Building the ZIP for $0** — the actual open engineering problem is the background build itself,
-since it moves the same total CPU cost somewhere else rather than deleting it. Verified building
-blocks (2026-08-21):
-
-- **Cloudflare Queues has a free tier**: 10,000 operations/day, fixed 24 h retention (non-configurable
-  on Free) — [pricing](https://developers.cloudflare.com/queues/platform/pricing/). A 500-photo
-  gallery is ~500 messages; nowhere close to the cap.
-- **Workers Free supports Cron Triggers** (up to 5/account) as well as Queue consumers — either can
-  drive the background job without a live client waiting.
-- **R2 multipart upload** (`createMultipartUpload`/`uploadPart`/`completeMultipartUpload` on the R2
-  binding): 5 MiB minimum part size, **all parts except the last must be the same size** (not just
-  independently ≥5 MiB — this broke the original "one photo = one part" idea, since JPEGs vary in
-  size), max 10,000 parts, max 5 TiB object —
-  [docs](https://developers.cloudflare.com/r2/objects/multipart-objects/).
-- Consequence of the uniform-part-size rule: the builder needs a **rolling buffer spanning photo
-  boundaries** (write each photo's ZIP local-file-header + raw bytes into the buffer; whenever it
-  reaches a fixed part size — e.g. 8 MiB — cut and upload exactly that much, carry the remainder
-  forward), not a clean per-photo mapping. CRC32 + size are already captured at upload (`Photo.crc32`,
-  `Photo.sizeBytes`) specifically so the header can be written without re-reading the file, so this
-  part is unaffected.
-- Each invocation stays under the 10 ms CPU budget by processing a bounded slice of work, then
-  re-enqueuing a "continue" message. Queue messages cap at 128 KB — far too small to carry a
-  multi-MB pending buffer between invocations — so the leftover buffer has to live as a temporary R2
-  object (`_tmp/zip-build/<galleryId>/pending.bin` or similar) that each invocation reads, appends
-  to, and rewrites; only the small cursor state (which photo index, how many bytes pending) goes in
-  the queue message itself.
+- **"Download all"** pre-builds the archive in the background and stores it as a plain R2 object;
+  the app serves it as a direct `cdn.svatebni-fotograf-cechy.cz` link with no Worker involved at
+  download time (`Content-Disposition` is set on the R2 object itself, at build time).
+- **Partial selection** on-the-fly ZIP was dropped as planned — per-photo download covers it.
+- **Chunking turned out simpler than first sketched**: `localHeader`/`centralHeader`/
+  `endOfCentralDirectory` (`src/lib/zip64.ts`) are pure functions of entry metadata, so the whole
+  archive's byte layout is knowable before any file data is read. `src/lib/zip-chunk-layout.ts`
+  exploits that to make every part **independent** — no rolling buffer, no ordering, no state
+  carried between Queue messages — rather than the sequential design originally proposed here.
+  R2's requirement that every part but the last be the _same_ size (not just independently ≥5 MiB)
+  is handled by cutting fixed windows out of the logical byte stream regardless of photo boundaries.
+- **Orchestration**: a Vercel cron (`/api/cron/zip-build`, `src/lib/zip-build.ts`) kicks off one
+  build at a time via a signed handoff (`src/lib/zip-build-manifest.ts`, same HMAC scheme as the
+  live Worker's manifest) to the builder's `/build-start`, which creates the R2 multipart upload and
+  enqueues one Queue message per part. The builder's own Cron Trigger (every 2 min) finalizes
+  completed uploads and aborts stale ones, then calls back to `/api/internal/zip-callback` — the
+  builder holds no session and talks to no database, same principle as the live Worker.
+  `Gallery.zipStatus` (`NONE → PENDING → BUILDING → READY`, or `FAILED`) is the state machine; a
+  photo confirmed after `READY` drops it back to `PENDING` rather than serving a stale archive.
+- Verified end-to-end against real R2 before merging: uploaded fake photos, ran the full
+  build-start → Queue → Cron-finalize → callback path, downloaded the resulting object, and
+  confirmed a byte-correct, `unzip -t`-clean archive with the right `Content-Disposition`.
 
 **Open questions before building**
 

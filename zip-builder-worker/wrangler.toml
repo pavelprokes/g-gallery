@@ -1,0 +1,40 @@
+name = "g-gallery-zip-builder"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Deliberately NO [limits] override (docs/TODO.md §7) — every invocation here
+# (one part, or one finalize check) is designed to stay under the Workers
+# Free 10 ms CPU ceiling. Raising it would require Workers Paid, which is
+# exactly what this Worker exists to avoid; the paid live-streaming Worker
+# (../worker/) is a separate deployment for that reason.
+
+[vars]
+APP_CALLBACK_URL = "https://photos.svatebni-fotograf-cechy.cz/api/internal/zip-callback"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "g-gallery"
+# Without this, wrangler provisions/binds the DEFAULT-jurisdiction bucket —
+# a same-named but entirely different resource from the real one (created
+# jurisdiction=eu, docs/SETUP.md §3, immutable at creation). Learned the hard
+# way: the first deploy of this Worker silently created a second, empty
+# "g-gallery" bucket outside the EU jurisdiction.
+jurisdiction = "eu"
+
+[[queues.producers]]
+binding = "PARTS"
+queue = "g-gallery-zip-parts"
+
+[[queues.consumers]]
+queue = "g-gallery-zip-parts"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+
+[triggers]
+# Checks for finished builds (finalize) and stale ones (abort). Workers Free
+# allows up to 5 Cron Triggers per account — this uses one.
+crons = ["*/2 * * * *"]
+
+[observability]
+enabled = true

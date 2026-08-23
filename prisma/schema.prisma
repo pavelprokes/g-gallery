@@ -123,6 +123,18 @@ enum StorageTier {
   @@schema("g_gallery")
 }
 
+/// Background "download all" ZIP build (docs/TODO.md §7) — NONE until the
+/// first build kicks off; any photo add/delete after READY drops it back to
+/// PENDING rather than serving a stale archive.
+enum ZipStatus {
+  NONE
+  PENDING
+  BUILDING
+  READY
+  FAILED
+  @@schema("g_gallery")
+}
+
 model Gallery {
   id                String        @id @default(cuid())
   ownerId           String
@@ -145,6 +157,19 @@ model Gallery {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
+  /// docs/TODO.md §7 — pre-built "download all" archive, built in the background
+  /// on Cloudflare's free tier (R2 multipart + Queues), never on Vercel.
+  zipStatus        ZipStatus @default(NONE)
+  /// R2 object key once READY — a direct link, no Worker involved at download time
+  zipObjectKey     String?
+  zipSizeBytes     Int?
+  zipBuiltAt       DateTime?
+  /// R2 multipart upload id while BUILDING — needed to list/finalize/abort it
+  zipUploadId      String?
+  /// Part count the finalize step waits for via R2 listParts — set at kickoff,
+  /// since it's computed from the entry list, not discovered afterwards
+  zipPartsExpected Int?
+
   photos     Photo[]
   shareLinks ShareLink[]
   viewers    Viewer[]
@@ -152,6 +177,7 @@ model Gallery {
   events     ActivityEvent[]
 
   @@index([ownerId, status])
+  @@index([zipStatus])
   @@schema("g_gallery")
 }
 

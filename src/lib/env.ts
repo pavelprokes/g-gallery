@@ -17,6 +17,12 @@ const schema = z.object({
   CRON_SECRET: z.string().min(1),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  // Background "download all" ZIP build (docs/TODO.md §7) — a free-tier
+  // Cloudflare Worker + Queue, separate from the paid live-streaming one.
+  // All optional: unset just means the cron route no-ops instead of failing.
+  ZIP_BUILDER_WORKER_URL: z.url().optional(),
+  ZIP_BUILD_SIGNING_SECRET: z.string().min(1).optional(),
+  ZIP_BUILD_CALLBACK_SECRET: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof schema>;

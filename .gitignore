@@ -51,9 +51,11 @@ next-env.d.ts
 # prisma generated client
 /src/generated/
 
-# worker has its own install (Workers types conflict with the app DOM lib)
+# workers have their own installs (Workers types conflict with the app DOM lib)
 /worker/node_modules
 /worker/.dev.vars
+/zip-builder-worker/node_modules
+/zip-builder-worker/.dev.vars
 
 # playwright-mcp scratch output
 /.playwright-mcp

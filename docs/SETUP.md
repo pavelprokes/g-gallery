@@ -151,7 +151,7 @@ https://cdn.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality=82,format
 > that schema — chosen over a separate project because the noisy-neighbor risk (shared connection
 > pool/CPU) was judged acceptable against burning the last free slot. If that trade stops being
 > acceptable, moving to a dedicated project later just means: new project, same schema/role setup
-> below, restore the last backup (§12) into it.
+> below, restore the last backup (§13) into it.
 
 1. **Create the schema and role** (run once, as the project's `postgres` superuser):
    ```sql
@@ -279,7 +279,13 @@ AWS bill across both projects.
 
 ---
 
-## 9. ZIP download Worker (Workers Paid, $5/mo)
+## 9. ZIP download Worker (Workers Paid, $5/mo) — **not deployed** (docs/TODO.md §7)
+
+> **Deferred (2026-08-23):** Pavel wanted pay-per-use, not a flat $5/mo minimum for a rarely-used
+> feature. §10 below (`zip-builder-worker/`, free tier) replaced this for "download all". This
+> section is kept for the parts it still covers on its own — per-photo download and any future
+> "download exactly these N photos" selection — should that ever get built and need Workers Paid
+> after all.
 
 The archive is streamed by a Cloudflare Worker, never by Vercel — a function there is billed for
 data transfer and for provisioned memory across the whole download, and dies at `maxDuration` long
@@ -308,7 +314,43 @@ Local development: `cp worker/.dev.vars.example worker/.dev.vars`, paste the app
 
 ---
 
-## 10. Post-setup verification
+## 10. Free ZIP builder Worker (`zip-builder-worker/`, Workers Free)
+
+Background "download all" build (docs/TODO.md §7) — a **separate deployment** from `worker/`
+above, on purpose: that script's `[limits] cpu_ms` override needs Workers Paid, and mixing this one
+into the same script would force it onto Paid too. This one deliberately carries no `[limits]`
+override and stays on the Free 10 ms ceiling.
+
+```bash
+cd zip-builder-worker
+pnpm install --ignore-workspace
+npx wrangler queues create g-gallery-zip-parts
+npx wrangler secret put ZIP_BUILD_SIGNING_SECRET   # must match the app's env byte for byte
+npx wrangler secret put ZIP_BUILD_CALLBACK_SECRET  # ditto
+npx wrangler deploy
+```
+
+`wrangler.toml`'s R2 binding **must** set `jurisdiction = "eu"` explicitly — without it, the first
+deploy silently provisions a second, empty `g-gallery` bucket in the default jurisdiction instead of
+binding the real one (this happened once; the duplicate was caught by `wrangler r2 bucket list`
+showing two buckets of the same name, and deleted). `[vars].APP_CALLBACK_URL` points at
+`https://photos.svatebni-fotograf-cechy.cz/api/internal/zip-callback` — update it if the app domain
+ever changes.
+
+Then set in Vercel: `ZIP_BUILDER_WORKER_URL` (the deployed Worker's `*.workers.dev` URL, or a custom
+domain), `ZIP_BUILD_SIGNING_SECRET`, `ZIP_BUILD_CALLBACK_SECRET`. All three are optional at the env
+schema level — unset just means `/api/cron/zip-build` no-ops instead of failing, so galleries simply
+never get a pre-built archive (`archiveZipUrl` stays null, the UI shows "archiv se připravuje" and
+never resolves).
+
+Verify after deploying: publish a gallery with a few photos, wait for the next `/api/cron/zip-build`
+tick (every 15 min, `vercel.json`) to kick off a build, then the Worker's own Cron Trigger (every
+2 min) to finalize it — `Gallery.zipStatus` should reach `READY` within a few minutes, and
+`https://cdn.svatebni-fotograf-cechy.cz/<zipObjectKey>` should download the archive directly.
+
+---
+
+## 11. Post-setup verification
 
 - [ ] `https://photos.svatebni-fotograf-cechy.cz` serves the app; `cdn.` subdomain returns R2 objects
 - [ ] Sign in with Google → `/admin` loads (role = admin)
@@ -326,7 +368,7 @@ Local development: `cp worker/.dev.vars.example worker/.dev.vars`, paste the app
 
 ---
 
-## 11. R2 lifecycle rule (Infrequent Access)
+## 12. R2 lifecycle rule (Infrequent Access)
 
 `/api/cron/lifecycle` records which originals are cold (`Photo.storageTier`), but R2 has no API to
 change an existing object's storage class — the transition itself is a **bucket lifecycle rule**,
@@ -341,7 +383,7 @@ saving would be cents.
 
 ---
 
-## 12. Database backup & restore
+## 13. Database backup & restore
 
 `.github/workflows/db-backup.yml` runs daily at 03:20 UTC: `pg_dump --schema=g_gallery` through the
 session pooler, restore-verified into a throwaway PostgreSQL 17 container, then stored in R2 under
