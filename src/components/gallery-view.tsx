@@ -48,10 +48,9 @@ import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import { srcFor } from "@/lib/image-src";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
-import { OfflineToggle } from "@/components/offline-toggle";
+import { OfflineIconButton } from "@/components/offline-toggle";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { NavButton } from "@/components/ui/icon-button";
+import { IconButton, IconButtonLink, NavButton } from "@/components/ui/icon-button";
 import {
   CheckCircleIcon,
   CheckIcon,
@@ -60,6 +59,7 @@ import {
   CloseIcon,
   DownloadIcon,
   HeartIcon,
+  ProjectorIcon,
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import {
@@ -943,96 +943,93 @@ function GalleryViewInner({
             <p className="text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {photos.length > 0 && (
-            <button
-              type="button"
+            <IconButton
               onClick={() => setProjecting(true)}
-              className="rounded-full border px-3 py-1.5 text-sm"
+              aria-label="Projekce"
               title="Fotky na plátno — mění se samy, nové přibývají živě"
             >
-              Projekce
-            </button>
+              <ProjectorIcon />
+            </IconButton>
+          )}
+          {allowDownload &&
+            photos.length > 0 &&
+            selection.ids.size === 0 &&
+            (photos.length > 1 && archiveZipUrl ? (
+              // A pre-built archive (docs/TODO.md §7) is a plain CDN link —
+              // no signed manifest, no Worker request, just a download.
+              <IconButtonLink
+                href={archiveZipUrl}
+                aria-label="Stáhnout vše (ZIP)"
+                title="Stáhnout vše (ZIP)"
+              >
+                <DownloadIcon />
+              </IconButtonLink>
+            ) : (
+              <IconButton
+                disabled={zipState === "preparing" || photos.length > 1}
+                onClick={() => void downloadZip([])}
+                aria-label={photos.length > 1 ? "Archiv se připravuje" : "Stáhnout fotku"}
+                title={
+                  photos.length > 1
+                    ? "Archiv se připravuje na pozadí — zkus to znovu za pár minut."
+                    : "Stáhnout fotku"
+                }
+              >
+                <DownloadIcon />
+              </IconButton>
+            ))}
+          {photos.length > 0 && (
+            <OfflineIconButton token={token} objectKeys={photos.map((photo) => photo.objectKey)} />
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
         </div>
       </header>
 
-      {allowDownload && photos.length > 0 && (
+      {zipState === "error" && selection.ids.size === 0 && (
+        <p className="-mt-4 mb-4 text-xs text-red-600">
+          Stažení se nepodařilo připravit. Zkus to prosím znovu.
+        </p>
+      )}
+
+      {allowDownload && photos.length > 0 && selection.ids.size > 0 && (
         <div className="sticky top-0 z-30 -mx-4 mb-4 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 dark:bg-neutral-950/90">
-          {selection.ids.size > 0 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setSelection(clearSelection())}
-                aria-label="Zrušit výběr"
-                className="rounded-full border px-2 py-1 text-sm"
-              >
-                ✕
-              </button>
-              <span className="text-sm font-medium">
-                {pluralize(selection.ids.size, FORMS.selected)}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setSelection((prev) =>
-                    isAllSelected(prev, photoIds) ? clearSelection() : selectAll(photoIds),
-                  )
-                }
-                className="text-sm underline"
-              >
-                {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše načtené"}
-              </button>
-              <button
-                type="button"
-                disabled={zipState === "preparing"}
-                onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
-                className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-              >
-                {zipState === "preparing"
-                  ? "Připravuji…"
-                  : `Stáhnout ${pluralize(selection.ids.size, FORMS.photoAccusative)}${
-                      selection.ids.size > 1 ? " (ZIP)" : ""
-                    }`}
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                Podrž fotku (nebo na ni najeď myší) a vyber, co chceš stáhnout.
-              </span>
-              {photos.length > 1 && archiveZipUrl ? (
-                // A pre-built archive (docs/TODO.md §7) is a plain CDN link —
-                // no signed manifest, no Worker request, just a download.
-                <a
-                  href={archiveZipUrl}
-                  className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white dark:bg-white dark:text-neutral-900"
-                >
-                  Stáhnout vše (ZIP)
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled={zipState === "preparing" || photos.length > 1}
-                  onClick={() => void downloadZip([])}
-                  title={
-                    photos.length > 1
-                      ? "Archiv se připravuje na pozadí — zkus to znovu za pár minut."
-                      : undefined
-                  }
-                  className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-                >
-                  {zipState === "preparing"
-                    ? "Připravuji…"
-                    : photos.length > 1
-                      ? "Archiv se připravuje…"
-                      : "Stáhnout fotku"}
-                </button>
-              )}
-            </>
-          )}
+          <button
+            type="button"
+            onClick={() => setSelection(clearSelection())}
+            aria-label="Zrušit výběr"
+            className="rounded-full border px-2 py-1 text-sm"
+          >
+            ✕
+          </button>
+          <span className="text-sm font-medium">
+            {pluralize(selection.ids.size, FORMS.selected)}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setSelection((prev) =>
+                isAllSelected(prev, photoIds) ? clearSelection() : selectAll(photoIds),
+              )
+            }
+            className="text-sm underline"
+          >
+            {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše načtené"}
+          </button>
+          <button
+            type="button"
+            disabled={zipState === "preparing"}
+            onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
+            className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+          >
+            {zipState === "preparing"
+              ? "Připravuji…"
+              : `Stáhnout ${pluralize(selection.ids.size, FORMS.photoAccusative)}${
+                  selection.ids.size > 1 ? " (ZIP)" : ""
+                }`}
+          </button>
           {zipState === "error" && (
             <span className="w-full text-xs text-red-600">
               Stažení se nepodařilo připravit. Zkus to prosím znovu.
@@ -1305,26 +1302,16 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="mt-10 space-y-4 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
-        {photos.length > 0 && (
-          <Card>
-            <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
-              Offline přístup
-            </p>
-            <OfflineToggle token={token} objectKeys={photos.map((photo) => photo.objectKey)} />
-          </Card>
-        )}
-        <p>
-          Počítáme návštěvy galerie pomocí identifikátoru uloženého jen ve tvém prohlížeči — slouží
-          k tvým oblíbeným fotkám a k tomu, aby se jedna návštěva nezapočítala vícekrát. Nepředáváme
-          ho nikam dál a neukládáme IP adresu.
-        </p>
+      <footer className="mt-10 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
         {!optedOut ? (
-          <button type="button" className="mt-2 underline" onClick={optOut}>
-            Nepočítat mě
-          </button>
+          <p>
+            Návštěvu počítáme anonymně, jen přes tenhle prohlížeč — bez IP adresy.{" "}
+            <button type="button" className="underline" onClick={optOut}>
+              Nepočítat mě
+            </button>
+          </p>
         ) : (
-          <p className="mt-2">Tvoje návštěvy se nepočítají.</p>
+          <p>Tvoje návštěvy se nepočítají.</p>
         )}
       </footer>
 
