@@ -25,6 +25,7 @@ export interface GalleryViewData {
   initialPhotos: {
     id: string;
     objectKey: string;
+    thumbObjectKey: string | null;
     fileName: string;
     width: number | null;
     height: number | null;
@@ -63,6 +64,7 @@ export async function loadGalleryViewData(
         select: {
           id: true,
           objectKey: true,
+          thumbObjectKey: true,
           fileName: true,
           width: true,
           height: true,
@@ -91,6 +93,7 @@ export async function loadGalleryViewData(
     initialPhotos: page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
       fileName: photo.fileName,
       width: photo.width,
       height: photo.height,

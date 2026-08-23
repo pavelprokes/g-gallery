@@ -46,6 +46,7 @@ import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import { srcFor } from "@/lib/image-src";
+import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineToggle } from "@/components/offline-toggle";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,8 @@ const LONG_PRESS_MS = 450;
 export interface GalleryPhoto {
   id: string;
   objectKey: string;
+  /** Browser-made 512 px WebP, when the uploading device could produce one. */
+  thumbObjectKey: string | null;
   fileName: string;
   width: number | null;
   height: number | null;
@@ -229,6 +232,8 @@ export function GalleryView(props: GalleryViewProps) {
 
 interface GalleryViewProps {
   token: string;
+  /** Only ever used to key the presence channel — never sent anywhere else. */
+  galleryId: string;
   title: string;
   eventDate: string | null;
   initialPhotos: GalleryPhoto[];
@@ -254,6 +259,7 @@ interface GalleryViewProps {
 
 function GalleryViewInner({
   token,
+  galleryId,
   title,
   eventDate,
   initialPhotos,
@@ -278,6 +284,7 @@ function GalleryViewInner({
     () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
+  const [projecting, setProjecting] = useState(false);
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
   // server-rendered.
@@ -937,7 +944,17 @@ function GalleryViewInner({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <PresenceStrip token={token} optedOut={optedOut} />
+          {photos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setProjecting(true)}
+              className="rounded-full border px-3 py-1.5 text-sm"
+              title="Fotky na plátno — mění se samy, nové přibývají živě"
+            >
+              Projekce
+            </button>
+          )}
+          <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
         </div>
       </header>
@@ -1074,7 +1091,12 @@ function GalleryViewInner({
                   <PhotoTile
                     key={photo.id}
                     photo={photo}
-                    src={srcFor(photo.objectKey, imageGrant)}
+                    // The grid prefers the browser-made thumbnail: already the
+                    // right size, so it costs no Cloudflare transformation
+                    // (docs/GUEST-GALLERIES.md §9). Null on photos uploaded by a
+                    // device that could not make one, which fall back to the
+                    // transformed original exactly as before.
+                    src={srcFor(photo.thumbObjectKey ?? photo.objectKey, imageGrant)}
                     width={entry.width}
                     height={entry.height}
                     index={index}
@@ -1305,6 +1327,17 @@ function GalleryViewInner({
           <p className="mt-2">Tvoje návštěvy se nepočítají.</p>
         )}
       </footer>
+
+      {projecting && (
+        <Slideshow
+          photos={photos}
+          imageGrant={imageGrant}
+          onClose={() => setProjecting(false)}
+          onRefresh={() => {
+            void queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+          }}
+        />
+      )}
 
       {allowUpload && (
         <GuestUploader

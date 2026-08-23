@@ -6,8 +6,11 @@ import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { Uploader } from "@/components/uploader";
 import { DeletePhotoButton } from "@/components/delete-photo-button";
+import { decryptToken } from "@/lib/token-cipher";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
+import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
+import { GallerySettings } from "@/components/gallery-settings";
 import { publishGallery, restoreGallery } from "../../actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     select: {
       id: true,
       title: true,
+      eventDate: true,
+      description: true,
       status: true,
       trashedAt: true,
       photos: {
@@ -52,6 +57,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           passwordHash: true,
           allowUpload: true,
           createdAt: true,
+          slug: true,
+          tokenCipher: true,
         },
       },
     },
@@ -89,11 +96,20 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             {gallery.status} · {gallery.photos.length} fotek
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <GallerySettings
+            galleryId={gallery.id}
+            title={gallery.title}
+            eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
+            description={gallery.description}
+          />
           {gallery.status === "DRAFT" && (
             <form action={publish}>
               <Button type="submit">Publikovat</Button>
             </form>
+          )}
+          {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
+            <UnpublishGalleryButton galleryId={gallery.id} />
           )}
           {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
         </div>
@@ -113,7 +129,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <ShareLinkPanel
         galleryId={gallery.id}
-        shareLinks={gallery.shareLinks}
+        shareLinks={gallery.shareLinks.map((link) => {
+          const token = decryptToken(link.tokenCipher);
+          return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+        })}
         published={gallery.status === "PUBLISHED"}
       />
 

@@ -2,6 +2,7 @@
 
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { classifyContentType } from "@/lib/upload-content-types";
+import { makeThumbnail } from "@/lib/thumbnail";
 import { stripGpsFromFile } from "@/lib/exif-gps";
 import { averageColorOf } from "@/lib/placeholder";
 
@@ -61,6 +62,8 @@ export interface PresignedUpload {
   objectKey: string;
   url: string;
   headers: Record<string, string>;
+  /** Where a grid thumbnail may go, one signed target per format. */
+  thumbTargets?: Partial<Record<"webp" | "jpeg", { url: string; headers: Record<string, string> }>>;
 }
 
 function credentialFields(credentials: UploadCredentials): Record<string, unknown> {
@@ -172,6 +175,9 @@ async function uploadOne(
   const dimensions = await readDimensions(body);
   // Cosmetic, so a failure here never blocks the upload.
   const placeholder = await averageColorOf(body);
+  // Null on any device that cannot produce one — the grid then falls back to a
+  // Cloudflare transformation of the original, exactly as before.
+  const thumbnail = target.thumbTargets ? await makeThumbnail(body) : null;
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -183,6 +189,23 @@ async function uploadOne(
         body,
       });
       if (!put.ok) throw new Error(`R2 PUT failed (${put.status})`);
+
+      // Best-effort and deliberately after the original: the photo is what
+      // matters, and a failed thumbnail must never cost someone their upload.
+      let thumbStored: "webp" | "jpeg" | null = null;
+      const thumbTarget = thumbnail && target.thumbTargets?.[thumbnail.format];
+      if (thumbnail && thumbTarget) {
+        try {
+          const thumbPut = await fetch(thumbTarget.url, {
+            method: "PUT",
+            headers: thumbTarget.headers,
+            body: thumbnail.blob,
+          });
+          if (thumbPut.ok) thumbStored = thumbnail.format;
+        } catch {
+          thumbStored = null;
+        }
+      }
 
       const confirm = await fetch("/api/uploads/confirm", {
         method: "POST",
@@ -196,6 +219,7 @@ async function uploadOne(
           width: dimensions?.width,
           height: dimensions?.height,
           placeholder,
+          thumb: thumbStored,
         }),
       });
       if (!confirm.ok) throw await rejectionFrom(confirm);

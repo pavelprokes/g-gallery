@@ -41,6 +41,40 @@ body {
   }
 }
 
+/*
+ * Tailwind 4 dropped the preflight rule that gave buttons `cursor: pointer`,
+ * so every button in the app inherited the browser default (`default`) and
+ * only the handful with an explicit `cursor-pointer` class looked clickable.
+ * Setting it once here is the fix; sprinkling a utility class on dozens of
+ * elements is how it stays half-done.
+ *
+ * Anchors already get it from the user-agent stylesheet. `label` is included
+ * for the guest uploader, where the file input *is* the button.
+ */
+button:not(:disabled),
+summary,
+select:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+/* A label that toggles or opens something is itself the control. Labels
+   wrapping a text or date field are deliberately left alone — there the
+   caret is the honest cursor. */
+label:has(> input[type="file"]:not(:disabled)),
+label:has(> input[type="checkbox"]:not(:disabled)),
+label:has(> input[type="radio"]:not(:disabled)) {
+  cursor: pointer;
+}
+
+/* Nothing to click means nothing should promise a click. */
+button:disabled,
+[aria-disabled="true"] {
+  cursor: default;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-brand-primary-dark);
   outline-offset: 2px;

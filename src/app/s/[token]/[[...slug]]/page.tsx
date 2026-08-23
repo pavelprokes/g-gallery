@@ -85,6 +85,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
   return (
     <GalleryView
       token={galleryToken}
+      galleryId={access.shareLink.galleryId}
       title={data.title}
       eventDate={data.eventDate}
       archiveZipUrl={data.archiveZipUrl}

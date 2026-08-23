@@ -86,6 +86,16 @@ Custom R2 domain and Image Transformations both require it
 3. **Share links**: ≥128-bit crypto-random tokens, constant-time comparison, server-side expiry
    check on _every_ surface (page, presign, favorites, ZIP), scrypt for gallery passwords (Node built-in, the same primitive better-auth uses — avoids a native argon2 dependency on Vercel),
    rate-limited password prompt.
+   **Revised 2026-08-23** (Pavel's call, so the admin can re-display a link): tokens are now also
+   kept AES-256-GCM encrypted next to their hash (`ShareLink.tokenCipher`, `Event.tokenCipher`,
+   `src/lib/token-cipher.ts`). Resolution is unchanged — still by hash only, never by ciphertext.
+   What this trades: a leaked database dump on its own no longer differs from before (the key lives
+   in `TOKEN_ENCRYPTION_KEY`, not in the DB, and backups go to R2 without it), but an attacker
+   holding **both** the dump and the app environment gains every share link, including ones only
+   ever meant for one recipient. Accepted deliberately against the alternative — an address that
+   exists for exactly one render and, once lost, cannot be recovered for signage already printed.
+   Without the env var nothing breaks: `tokenCipher` stays null and the admin says the address can
+   no longer be shown.
 4. **EXIF GPS**: transformations strip EXIF (default `metadata=copyright`; AVIF/WebP output drops
    EXIF entirely), but **ZIP delivers untouched originals** → strip GPS **client-side before
    upload** (piexifjs or similar) during the same pass that computes CRC32.

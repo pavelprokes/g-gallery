@@ -1,6 +1,7 @@
 "use client";
 
 import type { ImageLoaderProps } from "next/image";
+import { isThumbKey } from "@/lib/thumbnail";
 
 // Global custom loader (next.config.ts images.loaderFile). It never routes
 // through Vercel's /_next/image — zero image-optimization billing and zero
@@ -32,6 +33,11 @@ export default function imageLoader({ src, width, quality }: ImageLoaderProps): 
   const q = quality ?? DEFAULT_QUALITY;
   const [key, query] = src.split("?");
 
+  // A browser-made grid thumbnail is already the size it is going to be
+  // displayed at, so it is served straight from the bucket — no transformation
+  // billed, which is the entire point of producing it on the phone
+  // (docs/GUEST-GALLERIES.md §9). Signed grants still apply below.
+
   // docs/PLAN.md §4.1 "v2 hardening": when a gallery view minted a signed
   // access grant (src/lib/image-signing.ts, src/app/g/[token]/.../page.tsx),
   // every image request goes through the signing Worker instead of straight
@@ -54,7 +60,20 @@ export default function imageLoader({ src, width, quality }: ImageLoaderProps): 
     return `/${key}?w=${width}`;
   }
 
-  switch (transformMode()) {
+  const mode = transformMode();
+
+  // A browser-made grid thumbnail is already the size it will be displayed at,
+  // so on Cloudflare it is fetched straight from the bucket and no
+  // transformation is billed — the entire point of making it on the phone
+  // (docs/GUEST-GALLERIES.md §9).
+  //
+  // Only on Cloudflare, where the delivery host *is* the bucket. In local
+  // `imgproxy` mode the base is imgproxy itself and `{base}/{key}` is not an
+  // object, so the thumbnail goes through the normal path below — nothing is
+  // billed locally anyway. `none` already serves objects directly.
+  if (key && mode === "cloudflare" && isThumbKey(key)) return `${base}/${key}`;
+
+  switch (mode) {
     case "imgproxy":
       // `rs:fit:W:0` bounds the width and leaves height free; imgproxy does not
       // enlarge by default, which matches Cloudflare's fit=scale-down. Format

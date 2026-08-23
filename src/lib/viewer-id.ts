@@ -5,6 +5,8 @@
 // what dedupes "viewed" state. Single site, never cross-referenced, cleared by
 // the opt-out control in the gallery footer.
 
+import { randomId } from "@/lib/random-id";
+
 const STORAGE_KEY = "gg.viewer";
 const OPT_OUT_KEY = "gg.viewer.optout";
 const NAME_KEY = "gg.viewer.name";
@@ -87,7 +89,7 @@ export function getViewerId(): string | null {
   try {
     const existing = window.localStorage.getItem(STORAGE_KEY);
     if (existing) return existing;
-    const created = crypto.randomUUID();
+    const created = randomId();
     window.localStorage.setItem(STORAGE_KEY, created);
     return created;
   } catch {

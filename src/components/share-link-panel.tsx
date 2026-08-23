@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createShareLink, revokeShareLink } from "@/app/admin/actions";
+import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +16,8 @@ interface ShareLinkRow {
   passwordHash: string | null;
   allowUpload: boolean;
   createdAt: Date;
+  /** Path built server-side from the decrypted token; null when unreadable. */
+  url: string | null;
 }
 
 export function ShareLinkPanel({
@@ -78,44 +81,50 @@ export function ShareLinkPanel({
       </form>
 
       {freshUrl && (
-        <Alert className="mt-3">
-          <p className="font-medium">Odkaz zkopíruj teď — už se nikdy nezobrazí.</p>
-          <code className="mt-1 block text-xs break-all">{freshUrl}</code>
+        <Alert tone="success" className="mt-3">
+          <p className="font-medium">Odkaz vytvořen</p>
+          <div className="mt-2">
+            <CopyableLink href={freshUrl} />
+          </div>
           {!published && (
             <p className="mt-1 text-xs">Než ho pošleš, galerii publikuj — jinak vrací 404.</p>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-2"
-            onClick={() => void navigator.clipboard.writeText(freshUrl)}
-          >
-            Kopírovat
-          </Button>
         </Alert>
       )}
 
       <ul className="mt-4 divide-y text-sm">
         {shareLinks.length === 0 && <li className="py-2 text-neutral-500">Žádné odkazy.</li>}
         {shareLinks.map((link) => (
-          <li key={link.id} className="flex items-center justify-between py-2">
-            <div>
-              <p>{link.label ?? "Bez popisu"}</p>
-              <p className="text-xs text-neutral-500">
-                {link.revokedAt
-                  ? "Zrušen"
-                  : link.expiresAt
-                    ? `Platí do ${link.expiresAt.toLocaleDateString("cs-CZ")}`
-                    : "Bez expirace"}
-                {link.passwordHash && " · chráněno heslem"}
-                {link.allowUpload && " · hosté nahrávají"}
-              </p>
+          <li key={link.id} className="space-y-2 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p>{link.label ?? "Bez popisu"}</p>
+                <p className="text-xs text-neutral-500">
+                  {link.revokedAt
+                    ? "Zrušen"
+                    : link.expiresAt
+                      ? `Platí do ${link.expiresAt.toLocaleDateString("cs-CZ")}`
+                      : "Bez expirace"}
+                  {link.passwordHash && " · chráněno heslem"}
+                  {link.allowUpload && " · hosté nahrávají"}
+                </p>
+              </div>
+              {!link.revokedAt && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => void revokeShareLink(link.id)}
+                >
+                  Zrušit
+                </Button>
+              )}
             </div>
-            {!link.revokedAt && (
-              <Button variant="destructive" size="sm" onClick={() => void revokeShareLink(link.id)}>
-                Zrušit
-              </Button>
-            )}
+            {!link.revokedAt &&
+              (link.url ? (
+                <CopyableLink href={link.url} />
+              ) : (
+                <UnrecoverableLink reason="Adresu už nelze zobrazit — vznikla dřív, než se odkazy ukládaly čitelně. Vytvoř nový." />
+              ))}
           </li>
         ))}
       </ul>

@@ -155,26 +155,29 @@ enum ZipStatus {
 /// owner of access — each gallery keeps its own ShareLink, and `listedOnEvent`
 /// only decides whether a card for it shows up here.
 model Event {
-  id        String    @id @default(cuid())
-  ownerId   String
-  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  title     String
-  eventDate DateTime?
+  id          String    @id @default(cuid())
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  eventDate   DateTime?
   /// Free-text place shown under the title ("Statek Benice"); cosmetic.
-  venue     String?
-  /// SHA-256 of the 128-bit event token — the raw token is never stored, same
-  /// rule as ShareLink.tokenHash. This is a *different secret* from any
-  /// gallery's token, which is what keeps a forwarded gallery link from
-  /// exposing the wedding page.
-  tokenHash String    @unique
+  venue       String?
+  /// SHA-256 of the 128-bit event token — the only thing access resolves by.
+  /// A *different secret* from any gallery's token, which is what keeps a
+  /// forwarded gallery link from exposing the wedding page.
+  tokenHash   String    @unique
+  /// The same token, AES-256-GCM encrypted so the admin can show and copy the
+  /// address at any time (src/lib/token-cipher.ts). Never resolves anything;
+  /// null when TOKEN_ENCRYPTION_KEY is unset or the row predates it.
+  tokenCipher String?
   /// Readable URL hint frozen at creation, never parsed for resolution.
-  slug      String
+  slug        String
   /// Set when the whole wedding is moved to trash from the admin UI
-  trashedAt DateTime?
+  trashedAt   DateTime?
   /// Deadline for permanent deletion (trashedAt + 30 days)
-  purgeAt   DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  purgeAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   galleries Gallery[]
 
@@ -272,6 +275,11 @@ model Photo {
   placeholder        String?
   status             PhotoStatus @default(PENDING)
   storageTier        StorageTier @default(STANDARD)
+  /// A 512 px WebP the uploading browser produced, stored beside the original
+  /// (docs/GUEST-GALLERIES.md §9). Null whenever the device could not make one
+  /// — the grid then falls back to a Cloudflare transformation, exactly as
+  /// before this existed. Derived from `objectKey`, never client-supplied.
+  thumbObjectKey     String?
   /// OWNER unless a guest uploaded it through a share link with allowUpload.
   source             PhotoSource @default(OWNER)
   /// Which viewer added it, for attribution and for the per-guest quota.
@@ -297,8 +305,13 @@ model ShareLink {
   id                   String    @id @default(cuid())
   galleryId            String
   gallery              Gallery   @relation("GalleryShareLinks", fields: [galleryId], references: [id], onDelete: Cascade)
-  /// SHA-256 of the 128-bit share token — the raw token is never stored
+  /// SHA-256 of the 128-bit share token — the only thing access resolves by
   tokenHash            String    @unique
+  /// The same token, AES-256-GCM encrypted for display in the admin
+  /// (src/lib/token-cipher.ts). Never resolves anything; null when
+  /// TOKEN_ENCRYPTION_KEY is unset or the row predates it, which just means
+  /// the link can no longer be shown.
+  tokenCipher          String?
   label                String?
   /// scrypt hash "salt:key"; null = no password
   passwordHash         String?

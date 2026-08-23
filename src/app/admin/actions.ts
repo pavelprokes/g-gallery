@@ -12,6 +12,7 @@ import {
 } from "@/lib/share-token";
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
 import { deleteObject } from "@/lib/r2";
+import { encryptToken } from "@/lib/token-cipher";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3).
@@ -70,10 +71,11 @@ const createShareLinkSchema = z.object({
 });
 
 /**
- * Returns the raw token exactly once — only its SHA-256 hash is persisted, so
- * it can never be recovered or displayed again. The slug is frozen here too
- * (docs/TODO.md §6): a later rename of the gallery doesn't reach links
- * already handed out, matching Notion/Figma's own trade-off.
+ * Returns the raw token, and also stores it encrypted so the admin can show it
+ * again later (`src/lib/token-cipher.ts`). Access still resolves only by the
+ * SHA-256 hash. The slug is frozen here too (docs/TODO.md §6): a later rename
+ * of the gallery doesn't reach links already handed out, matching
+ * Notion/Figma's own trade-off.
  */
 export async function createShareLink(
   formData: FormData,
@@ -102,6 +104,7 @@ export async function createShareLink(
     data: {
       galleryId: gallery.id,
       tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
       label: parsed.data.label,
       passwordHash: parsed.data.password ? await hashPassword(parsed.data.password) : null,
       expiresAt: parsed.data.expiresInDays
@@ -249,10 +252,10 @@ const createEventSchema = z.object({
 });
 
 /**
- * Returns the raw event token exactly once — like a share link, only its
- * SHA-256 is persisted, so it can never be recovered or displayed again.
- * This is a *different secret* from any gallery's share token, which is what
- * keeps a forwarded gallery link from exposing the wedding page.
+ * A *different secret* from any gallery's share token — that separation is what
+ * keeps a forwarded gallery link from exposing the wedding page. Stored
+ * encrypted alongside its hash so the address can be shown and copied from the
+ * admin at any time.
  */
 export async function createEvent(
   formData: FormData,
@@ -277,6 +280,7 @@ export async function createEvent(
       eventDate,
       venue: parsed.data.venue,
       tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
       slug,
     },
     select: { id: true },
@@ -436,4 +440,209 @@ export async function restoreEvent(eventId: string) {
   });
 
   revalidatePath("/admin");
+}
+
+/**
+ * Creates a gallery already wired into a wedding page: attached, published, and
+ * with a share link the card grants through.
+ *
+ * Doing all four steps by hand is where the flow used to go wrong — a gallery
+ * created, attached and listed, but with no designated link, produces no card
+ * and no error. Here the only remaining step is the deliberate one.
+ *
+ * It is created **not listed**. Everything is ready, but nothing appears on the
+ * rozcestník until someone presses "Zobrazit na stránce" — in a product whose
+ * whole point is that the couple decides what is shared, a new gallery must not
+ * publish itself to eighty people as a side effect of being created.
+ */
+export async function createGalleryForEvent(eventId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, ownerId: session.user.id },
+    select: { id: true },
+  });
+  if (!event) throw new Error("NOT_FOUND");
+
+  const galleryId = await createGallery(formData);
+  await attachGalleryToEvent(event.id, galleryId);
+  await publishGallery(galleryId);
+
+  const gallery = await prisma.gallery.findFirstOrThrow({
+    where: { id: galleryId },
+    select: { title: true, eventDate: true },
+  });
+
+  const token = generateShareToken();
+  const link = await prisma.shareLink.create({
+    data: {
+      galleryId,
+      tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
+      slug: gallerySlug(gallery.title, gallery.eventDate),
+      allowUpload: formData.get("allowUpload") ? true : false,
+      label: formData.get("allowUpload") ? "Pro hosty" : "Pro pár",
+    },
+    select: { id: true },
+  });
+
+  await prisma.gallery.update({
+    where: { id: galleryId },
+    data: { eventLinkId: link.id, listedOnEvent: false },
+  });
+
+  revalidatePath(`/admin/e/${event.id}`);
+}
+
+const updateEventSchema = z.object({
+  title: z.string().min(1).max(200),
+  eventDate: z.string().optional(),
+  venue: z.string().max(200).optional(),
+});
+
+/**
+ * Renames a wedding, or fixes its date or venue.
+ *
+ * The **slug is deliberately not recomputed**. It is frozen at creation for the
+ * same reason a share link's is (docs/TODO.md §6): the address may already be
+ * printed on signage, and silently changing the canonical URL after a typo fix
+ * would be a worse outcome than a URL that still says `pavel-a-patricie` for
+ * `Pavel a Petra`. The segment is cosmetic and never resolves anything, so a
+ * stale one costs nothing but looks slightly wrong.
+ */
+export async function updateEvent(eventId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const parsed = updateEventSchema.safeParse({
+    title: formData.get("title"),
+    eventDate: formData.get("eventDate") || undefined,
+    venue: formData.get("venue") || undefined,
+  });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  await prisma.event.updateMany({
+    where: { id: eventId, ownerId: session.user.id },
+    data: {
+      title: parsed.data.title,
+      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+      venue: parsed.data.venue ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/e/${eventId}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * Moves a card one place up or down on the wedding page.
+ *
+ * Swaps the two positions rather than renumbering the list, so concurrent edits
+ * cannot leave a gap, and writes both in one transaction so a half-applied swap
+ * cannot duplicate a position.
+ */
+export async function moveGalleryInEvent(galleryId: string, direction: "up" | "down") {
+  const session = await requireAdmin();
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: galleryId, ownerId: session.user.id, eventId: { not: null } },
+    select: { id: true, eventId: true, position: true, title: true },
+  });
+  if (!gallery?.eventId) throw new Error("NOT_FOUND");
+
+  const siblings = await prisma.gallery.findMany({
+    where: { eventId: gallery.eventId },
+    orderBy: [{ position: "asc" }, { title: "asc" }],
+    select: { id: true, position: true },
+  });
+
+  const index = siblings.findIndex((sibling) => sibling.id === gallery.id);
+  const target = siblings[direction === "up" ? index - 1 : index + 1];
+  // Already at the end it can move to — nothing to do, and not an error.
+  if (index < 0 || !target) return;
+
+  // Ties on position are legal (everything attached in one go starts at 0), so
+  // a plain swap of equal numbers would be a no-op. Renumber the pair from the
+  // list order instead, which is what the page actually sorts by.
+  await prisma.$transaction([
+    prisma.gallery.update({ where: { id: gallery.id }, data: { position: target.position } }),
+    prisma.gallery.update({
+      where: { id: target.id },
+      data: {
+        position: gallery.position === target.position ? target.position + 1 : gallery.position,
+      },
+    }),
+  ]);
+
+  revalidatePath(`/admin/e/${gallery.eventId}`);
+}
+
+/**
+ * Takes a gallery back to DRAFT.
+ *
+ * This is a real cut-off, not a cosmetic flag: every share surface refuses a
+ * gallery that is not PUBLISHED, so every link to it — including a wedding-page
+ * card — starts returning 404 immediately. That is the point, and it is why the
+ * button asks first.
+ */
+export async function unpublishGallery(galleryId: string) {
+  const session = await requireAdmin();
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: galleryId, ownerId: session.user.id },
+    select: { id: true, eventId: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: { status: "DRAFT", publishedAt: null },
+  });
+
+  revalidatePath(`/admin/g/${gallery.id}`);
+  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+}
+
+const updateGallerySchema = z.object({
+  title: z.string().min(1).max(200),
+  eventDate: z.string().optional(),
+  description: z.string().max(2000).optional(),
+});
+
+/**
+ * Renames a gallery, or fixes its date or description.
+ *
+ * Two things are deliberately **not** recomputed, for the same reason as
+ * {@link updateEvent}: `ShareLink.slug` (docs/TODO.md §6) and `Gallery.eventKey`
+ * are frozen at creation. Both may already be in somebody's inbox or on printed
+ * signage, and neither resolves anything — the token does. A stale segment
+ * looks slightly wrong; a changed URL breaks.
+ */
+export async function updateGallery(galleryId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const parsed = updateGallerySchema.safeParse({
+    title: formData.get("title"),
+    eventDate: formData.get("eventDate") || undefined,
+    description: formData.get("description") || undefined,
+  });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: galleryId, ownerId: session.user.id },
+    select: { id: true, eventId: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: {
+      title: parsed.data.title,
+      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+      description: parsed.data.description ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/g/${gallery.id}`);
+  revalidatePath("/admin");
+  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
 }

@@ -184,32 +184,23 @@ is refused where the request landed. It deliberately does _not_ redirect to the 
 would hand the event token to someone who only ever held a link to one gallery, which is exactly
 the separation this whole design exists to keep.
 
-## 5. PIN on a single gallery — deferred, deliberately
+## 5. PIN on a single gallery — dropped, the password already does it
 
-Locking one gallery behind a PIN is a **social brake, not access control**: the token is already
-unguessable, so a PIN does not protect against guessing — it protects against careless forwarding.
-That is a real function, but it has to be named honestly, since a four-digit code written on a card
-and pasted into a family group chat has been forwarded too.
+**Resolved 2026-08-23 (Pavel): the share-link password covers this, so no separate PIN is built.**
 
-Three things must be settled before it can be switched on:
+"Show this gallery to some people, not all" was the one case a listing switch could not express,
+and it turns out not to need a new primitive. `ShareLink.passwordHash` has existed since Phase 2:
+create a second link for that gallery, give it a password, and hand out the link and the password
+together. If the wedding-page card should be gated too, point `eventLinkId` at the protected link
+and everyone arriving via the card meets the password form.
 
-- **Never on the guest gallery.** One extra number between a guest and their photo costs
-  participation, and participation is the only metric that matters here.
-- **The lockout counter is currently per link.** `failedUnlockAttempts` and `unlockLockedUntil` are
-  columns on `ShareLink` (`src/lib/share-access.ts`), so five wrong tries lock the link for
-  _everyone_. Harmless for a client gallery two people visit; at a wedding with eighty guests it is
-  a self-inflicted denial of service, triggered by the first uncle without his reading glasses.
-  The counter has to move to the viewer (`anonKey`) before any PIN ships.
-- **Four digits is 10 000 combinations.** Under today's lockout an attack takes weeks rather than
-  minutes, which is not the same as safe. Either a longer code, or a per-viewer counter plus a
-  per-gallery ceiling — preferably both.
-
-**Gallery state covers the real cases more cheaply**: draft / published / withdrawn. "We are not
-sharing the full set yet" and "we changed our minds" are both just the card not being on the event
-page — no PIN, no lockout, no new surface to test. The PIN is reserved for the one case state
-cannot express: _show it to some, not all_. When that comes up, it gets built properly — reusing
-`src/lib/share-unlock.ts` (whose signature is derived from the stored hash, so changing the PIN
-invalidates every outstanding cookie) generalised from a link id to a scope id.
+What that inherits, and why it is fine here: the lockout counter
+(`failedUnlockAttempts` / `unlockLockedUntil`) lives on the `ShareLink`, so five wrong attempts
+lock the link for **everyone** holding it. For a link given to a handful of people — which is
+exactly the "not all" case — that is harmless. It would have been a self-inflicted denial of
+service on a link eighty guests use, which is why a PIN on the _guest_ gallery was never the idea.
+So: **never put a password on the guest-upload link**, and if a password ever does end up on a
+many-viewer link, move that counter to the viewer (`anonKey`) first.
 
 ## 6. Guest upload path
 
@@ -269,15 +260,42 @@ Cloudflare Image Transformations bill per unique transformation, 5 000/month fre
 photos × 3 variants = 2 400 — **one wedding eats half the monthly allowance**, and two weddings in
 one month put us over.
 
-**Pavel, 2026-08-23: the free 5 000 is enough for now.** The client-generated thumbnail is
-therefore no longer a prerequisite for pointing a QR code at this — it drops out of F3's critical
-path and becomes an optimisation to reach for when a month actually has two weddings in it. The
-number to watch is the transformations counter in the Cloudflare dashboard, not the R2 bill:
-storage and egress are unaffected either way, since guest photos are small next to the
-photographer's 12 MB exports. When it does get built the shape is unchanged — the grid is served
-from uploaded 512 px derivatives, and a transformation is only spent when someone opens a photo
-full-screen. R2 storage and egress are unaffected (egress is free, and guest photos are small
-relative to the photographer's 12 MB exports).
+**Built 2026-08-23.** The grid is served from a 512 px derivative the uploading browser produced,
+so a transformation is only spent when someone opens a photo full-screen. Measured on the local
+stack: a 148 kB photo yields a 32 kB thumbnail.
+
+- **Resampling is pica** (`src/lib/thumbnail.ts`), **dynamically imported**. Scaling 4000 px
+  straight to 512 px with one `drawImage` aliases badly on exactly what a wedding is full of —
+  lace, foliage, hair — and pica resamples properly in a worker. Verified in the browser that the
+  chunk loads on the first upload and not before: DOM ready at 137 ms, pica fetched at 28.9 s when
+  a file was picked. The ~14 kB is paid only by people who actually upload, never by the eighty
+  who just look.
+- **The native shortcut is a dead end**, which is why the library earns its place:
+  `createImageBitmap`'s `resizeWidth` / `resizeQuality` are [unsupported in
+  Safari](https://caniuse.com/createimagebitmap), and pica
+  [disables that path by default](https://github.com/nodeca/pica) even where it exists because the
+  result depends on the browser.
+- **Every step degrades rather than fails**: no pica → plain canvas with smoothing; no WebP →
+  JPEG; nothing at all → null, and the photo uploads exactly as before while the grid falls back to
+  a Cloudflare transformation. No device ends up worse off than before this existed.
+- **Timeouts, because the failure that hurts is not an exception.** A worker that never answers
+  would leave the `await` hanging and the guest's upload sitting at "Nahrávám" until they gave up.
+  pica gets 8 s to load and 10 s per resize; the whole thumbnail gets 25 s. Past any of those it
+  falls through to the next option down.
+- **A failure disables pica for the rest of the session.** Retrying a resizer that just stalled for
+  ten seconds, once per photo in a batch of forty, would cost the guest six minutes to reach the
+  same answer forty times.
+- **It says so in the console** (`[g-gallery/thumbnail]`), once per session for pica and per photo
+  for a total failure. The guest sees nothing — the photo uploads either way — but "why do the
+  tiles look crunchy" needs to be answerable.
+- **Two signed targets per photo**, `.thumb.webp` and `.thumb.jpg`, both in the presign response
+  the client already waited for. A signed PUT is bound to one content type, so offering only WebP
+  would have meant no thumbnail at all on a browser that cannot encode it.
+- A plain `<canvas>` rather than `OffscreenCanvas`: Safari only got the latter in 16.4, and this
+  should reach as many phones as possible.
+- The key is derived from the one the server issued; the client only reports _which format_ it
+  managed, never where to write it. R2 storage and egress are unaffected (egress is free, and guest photos are small
+  relative to the photographer's 12 MB exports).
 
 ## 10. Privacy and law
 
@@ -319,9 +337,9 @@ F1–F4 are the minimum that can run a real wedding.
 | F0  | Close §11 decisions                                                                                                                                                                                                                                                   | 0.5 d    |
 | F1  | Guest uploads: `ShareLink.allowUpload`, second branch in presign/confirm, `Photo.source`, `uploadedByViewerId`, quotas, migration — **done 2026-08-23**, see below                                                                                                    | 3–4 d    |
 | F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below | 2–3 d    |
-| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state. HEIC refusal and the client-side skip shipped in F1; the 512 px thumbnail dropped out of scope — see §9                                                                     | 1–2 d    |
+| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state — **done 2026-08-23**, see below                                                                                                                                             | 1–2 d    |
 | F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                    | —        |
-| F5  | Projection: `/s/{token}/{slug}/show` — fullscreen, live via Supabase Realtime, burn-in guard, reconnect behaviour                                                                                                                                                     | 1–2 d    |
+| F5  | Projection: fullscreen, live, no controls — **done 2026-08-23**, see below                                                                                                                                                                                            | 1–2 d    |
 | F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path), real-device matrix, trial run on a small event                                                                                                   | 2 d      |
 | F7  | Printable QR graphics                                                                                                                                                                                                                                                 | separate |
 | F8  | Video                                                                                                                                                                                                                                                                 | separate |
@@ -373,11 +391,11 @@ own 30-day trash window on top, swept by the same daily cron.
   page exists.
 - **`loadGalleryViewData`** (`src/lib/shared-gallery.ts`) is now shared by `/g/` and `/s/`, so the
   two surfaces cannot drift on ordering, page size or which photos count as visible.
-- **Admin**: create a wedding (its URL is revealed exactly once, like a share link), attach and
-  detach galleries, the listing switch, and the picker for which share link a card grants through.
-  Attaching freezes the `eventKey`, for the same reason a share link's slug is frozen.
-  The page warns when a gallery is listed but has no designated link — the one state that silently
-  produces no card.
+- **Admin**: create a wedding, rename it, reorder and attach/detach galleries, the listing switch,
+  and the picker for which share link a card grants through. A gallery can also be un-published,
+  which cuts off every link to it including its card. Attaching freezes the `eventKey`, for the same reason a
+  share link's slug is frozen. The page warns when a gallery is listed but has no designated link —
+  the one state that silently produces no card.
 - **Trash and purge**: a wedding page gets the same 30-day window as a gallery and is swept by the
   same daily cron. Trashing it does _not_ trash the galleries; they are the photographer's work and
   outlive the page that listed them.
@@ -385,6 +403,64 @@ own 30-day trash window on top, swept by the same daily cron.
   rule is a five-way conjunction whose failure is silent). `e2e/wedding-page.spec.ts` covers the
   canonical redirect, that an un-listed gallery has no card _and_ is refused by key without
   redirecting, the two-card rozcestník, and the single-gallery inline render keeping its `/s/` URL.
+
+### Admin, reworked (2026-08-23)
+
+Links are no longer shown once and then lost. `ShareLink.tokenCipher` and `Event.tokenCipher` keep
+the token AES-256-GCM encrypted next to its hash (`src/lib/token-cipher.ts`, CLAUDE.md invariant 5
+revised) so every address can be displayed and copied at any time. Resolution is unchanged: still
+by hash, never by ciphertext.
+
+- **`/admin`** — two buttons rather than two permanently open forms: _+ Nová svatba_ and
+  _+ Samostatná galerie_. Weddings are listed with their address and a copy control.
+- **`/admin/e/{id}`** — the wedding's own address at the top, then per gallery: the card address
+  (`/s/{token}/{slug}/{key}`) _and_ the gallery's own `/g/` links, each copyable, so it is obvious
+  which one to send to whom. Plus the listing switch, the card-link picker and detach.
+- **`+ Nová galerie` inside a wedding** creates it, attaches it, publishes it and wires a share
+  link as the card's route in one step — the sequence where the old flow silently produced no card.
+  It is created **not listed**: everything is ready, but nothing reaches the rozcestník until
+  someone presses _Zobrazit na stránce_. A new gallery must not publish itself to eighty people as
+  a side effect of being created.
+- A row whose token predates the ciphertext (or a deployment without `TOKEN_ENCRYPTION_KEY`) says
+  so plainly instead of showing a broken link.
+
+### F3, as built (2026-08-23)
+
+- **`src/lib/wake-lock.ts`** holds a screen wake lock for the length of a run and re-acquires it
+  when the tab comes back. This is the cheapest fix for the actual problem: uploads at a wedding
+  usually die because somebody put the phone down and the display timed out after thirty seconds,
+  not because anyone deliberately locked it. Best-effort — Safari has had it since 16.4, older iOS
+  will not, and nothing depends on it.
+- **`src/lib/upload-queue.ts`** persists the pending files in IndexedDB (`File` is
+  structured-cloneable, so the _bytes_ are stored, not just the names). Each entry is removed the
+  moment it lands, so an interrupted run resumes with exactly what is left. Returning to the page
+  finishes the job automatically, even if the page was discarded entirely and the `File` objects
+  are long gone from memory. Entries expire after 7 days, and a clock that jumped forward cannot
+  create one that never expires. Without IndexedDB everything still uploads, it just cannot resume.
+- Server-side resume is unchanged and does the other half: `matchResumeTargets` re-claims the
+  PENDING rows by name and size, so a resumed run reuses them instead of creating duplicates.
+- **Honest copy**: "displej nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíte."
+  Not "you can lock the phone" — on iOS, JavaScript is suspended when the screen locks and there is
+  no API that keeps bytes flowing. What is promised is that nothing is lost, which is true.
+- A resumed run shows _Zahodit zbytek_ for anyone who abandoned it on purpose. Requests already in
+  flight finish; there is nothing to gain from abandoning bytes that are nearly there.
+
+### F5 projection, as built (2026-08-23)
+
+One **Projekce** button in the gallery header (not in the lightbox — Pavel's call), and from then
+on there is nothing to operate. It runs fullscreen, holds a screen wake lock so the projector does
+not sleep, and its only affordance is a way out (Escape, or a click).
+
+- **Crossfade, not a src swap.** Two layers stay mounted and the incoming photo is placed in the
+  hidden one a full interval before it is shown, so it is decoded by the time it fades in. A single
+  `<img>` whose `src` changes flashes white on a slow connection, and on a five-metre screen that
+  is the one thing everybody notices.
+- **Live.** It refetches every 30 s, and a photo it has not shown yet goes next — so a guest's shot
+  reaches the screen seconds after they upload it, which is the entire reason to project rather
+  than hand someone a slideshow file. Once every photo has had its turn the pass restarts.
+- **No controls on purpose.** Arrows, a counter or a scrubber on a screen nobody stands next to are
+  only things for a guest to poke at. The E2E asserts the dialog contains exactly one button.
+- 6 s per photo, 1.2 s fade, both constants at the top of `src/components/slideshow.tsx`.
 
 ### Guest self-delete (2026-08-23)
 
@@ -394,9 +470,9 @@ lightbox, shown only for the viewer's own photos, and the set refreshes after an
 can be taken back straight away. E2E covers both halves: a guest deletes what they added, and a
 photo somebody else added shows no delete button at all.
 
-Still open before pointing a QR code at a real wedding: an upload queue that survives a locked
-screen (F3). The progress copy says "nechte prosím stránku otevřenou" for exactly that reason — it
-will be a lie the moment F3 lands, and should be changed then.
+Nothing from the original F1–F3 scope is left open. What remains is deliberately deferred:
+moderation (§7), the client-side thumbnail (§9), a co-host login for the couple (§13.6), printable
+QR graphics (F7) and video (F8). The separate PIN was **dropped** — see §5.
 
 ## 12. Test focus
 
@@ -425,9 +501,10 @@ Written down because none of it is caught by unit tests:
 4. **Moderation?** Not now (Pavel, 2026-08-23). A guest deleting their own photo covers the real
    case and the photographer's per-photo delete is the backstop; approve-first stays designed but
    unbuilt (§7).
-5. **PIN on a single gallery?** Not in v1 — gallery state covers the real cases without a new
-   surface. When it is built: per-viewer lockout instead of per-link, never on the guest gallery.
-   See §5.
+5. **PIN on a single gallery?** Dropped entirely. The share-link password has done this since
+   Phase 2: a second, password-protected link is exactly "show it to some, not all". Never put a
+   password on the guest-upload link — the lockout counter is per link, so it would let one guest
+   lock out the whole wedding. See §5.
 6. **Who flips what the hub shows?** For v1, the photographer, on the couple's request. A co-host
    token is a _write_ capability in a URL — a different security class from today's read links. If
    it is built later: forced password, shorter expiry, reversible operations only (hide, never

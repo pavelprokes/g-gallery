@@ -79,6 +79,22 @@ test.describe("wedding page", () => {
     await expect(page.getByRole("link", { name: /^←/ })).toHaveCount(0);
   });
 
+  test("the projection runs itself and offers nothing to operate", async ({ page }) => {
+    await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}/prvni-vyber`);
+
+    await page.getByRole("button", { name: "Projekce" }).click();
+    const projection = page.getByRole("dialog", { name: "Projekce" });
+    await expect(projection).toBeVisible();
+
+    // Nothing to poke at on a screen nobody stands next to: no arrows, no
+    // counter, no scrubber — only a way out.
+    await expect(projection.getByRole("button")).toHaveCount(1);
+    await expect(projection.getByRole("button", { name: "Ukončit" })).toBeAttached();
+
+    await page.keyboard.press("Escape");
+    await expect(projection).toBeHidden();
+  });
+
   test("an unknown wedding token shows the branded not-found page", async ({ page }) => {
     const response = await page.goto("/s/definitely-not-a-real-token/whatever");
     expect(response?.status()).toBe(404);

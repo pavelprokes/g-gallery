@@ -18,9 +18,16 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   uploadToken: string;
   uploadSlug: string;
   readOnlyToken: string;
-  selfDeleteToken: string;
-  selfDeleteSlug: string;
+  /** One wedding per browser project — see e2e/seed.ts for why. */
+  selfDelete: Record<string, { token: string; slug: string }>;
 };
+
+/** The self-delete wedding belonging to the project running this test. */
+function selfDeleteUrl(projectName: string): string {
+  const wedding = seed.selfDelete[projectName];
+  if (!wedding) throw new Error(`no self-delete wedding seeded for project ${projectName}`);
+  return `/s/${wedding.token}/${wedding.slug}`;
+}
 
 /** A real, decodable 1×1 JPEG: the client strips EXIF, CRC32s and decodes it. */
 const ONE_PIXEL_JPEG = Buffer.from(
@@ -39,8 +46,9 @@ test.describe("guest uploads", () => {
   test("a link with allowUpload adds a photo the grid then shows", async ({ page }) => {
     await page.goto(`/g/${seed.uploadToken}/${seed.uploadSlug}`);
 
-    const addButton = page.getByRole("button", { name: "Přidat fotky" });
-    await expect(addButton).toBeVisible();
+    // A label wrapping the file input, not a <button> — see the tappability
+    // test below for why.
+    await expect(page.getByLabel("Přidat fotky")).toBeVisible();
 
     const before = await tileCount(page);
 
@@ -66,10 +74,16 @@ test.describe("guest uploads", () => {
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBeGreaterThan(before);
   });
 
-  test("a guest can take back a photo they uploaded, and only that one", async ({ page }) => {
-    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+  test("a guest can take back a photo they uploaded, and only that one", async ({
+    page,
+  }, testInfo) => {
+    await page.goto(selfDeleteUrl(testInfo.project.name));
 
-    const before = await tileCount(page);
+    // Wait for the seeded photos to render before counting. Reading the count
+    // straight after goto() catches an empty grid and turns every later
+    // assertion into a race — which is exactly how this test first failed.
+    const SEEDED = 2;
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED);
 
     await page.locator('input[type="file"]:not([capture])').setInputFiles({
       name: "omylem.jpg",
@@ -80,7 +94,7 @@ test.describe("guest uploads", () => {
       timeout: 30_000,
     });
     await page.getByRole("button", { name: "Přeskočit" }).click();
-    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before + 1);
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED + 1);
 
     // Newest first, so the photo just uploaded is the first tile.
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
@@ -89,14 +103,16 @@ test.describe("guest uploads", () => {
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Smazat mou fotku" }).click();
 
-    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before);
+    // Back to the seeded photos: the guest's own upload is gone, the two that
+    // were never theirs are untouched.
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED);
   });
 
-  test("a photo someone else uploaded offers no delete button", async ({ page }) => {
+  test("a photo someone else uploaded offers no delete button", async ({ page }, testInfo) => {
     // A fresh browser context has its own anonKey, so the seeded photos in this
     // gallery belong to nobody it knows — exactly the state of a guest looking
     // at somebody else's shot.
-    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+    await page.goto(selfDeleteUrl(testInfo.project.name));
 
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await expect
@@ -108,14 +124,35 @@ test.describe("guest uploads", () => {
     await expect(page.getByRole("button", { name: "Smazat mou fotku" })).toHaveCount(0);
   });
 
+  test("the file inputs are tappable, not display:none", async ({ page }) => {
+    await page.goto(`/g/${seed.uploadToken}/${seed.uploadSlug}`);
+
+    // Regression guard. The buttons used to call input.click() on a
+    // display:none input, which iOS Safari refuses to honour — nothing at all
+    // happened on an iPhone, the one device this bar exists for. Playwright
+    // drives inputs directly via setInputFiles, so no other test can catch it.
+    const picker = page.getByLabel("Přidat fotky");
+    const camera = page.getByLabel("Vyfotit");
+
+    await expect(picker).toBeVisible();
+    await expect(camera).toBeVisible();
+
+    for (const input of [picker, camera]) {
+      const box = await input.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThan(0);
+      expect(box?.height ?? 0).toBeGreaterThan(0);
+      await expect(input).toHaveCSS("display", /^(?!none$)/);
+    }
+  });
+
   test("a read-only link to the same gallery offers no way to upload", async ({ page }) => {
     await page.goto(`/g/${seed.readOnlyToken}/${seed.uploadSlug}`);
 
     // Asserting on the title rather than the grid: this gallery may still be
     // empty depending on worker order, and an empty grid renders zero-height.
     await expect(page).toHaveTitle(/E2E Guest Gallery/);
-    await expect(page.getByRole("button", { name: "Přidat fotky" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Vyfotit" })).toHaveCount(0);
+    await expect(page.getByLabel("Přidat fotky")).toHaveCount(0);
+    await expect(page.getByLabel("Vyfotit")).toHaveCount(0);
   });
 
   test("the server refuses an upload through a read-only link, not just the UI", async ({

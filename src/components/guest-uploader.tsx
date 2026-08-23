@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   dismissNamePrompt,
   getViewerId,
@@ -9,6 +9,13 @@ import {
   setViewerName,
 } from "@/lib/viewer-id";
 import { matchResumeTargets } from "@/lib/upload-resume";
+import {
+  clearQueuedUploads,
+  dequeueUpload,
+  enqueueUploads,
+  listQueuedUploads,
+} from "@/lib/upload-queue";
+import { holdScreenAwake } from "@/lib/wake-lock";
 import {
   fetchPendingUploads,
   runUploads,
@@ -42,8 +49,13 @@ export function GuestUploader({
   const [running, setRunning] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [askName, setAskName] = useState(false);
-  const pickRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+  const [resuming, setResuming] = useState(false);
+  /**
+   * How many files are being written to the queue before the first byte moves.
+   * Storing forty photos in IndexedDB takes real time, and without this the
+   * bar sat silent through it — indistinguishable from nothing happening.
+   */
+  const [preparing, setPreparing] = useState(0);
 
   // GDPR take-down route (docs/GUEST-GALLERIES.md §10). Read from the
   // environment rather than hard-coded: an address invented here would be a
@@ -55,18 +67,29 @@ export function GuestUploader({
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }, []);
 
-  const start = useCallback(
-    async (files: File[]) => {
+  /**
+   * Runs a set of already-queued entries. Each one is removed from the queue
+   * the moment it lands, so an interrupted run resumes with exactly what is
+   * left rather than starting over.
+   */
+  const run = useCallback(
+    async (queued: { id: string; file: File }[]) => {
+      const files = queued.map((entry) => entry.file);
       setItems(files.map((file) => ({ file, state: "pending" as const })));
       setFatal(null);
       setRunning(true);
+
+      // Removes the commonest cause of a dead upload: the display timing out
+      // while the phone lies on a table. Best-effort — never depended on.
+      const wakeLock = await holdScreenAwake();
 
       const anonKey = getViewerId();
       const credentials = { kind: "guest" as const, shareToken: token, anonKey };
 
       // Fetched here rather than on mount: most people who open the gallery
       // never upload anything, and 80 guests each firing a lookup they will
-      // not use is a request per page view for nothing.
+      // not use is a request per page view for nothing. It is also what makes
+      // a resumed run re-use its half-finished rows instead of duplicating.
       const resumeIds = matchResumeTargets(files, await fetchPendingUploads(credentials));
 
       let landed = 0;
@@ -75,18 +98,27 @@ export function GuestUploader({
         credentials,
         resumeIds,
         onItem: (index, patch) => {
-          if (patch.state === "done") landed += 1;
+          if (patch.state === "done") {
+            landed += 1;
+            const entry = queued[index];
+            if (entry) void dequeueUpload(entry.id);
+          }
           update(index, patch);
         },
         onFatal: (rejection) => setFatal(guestRejectionMessage(rejection)),
-        onSkipped: (rejection, count) =>
+        onSkipped: (rejection, count) => {
+          // Nothing will ever make these acceptable, so they leave the queue
+          // rather than being retried on every visit.
+          for (const entry of queued) void dequeueUpload(entry.id);
           setFatal(
             count > 1
               ? `${guestRejectionMessage(rejection)} (${count} souborů jsme přeskočili, ostatní nahráváme.)`
               : guestRejectionMessage(rejection),
-          ),
+          );
+        },
       });
 
+      wakeLock?.release();
       setRunning(false);
       if (landed > 0) {
         // Photos are only visible once the server flipped them to CONFIRMED,
@@ -100,6 +132,54 @@ export function GuestUploader({
     },
     [onUploaded, token, update],
   );
+
+  const start = useCallback(
+    async (files: File[]) => {
+      setFatal(null);
+      setPreparing(files.length);
+      try {
+        const queued = await enqueueUploads(token, files);
+        setPreparing(0);
+        await run(queued);
+      } catch (error) {
+        // Nothing may ever fail silently here. A guest who picked a photo and
+        // saw the bar go back to how it was has no idea whether it worked, and
+        // the honest answer is that it did not.
+        console.error("[g-gallery/upload] could not start:", error);
+        setFatal("Nahrávání se nepodařilo spustit. Zkuste to prosím znovu.");
+        setRunning(false);
+      } finally {
+        setPreparing(0);
+      }
+    },
+    [run, token],
+  );
+
+  /**
+   * Anything left from a previous visit finishes on its own. The files are in
+   * IndexedDB, so this works even when the page was discarded entirely and the
+   * File objects are long gone from memory — which is the whole point of the
+   * queue (docs/GUEST-GALLERIES.md §11, F3).
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void listQueuedUploads(token).then((queued) => {
+      if (cancelled || queued.length === 0) return;
+      setResuming(true);
+      void run(queued)
+        .catch((error: unknown) => {
+          console.error("[g-gallery/upload] could not resume:", error);
+          setFatal("Nedokončené nahrávání se nepodařilo dokončit.");
+        })
+        .finally(() => setResuming(false));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on the token alone: this must fire once per gallery,
+    // not again every time `run` is recreated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const done = items.filter((i) => i.state === "done").length;
   const failed = items.filter((i) => i.state === "error").length;
@@ -142,10 +222,36 @@ export function GuestUploader({
         <div className="mx-auto max-w-5xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {fatal && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{fatal}</p>}
 
+          {preparing > 0 && (
+            <p className="mb-2 flex items-center gap-2 text-sm">
+              <span
+                aria-hidden
+                className="inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
+              />
+              Připravuji {preparing === 1 ? "fotku" : `${preparing} fotek`}…
+            </p>
+          )}
+
           {running && (
             <div className="mb-2">
               <p className="text-sm">
-                Nahrávám {done} z {items.length} — nechte prosím stránku otevřenou.
+                {resuming ? "Dokončuji nahrávání" : "Nahrávám"} {done} z {items.length} · displej
+                nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíte.
+                {resuming && (
+                  <button
+                    type="button"
+                    className="ml-2 underline"
+                    onClick={() => {
+                      // Stops it coming back on the next visit. Requests
+                      // already in flight finish — there is nothing to gain
+                      // from abandoning bytes that are nearly there.
+                      void clearQueuedUploads(token);
+                      setResuming(false);
+                    }}
+                  >
+                    Zahodit zbytek
+                  </button>
+                )}
               </p>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
                 <div
@@ -165,23 +271,47 @@ export function GuestUploader({
             </p>
           )}
 
+          {/*
+            The file input *is* the button, stretched over it at zero opacity,
+            rather than a real button calling input.click() on a hidden input.
+            iOS Safari refuses to open the picker for an input that is
+            display:none, so the previous version did nothing at all on an
+            iPhone — the one device this bar exists for. Tapping here taps the
+            input itself, which every browser handles natively.
+          */}
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={running}
-              onClick={() => pickRef.current?.click()}
-              className="flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-base font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+            <label
+              className={`relative flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-center text-base font-medium text-white dark:bg-neutral-100 dark:text-neutral-900 ${
+                running ? "pointer-events-none opacity-50" : "cursor-pointer"
+              }`}
             >
               Přidat fotky
-            </button>
-            <button
-              type="button"
-              disabled={running}
-              onClick={() => cameraRef.current?.click()}
-              className="rounded-lg border px-4 py-3 text-base font-medium disabled:opacity-50"
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                disabled={running}
+                aria-label="Přidat fotky"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) => pick(event.target.files)}
+              />
+            </label>
+            <label
+              className={`relative rounded-lg border px-4 py-3 text-base font-medium ${
+                running ? "pointer-events-none opacity-50" : "cursor-pointer"
+              }`}
             >
               Vyfotit
-            </button>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                disabled={running}
+                aria-label="Vyfotit"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) => pick(event.target.files)}
+              />
+            </label>
           </div>
 
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -195,23 +325,6 @@ export function GuestUploader({
             )}
             .
           </p>
-
-          <input
-            ref={pickRef}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(event) => pick(event.target.files)}
-          />
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            className="hidden"
-            onChange={(event) => pick(event.target.files)}
-          />
         </div>
       </div>
 

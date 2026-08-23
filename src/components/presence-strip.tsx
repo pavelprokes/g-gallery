@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  channelForToken,
+  channelForGallery,
   distinctViewers,
   realtimeConfig,
   type PresenceState,
@@ -20,7 +20,7 @@ import { getViewerId, getViewerName } from "@/lib/viewer-id";
  * out, or when nobody else is here — an empty strip that says "0 viewers" is
  * worse than no strip.
  */
-export function PresenceStrip({ token, optedOut }: { token: string; optedOut: boolean }) {
+export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; optedOut: boolean }) {
   const [others, setOthers] = useState<{ count: number; names: string[] }>({
     count: 0,
     names: [],
@@ -42,8 +42,10 @@ export function PresenceStrip({ token, optedOut }: { token: string; optedOut: bo
       // Imported lazily so the Realtime client is only downloaded by viewers
       // of a gallery, never by the admin or the sign-in page.
       const { createClient } = await import("@supabase/supabase-js");
-      const topic = await channelForToken(token);
-      if (cancelled) return;
+      const topic = await channelForGallery(galleryId);
+      // No topic means no secure context, so no presence — see
+      // channelForGallery. Everything else on the page carries on.
+      if (cancelled || !topic) return;
 
       const client = createClient(config.url, config.anonKey, {
         realtime: { params: { eventsPerSecond: 1 } },
@@ -81,7 +83,7 @@ export function PresenceStrip({ token, optedOut }: { token: string; optedOut: bo
       cancelled = true;
       cleanup?.();
     };
-  }, [optedOut, token]);
+  }, [galleryId, optedOut]);
 
   if (others.count === 0) return null;
 
