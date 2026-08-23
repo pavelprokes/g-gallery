@@ -394,6 +394,10 @@ function guestRejectionMessage(rejection: UploadRejection): string {
       return rejection.detail.reason === "PASSWORD_REQUIRED"
         ? "Načti prosím stránku znovu a zadej heslo."
         : "Album už nové fotky nepřijímá.";
+    case "rate_limited":
+      return "Nahráváte hodně najednou — dejte tomu chvíli a zkuste to znovu.";
+    case "size_mismatch":
+      return "Fotka se nepřenesla celá. Zkoušíme to znovu.";
     default:
       return "Nahrávání se nepovedlo. Zkus to prosím znovu, až budeš mít lepší signál.";
   }

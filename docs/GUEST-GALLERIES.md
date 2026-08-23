@@ -26,8 +26,9 @@ galleries instead of one. Guest uploads are therefore not a product we sell; the
 acquisition channel for the photography business, and the metric that matters is _what share of
 guests uploaded at least one photo_, not photo count.
 
-Feature research, the roundtable it came out of, and the copy deck live in the review artifact:
-<https://claude.ai/code/artifact/8f6b132f-3446-4567-b2e2-7e554429bf99>.
+Feature research, the roundtable it came out of, the guest-facing copy deck, and the full pricing
+detail (390 Kč/year renewal once there's something to renew) live in
+`docs/GUEST-GALLERIES-RESEARCH.md`. Pricing itself is decided — see §15.
 
 | Sold as a paid feature elsewhere                          | Our position                                                                  |
 | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -525,3 +526,49 @@ Written down because none of it is caught by unit tests:
   leaves nobody wondering whose photo they are looking at. `Photo.source` survives for attribution
   inside a guest gallery, not as a view filter.
 - **Guestbook, RSVP, seating, face recognition.** See §1.
+
+## 15. Follow-up decisions (2026-08-23, second pass)
+
+Re-reviewed against the codebase — not just this document — before taking it back to Pavel.
+Findings first, then what got decided.
+
+- Everything §11 marks "done 2026-08-23" for F1–F3 and F5 is genuinely in the tree
+  (`thumbnail.ts`, `wake-lock.ts`, `upload-queue.ts`, `slideshow.tsx`, `event-token.ts`, `pica` in
+  `package.json`). `docs/TODO.md` §8 had not been updated after the thumbnail and projection
+  landed and said otherwise; fixed there, not a real gap.
+- `src/lib/guest-quota.ts` caps file **count** (150/`anonKey`, 2 000/gallery) but nothing caps
+  upload **frequency**, and the two numbers are hardcoded constants, not admin-configurable as §8
+  implies.
+- `POST /api/uploads/confirm` records the client-reported `sizeBytes` without checking it against
+  the actual R2 object — the "declared size mismatch" rejection §8 asks for does not exist.
+- F6 (§11) has real e2e coverage already (`guest-upload.spec.ts`: 8 cases; `wedding-page.spec.ts`)
+  but nothing physical has run yet.
+
+Decided:
+
+- ✅ **F7, printable QR graphics — green-lit**, next up. Moderation, co-host access (§13.6) and
+  video (§14) stay deferred, not reopened.
+- ✅ **Close two §8 gaps before real guests use this**: per-`anonKey` rate limiting on upload
+  requests, and a server-side check that `confirm`'s declared `sizeBytes` matches the R2 object.
+  Admin-configurable quota overrides stay out — the hardcoded constants are fine for now.
+- ✅ **F6, the physical half**: a real-device matrix (iPhone HEIC, old Android/Chrome) and a trial
+  run on a small real wedding before the first paid one.
+- ✅ **Pricing** (`docs/GUEST-GALLERIES-RESEARCH.md` §11): bundled free with a full-day package.
+  Not sold as a standalone product.
+
+**The two §8 gaps — done 2026-08-23:**
+
+- **Rate limit**: `checkGuestRateLimit` (`src/lib/guest-quota.ts`) caps a viewer at 80 presign
+  requests per rolling 60 s, counted the same way the file quota already is — a Postgres count
+  over recent `Photo` rows, no new infra. Deliberately generous: 80/minute clears one guest
+  dumping a full camera roll (the client batches 8 files per presign call) while still bounding a
+  script. Only applies when `anonKey` is present, matching the existing per-viewer quota's own
+  limitation — an opted-out guest still bounded by the gallery cap. `POST /api/uploads/presign`
+  returns 429 `rate_limited`.
+- **Size mismatch**: `POST /api/uploads/confirm` now HEADs the R2 object (`headObject` in
+  `src/lib/r2.ts`) and rejects with 409 `size_mismatch` if the actual byte count disagrees with
+  the client's declared `sizeBytes`. Not added to `FATAL_CODES` in `upload-run.ts` — a truncated
+  PUT on bad venue wifi is the likely cause, not an attack, so the existing per-file retry loop
+  retries it rather than ending the run.
+- Both surface a Czech message in `guest-uploader.tsx`; both are unit-tested
+  (`guest-quota.test.ts`).

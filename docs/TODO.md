@@ -146,8 +146,16 @@ messages, per-photo delete, and an E2E suite that drives a real file through pre
 confirm. **F2 (the wedding page) implemented the same day** — `Event` with its own token, the
 `/s/` route, admin CRUD, and trash/purge at the wedding level. `docs/GUEST-GALLERIES.md` §11 has
 the as-built notes for both. Guest self-delete followed the same day; **moderation is deferred on
-Pavel's call**, and the free 5 000 Cloudflare transformations are accepted as enough for now, which
-takes the client-side thumbnail off F3's critical path. **F3 landed the same day** — a screen wake
-lock plus an IndexedDB-backed upload queue that resumes by itself when the guest comes back — so
-nothing from the original F1–F3 scope is open. What is left is deliberately deferred: moderation,
-the PIN, a co-host login for the couple, live projection, printable QR graphics and video.
+Pavel's call**. **F3 landed the same day** — a screen wake lock plus an IndexedDB-backed upload
+queue that resumes by itself when the guest comes back. **The client-side thumbnail (§9) and F5
+projection also landed the same day** — `src/lib/thumbnail.ts` (pica) and
+`src/components/slideshow.tsx` are both in the tree, so nothing from the original F1–F5 scope is
+open.
+
+**Reviewed against the codebase and re-prioritized with Pavel, same day, second pass** — see
+`docs/GUEST-GALLERIES.md` §15 for detail. Green-lit next: printable QR graphics (F7), closing the
+two §8 abuse gaps that shipped without (per-`anonKey` rate limiting, server-side size-mismatch
+check on confirm), and the physical half of F6 (real-device matrix, small-wedding trial run).
+Pricing is decided too — bundled free with a full-day package, not a standalone paid product.
+Still deferred, not reopened: moderation, the PIN (dropped, not deferred — see §5), a co-host login
+for the couple, and video.

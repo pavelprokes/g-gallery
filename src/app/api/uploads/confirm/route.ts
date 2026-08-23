@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
+import { headObject } from "@/lib/r2";
 import { thumbKeyFor } from "@/lib/thumbnail";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +94,19 @@ export async function POST(request: Request) {
   }
 
   if (!photo) return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+
+  // Ground truth against what the client claims: a client-declared sizeBytes
+  // is otherwise trusted outright, and this is the one anonymous write path
+  // into storage (docs/GUEST-GALLERIES.md §15). A stalled or truncated PUT
+  // leaves an object smaller than what was promised, which is why this is
+  // retried on the client rather than treated as a permanent rejection.
+  const stored = await headObject(photo.objectKey);
+  if (!stored || stored.sizeBytes !== sizeBytes) {
+    return NextResponse.json(
+      { error: "size_mismatch", expected: sizeBytes, actual: stored?.sizeBytes ?? null },
+      { status: 409 },
+    );
+  }
 
   await prisma.photo.update({
     where: { id: photo.id },

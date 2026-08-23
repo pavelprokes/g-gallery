@@ -64,3 +64,23 @@ export function checkGuestQuota(input: {
     remaining,
   };
 }
+
+/**
+ * Requests-per-minute guardrail, independent of the total caps above: those
+ * bound how much can ever land in a gallery, this bounds how fast one
+ * `anonKey` can hit the presign endpoint. 80/minute clears a guest dumping
+ * their whole camera roll in one go (well under a minute at the client's
+ * 8-file batch size) while still bounding a script that would otherwise
+ * create unlimited PENDING rows.
+ */
+export const GUEST_RATE_LIMIT_WINDOW_MS = 60_000;
+export const GUEST_RATE_LIMIT_MAX_PER_WINDOW = 80;
+
+export function checkGuestRateLimit(input: {
+  recentCount: number;
+  requested: number;
+  max?: number;
+}): boolean {
+  const max = input.max ?? GUEST_RATE_LIMIT_MAX_PER_WINDOW;
+  return input.recentCount + input.requested <= max;
+}

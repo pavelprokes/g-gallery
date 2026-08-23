@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   GUEST_MAX_FILES_PER_GALLERY,
   GUEST_MAX_FILES_PER_VIEWER,
+  GUEST_RATE_LIMIT_MAX_PER_WINDOW,
   checkGuestQuota,
+  checkGuestRateLimit,
 } from "./guest-quota";
 
 describe("checkGuestQuota", () => {
@@ -67,5 +69,28 @@ describe("checkGuestQuota", () => {
     expect(
       checkGuestQuota({ galleryUsed: 999, viewerUsed: 999, requested: 0, perGallery: 10 }).ok,
     ).toBe(true);
+  });
+});
+
+describe("checkGuestRateLimit", () => {
+  it("allows a batch that fits inside the window", () => {
+    expect(checkGuestRateLimit({ recentCount: 10, requested: 8 })).toBe(true);
+  });
+
+  it("allows a batch that exactly reaches the ceiling", () => {
+    expect(
+      checkGuestRateLimit({ recentCount: GUEST_RATE_LIMIT_MAX_PER_WINDOW - 8, requested: 8 }),
+    ).toBe(true);
+  });
+
+  it("refuses a batch that would push past the ceiling", () => {
+    expect(
+      checkGuestRateLimit({ recentCount: GUEST_RATE_LIMIT_MAX_PER_WINDOW - 1, requested: 8 }),
+    ).toBe(false);
+  });
+
+  it("honours a custom ceiling", () => {
+    expect(checkGuestRateLimit({ recentCount: 5, requested: 5, max: 10 })).toBe(true);
+    expect(checkGuestRateLimit({ recentCount: 6, requested: 5, max: 10 })).toBe(false);
   });
 });
