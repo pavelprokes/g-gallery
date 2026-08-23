@@ -26,7 +26,12 @@ const TOPIC_LENGTH = 16;
  *
  * Runs in the browser (Web Crypto) and on the server (node:crypto webcrypto).
  */
-export async function channelForGallery(galleryId: string): Promise<string> {
+export async function channelForGallery(galleryId: string): Promise<string | null> {
+  // `crypto.subtle` only exists on a secure origin. Presence is a nicety, so
+  // on plain http over a LAN — how the app gets tested from a phone — it
+  // simply does not appear rather than throwing into the render.
+  if (typeof crypto === "undefined" || !crypto.subtle) return null;
+
   const bytes = new TextEncoder().encode(`gallery:${galleryId}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hex = Array.from(new Uint8Array(digest))

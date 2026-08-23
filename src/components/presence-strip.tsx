@@ -43,7 +43,9 @@ export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; opte
       // of a gallery, never by the admin or the sign-in page.
       const { createClient } = await import("@supabase/supabase-js");
       const topic = await channelForGallery(galleryId);
-      if (cancelled) return;
+      // No topic means no secure context, so no presence — see
+      // channelForGallery. Everything else on the page carries on.
+      if (cancelled || !topic) return;
 
       const client = createClient(config.url, config.anonKey, {
         realtime: { params: { eventsPerSecond: 1 } },

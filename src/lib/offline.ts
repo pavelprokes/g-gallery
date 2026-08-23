@@ -157,7 +157,12 @@ export async function requestPersistence(): Promise<boolean> {
 }
 
 /** Cache key for one gallery; a hash so the share token never becomes a name. */
-export async function cacheKeyForToken(token: string): Promise<string> {
+export async function cacheKeyForToken(token: string): Promise<string | null> {
+  // Same secure-context rule as the presence channel: without `crypto.subtle`
+  // there is no cache key, so offline storage is unavailable rather than
+  // broken. Production is https, so this only bites on a LAN test.
+  if (typeof crypto === "undefined" || !crypto.subtle) return null;
+
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
   return Array.from(new Uint8Array(digest))
     .slice(0, 8)

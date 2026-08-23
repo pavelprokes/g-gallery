@@ -16,6 +16,9 @@
  * Everything degrades to a no-op without IndexedDB — private modes and old
  * browsers still upload, they just cannot resume after a discard.
  */
+import { randomId } from "@/lib/random-id";
+import { withTimeout } from "@/lib/with-timeout";
+
 const DB_NAME = "gg-uploads";
 const DB_VERSION = 1;
 const STORE = "queue";
@@ -38,7 +41,14 @@ export function isStale(addedAt: number, now: number, maxAgeMs = QUEUE_MAX_AGE_M
   return now - addedAt > maxAgeMs || addedAt > now + maxAgeMs;
 }
 
+/** IndexedDB can simply not answer — Safari in particular. Never wait forever. */
+const OPEN_TIMEOUT_MS = 5_000;
+
 function openDb(): Promise<IDBDatabase | null> {
+  return withTimeout(openDbRaw(), OPEN_TIMEOUT_MS, "IndexedDB open").catch(() => null);
+}
+
+function openDbRaw(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
 
   return new Promise((resolve) => {
@@ -80,7 +90,7 @@ function tx<T>(
 /** Stores the files and returns them with the ids the queue knows them by. */
 export async function enqueueUploads(token: string, files: File[]): Promise<QueuedUpload[]> {
   const entries: QueuedUpload[] = files.map((file) => ({
-    id: crypto.randomUUID(),
+    id: randomId(),
     token,
     file,
     addedAt: Date.now(),

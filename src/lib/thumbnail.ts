@@ -1,3 +1,5 @@
+import { withTimeout } from "@/lib/with-timeout";
+
 /**
  * The grid thumbnail the phone makes for itself (docs/GUEST-GALLERIES.md §9).
  *
@@ -81,24 +83,6 @@ const PICA_RESIZE_TIMEOUT_MS = 10_000;
 const THUMBNAIL_TIMEOUT_MS = 25_000;
 
 const LOG_PREFIX = "[g-gallery/thumbnail]";
-
-/**
- * Rejects if the work has not finished in time. The original promise is left
- * to settle on its own — there is nothing to cancel and nothing reads it after.
- */
-export async function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /**
  * One pica instance per page, not per photo: it owns a pool of web workers, and

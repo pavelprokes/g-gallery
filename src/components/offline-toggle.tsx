@@ -50,7 +50,13 @@ export function OfflineToggle({
       }
 
       const key = await cacheKeyForToken(token);
+      // Null means no `crypto.subtle`, so no cache key and no offline storage
+      // — presented as unsupported rather than half-working.
       if (cancelled) return;
+      if (!key) {
+        setState("unsupported");
+        return;
+      }
       keyRef.current = key;
       // Computed here, not during render: the estimate depends on the screen,
       // and the server-side render has no screen.

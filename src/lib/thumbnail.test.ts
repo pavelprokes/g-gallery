@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { isThumbKey, THUMB_MAX_PX, thumbKeyFor, thumbSize, withTimeout } from "./thumbnail";
+import { isThumbKey, THUMB_MAX_PX, thumbKeyFor, thumbSize } from "./thumbnail";
+import { withTimeout } from "./with-timeout";
 
 describe("thumbKeyFor", () => {
   it("sits beside the original, inside the same gallery prefix", () => {

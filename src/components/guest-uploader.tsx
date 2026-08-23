@@ -50,6 +50,12 @@ export function GuestUploader({
   const [fatal, setFatal] = useState<string | null>(null);
   const [askName, setAskName] = useState(false);
   const [resuming, setResuming] = useState(false);
+  /**
+   * How many files are being written to the queue before the first byte moves.
+   * Storing forty photos in IndexedDB takes real time, and without this the
+   * bar sat silent through it — indistinguishable from nothing happening.
+   */
+  const [preparing, setPreparing] = useState(0);
 
   // GDPR take-down route (docs/GUEST-GALLERIES.md §10). Read from the
   // environment rather than hard-coded: an address invented here would be a
@@ -129,7 +135,22 @@ export function GuestUploader({
 
   const start = useCallback(
     async (files: File[]) => {
-      await run(await enqueueUploads(token, files));
+      setFatal(null);
+      setPreparing(files.length);
+      try {
+        const queued = await enqueueUploads(token, files);
+        setPreparing(0);
+        await run(queued);
+      } catch (error) {
+        // Nothing may ever fail silently here. A guest who picked a photo and
+        // saw the bar go back to how it was has no idea whether it worked, and
+        // the honest answer is that it did not.
+        console.error("[g-gallery/upload] could not start:", error);
+        setFatal("Nahrávání se nepodařilo spustit. Zkuste to prosím znovu.");
+        setRunning(false);
+      } finally {
+        setPreparing(0);
+      }
     },
     [run, token],
   );
@@ -145,7 +166,12 @@ export function GuestUploader({
     void listQueuedUploads(token).then((queued) => {
       if (cancelled || queued.length === 0) return;
       setResuming(true);
-      void run(queued).finally(() => setResuming(false));
+      void run(queued)
+        .catch((error: unknown) => {
+          console.error("[g-gallery/upload] could not resume:", error);
+          setFatal("Nedokončené nahrávání se nepodařilo dokončit.");
+        })
+        .finally(() => setResuming(false));
     });
     return () => {
       cancelled = true;
@@ -195,6 +221,16 @@ export function GuestUploader({
       <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 backdrop-blur dark:bg-neutral-950/95">
         <div className="mx-auto max-w-5xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {fatal && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{fatal}</p>}
+
+          {preparing > 0 && (
+            <p className="mb-2 flex items-center gap-2 text-sm">
+              <span
+                aria-hidden
+                className="inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
+              />
+              Připravuji {preparing === 1 ? "fotku" : `${preparing} fotek`}…
+            </p>
+          )}
 
           {running && (
             <div className="mb-2">
