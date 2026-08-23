@@ -14,6 +14,9 @@ import {
 } from "@/lib/offline";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { IconButton } from "@/components/ui/icon-button";
+import { OfflineIcon } from "@/components/ui/icons";
 
 /**
  * "Keep this gallery on the device".
@@ -227,6 +230,48 @@ export function OfflineToggle({
         originály.
       </p>
       <Button onClick={() => void start()}>Zpřístupnit offline</Button>
+    </div>
+  );
+}
+
+/**
+ * The header toolbar's entry point — same icon-button chrome as Projekce and
+ * download, next to them (docs/PLAN.md's grid header), instead of a permanent
+ * card in the footer nobody scrolled to. `OfflineToggle` itself is unchanged:
+ * all its states (checking a previous download, progress, no-space, error)
+ * render inside this panel exactly as they did in the footer card.
+ */
+export function OfflineIconButton(props: { token: string; objectKeys: readonly string[] }) {
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={panelRef} className="relative">
+      <IconButton
+        onClick={() => setOpen((prev) => !prev)}
+        aria-label="Offline přístup"
+        aria-expanded={open}
+        title="Uložit fotky do zařízení pro prohlížení bez signálu"
+      >
+        <OfflineIcon />
+      </IconButton>
+      {open && (
+        <Card className="absolute top-full right-0 z-20 mt-2 w-72 bg-white dark:bg-neutral-900">
+          <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+            Offline přístup
+          </p>
+          <OfflineToggle token={props.token} objectKeys={props.objectKeys} />
+        </Card>
+      )}
     </div>
   );
 }
