@@ -2,13 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
-import { BADGE_CAP, unreadCount } from "@/lib/feed";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
 import { AdminCreateBar } from "@/components/admin-create-bar";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { decryptToken } from "@/lib/token-cipher";
 import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,6 @@ function daysUntilPurge(purgeAt: Date): number {
 export default async function AdminPage() {
   const session = await getAdminSession();
   if (!session) redirect("/sign-in?next=/admin");
-
-  const unread = await unreadCount(session.user.id);
 
   const [galleries, trashed, events, trashedEvents] = await Promise.all([
     prisma.gallery.findMany({
@@ -69,28 +68,15 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Přehled</h1>
-        <div className="flex items-center gap-4">
-          <Link href="/admin/updates" className="relative text-sm underline">
-            Aktivita
-            {unread > 0 && (
-              <span className="absolute -top-2 -right-4 rounded-full bg-rose-600 px-1.5 text-xs font-medium text-white tabular-nums">
-                {unread > BADGE_CAP ? `${BADGE_CAP}+` : unread}
-              </span>
-            )}
-          </Link>
-          <span className="text-sm text-neutral-500">{session.user.email}</span>
-        </div>
-      </header>
+    <>
+      <PageHeader title="Přehled" />
 
       <AdminCreateBar createGalleryAction={create} />
 
       {events.length > 0 && (
         <>
-          <h2 className="mt-8 text-sm font-medium text-neutral-500">Svatby</h2>
-          <ul className="mt-2 divide-y rounded-lg border">
+          <CardTitle className="mt-8">Svatby</CardTitle>
+          <Card as="ul" className="divide-admin-border divide-y p-0 sm:p-0 dark:divide-neutral-800">
             {events.map((event) => {
               const token = decryptToken(event.tokenCipher);
               return (
@@ -100,12 +86,12 @@ export default async function AdminPage() {
                       <Link href={`/admin/e/${event.id}`} className="font-medium hover:underline">
                         {event.title}
                       </Link>
-                      <p className="text-xs text-neutral-500">
+                      <p className="text-admin-muted text-xs dark:text-neutral-400">
                         {event._count.galleries} galerií
                         {event.venue && ` · ${event.venue}`}
                       </p>
                     </div>
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-admin-muted text-xs dark:text-neutral-400">
                       {event.eventDate?.toLocaleDateString("cs-CZ") ?? "—"}
                     </span>
                   </div>
@@ -117,14 +103,16 @@ export default async function AdminPage() {
                 </li>
               );
             })}
-          </ul>
+          </Card>
         </>
       )}
 
-      <h2 className="mt-8 text-sm font-medium text-neutral-500">Galerie</h2>
-      <ul className="mt-2 divide-y rounded-lg border">
+      <CardTitle className="mt-8">Galerie</CardTitle>
+      <Card as="ul" className="divide-admin-border divide-y p-0 sm:p-0 dark:divide-neutral-800">
         {galleries.length === 0 && (
-          <li className="p-4 text-sm text-neutral-500">Zatím žádná galerie.</li>
+          <li className="text-admin-muted p-4 text-sm dark:text-neutral-400">
+            Zatím žádná galerie.
+          </li>
         )}
         {galleries.map((gallery) => (
           <li key={gallery.id} className="flex items-center justify-between p-4">
@@ -132,30 +120,32 @@ export default async function AdminPage() {
               <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
                 {gallery.title}
               </Link>
-              <p className="text-xs text-neutral-500">
+              <p className="text-admin-muted text-xs dark:text-neutral-400">
                 {gallery.status} · {gallery._count.photos} fotek · {gallery._count.viewers} diváků
               </p>
             </div>
-            <span className="text-xs text-neutral-400">
+            <span className="text-admin-muted text-xs dark:text-neutral-400">
               {gallery.eventDate?.toLocaleDateString("cs-CZ") ?? "—"}
             </span>
           </li>
         ))}
-      </ul>
+      </Card>
 
       {trashedEvents.length > 0 && (
-        <details className="mt-6 rounded-lg border">
-          <summary className="cursor-pointer p-4 text-sm font-medium text-neutral-500">
+        <Card as="details" className="mt-6 p-0 sm:p-0">
+          <summary className="text-admin-muted cursor-pointer p-4 text-sm font-semibold dark:text-neutral-400">
             Svatby v koši ({trashedEvents.length})
           </summary>
-          <ul className="divide-y border-t">
+          <ul className="divide-admin-border border-admin-border divide-y border-t dark:divide-neutral-800 dark:border-neutral-800">
             {trashedEvents.map((event) => {
               const daysLeft = event.purgeAt ? daysUntilPurge(event.purgeAt) : 0;
               return (
                 <li key={event.id} className="flex items-center justify-between p-4">
                   <div>
-                    <p className="font-medium text-neutral-500">{event.title}</p>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-admin-muted font-medium dark:text-neutral-400">
+                      {event.title}
+                    </p>
+                    <p className="text-admin-muted text-xs dark:text-neutral-400">
                       {daysLeft > 0
                         ? `Smazána natrvalo za ${pluralize(daysLeft, FORMS.day)}`
                         : "Bude smazána natrvalo brzy"}
@@ -170,22 +160,24 @@ export default async function AdminPage() {
               );
             })}
           </ul>
-        </details>
+        </Card>
       )}
 
       {trashed.length > 0 && (
-        <details className="mt-6 rounded-lg border">
-          <summary className="cursor-pointer p-4 text-sm font-medium text-neutral-500">
+        <Card as="details" className="mt-6 p-0 sm:p-0">
+          <summary className="text-admin-muted cursor-pointer p-4 text-sm font-semibold dark:text-neutral-400">
             Koš ({trashed.length})
           </summary>
-          <ul className="divide-y border-t">
+          <ul className="divide-admin-border border-admin-border divide-y border-t dark:divide-neutral-800 dark:border-neutral-800">
             {trashed.map((gallery) => {
               const daysLeft = gallery.purgeAt ? daysUntilPurge(gallery.purgeAt) : 0;
               return (
                 <li key={gallery.id} className="flex items-center justify-between p-4">
                   <div>
-                    <p className="font-medium text-neutral-500">{gallery.title}</p>
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-admin-muted font-medium dark:text-neutral-400">
+                      {gallery.title}
+                    </p>
+                    <p className="text-admin-muted text-xs dark:text-neutral-400">
                       {daysLeft > 0
                         ? `Smazána natrvalo za ${pluralize(daysLeft, FORMS.day)}`
                         : "Bude smazána natrvalo brzy"}
@@ -200,8 +192,8 @@ export default async function AdminPage() {
               );
             })}
           </ul>
-        </details>
+        </Card>
       )}
-    </main>
+    </>
   );
 }

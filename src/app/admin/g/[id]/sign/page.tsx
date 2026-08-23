@@ -1,4 +1,4 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -7,6 +7,8 @@ import { renderSignQrSvg } from "@/lib/qr";
 import { absoluteSignUrl, gallerySignPath } from "@/lib/sign-url";
 import { PrintableSign } from "@/components/printable-sign";
 import { Alert } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { gallerySignCrumbs } from "@/lib/admin-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -26,20 +28,19 @@ export default async function GallerySignPage(props: PageProps<"/admin/g/[id]/si
 
   const gallery = await prisma.gallery.findFirst({
     where: { id, ownerId: session.user.id },
-    select: { id: true, title: true },
+    // `event` is only for the breadcrumb — an event-owned gallery routes through
+    // its wedding rather than jumping straight back to the overview.
+    select: { id: true, title: true, event: { select: { id: true, title: true } } },
   });
   if (!gallery) notFound();
 
-  const backHref = `/admin/g/${gallery.id}`;
-  const backLink = (
-    <Link href={backHref} className="no-print text-sm text-neutral-500 underline">
-      ← Zpět na galerii
-    </Link>
-  );
-  const heading = (
-    <h1 className="no-print text-brand-ink text-lg font-semibold">
-      Cedulka k tisku — {gallery.title}
-    </h1>
+  // Six of the seven exits from this page are refusals. Wrapping them all in one
+  // helper is what keeps the way back — and the breadcrumb — on every one of them.
+  const page = (children: ReactNode) => (
+    <div className="max-w-2xl space-y-6">
+      <PageHeader title="Cedulka k tisku" crumbs={gallerySignCrumbs(gallery)} />
+      {children}
+    </div>
   );
 
   const link =
@@ -58,77 +59,53 @@ export default async function GallerySignPage(props: PageProps<"/admin/g/[id]/si
       : null;
 
   if (!link) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
-        <Alert>Vyber odkaz z detailu galerie — tlačítko „Cedulka k tisku“ je u něj.</Alert>
-      </main>
+    return page(
+      <Alert>Vyber odkaz z detailu galerie — tlačítko „Cedulka k tisku“ je u něj.</Alert>,
     );
   }
   if (link.revokedAt) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
-        <Alert>Tenhle odkaz je zrušený — cedulka by vedla nikam. Vytvoř nový odkaz.</Alert>
-      </main>
+    return page(
+      <Alert>Tenhle odkaz je zrušený — cedulka by vedla nikam. Vytvoř nový odkaz.</Alert>,
     );
   }
   if (!link.allowUpload) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
-        <Alert>
-          Tenhle odkaz nemá zapnuté nahrávání hosty — cedulka by hosta pustila do galerie, ale
-          tlačítko nahrát by odmítlo každou fotku. Zapni „Hosté smí nahrávat“ u odkazu, nebo vyber
-          jiný.
-        </Alert>
-      </main>
+    return page(
+      <Alert>
+        Tenhle odkaz nemá zapnuté nahrávání hosty — cedulka by hosta pustila do galerie, ale
+        tlačítko nahrát by odmítlo každou fotku. Zapni „Hosté smí nahrávat“ u odkazu, nebo vyber
+        jiný.
+      </Alert>,
     );
   }
   if (link.passwordHash) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
-        <Alert>
-          Tenhle odkaz je chráněný heslem — cedulka s QR kódem samotná hosta pustí jen k zadání
-          hesla, které na ní není. Na cedulku pro hosty nikdy nedávej odkaz s heslem — vytvoř zvlášť
-          odkaz bez hesla se zapnutým nahráváním.
-        </Alert>
-      </main>
+    return page(
+      <Alert>
+        Tenhle odkaz je chráněný heslem — cedulka s QR kódem samotná hosta pustí jen k zadání hesla,
+        které na ní není. Na cedulku pro hosty nikdy nedávej odkaz s heslem — vytvoř zvlášť odkaz
+        bez hesla se zapnutým nahráváním.
+      </Alert>,
     );
   }
 
   const token = decryptToken(link.tokenCipher);
   if (!token) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
-        <Alert>
-          Adresu tohohle odkazu už nelze zobrazit — vznikl dřív, než se odkazy ukládaly čitelně.
-          Vytvoř nový odkaz a cedulku z něj.
-        </Alert>
-      </main>
+    return page(
+      <Alert>
+        Adresu tohohle odkazu už nelze zobrazit — vznikl dřív, než se odkazy ukládaly čitelně.
+        Vytvoř nový odkaz a cedulku z něj.
+      </Alert>,
     );
   }
 
   const url = absoluteSignUrl(gallerySignPath(token, link.slug));
   const qrSvg = await renderSignQrSvg(url);
 
-  return (
-    <main className="mx-auto max-w-2xl space-y-6 p-8">
-      {backLink}
-      {heading}
-      <PrintableSign
-        url={url}
-        qrSvg={qrSvg}
-        targetLabel={gallery.title}
-        readinessNote={{ ok: true, text: "nahrávání zapnuto" }}
-      />
-    </main>
+  return page(
+    <PrintableSign
+      url={url}
+      qrSvg={qrSvg}
+      targetLabel={gallery.title}
+      readinessNote={{ ok: true, text: "nahrávání zapnuto" }}
+    />,
   );
 }

@@ -25,7 +25,7 @@ export function CopyButton({
       type="button"
       title={label}
       aria-label={label}
-      className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs whitespace-nowrap hover:bg-neutral-100 dark:hover:bg-neutral-800"
+      className="border-admin-border text-brand-primary-dark hover:border-brand-primary hover:text-brand-primary inline-flex items-center gap-1 rounded-full border bg-white px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
       onClick={() => {
         const url = value.startsWith("/") ? `${window.location.origin}${value}` : value;
         void navigator.clipboard.writeText(url).then(() => {
@@ -44,16 +44,16 @@ export function CopyButton({
 export function CopyableLink({ href, note }: { href: string; note?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <code className="min-w-0 flex-1 truncate rounded bg-neutral-100 px-2 py-1 text-xs dark:bg-neutral-900">
+      <code className="bg-admin-surface-muted border-admin-border min-w-0 flex-1 truncate rounded border px-2 py-1 text-xs dark:border-neutral-800 dark:bg-neutral-900">
         {href}
       </code>
       <CopyButton value={href} />
-      {note && <span className="text-xs text-neutral-500">{note}</span>}
+      {note && <span className="text-admin-muted text-xs dark:text-neutral-400">{note}</span>}
     </div>
   );
 }
 
 /** What is shown where a link would be, when it cannot be recovered. */
 export function UnrecoverableLink({ reason }: { reason: string }) {
-  return <p className="text-xs text-neutral-500">{reason}</p>;
+  return <p className="text-admin-muted text-xs dark:text-neutral-400">{reason}</p>;
 }

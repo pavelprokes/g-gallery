@@ -33,14 +33,25 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 export function PushToggle() {
-  const [state, setState] = useState<State>(() => (pushSupported() ? "loading" : "unsupported"));
+  // Always "loading" on the first render, never a support check: `pushSupported()`
+  // reads `navigator`, so it is false on the server and true in the browser, and
+  // the two renders disagreed — the server emitted the "unsupported" hint where
+  // the client emitted nothing. Support is resolved in the effect below, which
+  // only ever runs on the client.
+  const [state, setState] = useState<State>("loading");
   const [publicKey, setPublicKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!pushSupported()) return;
-
     let cancelled = false;
     void (async () => {
+      // Inside the async body, not the effect's: the support check has to run on
+      // the client, but a synchronous setState in an effect body is what the
+      // react-hooks lint rule forbids.
+      if (!pushSupported()) {
+        setState("unsupported");
+        return;
+      }
+
       const response = await fetch("/api/push/subscribe").catch(() => null);
       const data = response?.ok ? ((await response.json()) as { publicKey: string | null }) : null;
       if (cancelled) return;
@@ -138,12 +149,14 @@ export function PushToggle() {
         {state === "on" ? "Vypnout notifikace" : "Zapnout notifikace"}
       </Button>
       {state === "off" && (
-        <span className="text-xs text-neutral-500">Na iPhonu funguje až po přidání na plochu.</span>
+        <span className="text-admin-muted text-xs dark:text-neutral-400">
+          Na iPhonu funguje až po přidání na plochu.
+        </span>
       )}
     </div>
   );
 }
 
 function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-neutral-500">{children}</p>;
+  return <p className="text-admin-muted text-xs dark:text-neutral-400">{children}</p>;
 }

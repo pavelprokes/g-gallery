@@ -1,6 +1,7 @@
 "use client";
 
 import { unpublishGallery } from "@/app/admin/actions";
+import { Button } from "@/components/ui/button";
 
 /**
  * Takes a gallery back to DRAFT. Every share surface refuses a gallery that is
@@ -21,9 +22,9 @@ export function UnpublishGalleryButton({ galleryId }: { galleryId: string }) {
         }
       }}
     >
-      <button type="submit" className="rounded border px-3 py-1.5 text-sm">
+      <Button type="submit" variant="secondary">
         Odpublikovat
-      </button>
+      </Button>
     </form>
   );
 }

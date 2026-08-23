@@ -11,6 +11,50 @@
   --color-brand-primary-dark: #69422d; /* brownColor — hover/active */
   --color-brand-border: #dfc8bf; /* lightBrownColor — borders, muted fills, dark-bg accents */
   --color-brand-tint: #fdf8f5; /* warm near-white card background */
+
+  /*
+   * Admin portal palette, mirrored from svatebni-fotograf-cechy-2.0's
+   * components/Admin/ui.ts `adminTokens` so the two admin surfaces match. Only the
+   * values that differ from the brand tokens above are listed: that palette's
+   * text/accent/accentDark already *are* brand-ink/brand-primary/brand-primary-dark,
+   * and its `surface` is plain white. Note `--color-brand-border` (#dfc8bf) is the
+   * guest-facing border and is deliberately NOT the admin one — they are two colors.
+   */
+  --color-admin-bg: #f6f1ed; /* page background — warm cream */
+  --color-admin-surface-muted: #fbf7f4; /* disabled fields, inset panels */
+  --color-admin-border: #e6dad2;
+  --color-admin-muted: #6f5e55; /* labels, secondary text */
+  --color-admin-accent-soft: #f0e3dc; /* active nav pill, badge fill, focus ring */
+  --color-admin-placeholder: #a9998f;
+  --color-admin-danger: #a3261e;
+  --color-admin-danger-soft: #fbeae8;
+  --color-admin-danger-border: #f0c7c3;
+  --color-admin-warning: #8a5100;
+  --color-admin-warning-soft: #fdf3e3;
+  --color-admin-warning-border: #f0d9ae;
+  --color-admin-success: #42611f;
+  --color-admin-success-soft: #edf4e4;
+  --color-admin-success-border: #cfe0b8;
+}
+
+/*
+ * The admin portal is light-only — the design it mirrors has no dark variant — but
+ * src/components/ui/* is shared with the guest surfaces, which keep theirs. Rather
+ * than forking every primitive, the `dark:` variant itself is taught to stop at the
+ * admin shell: every `dark:` utility still compiles and still fires under
+ * prefers-color-scheme, it just does not match inside [data-admin-shell]. `:where()`
+ * contributes no specificity, so nothing in the cascade reorders.
+ *
+ * This does NOT cover native widgets (<select>, <input type="date">, scrollbars) —
+ * those follow `color-scheme`, which no media query can override. The shell carries
+ * Tailwind's `scheme-light` utility for that half. Both halves are required.
+ */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-admin-shell] *)):where(:not([data-admin-shell])) {
+      @slot;
+    }
+  }
 }
 
 /*
@@ -78,6 +122,37 @@ button:disabled,
 :focus-visible {
   outline: 2px solid var(--color-brand-primary-dark);
   outline-offset: 2px;
+}
+
+/*
+ * Print rules for the admin portal.
+ *
+ * `.no-print` used to be declared inside PrintableSign's own inline <style>, which
+ * meant the rule simply did not exist on the sign pages' error branches (revoked
+ * link, password-protected link, missing ?linkId) — the component that declared it
+ * never rendered. It lives here now so it is unconditional. The A6 `@page` sizing
+ * stays with PrintableSign: it must not apply to printing any other page.
+ *
+ * The shell's own chrome is hidden per-element with Tailwind's `print:hidden`
+ * (compiled unconditionally, unlike a class that depends on a component rendering).
+ * This block only flattens the shell's box so the card is not pushed down the sheet
+ * by admin gutters. Hiding the sticky top bar outright also sidesteps the engines
+ * that repeat a `position: sticky` header on every printed page.
+ */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  [data-admin-shell] {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+
+  [data-admin-shell] main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

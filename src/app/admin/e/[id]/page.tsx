@@ -17,7 +17,11 @@ import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 import { EventSettings } from "@/components/event-settings";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Label, Select } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { eventCrumbs } from "@/lib/admin-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -91,21 +95,16 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
   const now = new Date();
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <Link href="/admin" className="text-sm text-neutral-500 underline">
-            ← Přehled
-          </Link>
-          <h1 className="mt-1 text-2xl font-semibold">{event.title}</h1>
-          <p className="text-sm text-neutral-500">
-            {[event.eventDate?.toLocaleDateString("cs-CZ"), event.venue]
-              .filter(Boolean)
-              .join(" · ") || "Bez data a místa"}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
+    <div className="space-y-6">
+      <PageHeader
+        title={event.title}
+        crumbs={eventCrumbs(event)}
+        subtitle={
+          [event.eventDate?.toLocaleDateString("cs-CZ"), event.venue].filter(Boolean).join(" · ") ||
+          "Bez data a místa"
+        }
+        actions={
+          <>
             <EventSettings
               eventId={event.id}
               title={event.title}
@@ -117,13 +116,13 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                 Do koše
               </Button>
             </form>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <Card as="section">
-        <h2 className="text-sm font-medium">Adresa svatby</h2>
-        <p className="mt-1 mb-2 text-xs text-neutral-500">
+        <CardTitle className="mb-1">Adresa svatby</CardTitle>
+        <p className="text-admin-muted mb-3 text-sm dark:text-neutral-400">
           Tohle dáš na QR ceduli. Vede sem každá připojená galerie a adresa se nemění, ani když
           galerie přibývají.
         </p>
@@ -144,17 +143,21 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
 
       <Card as="section">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium">Galerie na této svatbě</h2>
-          <span className="text-xs text-neutral-500">{event.galleries.length}</span>
+          <CardTitle className="mb-0">Galerie na této svatbě</CardTitle>
+          <span className="text-admin-muted text-xs dark:text-neutral-400">
+            {event.galleries.length}
+          </span>
         </div>
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="text-admin-muted mt-2 text-sm dark:text-neutral-400">
           „Na stránce“ řídí jen kartu na rozcestníku. Vlastní odkaz galerie tím nezaniká — kdo ho
           dostal, chodí dál.
         </p>
 
-        <ul className="mt-4 divide-y">
+        <ul className="divide-admin-border mt-4 divide-y dark:divide-neutral-800">
           {event.galleries.length === 0 && (
-            <li className="py-3 text-sm text-neutral-500">Zatím žádná galerie. Přidej ji níže.</li>
+            <li className="text-admin-muted py-3 text-sm dark:text-neutral-400">
+              Zatím žádná galerie. Přidej ji níže.
+            </li>
           )}
           {event.galleries.map((gallery, index) => {
             const visible = isCardVisible(
@@ -182,23 +185,19 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                     <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
                       {gallery.title}
                     </Link>
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-admin-muted text-xs dark:text-neutral-400">
                       {gallery._count.photos} fotek · {gallery.status}
                     </p>
                   </div>
-                  <span
-                    className={
-                      visible
-                        ? "rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                        : "rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500 dark:bg-neutral-900"
-                    }
-                  >
+                  <Badge tone={visible ? "success" : "muted"}>
                     {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
-                  </span>
+                  </Badge>
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-neutral-500">Ze stránky svatby</p>
+                  <p className="text-admin-muted text-sm font-semibold dark:text-neutral-400">
+                    Ze stránky svatby
+                  </p>
                   {cardUrl ? (
                     <CopyableLink href={cardUrl} />
                   ) : (
@@ -213,11 +212,11 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                 </div>
 
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-neutral-500">
+                  <p className="text-admin-muted text-sm font-semibold dark:text-neutral-400">
                     Vlastní odkazy galerie — pošli je někomu, kdo nemá vidět zbytek svatby
                   </p>
                   {gallery.shareLinks.length === 0 && (
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-admin-muted text-xs dark:text-neutral-400">
                       Žádný živý odkaz. Vytvoř ho v detailu galerie.
                     </p>
                   )}
@@ -257,11 +256,14 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                     }}
                     className="flex items-center gap-2"
                   >
-                    <label className="text-neutral-500">Karta vede přes</label>
-                    <select
+                    <Label htmlFor={`event-link-${gallery.id}`} className="mb-0 shrink-0">
+                      Karta vede přes
+                    </Label>
+                    <Select
+                      id={`event-link-${gallery.id}`}
                       name="shareLinkId"
                       defaultValue={gallery.eventLinkId ?? ""}
-                      className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
+                      className="w-auto"
                     >
                       <option value="">— žádný —</option>
                       {gallery.shareLinks.map((link) => (
@@ -270,7 +272,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                           {link.allowUpload ? " · hosté nahrávají" : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <Button type="submit" variant="secondary" size="sm">
                       Uložit
                     </Button>
@@ -323,6 +325,6 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
       </Card>
 
       <NewGalleryInEvent eventId={event.id} unattached={unattached} attach={attachGalleryToEvent} />
-    </main>
+    </div>
   );
 }

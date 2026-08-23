@@ -6,7 +6,7 @@ import { createShareLink, revokeShareLink } from "@/app/admin/actions";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 interface ShareLinkRow {
@@ -54,7 +54,7 @@ export function ShareLinkPanel({
 
   return (
     <Card as="section">
-      <h2 className="text-sm font-medium">Sdílené odkazy</h2>
+      <CardTitle>Sdílené odkazy</CardTitle>
 
       {!published && (
         // Every share surface refuses an unpublished gallery, so a link created

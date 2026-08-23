@@ -11,9 +11,6 @@ import type { ActivityType } from "@/generated/prisma/enums";
 /** Nobody reads a feed of heartbeats, so page size stays small and recent. */
 const DEFAULT_LIMIT = 40;
 
-/** Beyond this the badge reads "99+" rather than a number nobody acts on. */
-export const BADGE_CAP = 99;
-
 export interface FeedEntry {
   id: string;
   type: ActivityType;
