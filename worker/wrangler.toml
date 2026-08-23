@@ -10,9 +10,18 @@ cpu_ms = 300000
 
 # Zero-egress reads straight from the bucket. Image bytes never touch Vercel
 # and never leave Cloudflare's network on the way in (CLAUDE.md invariant #1).
+#
+# jurisdiction MUST be "eu" — the real bucket was created under EU jurisdiction
+# (CLAUDE.md/docs/PLAN.md invariant, endpoint
+# https://211265b6bb0b7d7f1aa944a0999413fe.eu.r2.cloudflarestorage.com/g-gallery).
+# Omitting this line makes `wrangler deploy` silently provision (or bind to) a
+# same-named bucket in the *default* jurisdiction instead — confirmed
+# 2026-08-23 when a first deploy attempt did exactly that, creating an empty
+# non-EU "g-gallery" that has since been deleted.
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "g-gallery"
+jurisdiction = "eu"
 
 [observability]
 enabled = true
