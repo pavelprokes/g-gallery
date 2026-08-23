@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContactLine, DeadEnd } from "@/components/dead-end";
+import { buttonClasses } from "@/components/ui/button";
 
 /**
  * A share link that resolved but is no longer open: expired, or revoked.
@@ -33,7 +34,7 @@ export function EventPartGone({ backHref, eventTitle }: { backHref: string; even
       title="Tahle část už tu není"
       lead="Fotograf ji ze stránky svatby sundal. Zbytek tam ale pořád je."
       action={
-        <Link href={backHref} className="rounded-lg border px-4 py-2 text-sm">
+        <Link href={backHref} className={buttonClasses()}>
           ← {eventTitle}
         </Link>
       }

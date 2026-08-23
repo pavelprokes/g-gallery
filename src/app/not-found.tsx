@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ContactLine, DeadEnd } from "@/components/dead-end";
+import { buttonClasses } from "@/components/ui/button";
 
 /**
  * The app's only 404 page, on purpose.
@@ -26,7 +27,7 @@ export default function NotFound() {
         title="Tady nic není"
         lead="Tahle adresa v administraci neexistuje."
         action={
-          <Link href="/admin" className="rounded-lg border px-4 py-2 text-sm">
+          <Link href="/admin" className={buttonClasses()}>
             Zpátky na přehled
           </Link>
         }

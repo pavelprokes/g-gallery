@@ -20,6 +20,15 @@ const SIZE_CLASSES = {
 type ButtonVariant = keyof typeof VARIANT_CLASSES;
 type ButtonSize = keyof typeof SIZE_CLASSES;
 
+/**
+ * The same look for an `<a>`. A link that navigates must stay a link — it has
+ * to work with a middle click and open in a new tab — so it cannot be the
+ * `Button` element above, but it has no business inventing its own styling.
+ */
+export function buttonClasses(variant: ButtonVariant = "secondary", size: ButtonSize = "lg") {
+  return `rounded-md font-medium transition-colors ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]}`;
+}
+
 export function Button({
   variant = "primary",
   size = "md",

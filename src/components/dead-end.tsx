@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Card } from "@/components/ui/card";
 
 /**
  * Every dead end in the app looks like this one component: a mistyped link, an
@@ -29,15 +30,15 @@ export function DeadEnd({
 }) {
   return (
     <main className="flex min-h-dvh items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl border bg-white p-8 text-center shadow-sm dark:bg-neutral-900">
+      <Card className="w-full max-w-sm p-8 text-center">
         <span
           aria-hidden
-          className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500"
+          className="bg-brand-tint text-brand-primary dark:text-brand-border mx-auto mb-5 flex size-12 items-center justify-center rounded-full dark:bg-neutral-800"
         >
           {/* Drawn, not typed: a glyph like ✂ renders as a colour emoji on
-              iOS, which is most of the traffic that reaches this page. A photo
-              frame rather than a warning sign — nothing is broken on the
-              visitor's side, and the words already say what happened. */}
+              iOS, which is most of the traffic that lands here. A photo frame
+              rather than a warning sign — nothing is broken on the visitor's
+              side, and the words already say what happened. */}
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -54,11 +55,13 @@ export function DeadEnd({
           </svg>
         </span>
 
-        <h1 className="text-xl font-semibold tracking-tight text-balance">{title}</h1>
+        <h1 className="text-brand-ink text-xl font-semibold tracking-tight text-balance dark:text-neutral-100">
+          {title}
+        </h1>
         <p className="mt-2.5 text-sm/6 text-neutral-600 dark:text-neutral-300">{lead}</p>
         {hint && <p className="mt-2 text-sm/6 text-neutral-500 dark:text-neutral-400">{hint}</p>}
         {action && <div className="mt-6 flex justify-center">{action}</div>}
-      </div>
+      </Card>
     </main>
   );
 }
