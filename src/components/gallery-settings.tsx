@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { updateGallery } from "@/app/admin/actions";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Hint, Input, Label } from "@/components/ui/input";
 
 /**
  * Renaming a gallery, or fixing its date or description. Behind a button, like
@@ -26,68 +29,47 @@ export function GallerySettings({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded border px-3 py-1.5 text-sm"
-      >
+      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
         Přejmenovat
-      </button>
+      </Button>
     );
   }
 
   return (
-    <form
+    <Card
+      as="form"
       action={async (formData: FormData) => {
         await updateGallery(galleryId, formData);
         setOpen(false);
       }}
-      className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
+      className="flex flex-wrap items-end gap-3"
     >
-      <label className="flex flex-col gap-1 text-sm">
-        Název
-        <input
-          name="title"
-          required
-          maxLength={200}
-          defaultValue={title}
-          className="rounded border px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Datum akce
-        <input
-          name="eventDate"
-          type="date"
-          defaultValue={eventDate ?? ""}
-          className="rounded border px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Popis
-        <input
+      <div className="min-w-48 flex-1">
+        <Label htmlFor="gallery-title">Název</Label>
+        <Input id="gallery-title" name="title" required maxLength={200} defaultValue={title} />
+      </div>
+      <div>
+        <Label htmlFor="gallery-date">Datum akce</Label>
+        <Input id="gallery-date" name="eventDate" type="date" defaultValue={eventDate ?? ""} />
+      </div>
+      <div className="min-w-48 flex-1">
+        <Label htmlFor="gallery-description">Popis</Label>
+        <Input
+          id="gallery-description"
           name="description"
           maxLength={2000}
           defaultValue={description ?? ""}
-          className="rounded border px-2 py-1"
         />
-      </label>
-      <button
-        type="submit"
-        className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-      >
+      </div>
+      <Button type="submit" size="lg">
         Uložit
-      </button>
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="px-2 py-1.5 text-sm underline"
-      >
+      </Button>
+      <Button type="button" variant="ghost" size="lg" onClick={() => setOpen(false)}>
         Zrušit
-      </button>
-      <p className="w-full text-xs text-neutral-500">
+      </Button>
+      <Hint className="w-full">
         Adresy odkazů se nezmění — jsou zamrazené od vytvoření, aby už rozeslané fungovaly dál.
-      </p>
-    </form>
+      </Hint>
+    </Card>
   );
 }

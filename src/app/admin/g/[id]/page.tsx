@@ -14,7 +14,10 @@ import { GallerySettings } from "@/components/gallery-settings";
 import { publishGallery, restoreGallery } from "../../actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
+import { PageHeader } from "@/components/ui/page-header";
+import { galleryCrumbs } from "@/lib/admin-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       status: true,
       trashedAt: true,
       eventId: true,
+      // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
+      event: { select: { id: true, title: true } },
       photos: {
         where: { status: "CONFIRMED" },
         orderBy: [{ favorites: { _count: "desc" } }, { createdAt: "asc" }],
@@ -78,7 +83,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-8">
+    <div className="space-y-6">
       {gallery.trashedAt && (
         <Alert className="flex items-center justify-between">
           <p>Tato galerie je v koši a bude po uplynutí lhůty natrvalo smazána.</p>
@@ -90,31 +95,30 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         </Alert>
       )}
 
-      <header className="flex items-baseline justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{gallery.title}</h1>
-          <p className="text-sm text-neutral-500">
-            {gallery.status} · {gallery.photos.length} fotek
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <GallerySettings
-            galleryId={gallery.id}
-            title={gallery.title}
-            eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
-            description={gallery.description}
-          />
-          {gallery.status === "DRAFT" && (
-            <form action={publish}>
-              <Button type="submit">Publikovat</Button>
-            </form>
-          )}
-          {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
-            <UnpublishGalleryButton galleryId={gallery.id} />
-          )}
-          {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
-        </div>
-      </header>
+      <PageHeader
+        title={gallery.title}
+        crumbs={galleryCrumbs(gallery)}
+        subtitle={`${gallery.status} · ${gallery.photos.length} fotek`}
+        actions={
+          <>
+            <GallerySettings
+              galleryId={gallery.id}
+              title={gallery.title}
+              eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
+              description={gallery.description}
+            />
+            {gallery.status === "DRAFT" && (
+              <form action={publish}>
+                <Button type="submit">Publikovat</Button>
+              </form>
+            )}
+            {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
+              <UnpublishGalleryButton galleryId={gallery.id} />
+            )}
+            {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
+          </>
+        }
+      />
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Zobrazení" value={counts.views} />
@@ -139,7 +143,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       />
 
       <section>
-        <h2 className="text-sm font-medium">Fotky — zobrazení a unikátní diváci</h2>
+        <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {gallery.photos.map((photo) => {
             const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
@@ -160,7 +164,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     {photo.uploadedBy?.displayName && ` · ${photo.uploadedBy.displayName}`}
                   </p>
                 )}
-                <p className="text-xs text-neutral-500">
+                <p className="text-admin-muted text-xs dark:text-neutral-400">
                   {stats.views} zobr. · {stats.uniqueViewers} unik.
                   {photo._count.favorites > 0 && (
                     <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
@@ -175,18 +179,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           })}
         </ul>
         {gallery.photos.length === 0 && (
-          <p className="mt-3 text-sm text-neutral-500">Zatím žádné potvrzené fotky.</p>
+          <p className="text-admin-muted mt-3 text-sm dark:text-neutral-400">
+            Zatím žádné potvrzené fotky.
+          </p>
         )}
       </section>
-    </main>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <Card>
-      <p className="text-2xl font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-neutral-500">{label}</p>
-    </Card>
+    </div>
   );
 }

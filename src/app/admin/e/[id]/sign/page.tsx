@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -8,6 +7,8 @@ import { absoluteSignUrl, eventSignPath } from "@/lib/sign-url";
 import { isCardVisible } from "@/lib/event-cards";
 import { PrintableSign } from "@/components/printable-sign";
 import { Alert } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { eventSignCrumbs } from "@/lib/admin-breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -48,28 +49,20 @@ export default async function EventSignPage(props: PageProps<"/admin/e/[id]/sign
   });
   if (!event) notFound();
 
-  const backLink = (
-    <Link href={`/admin/e/${event.id}`} className="no-print text-sm text-neutral-500 underline">
-      ← Zpět na svatbu
-    </Link>
-  );
-  const heading = (
-    <h1 className="no-print text-brand-ink text-lg font-semibold">
-      Cedulka k tisku — {event.title}
-    </h1>
-  );
+  // Rendered above every branch below — the header is print:hidden, so it costs
+  // the printed card nothing and the page never loses its way back.
+  const header = <PageHeader title="Cedulka k tisku" crumbs={eventSignCrumbs(event)} />;
 
   const token = decryptToken(event.tokenCipher);
   if (!token) {
     return (
-      <main className="mx-auto max-w-2xl space-y-6 p-8">
-        {backLink}
-        {heading}
+      <div className="max-w-2xl space-y-6">
+        {header}
         <Alert>
           Adresu téhle svatby už nelze zobrazit — vznikla dřív, než se odkazy ukládaly čitelně.
           Cedulku z ní nejde vytisknout.
         </Alert>
-      </main>
+      </div>
     );
   }
 
@@ -85,9 +78,8 @@ export default async function EventSignPage(props: PageProps<"/admin/e/[id]/sign
   );
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-8">
-      {backLink}
-      {heading}
+    <div className="max-w-2xl space-y-6">
+      {header}
       <PrintableSign
         url={url}
         qrSvg={qrSvg}
@@ -101,6 +93,6 @@ export default async function EventSignPage(props: PageProps<"/admin/e/[id]/sign
               }
         }
       />
-    </main>
+    </div>
   );
 }

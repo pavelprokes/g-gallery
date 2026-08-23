@@ -83,7 +83,8 @@ export function PrintableSign({
       {/* A6 card, flat (not a fold-over tent) — kept deliberately simple for v1. */}
       <style>{`
         @media print {
-          .no-print { display: none !important; }
+          /* .no-print lives in globals.css — it has to exist on this page's error
+             branches too, where this component never renders. */
           @page { size: 105mm 148mm; margin: 0; }
           html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
           #printable-sign {

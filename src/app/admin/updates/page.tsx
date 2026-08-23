@@ -5,7 +5,10 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { ownerFeed, markFeedRead, type FeedEntry } from "@/lib/feed";
 import { REACTION_EMOJI } from "@/lib/reactions-shared";
 import { PushToggle } from "@/components/push-toggle";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { updatesCrumbs } from "@/lib/admin-breadcrumbs";
+import { FeedReadSync } from "@/components/admin/feed-read-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -24,35 +27,31 @@ export default async function UpdatesPage() {
   await markFeedRead(session.user.id);
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Aktivita</h1>
-        <Link href="/admin" className="text-sm underline">
-          Zpět na galerie
-        </Link>
-      </header>
+    <div className="max-w-3xl space-y-6">
+      <PageHeader title="Aktivita" crumbs={updatesCrumbs()} />
+      <FeedReadSync />
 
       <Card>
-        <p className="text-sm font-medium">Upozornění na návštěvu</p>
-        <p className="mt-1 mb-3 text-xs text-neutral-500">
+        <CardTitle>Upozornění na návštěvu</CardTitle>
+        <p className="text-admin-muted mb-3 text-sm dark:text-neutral-400">
           Nejvýš jedno za 30 minut na galerii. Denní souhrn chodí e-mailem vždy.
         </p>
         <PushToggle />
       </Card>
 
       {entries.length === 0 ? (
-        <p className="text-sm text-neutral-500">
+        <p className="text-admin-muted text-sm dark:text-neutral-400">
           Zatím žádná aktivita. Objeví se tu reakce, oblíbené fotky a stažení — ne samotná
           zobrazení, těch by byly stovky.
         </p>
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <Card as="ul" className="divide-admin-border divide-y p-0 sm:p-0 dark:divide-neutral-800">
           {entries.map((entry) => (
             <FeedRow key={entry.id} entry={entry} />
           ))}
-        </ul>
+        </Card>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -73,7 +72,7 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
         <Link href={`/admin/g/${entry.galleryId}`} className="hover:underline">
           {describe(entry)}
         </Link>
-        <span className="block text-xs text-neutral-500">
+        <span className="text-admin-muted block text-xs dark:text-neutral-400">
           {entry.galleryTitle} · {formatWhen(entry.createdAt)}
         </span>
       </span>

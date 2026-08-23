@@ -11,7 +11,7 @@ import {
   type UploadItemState,
 } from "@/lib/upload-run";
 import { Alert } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 
 // The transport lives in src/lib/upload-run.ts, shared with the guest uploader
 // (docs/GUEST-GALLERIES.md §6) — this component is the photographer's UI over it.
@@ -82,7 +82,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
 
   return (
     <Card as="section">
-      <h2 className="text-sm font-medium">Nahrát fotky</h2>
+      <CardTitle>Nahrát fotky</CardTitle>
 
       {fatal && (
         <Alert tone="danger" className="mt-3">
@@ -97,7 +97,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
             Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené zbytky
             se po 24 hodinách uklidí samy.
           </p>
-          <ul className="mt-2 max-h-24 overflow-y-auto text-xs text-neutral-600 dark:text-neutral-400">
+          <ul className="text-admin-muted mt-2 max-h-24 overflow-y-auto text-xs dark:text-neutral-400">
             {pendingRows.map((row) => (
               <li key={row.id}>
                 {row.fileName}
@@ -123,13 +123,13 @@ export function Uploader({ galleryId }: { galleryId: string }) {
 
       {items.length > 0 && (
         <div className="mt-4 space-y-2">
-          <p className="text-sm text-neutral-500">
+          <p className="text-admin-muted text-sm dark:text-neutral-400">
             {done}/{items.length} nahráno
             {failed > 0 && <span className="text-red-600"> · {failed} selhalo</span>}
           </p>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div className="bg-admin-accent-soft h-1.5 w-full overflow-hidden rounded-full dark:bg-neutral-800">
             <div
-              className="h-full bg-neutral-900 transition-all dark:bg-neutral-100"
+              className="bg-brand-primary h-full transition-all"
               style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
             />
           </div>

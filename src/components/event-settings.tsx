@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { updateEvent } from "@/app/admin/actions";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Hint, Input, Label } from "@/components/ui/input";
 
 /**
  * Renaming a wedding, or fixing its date or venue. Behind a button because it
@@ -25,68 +28,42 @@ export function EventSettings({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded border px-3 py-1.5 text-sm"
-      >
+      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
         Upravit
-      </button>
+      </Button>
     );
   }
 
   return (
-    <form
+    <Card
+      as="form"
       action={async (formData: FormData) => {
         await updateEvent(eventId, formData);
         setOpen(false);
       }}
-      className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
+      className="flex flex-wrap items-end gap-3"
     >
-      <label className="flex flex-col gap-1 text-sm">
-        Pár
-        <input
-          name="title"
-          required
-          maxLength={200}
-          defaultValue={title}
-          className="rounded border px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Datum
-        <input
-          name="eventDate"
-          type="date"
-          defaultValue={eventDate ?? ""}
-          className="rounded border px-2 py-1"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Místo
-        <input
-          name="venue"
-          maxLength={200}
-          defaultValue={venue ?? ""}
-          className="rounded border px-2 py-1"
-        />
-      </label>
-      <button
-        type="submit"
-        className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-      >
+      <div className="min-w-48 flex-1">
+        <Label htmlFor="event-title">Pár</Label>
+        <Input id="event-title" name="title" required maxLength={200} defaultValue={title} />
+      </div>
+      <div>
+        <Label htmlFor="event-date">Datum</Label>
+        <Input id="event-date" name="eventDate" type="date" defaultValue={eventDate ?? ""} />
+      </div>
+      <div className="min-w-48 flex-1">
+        <Label htmlFor="event-venue">Místo</Label>
+        <Input id="event-venue" name="venue" maxLength={200} defaultValue={venue ?? ""} />
+      </div>
+      <Button type="submit" size="lg">
         Uložit
-      </button>
-      <button
-        type="button"
-        onClick={() => setOpen(false)}
-        className="px-2 py-1.5 text-sm underline"
-      >
+      </Button>
+      <Button type="button" variant="ghost" size="lg" onClick={() => setOpen(false)}>
         Zrušit
-      </button>
-      <p className="w-full text-xs text-neutral-500">
+      </Button>
+      <Hint className="w-full">
         Adresa svatby se nezmění — je zamrazená od založení, aby vytištěný QR kód dál fungoval.
-      </p>
-    </form>
+      </Hint>
+    </Card>
   );
 }
