@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   dismissNamePrompt,
   getViewerId,
@@ -9,6 +9,13 @@ import {
   setViewerName,
 } from "@/lib/viewer-id";
 import { matchResumeTargets } from "@/lib/upload-resume";
+import {
+  clearQueuedUploads,
+  dequeueUpload,
+  enqueueUploads,
+  listQueuedUploads,
+} from "@/lib/upload-queue";
+import { holdScreenAwake } from "@/lib/wake-lock";
 import {
   fetchPendingUploads,
   runUploads,
@@ -42,6 +49,7 @@ export function GuestUploader({
   const [running, setRunning] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
   const [askName, setAskName] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -55,18 +63,29 @@ export function GuestUploader({
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }, []);
 
-  const start = useCallback(
-    async (files: File[]) => {
+  /**
+   * Runs a set of already-queued entries. Each one is removed from the queue
+   * the moment it lands, so an interrupted run resumes with exactly what is
+   * left rather than starting over.
+   */
+  const run = useCallback(
+    async (queued: { id: string; file: File }[]) => {
+      const files = queued.map((entry) => entry.file);
       setItems(files.map((file) => ({ file, state: "pending" as const })));
       setFatal(null);
       setRunning(true);
+
+      // Removes the commonest cause of a dead upload: the display timing out
+      // while the phone lies on a table. Best-effort — never depended on.
+      const wakeLock = await holdScreenAwake();
 
       const anonKey = getViewerId();
       const credentials = { kind: "guest" as const, shareToken: token, anonKey };
 
       // Fetched here rather than on mount: most people who open the gallery
       // never upload anything, and 80 guests each firing a lookup they will
-      // not use is a request per page view for nothing.
+      // not use is a request per page view for nothing. It is also what makes
+      // a resumed run re-use its half-finished rows instead of duplicating.
       const resumeIds = matchResumeTargets(files, await fetchPendingUploads(credentials));
 
       let landed = 0;
@@ -75,18 +94,27 @@ export function GuestUploader({
         credentials,
         resumeIds,
         onItem: (index, patch) => {
-          if (patch.state === "done") landed += 1;
+          if (patch.state === "done") {
+            landed += 1;
+            const entry = queued[index];
+            if (entry) void dequeueUpload(entry.id);
+          }
           update(index, patch);
         },
         onFatal: (rejection) => setFatal(guestRejectionMessage(rejection)),
-        onSkipped: (rejection, count) =>
+        onSkipped: (rejection, count) => {
+          // Nothing will ever make these acceptable, so they leave the queue
+          // rather than being retried on every visit.
+          for (const entry of queued) void dequeueUpload(entry.id);
           setFatal(
             count > 1
               ? `${guestRejectionMessage(rejection)} (${count} souborů jsme přeskočili, ostatní nahráváme.)`
               : guestRejectionMessage(rejection),
-          ),
+          );
+        },
       });
 
+      wakeLock?.release();
       setRunning(false);
       if (landed > 0) {
         // Photos are only visible once the server flipped them to CONFIRMED,
@@ -100,6 +128,34 @@ export function GuestUploader({
     },
     [onUploaded, token, update],
   );
+
+  const start = useCallback(
+    async (files: File[]) => {
+      await run(await enqueueUploads(token, files));
+    },
+    [run, token],
+  );
+
+  /**
+   * Anything left from a previous visit finishes on its own. The files are in
+   * IndexedDB, so this works even when the page was discarded entirely and the
+   * File objects are long gone from memory — which is the whole point of the
+   * queue (docs/GUEST-GALLERIES.md §11, F3).
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void listQueuedUploads(token).then((queued) => {
+      if (cancelled || queued.length === 0) return;
+      setResuming(true);
+      void run(queued).finally(() => setResuming(false));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Deliberately keyed on the token alone: this must fire once per gallery,
+    // not again every time `run` is recreated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const done = items.filter((i) => i.state === "done").length;
   const failed = items.filter((i) => i.state === "error").length;
@@ -145,7 +201,23 @@ export function GuestUploader({
           {running && (
             <div className="mb-2">
               <p className="text-sm">
-                Nahrávám {done} z {items.length} — nechte prosím stránku otevřenou.
+                {resuming ? "Dokončuji nahrávání" : "Nahrávám"} {done} z {items.length} · displej
+                nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíte.
+                {resuming && (
+                  <button
+                    type="button"
+                    className="ml-2 underline"
+                    onClick={() => {
+                      // Stops it coming back on the next visit. Requests
+                      // already in flight finish — there is nothing to gain
+                      // from abandoning bytes that are nearly there.
+                      void clearQueuedUploads(token);
+                      setResuming(false);
+                    }}
+                  >
+                    Zahodit zbytek
+                  </button>
+                )}
               </p>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
                 <div

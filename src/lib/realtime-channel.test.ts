@@ -1,29 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  channelForToken,
+  channelForGallery,
   distinctViewers,
   realtimeConfig,
   type PresenceState,
 } from "./realtime-channel";
 
-describe("channelForToken", () => {
-  it("never contains the token itself", async () => {
-    // The whole point: a Realtime topic is visible to everyone on the channel.
-    const token = "-9nCxZ3EyowniaVIeGxK9g";
-    const topic = await channelForToken(token);
-    expect(topic).not.toContain(token);
+describe("channelForGallery", () => {
+  it("never contains the gallery id itself", async () => {
+    // A Realtime topic is visible to everyone on the channel.
+    const galleryId = "cmt5snm2q00005i2bvjzgv2pf";
+    expect(await channelForGallery(galleryId)).not.toContain(galleryId);
   });
 
-  it("is stable for the same token", async () => {
-    expect(await channelForToken("abc")).toBe(await channelForToken("abc"));
+  it("is stable for the same gallery", async () => {
+    expect(await channelForGallery("abc")).toBe(await channelForGallery("abc"));
   });
 
-  it("differs for different tokens", async () => {
-    expect(await channelForToken("abc")).not.toBe(await channelForToken("abd"));
+  it("differs for different galleries", async () => {
+    expect(await channelForGallery("abc")).not.toBe(await channelForGallery("abd"));
   });
 
   it("is a short prefixed hex topic", async () => {
-    expect(await channelForToken("abc")).toMatch(/^g:[0-9a-f]{16}$/);
+    expect(await channelForGallery("abc")).toMatch(/^g:[0-9a-f]{16}$/);
+  });
+
+  it("does not depend on which link reached the gallery", async () => {
+    // The reason this is keyed on the gallery at all: one gallery can be
+    // reached by two share links, or by a link and a wedding-page card, and
+    // those audiences must not count each other as absent.
+    const viaOneLink = await channelForGallery("gal_1");
+    const viaAnother = await channelForGallery("gal_1");
+    expect(viaOneLink).toBe(viaAnother);
   });
 });
 

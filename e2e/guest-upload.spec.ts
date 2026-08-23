@@ -18,9 +18,16 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   uploadToken: string;
   uploadSlug: string;
   readOnlyToken: string;
-  selfDeleteToken: string;
-  selfDeleteSlug: string;
+  /** One wedding per browser project — see e2e/seed.ts for why. */
+  selfDelete: Record<string, { token: string; slug: string }>;
 };
+
+/** The self-delete wedding belonging to the project running this test. */
+function selfDeleteUrl(projectName: string): string {
+  const wedding = seed.selfDelete[projectName];
+  if (!wedding) throw new Error(`no self-delete wedding seeded for project ${projectName}`);
+  return `/s/${wedding.token}/${wedding.slug}`;
+}
 
 /** A real, decodable 1×1 JPEG: the client strips EXIF, CRC32s and decodes it. */
 const ONE_PIXEL_JPEG = Buffer.from(
@@ -66,8 +73,10 @@ test.describe("guest uploads", () => {
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBeGreaterThan(before);
   });
 
-  test("a guest can take back a photo they uploaded, and only that one", async ({ page }) => {
-    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+  test("a guest can take back a photo they uploaded, and only that one", async ({
+    page,
+  }, testInfo) => {
+    await page.goto(selfDeleteUrl(testInfo.project.name));
 
     const before = await tileCount(page);
 
@@ -92,11 +101,11 @@ test.describe("guest uploads", () => {
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(before);
   });
 
-  test("a photo someone else uploaded offers no delete button", async ({ page }) => {
+  test("a photo someone else uploaded offers no delete button", async ({ page }, testInfo) => {
     // A fresh browser context has its own anonKey, so the seeded photos in this
     // gallery belong to nobody it knows — exactly the state of a guest looking
     // at somebody else's shot.
-    await page.goto(`/s/${seed.selfDeleteToken}/${seed.selfDeleteSlug}`);
+    await page.goto(selfDeleteUrl(testInfo.project.name));
 
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await expect

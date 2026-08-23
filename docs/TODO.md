@@ -147,5 +147,7 @@ confirm. **F2 (the wedding page) implemented the same day** — `Event` with its
 `/s/` route, admin CRUD, and trash/purge at the wedding level. `docs/GUEST-GALLERIES.md` §11 has
 the as-built notes for both. Guest self-delete followed the same day; **moderation is deferred on
 Pavel's call**, and the free 5 000 Cloudflare transformations are accepted as enough for now, which
-takes the client-side thumbnail off F3's critical path. What is left before a real wedding is the
-upload queue surviving a locked screen.
+takes the client-side thumbnail off F3's critical path. **F3 landed the same day** — a screen wake
+lock plus an IndexedDB-backed upload queue that resumes by itself when the guest comes back — so
+nothing from the original F1–F3 scope is open. What is left is deliberately deferred: moderation,
+the PIN, a co-host login for the couple, live projection, printable QR graphics and video.

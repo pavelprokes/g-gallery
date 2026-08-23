@@ -207,6 +207,8 @@ export function GalleryView(props: GalleryViewProps) {
 
 interface GalleryViewProps {
   token: string;
+  /** Only ever used to key the presence channel — never sent anywhere else. */
+  galleryId: string;
   title: string;
   eventDate: string | null;
   initialPhotos: GalleryPhoto[];
@@ -232,6 +234,7 @@ interface GalleryViewProps {
 
 function GalleryViewInner({
   token,
+  galleryId,
   title,
   eventDate,
   initialPhotos,
@@ -914,7 +917,7 @@ function GalleryViewInner({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <PresenceStrip token={token} optedOut={optedOut} />
+          <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
         </div>
       </header>

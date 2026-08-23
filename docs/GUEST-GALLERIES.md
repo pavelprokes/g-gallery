@@ -319,7 +319,7 @@ F1–F4 are the minimum that can run a real wedding.
 | F0  | Close §11 decisions                                                                                                                                                                                                                                                   | 0.5 d    |
 | F1  | Guest uploads: `ShareLink.allowUpload`, second branch in presign/confirm, `Photo.source`, `uploadedByViewerId`, quotas, migration — **done 2026-08-23**, see below                                                                                                    | 3–4 d    |
 | F2  | Wedding page: `Event` (own token + slug), `Gallery.eventId` / `eventKey` / `position` / `listedOnEvent` / `eventLinkId`, `/s/` route, cards with cover + counts, inline render of a lone gallery, trash + purge at the wedding level — **done 2026-08-23**, see below | 2–3 d    |
-| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state. HEIC refusal and the client-side skip shipped in F1; the 512 px thumbnail dropped out of scope — see §9                                                                     | 1–2 d    |
+| F3  | Mobile reality: upload queue surviving screen lock and app switch, honest progress state — **done 2026-08-23**, see below                                                                                                                                             | 1–2 d    |
 | F4  | ~~Moderation~~ — deferred by Pavel 2026-08-23. Guest self-delete and per-photo admin delete shipped instead (§7); the consent line shipped with F1                                                                                                                    | —        |
 | F5  | Projection: `/s/{token}/{slug}/show` — fullscreen, live via Supabase Realtime, burn-in guard, reconnect behaviour                                                                                                                                                     | 1–2 d    |
 | F6  | Tests and a dry run: extend `e2e/` with the guest flow (no test-auth bypass needed — it is an unauthenticated path), real-device matrix, trial run on a small event                                                                                                   | 2 d      |
@@ -373,8 +373,9 @@ own 30-day trash window on top, swept by the same daily cron.
   page exists.
 - **`loadGalleryViewData`** (`src/lib/shared-gallery.ts`) is now shared by `/g/` and `/s/`, so the
   two surfaces cannot drift on ordering, page size or which photos count as visible.
-- **Admin**: create a wedding, attach and detach galleries, the listing switch, and the picker for
-  which share link a card grants through. Attaching freezes the `eventKey`, for the same reason a
+- **Admin**: create a wedding, rename it, reorder and attach/detach galleries, the listing switch,
+  and the picker for which share link a card grants through. A gallery can also be un-published,
+  which cuts off every link to it including its card. Attaching freezes the `eventKey`, for the same reason a
   share link's slug is frozen. The page warns when a gallery is listed but has no designated link —
   the one state that silently produces no card.
 - **Trash and purge**: a wedding page gets the same 30-day window as a gallery and is swept by the
@@ -405,6 +406,27 @@ by hash, never by ciphertext.
 - A row whose token predates the ciphertext (or a deployment without `TOKEN_ENCRYPTION_KEY`) says
   so plainly instead of showing a broken link.
 
+### F3, as built (2026-08-23)
+
+- **`src/lib/wake-lock.ts`** holds a screen wake lock for the length of a run and re-acquires it
+  when the tab comes back. This is the cheapest fix for the actual problem: uploads at a wedding
+  usually die because somebody put the phone down and the display timed out after thirty seconds,
+  not because anyone deliberately locked it. Best-effort — Safari has had it since 16.4, older iOS
+  will not, and nothing depends on it.
+- **`src/lib/upload-queue.ts`** persists the pending files in IndexedDB (`File` is
+  structured-cloneable, so the _bytes_ are stored, not just the names). Each entry is removed the
+  moment it lands, so an interrupted run resumes with exactly what is left. Returning to the page
+  finishes the job automatically, even if the page was discarded entirely and the `File` objects
+  are long gone from memory. Entries expire after 7 days, and a clock that jumped forward cannot
+  create one that never expires. Without IndexedDB everything still uploads, it just cannot resume.
+- Server-side resume is unchanged and does the other half: `matchResumeTargets` re-claims the
+  PENDING rows by name and size, so a resumed run reuses them instead of creating duplicates.
+- **Honest copy**: "displej nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíte."
+  Not "you can lock the phone" — on iOS, JavaScript is suspended when the screen locks and there is
+  no API that keeps bytes flowing. What is promised is that nothing is lost, which is true.
+- A resumed run shows _Zahodit zbytek_ for anyone who abandoned it on purpose. Requests already in
+  flight finish; there is nothing to gain from abandoning bytes that are nearly there.
+
 ### Guest self-delete (2026-08-23)
 
 `GET /api/g/[token]/mine` lists the ids this `anonKey` uploaded; `DELETE` removes one, taking the
@@ -413,9 +435,9 @@ lightbox, shown only for the viewer's own photos, and the set refreshes after an
 can be taken back straight away. E2E covers both halves: a guest deletes what they added, and a
 photo somebody else added shows no delete button at all.
 
-Still open before pointing a QR code at a real wedding: an upload queue that survives a locked
-screen (F3). The progress copy says "nechte prosím stránku otevřenou" for exactly that reason — it
-will be a lie the moment F3 lands, and should be changed then.
+Nothing from the original F1–F3 scope is left open. What remains is deliberately deferred:
+moderation (§7), the client-side thumbnail (§9), the PIN (§5), a co-host login for the couple
+(§13.6), live projection (F5), printable QR graphics (F7) and video (F8).
 
 ## 12. Test focus
 

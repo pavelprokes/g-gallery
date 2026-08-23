@@ -5,6 +5,7 @@ import { getAdminSession } from "@/lib/auth-guard";
 import {
   attachGalleryToEvent,
   detachGalleryFromEvent,
+  moveGalleryInEvent,
   setGalleryEventLink,
   setGalleryListed,
   trashEvent,
@@ -13,6 +14,7 @@ import { isCardVisible } from "@/lib/event-cards";
 import { decryptToken } from "@/lib/token-cipher";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
+import { EventSettings } from "@/components/event-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -99,11 +101,21 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               .join(" · ") || "Bez data a místa"}
           </p>
         </div>
-        <form action={trashEvent.bind(null, event.id)}>
-          <button type="submit" className="rounded border px-3 py-1.5 text-sm text-red-600">
-            Do koše
-          </button>
-        </form>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            <EventSettings
+              eventId={event.id}
+              title={event.title}
+              eventDate={event.eventDate?.toISOString().slice(0, 10) ?? null}
+              venue={event.venue}
+            />
+            <form action={trashEvent.bind(null, event.id)}>
+              <button type="submit" className="rounded border px-3 py-1.5 text-sm text-red-600">
+                Do koše
+              </button>
+            </form>
+          </div>
+        </div>
       </header>
 
       <section className="rounded-lg border p-4">
@@ -129,7 +141,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           {event.galleries.length === 0 && (
             <li className="py-3 text-sm text-neutral-500">Zatím žádná galerie. Přidej ji níže.</li>
           )}
-          {event.galleries.map((gallery) => {
+          {event.galleries.map((gallery, index) => {
             const visible = isCardVisible(
               {
                 id: gallery.id,
@@ -248,6 +260,31 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                       Uložit
                     </button>
                   </form>
+
+                  {event.galleries.length > 1 && (
+                    <span className="flex items-center gap-1">
+                      <form action={moveGalleryInEvent.bind(null, gallery.id, "up")}>
+                        <button
+                          type="submit"
+                          disabled={index === 0}
+                          aria-label="Posunout nahoru"
+                          className="rounded border px-2 py-1 disabled:opacity-30"
+                        >
+                          ↑
+                        </button>
+                      </form>
+                      <form action={moveGalleryInEvent.bind(null, gallery.id, "down")}>
+                        <button
+                          type="submit"
+                          disabled={index === event.galleries.length - 1}
+                          aria-label="Posunout dolů"
+                          className="rounded border px-2 py-1 disabled:opacity-30"
+                        >
+                          ↓
+                        </button>
+                      </form>
+                    </span>
+                  )}
 
                   <form action={detachGalleryFromEvent.bind(null, gallery.id)}>
                     <button type="submit" className="rounded border px-2 py-1 text-red-600">

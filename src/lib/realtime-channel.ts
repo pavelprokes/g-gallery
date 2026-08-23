@@ -15,9 +15,19 @@
 
 const TOPIC_LENGTH = 16;
 
-/** Runs in the browser (Web Crypto) and on the server (node:crypto webcrypto). */
-export async function channelForToken(token: string): Promise<string> {
-  const bytes = new TextEncoder().encode(token);
+/**
+ * Derived from the gallery, not from the token that reached it.
+ *
+ * Hashing the token used to be the rule, and it split presence the moment one
+ * gallery had two ways in — two share links, or a share link and a wedding-page
+ * card (docs/GUEST-GALLERIES.md §4). Two audiences of the same gallery then
+ * counted each other as absent. The gallery id is not a secret that grants
+ * anything on its own, and it is still hashed, so the topic reveals nothing.
+ *
+ * Runs in the browser (Web Crypto) and on the server (node:crypto webcrypto).
+ */
+export async function channelForGallery(galleryId: string): Promise<string> {
+  const bytes = new TextEncoder().encode(`gallery:${galleryId}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hex = Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))

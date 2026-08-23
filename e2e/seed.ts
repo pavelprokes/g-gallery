@@ -127,11 +127,16 @@ async function main() {
     2,
   );
 
-  // Its own wedding+gallery so deleting inside it cannot disturb the counts the
-  // other specs assert on. Seeded with photos nobody's anonKey owns, which is
-  // what "somebody else's photo" looks like to a fresh browser context.
-  const selfDelete = await makeWedding(user.id, "Klára a Tomáš", "Mlýn Kamenice");
-  await makeEventGallery(user.id, selfDelete.id, "Od hostů", "od-hostu", true, 2, true);
+  // One per browser project. Deleting asserts on exact counts, and both
+  // projects run in parallel — sharing a gallery would make the count a race
+  // rather than a fact. Seeded with photos nobody's anonKey owns, which is what
+  // "somebody else's photo" looks like to a fresh browser context.
+  const selfDelete: Record<string, { token: string; slug: string }> = {};
+  for (const project of ["chromium", "mobile-safari"]) {
+    const wedding = await makeWedding(user.id, `Klára a Tomáš ${project}`, "Mlýn Kamenice");
+    await makeEventGallery(user.id, wedding.id, "Od hostů", "od-hostu", true, 2, true);
+    selfDelete[project] = { token: wedding.token, slug: wedding.slug };
+  }
 
   const solo = await makeWedding(user.id, "Eliška a Honza", "Zámek Loučeň");
   const soloGallery = await makeEventGallery(user.id, solo.id, "Od hostů", "od-hostu", true, 2);
@@ -153,8 +158,7 @@ async function main() {
       soloWeddingToken: solo.token,
       soloWeddingSlug: solo.slug,
       soloGalleryIds: [soloGallery],
-      selfDeleteToken: selfDelete.token,
-      selfDeleteSlug: selfDelete.slug,
+      selfDelete,
     }),
   );
 

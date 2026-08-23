@@ -9,6 +9,7 @@ import { DeletePhotoButton } from "@/components/delete-photo-button";
 import { decryptToken } from "@/lib/token-cipher";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
+import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { publishGallery, restoreGallery } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -99,6 +100,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                 Publikovat
               </button>
             </form>
+          )}
+          {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
+            <UnpublishGalleryButton galleryId={gallery.id} />
           )}
           {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
         </div>
