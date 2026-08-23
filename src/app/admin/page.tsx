@@ -6,6 +6,8 @@ import { BADGE_CAP, unreadCount } from "@/lib/feed";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
 import { EventCreatePanel } from "@/components/event-create-panel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export const dynamic = "force-dynamic";
 
@@ -80,18 +82,19 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      <form action={create} className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border p-4">
+      <form
+        action={create}
+        className="border-brand-border/60 mt-6 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+      >
         <label className="flex flex-col gap-1 text-sm">
           Název
-          <input name="title" required maxLength={200} className="rounded border px-2 py-1" />
+          <Input name="title" required maxLength={200} />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Datum akce
-          <input name="eventDate" type="date" className="rounded border px-2 py-1" />
+          <Input name="eventDate" type="date" />
         </label>
-        <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-          Vytvořit
-        </button>
+        <Button type="submit">Vytvořit</Button>
       </form>
 
       <div className="mt-6">
@@ -159,9 +162,9 @@ export default async function AdminPage() {
                     </p>
                   </div>
                   <form action={restoreEvent.bind(null, event.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                    <Button type="submit" variant="secondary" size="sm">
                       Obnovit
-                    </button>
+                    </Button>
                   </form>
                 </li>
               );
@@ -189,9 +192,9 @@ export default async function AdminPage() {
                     </p>
                   </div>
                   <form action={restoreGallery.bind(null, gallery.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                    <Button type="submit" variant="secondary" size="sm">
                       Obnovit
-                    </button>
+                    </Button>
                   </form>
                 </li>
               );

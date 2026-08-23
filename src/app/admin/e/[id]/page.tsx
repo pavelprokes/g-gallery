@@ -10,6 +10,8 @@ import {
   trashEvent,
 } from "../../actions";
 import { isCardVisible } from "@/lib/event-cards";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -86,13 +88,13 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           </p>
         </div>
         <form action={trashEvent.bind(null, event.id)}>
-          <button type="submit" className="rounded border px-3 py-1.5 text-sm text-red-600">
+          <Button type="submit" variant="destructive">
             Do koše
-          </button>
+          </Button>
         </form>
       </header>
 
-      <section className="rounded-lg border p-4">
+      <Card as="section">
         <h2 className="text-sm font-medium">Galerie na této svatbě</h2>
         <p className="mt-1 text-xs text-neutral-500">
           „Na stránce“ řídí jen kartu na rozcestníku. Vlastní odkaz galerie tím nezaniká — kdo ho
@@ -143,9 +145,9 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
 
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                   <form action={setGalleryListed.bind(null, gallery.id, !gallery.listedOnEvent)}>
-                    <button type="submit" className="rounded border px-2 py-1">
+                    <Button type="submit" variant="secondary" size="sm">
                       {gallery.listedOnEvent ? "Skrýt ze stránky" : "Zobrazit na stránce"}
-                    </button>
+                    </Button>
                   </form>
 
                   <form
@@ -160,7 +162,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                     <select
                       name="shareLinkId"
                       defaultValue={gallery.eventLinkId ?? ""}
-                      className="rounded border px-2 py-1"
+                      className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700 dark:bg-neutral-900"
                     >
                       <option value="">— žádný —</option>
                       {gallery.shareLinks.map((link) => (
@@ -170,15 +172,15 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                         </option>
                       ))}
                     </select>
-                    <button type="submit" className="rounded border px-2 py-1">
+                    <Button type="submit" variant="secondary" size="sm">
                       Uložit
-                    </button>
+                    </Button>
                   </form>
 
                   <form action={detachGalleryFromEvent.bind(null, gallery.id)}>
-                    <button type="submit" className="rounded border px-2 py-1 text-red-600">
+                    <Button type="submit" variant="destructive" size="sm">
                       Odebrat ze svatby
-                    </button>
+                    </Button>
                   </form>
                 </div>
 
@@ -191,10 +193,10 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
             );
           })}
         </ul>
-      </section>
+      </Card>
 
       {unattached.length > 0 && (
-        <section className="rounded-lg border p-4">
+        <Card as="section">
           <h2 className="text-sm font-medium">Přidat galerii</h2>
           <form
             action={async (formData: FormData) => {
@@ -203,18 +205,19 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
             }}
             className="mt-3 flex flex-wrap items-end gap-3"
           >
-            <select name="galleryId" className="rounded border px-2 py-1 text-sm">
+            <select
+              name="galleryId"
+              className="rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+            >
               {unattached.map((gallery) => (
                 <option key={gallery.id} value={gallery.id}>
                   {gallery.title}
                 </option>
               ))}
             </select>
-            <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-              Přidat
-            </button>
+            <Button type="submit">Přidat</Button>
           </form>
-        </section>
+        </Card>
       )}
     </main>
   );

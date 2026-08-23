@@ -1,6 +1,7 @@
 "use client";
 
 import { trashGallery } from "@/app/admin/actions";
+import { Button } from "@/components/ui/button";
 
 /**
  * Moves a gallery to trash. Reversible (30-day recovery window), but still a
@@ -18,9 +19,9 @@ export function DeleteGalleryButton({ galleryId }: { galleryId: string }) {
         }
       }}
     >
-      <button type="submit" className="rounded border px-3 py-1.5 text-sm text-red-600">
+      <Button type="submit" variant="destructive">
         Smazat
-      </button>
+      </Button>
     </form>
   );
 }

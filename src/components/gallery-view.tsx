@@ -48,6 +48,18 @@ import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import { srcFor } from "@/lib/image-src";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineToggle } from "@/components/offline-toggle";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { NavButton } from "@/components/ui/icon-button";
+import {
+  CheckCircleIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  DownloadIcon,
+  HeartIcon,
+} from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import {
   REACTION_EMOJI,
@@ -96,6 +108,16 @@ function targetRowHeight(containerWidth: number): number {
   if (containerWidth < 500) return 120;
   if (containerWidth < 900) return 160;
   return 220;
+}
+
+/**
+ * On a phone, a fixed 2-column grid (Google/Apple Photos' own pattern) reads
+ * calmer than an adaptive row that lands on 3+ narrow tiles depending on
+ * each photo's aspect ratio. Wider containers keep the adaptive row count —
+ * more columns there is the point, not a bug.
+ */
+function itemsPerRow(containerWidth: number): number | undefined {
+  return containerWidth < 640 ? 2 : undefined;
 }
 
 /** Gap between tiles, both within a row and between rows — the layout
@@ -510,6 +532,7 @@ function GalleryViewInner({
       containerWidth,
       targetRowHeight(containerWidth),
       GAP,
+      itemsPerRow(containerWidth),
     );
   }, [photos, containerWidth]);
 
@@ -1133,105 +1156,84 @@ function GalleryViewInner({
               // the photo.
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-4 rounded-lg ring-4 ring-blue-500/80 ring-inset"
+                className="ring-brand-border/80 pointer-events-none absolute inset-4 rounded-lg ring-4 ring-inset"
               />
             )}
           </div>
 
-          <button
-            type="button"
+          <NavButton
             onClick={(event) => {
               event.stopPropagation();
               move(-1);
             }}
-            className="absolute left-4 rounded-full bg-white/10 px-4 py-3 text-white"
+            className="absolute left-0"
             aria-label="Předchozí"
           >
-            ‹
-          </button>
-          <button
-            type="button"
+            <ChevronLeftIcon />
+          </NavButton>
+          <NavButton
             onClick={(event) => {
               event.stopPropagation();
               move(1);
             }}
             disabled={lightboxIndex! >= photos.length - 1 && !hasNextPage}
-            className="absolute right-4 rounded-full bg-white/10 px-4 py-3 text-white disabled:opacity-40"
+            className="absolute right-0"
             aria-label="Další"
           >
-            ›
-          </button>
+            <ChevronRightIcon />
+          </NavButton>
           <div
-            className="absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent p-4"
+            className="absolute inset-x-0 top-0 flex items-center gap-3 p-4"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={closeLightbox}
-              className="rounded-full bg-white/10 px-3 py-2 text-white hover:bg-white/20"
-              aria-label="Zavřít"
-            >
-              ✕
-            </button>
-
-            {mine.has(active.id) && (
+            <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md">
               <button
                 type="button"
-                disabled={deleting}
-                onClick={() => void deleteMine(active.id)}
-                className="rounded-full bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+                onClick={closeLightbox}
+                aria-label="Zavřít"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
               >
-                {deleting ? "Mažu…" : "Smazat mou fotku"}
+                <CloseIcon className="h-5 w-5" />
               </button>
-            )}
 
-            {allowDownload && (
-              <button
-                type="button"
-                onClick={() => pick(lightboxIndex!, active.id, false)}
-                aria-pressed={activeSelected}
-                className={`flex items-center gap-2 rounded-full py-2 pr-4 pl-2 text-sm transition ${
-                  activeSelected
-                    ? "bg-blue-600 text-white"
-                    : "bg-white/10 text-white hover:bg-white/20"
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs ${
-                    activeSelected ? "border-white bg-white text-blue-600" : "border-white/80"
+              {mine.has(active.id) && (
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => void deleteMine(active.id)}
+                  className="flex h-11 items-center rounded-full px-3 text-sm text-white transition-colors hover:bg-white/15 disabled:opacity-50"
+                >
+                  {deleting ? "Mažu…" : "Smazat mou fotku"}
+                </button>
+              )}
+
+              {allowDownload && (
+                <button
+                  type="button"
+                  onClick={() => pick(lightboxIndex!, active.id, false)}
+                  aria-pressed={activeSelected}
+                  aria-label={activeSelected ? "Vybráno" : "Vybrat"}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
+                    activeSelected ? "" : "hover:bg-white/15"
                   }`}
                 >
-                  ✓
-                </span>
-                {activeSelected ? "Vybráno" : "Vybrat"}
-              </button>
-            )}
+                  {activeSelected ? (
+                    <CheckCircleIcon className="text-brand-primary h-5 w-5" />
+                  ) : (
+                    <CheckIcon className="h-5 w-5" />
+                  )}
+                </button>
+              )}
+            </div>
 
             <span className="ml-auto text-sm text-white/70 tabular-nums">
               {lightboxIndex! + 1} / {photos.length}
               {hasNextPage && "+"}
             </span>
-
-            {allowDownload && selection.ids.size > 0 && (
-              <>
-                <span className="text-sm text-white/70">
-                  {pluralize(selection.ids.size, FORMS.selected)}
-                </span>
-                <button
-                  type="button"
-                  disabled={zipState === "preparing"}
-                  onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
-                  className="rounded-full bg-white px-4 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
-                >
-                  {zipState === "preparing" ? "Připravuji…" : "Stáhnout"}
-                </button>
-              </>
-            )}
           </div>
 
           <div
-            className="absolute bottom-4 flex items-center gap-3"
+            className="absolute bottom-4 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md"
             onClick={(event) => event.stopPropagation()}
           >
             {allowReactions && (
@@ -1240,7 +1242,8 @@ function GalleryViewInner({
                   active={favorites.has(active.id)}
                   count={counts.get(active.id) ?? active.favoriteCount}
                   onClick={() => toggleFavorite(active.id)}
-                  className="bg-white/10 text-white"
+                  size="lg"
+                  bare
                 />
                 <ReactionBar
                   state={reactions.get(active.id)}
@@ -1253,9 +1256,10 @@ function GalleryViewInner({
                 type="button"
                 disabled={zipState === "preparing"}
                 onClick={() => void downloadZip([active.id])}
-                className="rounded-full bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+                aria-label={zipState === "preparing" ? "Připravuji stažení" : "Stáhnout originál"}
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 disabled:opacity-50"
               >
-                {zipState === "preparing" ? "Připravuji…" : "Stáhnout originál"}
+                <DownloadIcon className="h-5 w-5" />
               </button>
             )}
           </div>
@@ -1281,12 +1285,12 @@ function GalleryViewInner({
 
       <footer className="mt-10 space-y-4 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
         {photos.length > 0 && (
-          <div className="rounded-lg border p-4">
+          <Card>
             <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
               Offline přístup
             </p>
             <OfflineToggle token={token} objectKeys={photos.map((photo) => photo.objectKey)} />
-          </div>
+          </Card>
         )}
         <p>
           Počítáme návštěvy galerie pomocí identifikátoru uloženého jen ve tvém prohlížeči — slouží
@@ -1425,7 +1429,7 @@ const PhotoTile = memo(function PhotoTile({
           }
           onOpen(index);
         }}
-        className="relative block h-full w-full overflow-hidden rounded"
+        className="relative block h-full w-full overflow-hidden rounded-xl"
         // The tile carries the photo's own average colour, so the grid fills
         // in with the picture's palette instead of grey holes.
         style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
@@ -1441,7 +1445,7 @@ const PhotoTile = memo(function PhotoTile({
           // sized to the photo's own aspect ratio, so `fill` + the exact
           // rendered box is enough; no crop, no letterbox.
           className={`object-cover transition-transform duration-200 ${
-            selected ? "scale-90 rounded" : "hover:scale-105"
+            selected ? "scale-90 rounded-xl" : "hover:scale-105"
           }`}
         />
       </button>
@@ -1473,21 +1477,34 @@ function HeartButton({
   count,
   onClick,
   className = "",
+  size = "sm",
+  bare = false,
 }: {
   active: boolean;
   count: number;
   onClick: () => void;
   className?: string;
+  /** "lg" is the lightbox's larger badge; "sm" (default) is the compact grid-tile badge — both keep a ≥44px touch target. */
+  size?: "sm" | "lg";
+  /** True inside the lightbox's shared blurred bar, which already supplies the background. */
+  bare?: boolean;
 }) {
+  const sizeClasses =
+    size === "lg"
+      ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
+      : "min-h-11 min-w-11 px-2 py-1 text-xs";
+  const chromeClasses = bare
+    ? "hover:bg-white/15"
+    : "bg-black/40 backdrop-blur-sm hover:bg-black/55";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
       aria-label={active ? "Odebrat z oblíbených" : "Přidat do oblíbených"}
-      className={`flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm ${className}`}
+      className={`flex items-center justify-center gap-1 rounded-full text-white transition-colors ${sizeClasses} ${chromeClasses} ${className}`}
     >
-      <span aria-hidden>{active ? "♥" : "♡"}</span>
+      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-3.5 w-3.5"} active={active} />
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>
   );
@@ -1526,7 +1543,7 @@ function SelectCheck({
       }}
       className={`absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs transition-opacity ${
         selected
-          ? "border-white bg-blue-600 text-white opacity-100"
+          ? "bg-brand-primary border-white text-white opacity-100"
           : `border-white/80 bg-black/25 text-transparent hover:bg-black/45 ${
               pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
             }`
@@ -1549,7 +1566,7 @@ function ReactionBar({
   onPick: (kind: ReactionKind) => void;
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 backdrop-blur-sm">
+    <div className="flex items-center gap-1">
       {REACTION_KINDS.map((kind) => {
         const count = state?.counts[kind] ?? 0;
         const mine = state?.mine === kind;
@@ -1561,7 +1578,7 @@ function ReactionBar({
             aria-pressed={mine}
             aria-label={REACTION_LABEL[kind]}
             title={REACTION_LABEL[kind]}
-            className={`flex items-center gap-1 rounded-full px-2 py-1 text-sm transition-transform ${
+            className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-sm transition-transform ${
               mine ? "scale-110 bg-white/25" : "hover:bg-white/15"
             }`}
           >
@@ -1650,16 +1667,10 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
           className="w-full rounded border px-3 py-2"
         />
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded border px-3 py-1.5 text-sm"
-            onClick={() => onSubmit("")}
-          >
+          <Button type="button" variant="secondary" onClick={() => onSubmit("")}>
             Přeskočit
-          </button>
-          <button type="submit" className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white">
-            Uložit
-          </button>
+          </Button>
+          <Button type="submit">Uložit</Button>
         </div>
       </form>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Owner-side Web Push opt-in (docs/PLAN.md §8).
@@ -129,14 +130,13 @@ export function PushToggle() {
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         disabled={state === "busy"}
         onClick={() => void (state === "on" ? disable() : enable())}
-        className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
       >
         {state === "on" ? "Vypnout notifikace" : "Zapnout notifikace"}
-      </button>
+      </Button>
       {state === "off" && (
         <span className="text-xs text-neutral-500">Na iPhonu funguje až po přidání na plochu.</span>
       )}

@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { createShareLink, revokeShareLink } from "@/app/admin/actions";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface ShareLinkRow {
   id: string;
@@ -38,66 +42,57 @@ export function ShareLinkPanel({
   }
 
   return (
-    <section className="rounded-lg border p-4">
+    <Card as="section">
       <h2 className="text-sm font-medium">Sdílené odkazy</h2>
 
       {!published && (
         // Every share surface refuses an unpublished gallery, so a link created
         // now looks valid but 404s until the gallery is published.
-        <p className="mt-2 rounded border border-amber-400 bg-amber-50 p-2 text-xs dark:bg-amber-950/30">
+        <Alert compact className="mt-2">
           Galerie zatím není publikovaná — odkazy vytvořené teď budou vracet 404, dokud ji
           nepublikuješ.
-        </p>
+        </Alert>
       )}
 
       <form action={submit} className="mt-3 flex flex-wrap items-end gap-3">
         <input type="hidden" name="galleryId" value={galleryId} />
         <label className="flex flex-col gap-1 text-sm">
           Popis
-          <input name="label" maxLength={200} className="rounded border px-2 py-1" />
+          <Input name="label" maxLength={200} />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Heslo (volitelné)
-          <input name="password" type="text" minLength={4} className="rounded border px-2 py-1" />
+          <Input name="password" type="text" minLength={4} />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Platnost (dnů)
-          <input
-            name="expiresInDays"
-            type="number"
-            min={1}
-            max={3650}
-            className="w-28 rounded border px-2 py-1"
-          />
+          <Input name="expiresInDays" type="number" min={1} max={3650} className="w-28" />
         </label>
         <label className="flex items-center gap-2 pb-1.5 text-sm">
           <input name="allowUpload" type="checkbox" value="1" className="size-4" />
           Hosté smí nahrávat
         </label>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pending}>
           Vytvořit odkaz
-        </button>
+        </Button>
       </form>
 
       {freshUrl && (
-        <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+        <Alert className="mt-3">
           <p className="font-medium">Odkaz zkopíruj teď — už se nikdy nezobrazí.</p>
           <code className="mt-1 block text-xs break-all">{freshUrl}</code>
           {!published && (
             <p className="mt-1 text-xs">Než ho pošleš, galerii publikuj — jinak vrací 404.</p>
           )}
-          <button
-            type="button"
-            className="mt-2 rounded border px-2 py-1 text-xs"
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
             onClick={() => void navigator.clipboard.writeText(freshUrl)}
           >
             Kopírovat
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       <ul className="mt-4 divide-y text-sm">
@@ -117,17 +112,13 @@ export function ShareLinkPanel({
               </p>
             </div>
             {!link.revokedAt && (
-              <button
-                type="button"
-                className="rounded border px-2 py-1 text-xs text-red-600"
-                onClick={() => void revokeShareLink(link.id)}
-              >
+              <Button variant="destructive" size="sm" onClick={() => void revokeShareLink(link.id)}>
                 Zrušit
-              </button>
+              </Button>
             )}
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }

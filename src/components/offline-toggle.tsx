@@ -13,6 +13,7 @@ import {
   type OfflineProgress,
 } from "@/lib/offline";
 import { FORMS, pluralize } from "@/lib/czech-plural";
+import { Button } from "@/components/ui/button";
 
 /**
  * "Keep this gallery on the device".
@@ -138,7 +139,9 @@ export function OfflineToggle({
           V zařízení není dost místa. Galerie potřebuje zhruba {formatBytes(estimated)}
           {free !== null && `, volno je ${formatBytes(free)}`}.
         </Note>
-        <Button onClick={() => setState("off")}>Zkusit znovu</Button>
+        <Button variant="secondary" onClick={() => setState("off")}>
+          Zkusit znovu
+        </Button>
         <LiveRegion>
           Nedostatek místa v úložišti. Galerie potřebuje zhruba {formatBytes(estimated)}
           {free !== null && `, volno je ${formatBytes(free)}`}.
@@ -187,7 +190,9 @@ export function OfflineToggle({
           může po čase sám uvolnit — na iPhonu zhruba po týdnu bez otevření; pak stačí stáhnout
           znovu.
         </p>
-        <Button onClick={() => void remove()}>Odstranit ze zařízení</Button>
+        <Button variant="secondary" onClick={() => void remove()}>
+          Odstranit ze zařízení
+        </Button>
         <LiveRegion>Staženo, galerie je dostupná offline.</LiveRegion>
       </div>
     );
@@ -197,7 +202,9 @@ export function OfflineToggle({
     return (
       <div className="space-y-2">
         <Note>Stažení se nepodařilo dokončit.</Note>
-        <Button onClick={() => void start()}>Zkusit znovu</Button>
+        <Button variant="secondary" onClick={() => void start()}>
+          Zkusit znovu
+        </Button>
         <LiveRegion>Stažení se nepodařilo.</LiveRegion>
       </div>
     );
@@ -215,14 +222,6 @@ export function OfflineToggle({
       </p>
       <Button onClick={() => void start()}>Zpřístupnit offline</Button>
     </div>
-  );
-}
-
-function Button({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="rounded border px-3 py-1.5 text-sm">
-      {children}
-    </button>
   );
 }
 
