@@ -46,8 +46,9 @@ test.describe("guest uploads", () => {
   test("a link with allowUpload adds a photo the grid then shows", async ({ page }) => {
     await page.goto(`/g/${seed.uploadToken}/${seed.uploadSlug}`);
 
-    const addButton = page.getByRole("button", { name: "Přidat fotky" });
-    await expect(addButton).toBeVisible();
+    // A label wrapping the file input, not a <button> — see the tappability
+    // test below for why.
+    await expect(page.getByLabel("Přidat fotky")).toBeVisible();
 
     const before = await tileCount(page);
 
@@ -123,14 +124,35 @@ test.describe("guest uploads", () => {
     await expect(page.getByRole("button", { name: "Smazat mou fotku" })).toHaveCount(0);
   });
 
+  test("the file inputs are tappable, not display:none", async ({ page }) => {
+    await page.goto(`/g/${seed.uploadToken}/${seed.uploadSlug}`);
+
+    // Regression guard. The buttons used to call input.click() on a
+    // display:none input, which iOS Safari refuses to honour — nothing at all
+    // happened on an iPhone, the one device this bar exists for. Playwright
+    // drives inputs directly via setInputFiles, so no other test can catch it.
+    const picker = page.getByLabel("Přidat fotky");
+    const camera = page.getByLabel("Vyfotit");
+
+    await expect(picker).toBeVisible();
+    await expect(camera).toBeVisible();
+
+    for (const input of [picker, camera]) {
+      const box = await input.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThan(0);
+      expect(box?.height ?? 0).toBeGreaterThan(0);
+      await expect(input).toHaveCSS("display", /^(?!none$)/);
+    }
+  });
+
   test("a read-only link to the same gallery offers no way to upload", async ({ page }) => {
     await page.goto(`/g/${seed.readOnlyToken}/${seed.uploadSlug}`);
 
     // Asserting on the title rather than the grid: this gallery may still be
     // empty depending on worker order, and an empty grid renders zero-height.
     await expect(page).toHaveTitle(/E2E Guest Gallery/);
-    await expect(page.getByRole("button", { name: "Přidat fotky" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Vyfotit" })).toHaveCount(0);
+    await expect(page.getByLabel("Přidat fotky")).toHaveCount(0);
+    await expect(page.getByLabel("Vyfotit")).toHaveCount(0);
   });
 
   test("the server refuses an upload through a read-only link, not just the UI", async ({

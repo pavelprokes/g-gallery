@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   dismissNamePrompt,
   getViewerId,
@@ -50,8 +50,6 @@ export function GuestUploader({
   const [fatal, setFatal] = useState<string | null>(null);
   const [askName, setAskName] = useState(false);
   const [resuming, setResuming] = useState(false);
-  const pickRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
 
   // GDPR take-down route (docs/GUEST-GALLERIES.md §10). Read from the
   // environment rather than hard-coded: an address invented here would be a
@@ -237,23 +235,47 @@ export function GuestUploader({
             </p>
           )}
 
+          {/*
+            The file input *is* the button, stretched over it at zero opacity,
+            rather than a real button calling input.click() on a hidden input.
+            iOS Safari refuses to open the picker for an input that is
+            display:none, so the previous version did nothing at all on an
+            iPhone — the one device this bar exists for. Tapping here taps the
+            input itself, which every browser handles natively.
+          */}
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={running}
-              onClick={() => pickRef.current?.click()}
-              className="flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-base font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+            <label
+              className={`relative flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-center text-base font-medium text-white dark:bg-neutral-100 dark:text-neutral-900 ${
+                running ? "pointer-events-none opacity-50" : "cursor-pointer"
+              }`}
             >
               Přidat fotky
-            </button>
-            <button
-              type="button"
-              disabled={running}
-              onClick={() => cameraRef.current?.click()}
-              className="rounded-lg border px-4 py-3 text-base font-medium disabled:opacity-50"
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                disabled={running}
+                aria-label="Přidat fotky"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) => pick(event.target.files)}
+              />
+            </label>
+            <label
+              className={`relative rounded-lg border px-4 py-3 text-base font-medium ${
+                running ? "pointer-events-none opacity-50" : "cursor-pointer"
+              }`}
             >
               Vyfotit
-            </button>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                disabled={running}
+                aria-label="Vyfotit"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) => pick(event.target.files)}
+              />
+            </label>
           </div>
 
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -267,23 +289,6 @@ export function GuestUploader({
             )}
             .
           </p>
-
-          <input
-            ref={pickRef}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(event) => pick(event.target.files)}
-          />
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            className="hidden"
-            onChange={(event) => pick(event.target.files)}
-          />
         </div>
       </div>
 
