@@ -476,14 +476,21 @@ function GalleryViewInner({
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  const rowIndexForPhoto = useMemo(() => {
-    const map = new Map<number, number>();
+  // `rowStarts[i]` is the flat photo index of row i's first tile — together
+  // with `rowIndexForPhoto` this is enough to convert a flat index to a
+  // (row, column) position and back, which ArrowUp/ArrowDown need below:
+  // justified rows vary in length, so a flat-index step by "the current
+  // row's length" over/undershoots into the wrong row.
+  const { rowIndexForPhoto, rowStarts } = useMemo(() => {
+    const rowIndexForPhoto = new Map<number, number>();
+    const rowStarts: number[] = [];
+    let seen = 0;
     rows.forEach((row, rowIndex) => {
-      let seen = 0;
-      for (let i = 0; i < rowIndex; i += 1) seen += rows[i]!.items.length;
-      row.items.forEach((_, offset) => map.set(seen + offset, rowIndex));
+      rowStarts.push(seen);
+      row.items.forEach((_, offset) => rowIndexForPhoto.set(seen + offset, rowIndex));
+      seen += row.items.length;
     });
-    return map;
+    return { rowIndexForPhoto, rowStarts };
   }, [rows]);
 
   const onTileFocus = useCallback((index: number) => setRovingIndex(index), []);
@@ -515,30 +522,35 @@ function GalleryViewInner({
 
   const onGridKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLUListElement>) => {
-      const deltas: Partial<Record<string, number>> = {
-        ArrowRight: 1,
-        ArrowLeft: -1,
-      };
-      const rowStep = rows.find((r) => r.items.some((i) => photoIds[rovingIndex] === i.item.id))
-        ?.items.length;
-      if (event.key === "ArrowDown" && rowStep) deltas.ArrowDown = rowStep;
-      if (event.key === "ArrowUp" && rowStep) deltas.ArrowUp = -rowStep;
-
-      const delta = deltas[event.key];
-      if (delta === undefined && event.key !== "Home" && event.key !== "End") return;
-      if (photos.length === 0) return;
-
+      const key = event.key;
+      const isGridKey =
+        key === "ArrowRight" ||
+        key === "ArrowLeft" ||
+        key === "ArrowDown" ||
+        key === "ArrowUp" ||
+        key === "Home" ||
+        key === "End";
+      if (!isGridKey || photos.length === 0) return;
       event.preventDefault();
-      const next =
-        event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? photos.length - 1
-            : Math.min(Math.max(rovingIndex + (delta ?? 0), 0), photos.length - 1);
 
-      moveRoving(next);
+      if (key === "Home") return moveRoving(0);
+      if (key === "End") return moveRoving(photos.length - 1);
+      if (key === "ArrowRight") return moveRoving(Math.min(rovingIndex + 1, photos.length - 1));
+      if (key === "ArrowLeft") return moveRoving(Math.max(rovingIndex - 1, 0));
+
+      // ArrowDown/ArrowUp: move to the same visual column in the adjacent
+      // row rather than stepping the flat index by a row's length — rows
+      // vary in length (justified layout), so a flat step over/undershoots
+      // into the wrong row from anywhere but the first column.
+      const rowIndex = rowIndexForPhoto.get(rovingIndex);
+      if (rowIndex === undefined) return;
+      const targetRow = rowIndex + (key === "ArrowDown" ? 1 : -1);
+      if (targetRow < 0 || targetRow >= rows.length) return;
+      const column = rovingIndex - rowStarts[rowIndex]!;
+      const targetColumn = Math.min(column, rows[targetRow]!.items.length - 1);
+      moveRoving(rowStarts[targetRow]! + targetColumn);
     },
-    [photos.length, photoIds, rovingIndex, rows, moveRoving],
+    [photos.length, rovingIndex, rows, rowIndexForPhoto, rowStarts, moveRoving],
   );
 
   const pick = useCallback(
