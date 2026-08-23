@@ -6,6 +6,7 @@ import type { GalleryPhoto } from "@/components/gallery-view";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import { srcFor } from "@/lib/image-src";
 import { holdScreenAwake } from "@/lib/wake-lock";
+import { slideshowTiming } from "@/lib/slideshow-settings";
 
 /**
  * The projection for the party (docs/GUEST-GALLERIES.md, F5): photos on the
@@ -15,8 +16,8 @@ import { holdScreenAwake } from "@/lib/wake-lock";
  * next to — arrows, counters and a scrubber would only be things for a guest
  * to poke at. Escape or a click leaves; that is the whole interface.
  */
-const ADVANCE_MS = 6_000;
-const FADE_MS = 1_200;
+/** Pacing lives in one place — see `src/lib/slideshow-settings.ts`. */
+const { advanceMs: ADVANCE_MS, fadeMs: FADE_MS } = slideshowTiming();
 /** How often to look for photos guests have added since this started. */
 const REFRESH_MS = 30_000;
 
