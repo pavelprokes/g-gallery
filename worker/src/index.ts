@@ -68,25 +68,13 @@ export default {
 
     const { entries: manifestEntries, archiveName } = verified.manifest;
 
-    const entries: ZipEntry[] = manifestEntries.map((entry) => ({
-      name: entry.name,
-      size: entry.size,
-      // A missing CRC would produce an archive every extractor rejects, so it
-      // is caught here rather than 8 GB later.
-      crc32: Number.parseInt(entry.crc32 ?? "", 16) >>> 0,
-    }));
-
-    const missing = manifestEntries.findIndex((entry) => !entry.crc32 || !entry.size);
-    if (missing >= 0) {
-      return new Response(`Entry ${manifestEntries[missing]!.name} has no checksum or size`, {
-        status: 409,
-      });
-    }
-
     // One photo is served as that photo, not as a one-entry archive. This is
     // also what fixes per-photo download: the browser ignores the `download`
     // attribute cross-origin, so a plain link to R2 merely displays a 24 MB
     // JPEG. Content-Disposition is the only thing that actually saves a file.
+    // This branch reads the object straight out of R2 and never builds a ZIP
+    // central directory, so it must not be gated on the CRC/size check below
+    // — that check exists only for what the ZIP format itself requires.
     if (manifestEntries.length === 1) {
       const only = manifestEntries[0]!;
       const object = await env.PHOTOS.get(only.key);
@@ -103,6 +91,21 @@ export default {
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         },
+      });
+    }
+
+    const entries: ZipEntry[] = manifestEntries.map((entry) => ({
+      name: entry.name,
+      size: entry.size,
+      // A missing CRC would produce an archive every extractor rejects, so it
+      // is caught here rather than 8 GB later.
+      crc32: Number.parseInt(entry.crc32 ?? "", 16) >>> 0,
+    }));
+
+    const missing = manifestEntries.findIndex((entry) => !entry.crc32 || !entry.size);
+    if (missing >= 0) {
+      return new Response(`Entry ${manifestEntries[missing]!.name} has no checksum or size`, {
+        status: 409,
       });
     }
 

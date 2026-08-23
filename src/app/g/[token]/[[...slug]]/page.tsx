@@ -85,7 +85,10 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       // API route uses for every subsequent page.
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        // Newest upload first (2026-08-23, Pavel's call) — must match the
+        // cursor-paginated API route's own orderBy exactly, or scrolling
+        // past the first page would reshuffle what the viewer already saw.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: PHOTOS_PAGE_SIZE + 1,
         select: {
           id: true,

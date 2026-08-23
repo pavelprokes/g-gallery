@@ -422,7 +422,10 @@ noindex, contrast`.
    scrypt CPU-amplification angle is actually closed, not just UI-throttled.
 2. ✅ Lightbox: seed the background with the tile's placeholder colour instead of `transparent`
    before the full image loads (§3.2); push a history entry on open so back/Escape close it
-   symmetrically (§4.2).
+   symmetrically (§4.2). **Superseded 2026-08-23**: the placeholder-colour background was
+   replaced with a fixed black background plus a real opacity fade-in on load (Pavel's call,
+   matching Google Photos) — the black flash this item fixed no longer reads as broken once the
+   image actually fades in instead of popping in, so masking it with colour stopped being needed.
 3. ✅ Arrow-key navigation across the grid with a roving `tabindex` (§5.5).
 4. ✅ `React.memo` the photo tile (§3.4) — the shared long-press ref moved to a local one per
    tile in the process (a new `react-hooks/immutability` lint rule flags mutating a ref passed

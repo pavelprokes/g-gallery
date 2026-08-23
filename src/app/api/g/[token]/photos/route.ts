@@ -12,11 +12,12 @@ const querySchema = z.object({
 });
 
 /**
- * Keyset (cursor) pagination over a gallery's confirmed photos, ordered by
- * `createdAt` — the same ordering the first server-rendered page already
- * uses (`src/app/g/[token]/page.tsx`), so switching pages never reshuffles
- * what the viewer has already seen. `id` is the tiebreaker: two photos
- * confirmed in the same upload batch can share a millisecond `createdAt`.
+ * Keyset (cursor) pagination over a gallery's confirmed photos, newest
+ * upload first (`createdAt desc`, 2026-08-23) — the same ordering the first
+ * server-rendered page already uses (`src/app/g/[token]/[[...slug]]/page.tsx`),
+ * so switching pages never reshuffles what the viewer has already seen.
+ * `id` is the tiebreaker: two photos confirmed in the same upload batch can
+ * share a millisecond `createdAt`.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/photos">) {
   const { token } = await ctx.params;
@@ -39,13 +40,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       ...(cursor
         ? {
             OR: [
-              { createdAt: { gt: cursor.createdAt } },
-              { createdAt: cursor.createdAt, id: { gt: cursor.id } },
+              { createdAt: { lt: cursor.createdAt } },
+              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
             ],
           }
         : {}),
     },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: PHOTOS_PAGE_SIZE + 1,
     select: {
       id: true,

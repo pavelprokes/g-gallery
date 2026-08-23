@@ -218,6 +218,10 @@ function GalleryViewInner({
   archiveZipUrl,
 }: GalleryViewProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // Which photo's full-res image has actually finished loading — drives the
+  // lightbox fade-in below. Starts at null so even the very first photo
+  // fades in rather than popping straight onto the black background.
+  const [loadedPhotoId, setLoadedPhotoId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState<Map<string, number>>(
     () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
@@ -227,6 +231,10 @@ function GalleryViewInner({
   // Which reaction the name prompt interrupted, so it can be sent afterwards.
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  // Which way the viewer was last moving through the lightbox — the preload
+  // effect uses this to warm a photo two steps ahead, not just one, so fast
+  // repeated next/prev doesn't keep outrunning the network by exactly one.
+  const lastDirection = useRef<1 | -1>(1);
   const [selection, setSelection] = useState(EMPTY_SELECTION);
   const [zipState, setZipState] = useState<"idle" | "preparing" | "error">("idle");
 
@@ -586,6 +594,14 @@ function GalleryViewInner({
           body: JSON.stringify({ photoIds: ids }),
         });
         if (!response.ok) {
+          // The UI message stays generic and calm either way — this is only
+          // so a real failure is diagnosable from the console instead of a
+          // guess, since the route's reason (no_photos, DOWNLOAD_DISABLED,
+          // ZIP_NOT_CONFIGURED, ...) would otherwise be silently discarded.
+          const body: unknown = await response.json().catch(() => null);
+          const reason =
+            body && typeof body === "object" && "error" in body ? body.error : response.status;
+          console.error(`ZIP manifest request failed: ${String(reason)}`);
           setZipState("error");
           return;
         }
@@ -608,7 +624,8 @@ function GalleryViewInner({
         form.remove();
 
         setZipState("idle");
-      } catch {
+      } catch (error) {
+        console.error("ZIP manifest request threw", error);
         setZipState("error");
       }
     },
@@ -640,6 +657,7 @@ function GalleryViewInner({
    */
   const move = useCallback(
     (delta: number) => {
+      lastDirection.current = delta > 0 ? 1 : -1;
       setLightboxIndex((current) => {
         if (current === null) return current;
         const requested = current + delta;
@@ -728,7 +746,11 @@ function GalleryViewInner({
   }, [allowDownload, closeLightbox, lightboxIndex, move, namePromptFor, photos, pick]);
 
   /**
-   * Warms the next and previous photo while the current one is on screen.
+   * Warms the next and previous photo while the current one is on screen,
+   * plus a third one two steps further in whichever direction the viewer was
+   * last moving — one-ahead alone always trails a viewer clicking "next"
+   * faster than a preload can land, so fast repeated browsing kept stalling
+   * on the swipe after the one this effect had time to warm.
    *
    * Without this every swipe is a cold fetch of 120 kB on a phone and up to
    * 600 kB on a retina desktop, so the screen goes blank for as long as that
@@ -743,12 +765,16 @@ function GalleryViewInner({
   useEffect(() => {
     if (lightboxIndex === null || photos.length < 2) return;
 
+    // No wrapping past either loaded end: the next page may not have landed
+    // yet (see `move`, above) and, symmetrically, the "previous" of index 0
+    // isn't the last loaded photo — wrapping would warm the wrong photo in
+    // both directions.
+    const inRange = (index: number) => index >= 0 && index < photos.length;
+    const ahead = lightboxIndex + 2 * lastDirection.current;
     const neighbours = [
-      // No forward neighbour to preload past the last loaded photo — the
-      // next page hasn't landed yet (see `move`, above), so there's nothing
-      // to warm and wrapping to photos[0] would preload the wrong photo.
-      lightboxIndex + 1 < photos.length ? photos[lightboxIndex + 1] : undefined,
-      photos[(lightboxIndex - 1 + photos.length) % photos.length],
+      inRange(lightboxIndex + 1) ? photos[lightboxIndex + 1] : undefined,
+      inRange(lightboxIndex - 1) ? photos[lightboxIndex - 1] : undefined,
+      inRange(ahead) ? photos[ahead] : undefined,
     ];
 
     const links = neighbours
@@ -979,8 +1005,7 @@ function GalleryViewInner({
           onClick={closeLightbox}
         >
           <div
-            className="relative h-full w-full touch-pan-y"
-            style={{ backgroundColor: placeholderStyle(active.placeholder) }}
+            className="relative h-full w-full touch-pan-y bg-black"
             onClick={(event) => event.stopPropagation()}
             onTouchStart={(event) => {
               const touch = event.touches[0];
@@ -1004,9 +1029,10 @@ function GalleryViewInner({
               alt={active.fileName}
               fill
               sizes="100vw"
+              onLoad={() => setLoadedPhotoId(active.id)}
               className={`object-contain transition-all duration-200 ${
                 activeSelected ? "scale-[0.93]" : ""
-              }`}
+              } ${loadedPhotoId === active.id ? "opacity-100" : "opacity-0"}`}
               priority
             />
             {activeSelected && (
