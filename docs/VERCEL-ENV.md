@@ -25,24 +25,25 @@ error to notice.
 
 ## Required — the app will not work without these
 
-| Variable                          | Scope     | Notes                                                                      |
-| --------------------------------- | --------- | -------------------------------------------------------------------------- |
-| `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`          |
-| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI                 |
-| `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                  |
-| `BETTER_AUTH_URL`                 | runtime   | `https://photos.svatebni-fotograf-cechy.cz` — **not** the apex, see below  |
-| `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                    |
-| `GOOGLE_CLIENT_SECRET`            | runtime   |                                                                            |
-| `ADMIN_EMAILS`                    | runtime   | The only thing separating you from clients, who also sign in with Google   |
-| `R2_ACCOUNT_ID`                   | runtime   |                                                                            |
-| `R2_ACCESS_KEY_ID`                | runtime   |                                                                            |
-| `R2_SECRET_ACCESS_KEY`            | runtime   |                                                                            |
-| `R2_BUCKET`                       | runtime   | `g-gallery`                                                                |
-| `R2_ENDPOINT`                     | runtime   | `https://<account>.eu.r2.cloudflarestorage.com` — note `.eu.`              |
-| `S3_REGION`                       | runtime   | `auto` — R2 accepts nothing else                                           |
-| `CRON_SECRET`                     | runtime   | See "Cron" below                                                           |
-| **`NEXT_PUBLIC_PHOTOS_BASE_URL`** | **build** | `https://cdn.svatebni-fotograf-cechy.cz` — the R2/Images host, not the app |
-| **`NEXT_PUBLIC_IMAGE_TRANSFORM`** | **build** | `cloudflare`                                                               |
+| Variable                          | Scope     | Notes                                                                                                                                                                                              |
+| --------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`                                                                                                                                  |
+| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI                                                                                                                                         |
+| `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                                                                                                                                          |
+| `BETTER_AUTH_URL`                 | runtime   | `https://photos.svatebni-fotograf-cechy.cz` — **not** the apex, see below                                                                                                                          |
+| `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                                                                                                                                            |
+| `GOOGLE_CLIENT_SECRET`            | runtime   |                                                                                                                                                                                                    |
+| `ADMIN_EMAILS`                    | runtime   | The only thing separating you from clients, who also sign in with Google                                                                                                                           |
+| `R2_ACCOUNT_ID`                   | runtime   |                                                                                                                                                                                                    |
+| `R2_ACCESS_KEY_ID`                | runtime   |                                                                                                                                                                                                    |
+| `R2_SECRET_ACCESS_KEY`            | runtime   |                                                                                                                                                                                                    |
+| `R2_BUCKET`                       | runtime   | `g-gallery`                                                                                                                                                                                        |
+| `R2_ENDPOINT`                     | runtime   | `https://<account>.eu.r2.cloudflarestorage.com` — note `.eu.`                                                                                                                                      |
+| `S3_REGION`                       | runtime   | `auto` — R2 accepts nothing else                                                                                                                                                                   |
+| `CRON_SECRET`                     | runtime   | See "Cron" below                                                                                                                                                                                   |
+| **`NEXT_PUBLIC_PHOTOS_BASE_URL`** | **build** | `https://cdn.svatebni-fotograf-cechy.cz` — the R2/Images host, not the app                                                                                                                         |
+| **`NEXT_PUBLIC_IMAGE_TRANSFORM`** | **build** | `cloudflare`                                                                                                                                                                                       |
+| `NEXT_PUBLIC_TAKEDOWN_EMAIL`      | **build** | Optional. Address guests are pointed at to ask for a photo of theirs to be removed (docs/GUEST-GALLERIES.md §10). Unset: the copy points them at the couple instead, who can delete it themselves. |
 
 ### Google OAuth redirect URI
 

@@ -4,12 +4,8 @@ import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
-import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
-import {
-  IMAGE_GRANT_TTL_SECONDS,
-  signImageAccess,
-  type SignedImageGrant,
-} from "@/lib/image-signing";
+import { ShareLinkDead } from "@/components/share-link-dead";
+import { loadGalleryViewData } from "@/lib/shared-gallery";
 
 // Dynamic by definition: token validity, expiry, revocation, and the password
 // unlock cookie are checked server-side on every request (docs/PLAN.md §4).
@@ -54,117 +50,26 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
 
   if (!access.ok) {
     if (access.reason === "PASSWORD_REQUIRED") return <SharePasswordForm token={token} />;
-
-    if (access.reason === "EXPIRED" || access.reason === "REVOKED") {
-      return (
-        <main className="flex min-h-dvh items-center justify-center p-8 text-center">
-          <div>
-            <h1 className="text-xl font-semibold">Odkaz už není platný</h1>
-            <p className="mt-2 text-sm text-neutral-500">
-              Požádej fotografa o nový odkaz na galerii.
-            </p>
-          </div>
-        </main>
-      );
-    }
+    if (access.reason === "EXPIRED" || access.reason === "REVOKED") return <ShareLinkDead />;
     notFound();
   }
 
-  const gallery = await prisma.gallery.findUnique({
-    where: { id: access.shareLink.galleryId },
-    select: {
-      id: true,
-      title: true,
-      eventDate: true,
-      storagePrefix: true,
-      // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
-      zipStatus: true,
-      zipObjectKey: true,
-      // One extra row over the page size tells us whether a next page exists
-      // without a separate COUNT query — the same trick the cursor-paginated
-      // API route uses for every subsequent page.
-      photos: {
-        where: { status: "CONFIRMED" },
-        // Newest upload first (2026-08-23, Pavel's call) — must match the
-        // cursor-paginated API route's own orderBy exactly, or scrolling
-        // past the first page would reshuffle what the viewer already saw.
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: PHOTOS_PAGE_SIZE + 1,
-        select: {
-          id: true,
-          objectKey: true,
-          fileName: true,
-          width: true,
-          height: true,
-          placeholder: true,
-          createdAt: true,
-          _count: { select: { favorites: true } },
-        },
-      },
-      viewers: {
-        where: { displayName: { not: null }, optedOut: false },
-        orderBy: { lastSeenAt: "desc" },
-        take: 12,
-        select: { id: true, displayName: true },
-      },
-    },
-  });
-  if (!gallery) notFound();
-
-  const hasMore = gallery.photos.length > PHOTOS_PAGE_SIZE;
-  const page = hasMore ? gallery.photos.slice(0, PHOTOS_PAGE_SIZE) : gallery.photos;
-  const last = page.at(-1);
-  const initialCursor =
-    hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
-
-  const imageGrant = await mintImageGrant(gallery.storagePrefix);
-
-  // The finished archive is a plain CDN link — no Worker involved at
-  // download time (docs/TODO.md §7). Built server-side since
-  // NEXT_PUBLIC_PHOTOS_BASE_URL is the same public, build-time value the
-  // custom image loader already uses.
-  const archiveZipUrl =
-    gallery.zipStatus === "READY" && gallery.zipObjectKey && process.env.NEXT_PUBLIC_PHOTOS_BASE_URL
-      ? `${process.env.NEXT_PUBLIC_PHOTOS_BASE_URL.replace(/\/$/, "")}/${gallery.zipObjectKey
-          .split("/")
-          .map(encodeURIComponent)
-          .join("/")}`
-      : null;
+  const data = await loadGalleryViewData(access.shareLink);
+  if (!data) notFound();
 
   return (
     <GalleryView
       token={token}
-      title={gallery.title}
-      eventDate={gallery.eventDate?.toLocaleDateString("cs-CZ") ?? null}
-      archiveZipUrl={archiveZipUrl}
-      initialPhotos={page.map((photo) => ({
-        id: photo.id,
-        objectKey: photo.objectKey,
-        fileName: photo.fileName,
-        width: photo.width,
-        height: photo.height,
-        placeholder: photo.placeholder,
-        favoriteCount: photo._count.favorites,
-      }))}
-      initialCursor={initialCursor}
-      imageGrant={imageGrant}
-      viewers={gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" }))}
+      title={data.title}
+      eventDate={data.eventDate}
+      archiveZipUrl={data.archiveZipUrl}
+      initialPhotos={data.initialPhotos}
+      initialCursor={data.initialCursor}
+      imageGrant={data.imageGrant}
+      viewers={data.viewers}
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
+      allowUpload={access.shareLink.allowUpload}
     />
   );
-}
-
-/**
- * Signs image access for this gallery's whole `storagePrefix`, or returns
- * `null` when signing isn't configured — the loader (`src/lib/image-loader.ts`)
- * falls back to today's unsigned direct-CDN URLs either way, so this is safe
- * to deploy before the signing Worker exists (docs/PLAN.md §4.1).
- */
-async function mintImageGrant(storagePrefix: string): Promise<SignedImageGrant | null> {
-  const secret = process.env.IMAGE_SIGNING_SECRET;
-  if (!secret) return null;
-
-  const exp = Math.floor(Date.now() / 1000) + IMAGE_GRANT_TTL_SECONDS;
-  return { exp, sig: await signImageAccess({ prefix: storagePrefix, exp }, secret) };
 }

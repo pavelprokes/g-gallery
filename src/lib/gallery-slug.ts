@@ -23,7 +23,10 @@ export function gallerySlug(title: string, eventDate: Date | null): string {
   return parts.join("-") || "galerie";
 }
 
-function slugify(value: string): string {
+/** Diacritics stripped, lowercased, non-alphanumerics collapsed to dashes.
+ * Also used for a gallery's per-wedding key (docs/GUEST-GALLERIES.md §4), so
+ * both kinds of readable segment are built the same way. */
+export function slugify(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // strip combining diacritics after NFD

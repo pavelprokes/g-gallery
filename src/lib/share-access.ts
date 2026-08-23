@@ -1,5 +1,6 @@
 import "server-only";
 import { hashShareToken } from "@/lib/share-token";
+import { splitEventToken } from "@/lib/event-token";
 import { isUnlocked } from "@/lib/share-unlock";
 import { prisma } from "@/lib/db";
 
@@ -13,6 +14,8 @@ export interface ResolvedShareLink {
   galleryId: string;
   allowDownload: boolean;
   allowReactions: boolean;
+  /** Guests holding this link may add photos (docs/GUEST-GALLERIES.md §6). */
+  allowUpload: boolean;
   hasPassword: boolean;
 }
 
@@ -21,6 +24,7 @@ interface ShareLinkRecord {
   galleryId: string;
   allowDownload: boolean;
   allowReactions: boolean;
+  allowUpload: boolean;
   passwordHash: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
@@ -57,24 +61,69 @@ export function isUnlockLocked(unlockLockedUntil: Date | null, now: number = Dat
   return unlockLockedUntil !== null && unlockLockedUntil.getTime() > now;
 }
 
-async function findShareLink(token: string): Promise<ShareLinkRecord | null> {
-  if (!token || token.length > 128) return null;
+const LINK_FIELDS = {
+  id: true,
+  galleryId: true,
+  allowDownload: true,
+  allowReactions: true,
+  allowUpload: true,
+  passwordHash: true,
+  expiresAt: true,
+  revokedAt: true,
+  failedUnlockAttempts: true,
+  unlockLockedUntil: true,
+  gallery: { select: { status: true } },
+} as const;
 
-  return prisma.shareLink.findUnique({
-    where: { tokenHash: hashShareToken(token) },
-    select: {
-      id: true,
-      galleryId: true,
-      allowDownload: true,
-      allowReactions: true,
-      passwordHash: true,
-      expiresAt: true,
-      revokedAt: true,
-      failedUnlockAttempts: true,
-      unlockLockedUntil: true,
-      gallery: { select: { status: true } },
+/**
+ * Resolves a viewer token to the share link that governs access.
+ *
+ * Two token shapes reach this, and both end at a `ShareLink` row so that
+ * expiry, revocation, the password gate and the per-link permission flags have
+ * exactly one implementation:
+ *
+ * 1. A plain share token — one gallery, the link the owner handed out.
+ * 2. `"{eventToken}~{eventKey}"` — a gallery reached *through* its wedding page
+ *    (docs/GUEST-GALLERIES.md §4). The composite exists because raw share
+ *    tokens are never stored (invariant 5), so the wedding page cannot rebuild
+ *    a `/g/{token}` URL for its own cards; it addresses galleries by the event
+ *    token it already holds plus a per-wedding key. Permissions still come from
+ *    the `ShareLink` the owner designated for that card (`Gallery.eventLink`),
+ *    so a card can never grant more than the gallery's own link does.
+ *
+ * `~` is safe as a separator: share tokens are base64url, which cannot contain
+ * it.
+ */
+async function findShareLink(token: string): Promise<ShareLinkRecord | null> {
+  if (!token || token.length > 256) return null;
+
+  const composite = splitEventToken(token);
+  if (!composite) {
+    return prisma.shareLink.findUnique({
+      where: { tokenHash: hashShareToken(token) },
+      select: LINK_FIELDS,
+    });
+  }
+
+  const gallery = await prisma.gallery.findFirst({
+    where: {
+      eventKey: composite.eventKey,
+      // Un-listing a gallery closes this door and nothing else: its own share
+      // link keeps working for whoever was given it directly.
+      listedOnEvent: true,
+      trashedAt: null,
+      event: { tokenHash: hashShareToken(composite.eventToken), trashedAt: null },
     },
+    select: { id: true, eventLink: { select: LINK_FIELDS } },
   });
+
+  const link = gallery?.eventLink ?? null;
+  // A card with no designated link is not reachable — and a designated link
+  // belonging to a different gallery would be a mis-set pointer granting
+  // access to the wrong photos, so it is refused rather than followed.
+  if (!link || link.galleryId !== gallery?.id) return null;
+
+  return link;
 }
 
 function checkValidity(link: ShareLinkRecord | null): ShareAccessDenial | null {
@@ -90,6 +139,7 @@ function toResolved(link: ShareLinkRecord): ResolvedShareLink {
     galleryId: link.galleryId,
     allowDownload: link.allowDownload,
     allowReactions: link.allowReactions,
+    allowUpload: link.allowUpload,
     hasPassword: link.passwordHash !== null,
   };
 }

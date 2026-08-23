@@ -3,6 +3,9 @@
 Photographer client-delivery gallery (Google-Photos-style UI). Production env vars live in
 **`docs/VERCEL-ENV.md`**. **`docs/PLAN.md` is the architecture authority** — every stack decision there was verified against official docs with sources; read it
 before changing architecture, storage, auth, or billing-relevant code.
+**`docs/GUEST-GALLERIES.md`** is the authority for guest uploads and wedding hubs (adopted
+2026-08-23, Phase 6) — read it before touching share-link resolution, the presign routes, or
+anything that assumes one share link means one gallery.
 
 ## Commands
 

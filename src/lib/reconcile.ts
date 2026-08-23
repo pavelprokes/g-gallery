@@ -123,6 +123,39 @@ export async function purgeTrashedGalleries(now = new Date()): Promise<PurgeResu
 }
 
 /**
+ * Permanently deletes every trashed wedding page whose recovery window has
+ * passed (docs/GUEST-GALLERIES.md §2).
+ *
+ * Nothing in R2 belongs to an `Event` — it owns no objects, only the page that
+ * lists galleries — so this is a row delete, and `Gallery.eventId` is
+ * `SetNull`: the photographer's galleries outlive the page that listed them.
+ * Reuses {@link selectPurgeCandidates} so the "purgeAt set and in the past"
+ * rule has exactly one implementation.
+ */
+export async function purgeTrashedEvents(now = new Date()): Promise<PurgeResult> {
+  const events = await prisma.event.findMany({
+    where: { purgeAt: { not: null } },
+    select: { id: true, ownerId: true, title: true, purgeAt: true },
+  });
+
+  const candidates = selectPurgeCandidates(events, now);
+
+  const failures: string[] = [];
+  let purged = 0;
+
+  for (const candidate of candidates) {
+    try {
+      await prisma.event.delete({ where: { id: candidate.id } });
+      purged += 1;
+    } catch (error) {
+      failures.push(`${candidate.title}: ${(error as Error).message}`);
+    }
+  }
+
+  return { purged, failures };
+}
+
+/**
  * Every object lives under this prefix, so one listing covers the whole app
  * and nothing outside it (backups, for instance) is ever a deletion candidate.
  */

@@ -37,6 +37,7 @@ model User {
   sessions          Session[]
   accounts          Account[]
   galleries         Gallery[]
+  events            Event[]
   pushSubscriptions PushSubscription[]
 
   @@map("user")
@@ -107,6 +108,7 @@ enum GalleryStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+
   @@schema("g_gallery")
 }
 
@@ -114,12 +116,24 @@ enum PhotoStatus {
   PENDING // presigned URL issued, upload not confirmed
   CONFIRMED // ETag checked in — visible in the gallery
   FAILED
+
+  @@schema("g_gallery")
+}
+
+/// Who put the file there (docs/GUEST-GALLERIES.md §3). Structural, not a view
+/// filter: guest photos live in their own gallery, and this records attribution
+/// inside it — plus it is what the per-gallery guest quota counts.
+enum PhotoSource {
+  OWNER
+  GUEST
+
   @@schema("g_gallery")
 }
 
 enum StorageTier {
   STANDARD
   INFREQUENT_ACCESS
+
   @@schema("g_gallery")
 }
 
@@ -132,6 +146,39 @@ enum ZipStatus {
   BUILDING
   READY
   FAILED
+
+  @@schema("g_gallery")
+}
+
+/// The wedding page (docs/GUEST-GALLERIES.md §2): one unlisted address that
+/// lists several separate galleries and grows over time. Deliberately NOT the
+/// owner of access — each gallery keeps its own ShareLink, and `listedOnEvent`
+/// only decides whether a card for it shows up here.
+model Event {
+  id        String    @id @default(cuid())
+  ownerId   String
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title     String
+  eventDate DateTime?
+  /// Free-text place shown under the title ("Statek Benice"); cosmetic.
+  venue     String?
+  /// SHA-256 of the 128-bit event token — the raw token is never stored, same
+  /// rule as ShareLink.tokenHash. This is a *different secret* from any
+  /// gallery's token, which is what keeps a forwarded gallery link from
+  /// exposing the wedding page.
+  tokenHash String    @unique
+  /// Readable URL hint frozen at creation, never parsed for resolution.
+  slug      String
+  /// Set when the whole wedding is moved to trash from the admin UI
+  trashedAt DateTime?
+  /// Deadline for permanent deletion (trashedAt + 30 days)
+  purgeAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  galleries Gallery[]
+
+  @@index([ownerId, trashedAt])
   @@schema("g_gallery")
 }
 
@@ -170,53 +217,86 @@ model Gallery {
   /// since it's computed from the entry list, not discovered afterwards
   zipPartsExpected Int?
 
-  photos     Photo[]
-  shareLinks ShareLink[]
-  viewers    Viewer[]
-  sessions   ViewSession[]
-  events     ActivityEvent[]
+  /// Which wedding page lists this gallery, if any. Nullable by design:
+  /// a standalone gallery with no wedding page around it stays legal.
+  /// SetNull, never Cascade — deleting the wedding page must not delete the
+  /// photographer's galleries.
+  eventId       String?
+  event         Event?     @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  /// Slug identifying this gallery *within* its wedding page
+  /// (`/s/{token}/{slug}/{eventKey}`), frozen when the gallery is attached.
+  /// Unique per wedding, not globally.
+  eventKey      String?
+  /// Order of the cards on the wedding page.
+  position      Int        @default(0)
+  /// Whether a card for this gallery is shown to whoever holds the event link.
+  /// Independent of whether the gallery's own share link works — the two
+  /// switches are the whole access model (docs/GUEST-GALLERIES.md §3).
+  listedOnEvent Boolean    @default(true)
+  /// Which ShareLink the card points at. A gallery may have several (one with
+  /// a password, one without), so the page is told rather than guessing.
+  eventLinkId   String?
+  eventLink     ShareLink? @relation("EventCardLink", fields: [eventLinkId], references: [id], onDelete: SetNull)
 
+  photos         Photo[]
+  shareLinks     ShareLink[]     @relation("GalleryShareLinks")
+  viewers        Viewer[]
+  sessions       ViewSession[]
+  activityEvents ActivityEvent[]
+
+  @@unique([eventId, eventKey])
   @@index([ownerId, status])
+  @@index([eventId, position])
   @@index([zipStatus])
   @@schema("g_gallery")
 }
 
 model Photo {
-  id          String      @id @default(cuid())
-  galleryId   String
-  gallery     Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  id                 String      @id @default(cuid())
+  galleryId          String
+  gallery            Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   /// Full R2 object key ("<storagePrefix>/<random-uuid>.jpg")
-  objectKey   String      @unique
+  objectKey          String      @unique
   /// Original filename, used for ZIP entries and downloads
-  fileName    String
-  mimeType    String      @default("image/jpeg")
-  sizeBytes   Int?
+  fileName           String
+  mimeType           String      @default("image/jpeg")
+  sizeBytes          Int?
   /// CRC32 (hex) computed in the browser at upload — feeds the streaming ZIP writer
-  crc32       String?
-  etag        String?
-  width       Int?
-  height      Int?
+  crc32              String?
+  etag               String?
+  width              Int?
+  height             Int?
   /// Average colour as "#rrggbb", computed in the browser at upload. Fills the
   /// tile before any bytes arrive; 7 bytes per photo rather than the ~400 a
   /// base64 blur placeholder would add to every page render.
-  placeholder String?
-  status      PhotoStatus @default(PENDING)
-  storageTier StorageTier @default(STANDARD)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  placeholder        String?
+  status             PhotoStatus @default(PENDING)
+  storageTier        StorageTier @default(STANDARD)
+  /// OWNER unless a guest uploaded it through a share link with allowUpload.
+  source             PhotoSource @default(OWNER)
+  /// Which viewer added it, for attribution and for the per-guest quota.
+  /// SetNull, never Cascade: the 13-month viewer cleanup (docs/PLAN.md §8)
+  /// must forget who uploaded a photo without deleting the photo itself.
+  uploadedByViewerId String?
+  uploadedBy         Viewer?     @relation("GuestUploads", fields: [uploadedByViewerId], references: [id], onDelete: SetNull)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
-  favorites Favorite[]
-  reactions Reaction[]
-  events    ActivityEvent[]
+  favorites      Favorite[]
+  reactions      Reaction[]
+  activityEvents ActivityEvent[]
 
   @@index([galleryId, status])
+  /// Drives the per-gallery guest quota count and the admin's "from guests" view.
+  @@index([galleryId, source])
+  @@index([uploadedByViewerId])
   @@schema("g_gallery")
 }
 
 model ShareLink {
   id                   String    @id @default(cuid())
   galleryId            String
-  gallery              Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery              Gallery   @relation("GalleryShareLinks", fields: [galleryId], references: [id], onDelete: Cascade)
   /// SHA-256 of the 128-bit share token — the raw token is never stored
   tokenHash            String    @unique
   label                String?
@@ -226,6 +306,11 @@ model ShareLink {
   revokedAt            DateTime?
   allowDownload        Boolean   @default(true)
   allowReactions       Boolean   @default(true)
+  /// Guests holding this link may add photos to the gallery
+  /// (docs/GUEST-GALLERIES.md §6). Off by default: every link that existed
+  /// before this column was read-only, and silently widening one would be the
+  /// worst possible default for a feature that opens an anonymous write path.
+  allowUpload          Boolean   @default(false)
   /// Consecutive wrong-password unlock attempts; resets to 0 on success (anti-brute-force)
   failedUnlockAttempts Int       @default(0)
   /// Set once failedUnlockAttempts hits the threshold; unlock is refused (no scrypt call) until this passes
@@ -236,7 +321,9 @@ model ShareLink {
   slug                 String?
   createdAt            DateTime  @default(now())
 
-  viewers Viewer[]
+  viewers      Viewer[]
+  /// Galleries whose wedding-page card points at this link.
+  eventCardFor Gallery[] @relation("EventCardLink")
 
   @@index([galleryId])
   @@schema("g_gallery")
@@ -255,6 +342,7 @@ enum ActivityType {
   FAVORITE
   DOWNLOAD
   VISITOR_IDENTIFIED
+
   @@schema("g_gallery")
 }
 
@@ -272,10 +360,11 @@ model Viewer {
   firstSeenAt DateTime   @default(now())
   lastSeenAt  DateTime   @default(now())
 
-  sessions  ViewSession[]
-  favorites Favorite[]
-  reactions Reaction[]
-  events    ActivityEvent[]
+  sessions       ViewSession[]
+  favorites      Favorite[]
+  reactions      Reaction[]
+  activityEvents ActivityEvent[]
+  uploads        Photo[]         @relation("GuestUploads")
 
   @@unique([galleryId, anonKey])
   @@schema("g_gallery")
@@ -314,6 +403,7 @@ enum ReactionKind {
   LAUGH
   SAD
   CLAP
+
   @@schema("g_gallery")
 }
 
@@ -358,6 +448,7 @@ model PushSubscription {
   auth          String
   lastSuccessAt DateTime?
   createdAt     DateTime  @default(now())
+
   @@schema("g_gallery")
 }
 
@@ -365,5 +456,6 @@ model PushSubscription {
 model Keepalive {
   id       Int      @id @default(1)
   pingedAt DateTime @default(now())
+
   @@schema("g_gallery")
 }

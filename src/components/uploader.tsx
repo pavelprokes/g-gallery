@@ -1,138 +1,42 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { crc32HexOfBlob } from "@/lib/crc32";
-import { stripGpsFromFile } from "@/lib/exif-gps";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matchResumeTargets, type PendingUpload } from "@/lib/upload-resume";
-import { averageColorOf } from "@/lib/placeholder";
 import { FORMS, pluralize } from "@/lib/czech-plural";
+import {
+  fetchPendingUploads,
+  runUploads,
+  UploadRejection,
+  type UploadItemState,
+} from "@/lib/upload-run";
 
-// Uploads go browser -> R2 directly; Vercel only signs (4.5MB body limit).
-// Presigning is just-in-time in small batches because presigned URLs expire in
-// ~15 minutes while a 500-photo session runs far longer (docs/PLAN.md §5).
-const PRESIGN_BATCH = 8;
-const CONCURRENCY = 3;
-const MAX_RETRIES = 3;
-
-type FileState = "pending" | "uploading" | "done" | "error";
+// The transport lives in src/lib/upload-run.ts, shared with the guest uploader
+// (docs/GUEST-GALLERIES.md §6) — this component is the photographer's UI over it.
 
 interface Item {
   file: File;
-  state: FileState;
+  state: UploadItemState;
   error?: string;
-}
-
-interface PresignedUpload {
-  photoId: string;
-  objectKey: string;
-  url: string;
-  headers: Record<string, string>;
-}
-
-async function presign(
-  galleryId: string,
-  files: File[],
-  resumeIds: (string | undefined)[],
-): Promise<PresignedUpload[]> {
-  const response = await fetch("/api/uploads/presign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      galleryId,
-      files: files.map((f, i) => ({
-        fileName: f.name,
-        contentType: f.type || "image/jpeg",
-        sizeBytes: f.size,
-        resumePhotoId: resumeIds[i],
-      })),
-    }),
-  });
-  if (!response.ok) throw new Error(`presign failed (${response.status})`);
-  const data = (await response.json()) as { uploads: PresignedUpload[] };
-  return data.uploads;
-}
-
-/** Dimensions drive the justified gallery layout; failure is non-fatal. */
-async function readDimensions(blob: Blob): Promise<{ width: number; height: number } | null> {
-  if (typeof createImageBitmap !== "function") return null;
-  try {
-    const bitmap = await createImageBitmap(blob);
-    const size = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return size;
-  } catch {
-    return null;
-  }
-}
-
-async function uploadOne(file: File, target: PresignedUpload): Promise<void> {
-  // GPS is stripped before the bytes ever leave the browser, and the CRC32 is
-  // computed on the exact bytes that get stored so the future ZIP writer can
-  // trust it.
-  const body = await stripGpsFromFile(file);
-  const crc32 = await crc32HexOfBlob(body);
-  const dimensions = await readDimensions(body);
-  // Cosmetic, so a failure here never blocks the upload.
-  const placeholder = await averageColorOf(body);
-
-  let lastError: unknown;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const put = await fetch(target.url, {
-        method: "PUT",
-        // Headers must match what was signed, byte for byte.
-        headers: target.headers,
-        body,
-      });
-      if (!put.ok) throw new Error(`R2 PUT failed (${put.status})`);
-
-      const confirm = await fetch("/api/uploads/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          photoId: target.photoId,
-          etag: put.headers.get("etag") ?? "unknown",
-          crc32,
-          sizeBytes: body.size,
-          width: dimensions?.width,
-          height: dimensions?.height,
-          placeholder,
-        }),
-      });
-      if (!confirm.ok) throw new Error(`confirm failed (${confirm.status})`);
-      return;
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 2 ** attempt * 500));
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("upload failed");
 }
 
 export function Uploader({ galleryId }: { galleryId: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
   const [pendingRows, setPendingRows] = useState<PendingUpload[]>([]);
+  const [fatal, setFatal] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   // Rows left behind by an interrupted upload. Re-picking those exact files
   // reuses the rows instead of creating a second set (src/lib/upload-resume.ts).
-  const loadPending = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/uploads/pending?galleryId=${galleryId}`);
-      if (!response.ok) return;
-      const data = (await response.json()) as { pending: PendingUpload[] };
-      setPendingRows(data.pending);
-    } catch {
-      // Resume is an affordance, not a requirement — a failure here is silent.
-    }
-  }, [galleryId]);
+  const credentials = useMemo(() => ({ kind: "owner" as const, galleryId }), [galleryId]);
 
   useEffect(() => {
-    void loadPending();
-  }, [loadPending]);
+    const controller = new AbortController();
+    void fetchPendingUploads(credentials, controller.signal).then(setPendingRows);
+    return () => controller.abort();
+  }, [credentials]);
 
   const update = useCallback((index: number, patch: Partial<Item>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -141,60 +45,34 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const start = useCallback(
     async (files: File[]) => {
       setItems(files.map((file) => ({ file, state: "pending" as const })));
+      setFatal(null);
       setRunning(true);
 
       // Computed once for the whole selection: each pending row may be claimed
       // by only one file, which a per-batch match could not guarantee.
       const resumeIds = matchResumeTargets(files, pendingRows);
 
-      for (let offset = 0; offset < files.length; offset += PRESIGN_BATCH) {
-        const batch = files.slice(offset, offset + PRESIGN_BATCH);
-        let targets: PresignedUpload[];
-        try {
-          targets = await presign(
-            galleryId,
-            batch,
-            resumeIds.slice(offset, offset + PRESIGN_BATCH),
-          );
-        } catch (error) {
-          batch.forEach((_, i) =>
-            update(offset + i, { state: "error", error: (error as Error).message }),
-          );
-          continue;
-        }
-
-        // Bounded concurrency: a shared cursor over this batch.
-        let cursor = 0;
-        const workers = Array.from({ length: Math.min(CONCURRENCY, batch.length) }, async () => {
-          for (;;) {
-            const local = cursor++;
-            if (local >= batch.length) return;
-            const index = offset + local;
-            const file = batch[local]!;
-            const target = targets[local];
-            if (!target) {
-              update(index, { state: "error", error: "no presigned target" });
-              continue;
-            }
-            update(index, { state: "uploading" });
-            try {
-              await uploadOne(file, target);
-              update(index, { state: "done" });
-            } catch (error) {
-              update(index, { state: "error", error: (error as Error).message });
-            }
-          }
-        });
-        await Promise.all(workers);
-      }
+      await runUploads({
+        files,
+        credentials,
+        resumeIds,
+        onItem: update,
+        onFatal: (rejection) => setFatal(ownerRejectionMessage(rejection)),
+        onSkipped: (rejection, count) =>
+          setFatal(
+            count > 1
+              ? `${ownerRejectionMessage(rejection)} (přeskočeno ${count} souborů, zbytek nahrávám)`
+              : ownerRejectionMessage(rejection),
+          ),
+      });
 
       setRunning(false);
       // Photos only become visible once the server flips them to CONFIRMED, so
       // the grid above is stale until the Server Component re-renders.
       router.refresh();
-      void loadPending();
+      setPendingRows(await fetchPendingUploads(credentials));
     },
-    [galleryId, loadPending, pendingRows, router, update],
+    [credentials, pendingRows, router, update],
   );
 
   const done = items.filter((i) => i.state === "done").length;
@@ -203,6 +81,12 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   return (
     <section className="rounded-lg border p-4">
       <h2 className="text-sm font-medium">Nahrát fotky</h2>
+
+      {fatal && (
+        <p className="mt-3 rounded border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          {fatal}
+        </p>
+      )}
 
       {pendingRows.length > 0 && !running && (
         <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
@@ -263,4 +147,24 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       )}
     </section>
   );
+}
+
+/** Owner-side wording for a refusal the server named. */
+function ownerRejectionMessage(rejection: UploadRejection): string {
+  switch (rejection.code) {
+    case "unsupported_type":
+      return rejection.detail.reason === "heic"
+        ? `${rejection.detail.fileName ?? "Soubor"}: HEIC zatím neumíme. Exportuj jako JPEG.`
+        : `${rejection.detail.fileName ?? "Soubor"}: nepodporovaný formát.`;
+    case "unauthorized":
+      return "Přihlášení vypršelo. Načti stránku znovu.";
+    case "upload_denied":
+      return "Galerie už nepřijímá nahrávání.";
+    case "quota_exceeded":
+      return "Galerie je plná.";
+    case "file_too_large":
+      return `${rejection.detail.fileName ?? "Soubor"} je příliš velký.`;
+    default:
+      return "Nahrávání selhalo. Zkus to prosím znovu.";
+  }
 }

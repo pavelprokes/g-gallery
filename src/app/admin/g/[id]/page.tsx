@@ -5,6 +5,7 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { Uploader } from "@/components/uploader";
+import { DeletePhotoButton } from "@/components/delete-photo-button";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { publishGallery, restoreGallery } from "../../actions";
@@ -34,6 +35,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           width: true,
           height: true,
           _count: { select: { favorites: true } },
+          source: true,
+          uploadedBy: { select: { displayName: true } },
         },
       },
       shareLinks: {
@@ -44,6 +47,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           expiresAt: true,
           revokedAt: true,
           passwordHash: true,
+          allowUpload: true,
           createdAt: true,
         },
       },
@@ -131,6 +135,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     className="object-cover"
                   />
                 </div>
+                {photo.source === "GUEST" && (
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    Od hostů
+                    {photo.uploadedBy?.displayName && ` · ${photo.uploadedBy.displayName}`}
+                  </p>
+                )}
                 <p className="text-xs text-neutral-500">
                   {stats.views} zobr. · {stats.uniqueViewers} unik.
                   {photo._count.favorites > 0 && (
@@ -140,6 +150,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     <span className="text-amber-600"> · {reactions.get(photo.id)} reakcí</span>
                   )}
                 </p>
+                <DeletePhotoButton photoId={photo.id} />
               </li>
             );
           })}

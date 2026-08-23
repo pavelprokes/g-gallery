@@ -80,12 +80,12 @@ export async function collectDigest(
     where: {
       ownerId,
       // Only galleries that saw something; the rest would be zero rows anyway.
-      events: { some: { createdAt: { gte: since, lt: until } } },
+      activityEvents: { some: { createdAt: { gte: since, lt: until } } },
     },
     select: {
       id: true,
       title: true,
-      events: {
+      activityEvents: {
         where: { createdAt: { gte: since, lt: until } },
         select: { type: true, viewerId: true },
       },
@@ -101,7 +101,8 @@ export async function collectDigest(
   });
 
   const rows: DigestGallery[] = galleries.map((gallery) => {
-    const count = (type: string) => gallery.events.filter((e) => e.type === type).length;
+    const count = (type: string) =>
+      gallery.activityEvents.filter((event) => event.type === type).length;
     return {
       galleryId: gallery.id,
       title: gallery.title,

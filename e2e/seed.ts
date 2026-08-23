@@ -69,12 +69,155 @@ async function main() {
     },
   });
 
+  // A second gallery for the guest-upload flow (docs/GUEST-GALLERIES.md §6),
+  // kept apart from the viewer-flow one so an upload never changes the photo
+  // count the grid/lightbox tests assert on.
+  const guestGallery = await prisma.gallery.create({
+    data: {
+      ownerId: user.id,
+      title: "E2E Guest Gallery",
+      eventDate: new Date("2026-08-12T00:00:00Z"),
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-guest-${Date.now()}`,
+    },
+  });
+
+  const uploadToken = generateShareToken();
+  const uploadSlug = gallerySlug(guestGallery.title, guestGallery.eventDate);
+  await prisma.shareLink.create({
+    data: {
+      galleryId: guestGallery.id,
+      tokenHash: hashShareToken(uploadToken),
+      allowDownload: true,
+      allowReactions: true,
+      allowUpload: true,
+      slug: uploadSlug,
+    },
+  });
+
+  // Same gallery, a link that may only look. Proves the refusal is bound to
+  // the link and not to the gallery.
+  const readOnlyToken = generateShareToken();
+  await prisma.shareLink.create({
+    data: {
+      galleryId: guestGallery.id,
+      tokenHash: hashShareToken(readOnlyToken),
+      allowUpload: false,
+      slug: uploadSlug,
+    },
+  });
+
+  // --- wedding pages (docs/GUEST-GALLERIES.md §2) ---------------------------
+  // One wedding with two galleries — one listed, one attached but hidden — so
+  // the two switches can be told apart, and one with a single listed gallery
+  // for the render-in-place case.
+  const wedding = await makeWedding(user.id, "Pavel a Patricie", "Statek Benice");
+  // Two listed, so the page renders as a rozcestník — with a single listed
+  // gallery it renders that gallery in place instead, which the solo wedding
+  // below covers.
+  const guests = await makeEventGallery(user.id, wedding.id, "Od hostů", "od-hostu", true, 4);
+  const listed = await makeEventGallery(user.id, wedding.id, "První výběr", "prvni-vyber", true, 3);
+  const hidden = await makeEventGallery(
+    user.id,
+    wedding.id,
+    "Kompletní set",
+    "kompletni",
+    false,
+    2,
+  );
+
+  const solo = await makeWedding(user.id, "Eliška a Honza", "Zámek Loučeň");
+  const soloGallery = await makeEventGallery(user.id, solo.id, "Od hostů", "od-hostu", true, 2);
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
-    JSON.stringify({ galleryId: gallery.id, token, slug, photoCount: aspects.length }),
+    JSON.stringify({
+      galleryId: gallery.id,
+      token,
+      slug,
+      photoCount: aspects.length,
+      guestGalleryId: guestGallery.id,
+      uploadToken,
+      uploadSlug,
+      readOnlyToken,
+      weddingToken: wedding.token,
+      weddingSlug: wedding.slug,
+      weddingGalleryIds: [guests, listed, hidden],
+      soloWeddingToken: solo.token,
+      soloWeddingSlug: solo.slug,
+      soloGalleryIds: [soloGallery],
+    }),
   );
 
   await prisma.$disconnect();
 }
 
 void main();
+
+/** A wedding page plus its raw token, which exists only here and in .seed.json. */
+async function makeWedding(ownerId: string, title: string, venue: string) {
+  const token = generateShareToken();
+  const eventDate = new Date("2026-08-12T00:00:00Z");
+  const slug = gallerySlug(title, eventDate);
+  const event = await prisma.event.create({
+    data: { ownerId, title, venue, eventDate, tokenHash: hashShareToken(token), slug },
+    select: { id: true },
+  });
+  return { id: event.id, token, slug };
+}
+
+/**
+ * A gallery attached to a wedding page, with the share link its card grants
+ * through. Returns the gallery id so teardown can remove it.
+ */
+async function makeEventGallery(
+  ownerId: string,
+  eventId: string,
+  title: string,
+  eventKey: string,
+  listedOnEvent: boolean,
+  photos: number,
+): Promise<string> {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title,
+      eventDate: new Date("2026-08-12T00:00:00Z"),
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-ev-${eventKey}-${Date.now()}`,
+      eventId,
+      eventKey,
+      listedOnEvent,
+    },
+  });
+
+  for (let i = 0; i < photos; i += 1) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/photo-${i}.jpg`,
+        fileName: `${eventKey}_${i}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#a37c5c",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+      },
+    });
+  }
+
+  const link = await prisma.shareLink.create({
+    data: {
+      galleryId: gallery.id,
+      tokenHash: hashShareToken(generateShareToken()),
+      slug: gallerySlug(title, null),
+    },
+    select: { id: true },
+  });
+  await prisma.gallery.update({ where: { id: gallery.id }, data: { eventLinkId: link.id } });
+
+  return gallery.id;
+}

@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { BADGE_CAP, unreadCount } from "@/lib/feed";
 import { FORMS, pluralize } from "@/lib/czech-plural";
-import { createGallery, restoreGallery } from "./actions";
+import { createGallery, restoreGallery, restoreEvent } from "./actions";
+import { EventCreatePanel } from "@/components/event-create-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function AdminPage() {
 
   const unread = await unreadCount(session.user.id);
 
-  const [galleries, trashed] = await Promise.all([
+  const [galleries, trashed, events, trashedEvents] = await Promise.all([
     prisma.gallery.findMany({
       where: { ownerId: session.user.id, trashedAt: null },
       orderBy: { createdAt: "desc" },
@@ -30,10 +31,26 @@ export default async function AdminPage() {
         title: true,
         status: true,
         eventDate: true,
-        _count: { select: { photos: true, viewers: true, events: true } },
+        _count: { select: { photos: true, viewers: true, activityEvents: true } },
       },
     }),
     prisma.gallery.findMany({
+      where: { ownerId: session.user.id, trashedAt: { not: null } },
+      orderBy: { trashedAt: "desc" },
+      select: { id: true, title: true, purgeAt: true },
+    }),
+    prisma.event.findMany({
+      where: { ownerId: session.user.id, trashedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        eventDate: true,
+        venue: true,
+        _count: { select: { galleries: true } },
+      },
+    }),
+    prisma.event.findMany({
       where: { ownerId: session.user.id, trashedAt: { not: null } },
       orderBy: { trashedAt: "desc" },
       select: { id: true, title: true, purgeAt: true },
@@ -77,6 +94,31 @@ export default async function AdminPage() {
         </button>
       </form>
 
+      <div className="mt-6">
+        <EventCreatePanel />
+      </div>
+
+      {events.length > 0 && (
+        <ul className="mt-4 divide-y rounded-lg border">
+          {events.map((event) => (
+            <li key={event.id} className="flex items-center justify-between p-4">
+              <div>
+                <Link href={`/admin/e/${event.id}`} className="font-medium hover:underline">
+                  {event.title}
+                </Link>
+                <p className="text-xs text-neutral-500">
+                  Svatba · {event._count.galleries} galerií
+                  {event.venue && ` · ${event.venue}`}
+                </p>
+              </div>
+              <span className="text-xs text-neutral-400">
+                {event.eventDate?.toLocaleDateString("cs-CZ") ?? "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <ul className="mt-6 divide-y rounded-lg border">
         {galleries.length === 0 && (
           <li className="p-4 text-sm text-neutral-500">Zatím žádná galerie.</li>
@@ -97,6 +139,36 @@ export default async function AdminPage() {
           </li>
         ))}
       </ul>
+
+      {trashedEvents.length > 0 && (
+        <details className="mt-6 rounded-lg border">
+          <summary className="cursor-pointer p-4 text-sm font-medium text-neutral-500">
+            Svatby v koši ({trashedEvents.length})
+          </summary>
+          <ul className="divide-y border-t">
+            {trashedEvents.map((event) => {
+              const daysLeft = event.purgeAt ? daysUntilPurge(event.purgeAt) : 0;
+              return (
+                <li key={event.id} className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-neutral-500">{event.title}</p>
+                    <p className="text-xs text-neutral-400">
+                      {daysLeft > 0
+                        ? `Smazána natrvalo za ${pluralize(daysLeft, FORMS.day)}`
+                        : "Bude smazána natrvalo brzy"}
+                    </p>
+                  </div>
+                  <form action={restoreEvent.bind(null, event.id)}>
+                    <button type="submit" className="rounded border px-2 py-1 text-xs">
+                      Obnovit
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
 
       {trashed.length > 0 && (
         <details className="mt-6 rounded-lg border">

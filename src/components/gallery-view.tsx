@@ -12,7 +12,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { QueryClient, QueryClientProvider, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
   dismissNamePrompt,
@@ -40,6 +45,8 @@ import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
+import { srcFor } from "@/lib/image-src";
+import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineToggle } from "@/components/offline-toggle";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import {
@@ -107,11 +114,6 @@ function aspectOf(photo: GalleryPhoto): number {
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
-function srcFor(objectKey: string, grant: SignedImageGrant | null): string {
-  if (!grant) return objectKey;
-  return `${objectKey}?sig=${encodeURIComponent(grant.sig)}&exp=${grant.exp}`;
-}
-
 /**
  * Traps Tab/Shift+Tab inside a modal container and restores focus to
  * whatever was focused before it opened. Shared by the lightbox and the name
@@ -197,6 +199,13 @@ interface GalleryViewProps {
   viewers: GalleryViewer[];
   allowDownload: boolean;
   allowReactions: boolean;
+  /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
+  allowUpload: boolean;
+  /** Set only when this gallery was opened from a wedding page that lists more
+   * than one — the way back to the rozcestník. Absent on a plain `/g/` link,
+   * which must never reveal that a wedding page exists. */
+  backHref?: string;
+  backLabel?: string;
   /** Pre-built "download all" archive (docs/TODO.md §7), if one is ready — a
    * plain CDN link, not a Worker request. Null covers every other state
    * (never built, still building, or invalidated by a newer upload) equally;
@@ -215,8 +224,12 @@ function GalleryViewInner({
   viewers,
   allowDownload,
   allowReactions,
+  allowUpload,
   archiveZipUrl,
+  backHref,
+  backLabel,
 }: GalleryViewProps) {
+  const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // Which photo's full-res image has actually finished loading — drives the
   // lightbox fade-in below. Starts at null so even the very first photo
@@ -816,6 +829,14 @@ function GalleryViewInner({
       </div>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
+          {backHref && (
+            <a
+              href={backHref}
+              className="mb-1 inline-block text-sm text-neutral-500 underline dark:text-neutral-400"
+            >
+              ← {backLabel ?? "Zpět"}
+            </a>
+          )}
           <h1 className="text-2xl font-semibold">{title}</h1>
           {eventDate && (
             <p className="text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
@@ -1198,6 +1219,15 @@ function GalleryViewInner({
           <p className="mt-2">Tvoje návštěvy se nepočítají.</p>
         )}
       </footer>
+
+      {allowUpload && (
+        <GuestUploader
+          token={token}
+          onUploaded={() => {
+            void queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -9,6 +9,7 @@ interface ShareLinkRow {
   expiresAt: Date | null;
   revokedAt: Date | null;
   passwordHash: string | null;
+  allowUpload: boolean;
   createdAt: Date;
 }
 
@@ -69,6 +70,10 @@ export function ShareLinkPanel({
             className="w-28 rounded border px-2 py-1"
           />
         </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm">
+          <input name="allowUpload" type="checkbox" value="1" className="size-4" />
+          Hosté smí nahrávat
+        </label>
         <button
           type="submit"
           disabled={pending}
@@ -108,6 +113,7 @@ export function ShareLinkPanel({
                     ? `Platí do ${link.expiresAt.toLocaleDateString("cs-CZ")}`
                     : "Bez expirace"}
                 {link.passwordHash && " · chráněno heslem"}
+                {link.allowUpload && " · hosté nahrávají"}
               </p>
             </div>
             {!link.revokedAt && (

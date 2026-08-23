@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/env";
-import { purgeTrashedGalleries } from "@/lib/reconcile";
+import { purgeTrashedEvents, purgeTrashedGalleries } from "@/lib/reconcile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,7 +18,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await purgeTrashedGalleries();
+  const galleries = await purgeTrashedGalleries();
+  // Wedding pages have their own 30-day window and own no R2 objects, so they
+  // are swept here rather than in a second cron (docs/GUEST-GALLERIES.md §2).
+  const events = await purgeTrashedEvents();
 
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json({
+    ok: true,
+    purged: galleries.purged,
+    failures: [...galleries.failures, ...events.failures],
+    eventsPurged: events.purged,
+  });
 }

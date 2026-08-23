@@ -15,6 +15,11 @@ UI (justified grid, lightbox, swipe/keyboard navigation).
 - Admin (photographer) signs in with Google; clients access via share links
 - Budget: a few USD/month of _marginal_ cost (Vercel Pro already paid)
 
+Extended 2026-08-23 with a second surface: **guest galleries and wedding hubs** — wedding guests
+upload phone photos through a QR code, and one address per wedding lists several separate galleries
+that arrive over time. Spec and decisions in **`docs/GUEST-GALLERIES.md`**; it changes no invariant
+here (guest uploads use the same presigned-PUT path, so no image bytes pass through Vercel).
+
 ## 2. Architecture
 
 ```
@@ -300,6 +305,10 @@ gallery in one month.
 6. **Phase 5 — E2E test suite**: deferred deliberately to the very end (`docs/TODO.md` §0) — the
    routes, upload flow and share gating kept moving, so tests written earlier would get rewritten.
    Unit tests (Vitest) continue as normal throughout.
+7. **Phase 6 — guest galleries & wedding hubs** (adopted 2026-08-23, not started): guest uploads
+   through a share token, `Event` as the parent of several galleries, grants per share link,
+   moderation, quotas, live projection. Full breakdown and estimates in
+   **`docs/GUEST-GALLERIES.md`** §11.
 
 ## 12. Decisions (resolved 2026-08-20)
 

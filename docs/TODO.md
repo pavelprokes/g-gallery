@@ -131,3 +131,18 @@ Workers Paid too):
 - Does this **replace** `worker/`'s live ZIP entirely, or stay alongside it as a fallback for
   galleries too large/urgent to wait for a background build?
 - Cleanup: pruning old pre-built ZIPs when a gallery is re-built or archived.
+
+## 8. Guest galleries & wedding hubs — **adopted 2026-08-23, spec written**
+
+Public QR galleries that wedding guests upload to from their phones, plus one hub address per
+wedding listing several separate galleries (guest photos, preview set, full set) that the couple
+can expose selectively. Researched against the Czech and international market, reviewed, and
+accepted by Pavel the same day — so it is no longer "to discuss": the data model, the resolved
+decisions and the phase estimates live in **`docs/GUEST-GALLERIES.md`**, and `docs/PLAN.md` §11
+carries it as Phase 6.
+
+**F1 (guest uploads) implemented 2026-08-23** — schema, both upload branches, quotas, refusal
+messages, per-photo delete, and an E2E suite that drives a real file through presign → PUT →
+confirm. **F2 (the wedding page) implemented the same day** — `Event` with its own token, the
+`/s/` route, admin CRUD, and trash/purge at the wedding level. `docs/GUEST-GALLERIES.md` §11 has
+the as-built notes for both. F3 (mobile reality: client thumbnails, upload queue, HEIC) is next.
