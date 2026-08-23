@@ -278,6 +278,16 @@ stack: a 148 kB photo yields a 32 kB thumbnail.
 - **Every step degrades rather than fails**: no pica → plain canvas with smoothing; no WebP →
   JPEG; nothing at all → null, and the photo uploads exactly as before while the grid falls back to
   a Cloudflare transformation. No device ends up worse off than before this existed.
+- **Timeouts, because the failure that hurts is not an exception.** A worker that never answers
+  would leave the `await` hanging and the guest's upload sitting at "Nahrávám" until they gave up.
+  pica gets 8 s to load and 10 s per resize; the whole thumbnail gets 25 s. Past any of those it
+  falls through to the next option down.
+- **A failure disables pica for the rest of the session.** Retrying a resizer that just stalled for
+  ten seconds, once per photo in a batch of forty, would cost the guest six minutes to reach the
+  same answer forty times.
+- **It says so in the console** (`[g-gallery/thumbnail]`), once per session for pica and per photo
+  for a total failure. The guest sees nothing — the photo uploads either way — but "why do the
+  tiles look crunchy" needs to be answerable.
 - **Two signed targets per photo**, `.thumb.webp` and `.thumb.jpg`, both in the presign response
   the client already waited for. A signed PUT is bound to one content type, so offering only WebP
   would have meant no thumbnail at all on a browser that cannot encode it.
