@@ -258,7 +258,7 @@ export function OfflineIconButton(props: { token: string; objectKeys: readonly s
     <div ref={panelRef} className="relative">
       <IconButton
         onClick={() => setOpen((prev) => !prev)}
-        aria-label="Offline přístup"
+        label="Offline"
         aria-expanded={open}
         title="Uložit fotky do zařízení pro prohlížení bez signálu"
       >

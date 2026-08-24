@@ -1,7 +1,23 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 
 const ICON_BUTTON_CLASSES =
-  "flex h-11 w-11 items-center justify-center rounded-full border border-neutral-300 text-neutral-700 transition-colors hover:border-brand-primary hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-neutral-300 disabled:hover:bg-transparent dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800";
+  "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-neutral-300 px-3 text-sm text-neutral-700 transition-colors hover:border-brand-primary hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-neutral-300 disabled:hover:bg-transparent dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800";
+
+/**
+ * A row of unlabelled circles is a guessing game: a projector, a download and
+ * an offline download all read as "some icon", and the two downloads read as
+ * the same icon. Anything a viewer has to be right about the first time gets
+ * the word next to it; `px-3` leaves an icon-only button its 44 px circle.
+ */
+function withLabel(children: ReactNode, label: string | undefined) {
+  if (!label) return children;
+  return (
+    <>
+      {children}
+      <span>{label}</span>
+    </>
+  );
+}
 
 /**
  * Circular icon-only control for light backgrounds (gallery header toolbar) —
@@ -12,12 +28,13 @@ const ICON_BUTTON_CLASSES =
  */
 export function IconButton({
   className = "",
+  label,
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label?: string }) {
   return (
     <button type="button" className={`${ICON_BUTTON_CLASSES} ${className}`} {...props}>
-      {children}
+      {withLabel(children, label)}
     </button>
   );
 }
@@ -25,12 +42,13 @@ export function IconButton({
 /** Same chrome as `IconButton`, for a plain download link (a pre-built ZIP is a CDN URL, not a click handler). */
 export function IconButtonLink({
   className = "",
+  label,
   children,
   ...props
-}: AnchorHTMLAttributes<HTMLAnchorElement>) {
+}: AnchorHTMLAttributes<HTMLAnchorElement> & { label?: string }) {
   return (
     <a className={`${ICON_BUTTON_CLASSES} ${className}`} {...props}>
-      {children}
+      {withLabel(children, label)}
     </a>
   );
 }

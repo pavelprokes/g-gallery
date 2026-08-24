@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   memo,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
   useCallback,
   useEffect,
@@ -45,6 +46,16 @@ import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
+import {
+  clampPan,
+  clampScale,
+  distance,
+  DOUBLE_TAP_SCALE,
+  isZoomed,
+  midpoint,
+  type Point,
+  zoomAround,
+} from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
@@ -196,6 +207,415 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
   }, [active, containerRef]);
 }
 
+/** Movement under this is still a tap, not a drag — fingers are never still. */
+const TAP_SLOP_PX = 8;
+
+/** Two taps inside this window are a double tap. Also how long a single tap
+ * waits before acting, since it cannot know yet that it is single. */
+const DOUBLE_TAP_MS = 260;
+
+/** Two taps further apart than this are two separate taps, not a double tap —
+ * a thumb lands in a slightly different place each time. */
+const DOUBLE_TAP_SLOP_PX = 40;
+
+/** How far a downward drag must travel before letting go closes the photo. */
+const DISMISS_THRESHOLD_PX = 110;
+
+/** Drag-to-dismiss fades as it goes; this is the travel that reaches
+ * transparent, so the gesture reads as "throwing the photo away". */
+const DISMISS_FADE_PX = 400;
+
+interface GestureHandlers {
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+}
+
+/**
+ * Every gesture the open photo answers to, in one place: pinch and double-tap
+ * to zoom, drag to pan while zoomed, swipe sideways for the next photo, swipe
+ * down to close, and a plain tap to get the chrome out of the way.
+ *
+ * They share a handler because they are told apart by the same few numbers —
+ * how many fingers, how far, which way, how long. Pointer events rather than
+ * touch events, so a mouse gets the same behaviour for free, with
+ * `touch-action: none` on the surface so the browser's own pan and zoom don't
+ * race this one.
+ *
+ * The transform is written straight to `frameRef.current.style` instead of
+ * through state: a pinch produces pointer events far faster than React can
+ * re-render, and a photo that lags the fingers by a frame feels broken. The
+ * component is keyed by photo id, so "reset when the photo changes" is a
+ * remount rather than anything this has to undo.
+ */
+function useLightboxGestures(
+  frameRef: RefObject<HTMLElement | null>,
+  aspect: number,
+  onSwipe: (delta: 1 | -1) => void,
+  onDismiss: () => void,
+  onTap: () => void,
+  onZoomChange: (zoomed: boolean) => void,
+): GestureHandlers {
+  const scale = useRef(1);
+  const pan = useRef<Point>({ x: 0, y: 0 });
+  const rect = useRef({ left: 0, top: 0, width: 0, height: 0 });
+  const pointers = useRef(new Map<number, Point>());
+  const gesture = useRef<{
+    kind: "drag" | "pan" | "pinch";
+    startPan: Point;
+    startScale: number;
+    startPoint: Point;
+    startDistance: number;
+    focus: Point;
+    moved: boolean;
+  } | null>(null);
+  const lastTap = useRef<{ at: number; point: Point } | null>(null);
+  const tapTimer = useRef<number | null>(null);
+
+  const paint = useCallback(
+    (nextScale: number, nextPan: Point, dismiss: number, animated: boolean) => {
+      const wasZoomed = isZoomed(scale.current);
+      scale.current = nextScale;
+      pan.current = nextPan;
+
+      const frame = frameRef.current;
+      if (frame) {
+        frame.style.transition = animated ? "transform 200ms, opacity 200ms" : "none";
+        frame.style.transform = `translate3d(${nextPan.x}px, ${
+          nextPan.y + dismiss
+        }px, 0) scale(${nextScale})`;
+        // A drag-to-dismiss fades as it travels, so letting go halfway reads
+        // as a decision rather than an accident.
+        frame.style.opacity = String(Math.max(0.2, 1 - dismiss / DISMISS_FADE_PX));
+      }
+
+      if (isZoomed(nextScale) !== wasZoomed) onZoomChange(isZoomed(nextScale));
+    },
+    [frameRef, onZoomChange],
+  );
+
+  const cancelTapTimer = useCallback(() => {
+    if (tapTimer.current === null) return;
+    clearTimeout(tapTimer.current);
+    tapTimer.current = null;
+  }, []);
+
+  useEffect(() => cancelTapTimer, [cancelTapTimer]);
+
+  /** Client coordinates as an offset from the frame's centre, which is where
+   * the CSS transform is anchored. */
+  const toCentre = useCallback(
+    (point: Point): Point => ({
+      x: point.x - (rect.current.left + rect.current.width / 2),
+      y: point.y - (rect.current.top + rect.current.height / 2),
+    }),
+    [],
+  );
+
+  const size = useCallback(() => ({ width: rect.current.width, height: rect.current.height }), []);
+
+  const toggleZoom = useCallback(
+    (focus: Point) => {
+      if (isZoomed(scale.current)) {
+        paint(1, { x: 0, y: 0 }, 0, true);
+        return;
+      }
+      const next = DOUBLE_TAP_SCALE;
+      paint(
+        next,
+        clampPan(zoomAround(focus, { x: 0, y: 0 }, 1, next), size(), aspect, next),
+        0,
+        true,
+      );
+    },
+    [aspect, paint, size],
+  );
+
+  const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    // Measured per gesture rather than cached: the frame is the viewport here,
+    // and the viewport changes when a phone's browser bar slides away.
+    const box = event.currentTarget.getBoundingClientRect();
+    rect.current = { left: box.left, top: box.top, width: box.width, height: box.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const point = { x: event.clientX, y: event.clientY };
+    pointers.current.set(event.pointerId, point);
+
+    const active = [...pointers.current.values()];
+    const [first, second] = active;
+    if (active.length >= 2 && first && second) {
+      const between = midpoint(first, second);
+      gesture.current = {
+        kind: "pinch",
+        startPan: pan.current,
+        startScale: scale.current,
+        startPoint: point,
+        startDistance: distance(first, second),
+        focus: {
+          x: between.x - (box.left + box.width / 2),
+          y: between.y - (box.top + box.height / 2),
+        },
+        moved: true,
+      };
+      return;
+    }
+
+    gesture.current = {
+      kind: isZoomed(scale.current) ? "pan" : "drag",
+      startPan: pan.current,
+      startScale: scale.current,
+      startPoint: point,
+      startDistance: 0,
+      focus: { x: 0, y: 0 },
+      moved: false,
+    };
+  }, []);
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (!pointers.current.has(event.pointerId)) return;
+      const point = { x: event.clientX, y: event.clientY };
+      pointers.current.set(event.pointerId, point);
+
+      const current = gesture.current;
+      if (!current) return;
+
+      if (current.kind === "pinch") {
+        const [first, second] = [...pointers.current.values()];
+        if (!first || !second || current.startDistance <= 0) return;
+        const next = clampScale(
+          current.startScale * (distance(first, second) / current.startDistance),
+        );
+        paint(
+          next,
+          clampPan(
+            zoomAround(current.focus, current.startPan, current.startScale, next),
+            size(),
+            aspect,
+            next,
+          ),
+          0,
+          false,
+        );
+        return;
+      }
+
+      const dx = point.x - current.startPoint.x;
+      const dy = point.y - current.startPoint.y;
+      if (Math.abs(dx) > TAP_SLOP_PX || Math.abs(dy) > TAP_SLOP_PX) current.moved = true;
+
+      if (current.kind === "pan") {
+        paint(
+          current.startScale,
+          clampPan(
+            { x: current.startPan.x + dx, y: current.startPan.y + dy },
+            size(),
+            aspect,
+            current.startScale,
+          ),
+          0,
+          false,
+        );
+        return;
+      }
+
+      // Only a downward, mostly-vertical drag is a dismissal; a sideways one is
+      // on its way to being the next photo and must not drag anything.
+      const dismissing = dy > 0 && Math.abs(dy) > Math.abs(dx);
+      paint(current.startScale, current.startPan, dismissing ? dy : 0, false);
+    },
+    [aspect, paint, size],
+  );
+
+  const endGesture = useCallback(
+    (event: ReactPointerEvent<HTMLElement>, cancelled: boolean) => {
+      const known = pointers.current.delete(event.pointerId);
+      const current = gesture.current;
+      if (!known || !current) return;
+
+      if (current.kind === "pinch") {
+        // Down to one finger: re-anchor on it so it pans from where the photo
+        // actually is, rather than scaling against a distance that no longer
+        // has two pointers behind it.
+        const remaining = [...pointers.current.values()][0];
+        gesture.current = remaining
+          ? {
+              kind: "pan",
+              startPan: pan.current,
+              startScale: scale.current,
+              startPoint: remaining,
+              startDistance: 0,
+              focus: { x: 0, y: 0 },
+              moved: true,
+            }
+          : null;
+        // A pinch that ends barely zoomed means "back to the whole photo".
+        if (!remaining && !isZoomed(scale.current)) paint(1, { x: 0, y: 0 }, 0, true);
+        return;
+      }
+
+      gesture.current = null;
+
+      // A pan that went anywhere is simply finished. One that didn't is a tap
+      // on a zoomed-in photo, and still has to reach the tap handling below —
+      // otherwise a photo, once zoomed, could never be zoomed back out.
+      if (current.kind === "pan" && current.moved) return;
+
+      // Whatever a drag did to the transform, put it back; only the decision
+      // below depends on how far it travelled.
+      if (current.kind === "drag") paint(current.startScale, current.startPan, 0, true);
+      if (cancelled) return;
+
+      const point = { x: event.clientX, y: event.clientY };
+      const dx = point.x - current.startPoint.x;
+      const dy = point.y - current.startPoint.y;
+
+      if (current.kind === "drag") {
+        if (dy > DISMISS_THRESHOLD_PX && Math.abs(dy) > Math.abs(dx)) {
+          onDismiss();
+          return;
+        }
+        if (Math.abs(dx) >= SWIPE_THRESHOLD_PX && Math.abs(dy) <= SWIPE_MAX_VERTICAL_PX) {
+          onSwipe(dx < 0 ? 1 : -1);
+          return;
+        }
+      }
+      if (current.moved) return;
+
+      // A tap. It cannot yet know whether it is the first of two, so the
+      // single-tap action waits out the double-tap window.
+      const now = performance.now();
+      const previous = lastTap.current;
+      cancelTapTimer();
+      if (
+        previous &&
+        now - previous.at < DOUBLE_TAP_MS &&
+        distance(point, previous.point) < DOUBLE_TAP_SLOP_PX
+      ) {
+        lastTap.current = null;
+        toggleZoom(toCentre(point));
+        return;
+      }
+
+      lastTap.current = { at: now, point };
+      tapTimer.current = window.setTimeout(() => {
+        tapTimer.current = null;
+        onTap();
+      }, DOUBLE_TAP_MS);
+    },
+    [cancelTapTimer, onDismiss, onSwipe, onTap, paint, toCentre, toggleZoom],
+  );
+
+  const onPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => endGesture(event, false),
+    [endGesture],
+  );
+  const onPointerCancel = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => endGesture(event, true),
+    [endGesture],
+  );
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
+}
+
+interface LightboxPhotoProps {
+  photo: GalleryPhoto;
+  src: string;
+  /** The grid thumbnail to hold the frame until the full size arrives. */
+  preview: { src: string; sizes: string } | null;
+  loaded: boolean;
+  selected: boolean;
+  onLoad: () => void;
+  onSwipe: (delta: 1 | -1) => void;
+  onDismiss: () => void;
+  onTap: () => void;
+  onZoomChange: (zoomed: boolean) => void;
+}
+
+/**
+ * The photo itself inside the lightbox, and every gesture aimed at it.
+ *
+ * Its own component so that `key={photo.id}` in the parent is what resets the
+ * zoom between photos: a remount cannot leave half a gesture behind, which an
+ * effect undoing state one field at a time eventually would.
+ */
+function LightboxPhoto({
+  photo,
+  src,
+  preview,
+  loaded,
+  selected,
+  onLoad,
+  onSwipe,
+  onDismiss,
+  onTap,
+  onZoomChange,
+}: LightboxPhotoProps) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const gestures = useLightboxGestures(
+    frameRef,
+    aspectOf(photo),
+    onSwipe,
+    onDismiss,
+    onTap,
+    onZoomChange,
+  );
+
+  return (
+    <div
+      // `touch-none` hands every gesture in here to the handlers above: the
+      // browser's own pan and zoom would otherwise fight them for the same
+      // fingers.
+      className="relative h-full w-full touch-none bg-black select-none"
+      onClick={(event) => event.stopPropagation()}
+      {...gestures}
+    >
+      <div ref={frameRef} className="absolute inset-0">
+        {/* The thumbnail the viewer just tapped, at the exact size the grid
+            rendered it — already in the browser's cache, so it paints
+            immediately and the full-size photo resolves on top of it. Without
+            it, opening a photo on a wedding's mobile signal is a black screen
+            for as long as the original takes to arrive. */}
+        {preview && !loaded && (
+          <Image
+            alt=""
+            src={preview.src}
+            fill
+            sizes={preview.sizes}
+            // `fill` images lazy-load by default; this one exists precisely to
+            // be on screen in the frame the lightbox opens in.
+            loading="eager"
+            className={`object-contain ${selected ? "scale-[0.93]" : ""}`}
+          />
+        )}
+        <Image
+          // The dialog itself is labelled with the photo's position; repeating
+          // a file name here would only make a screen reader say "DSC_1234.jpg".
+          alt=""
+          src={src}
+          fill
+          sizes="100vw"
+          onLoad={onLoad}
+          className={`object-contain transition-opacity duration-200 ${
+            selected ? "scale-[0.93]" : ""
+          } ${loaded ? "opacity-100" : "opacity-0"}`}
+          priority
+        />
+      </div>
+      {selected && (
+        // Inset ring rather than a border on the image: the image is
+        // object-contain, so a border would frame the letterboxing, not the
+        // photo.
+        <span
+          aria-hidden
+          className="ring-brand-border/80 pointer-events-none absolute inset-4 ring-4 ring-inset"
+        />
+      )}
+    </div>
+  );
+}
+
 interface PhotosPage {
   items: GalleryPhoto[];
   nextCursor: string | null;
@@ -246,6 +666,9 @@ interface GalleryViewProps {
   galleryId: string;
   title: string;
   eventDate: string | null;
+  /** Every confirmed photo in the gallery, not just the loaded pages — the
+   * header says how big it is before the viewer has scrolled anywhere. */
+  photoCount: number;
   initialPhotos: GalleryPhoto[];
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
@@ -272,6 +695,7 @@ function GalleryViewInner({
   galleryId,
   title,
   eventDate,
+  photoCount,
   initialPhotos,
   initialCursor,
   imageGrant,
@@ -303,13 +727,20 @@ function GalleryViewInner({
   const [reactions, setReactions] = useState<Map<string, PhotoReactionState>>(() => new Map());
   // Which reaction the name prompt interrupted, so it can be sent afterwards.
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
   // Which way the viewer was last moving through the lightbox — the preload
   // effect uses this to warm a photo two steps ahead, not just one, so fast
   // repeated next/prev doesn't keep outrunning the network by exactly one.
   const lastDirection = useRef<1 | -1>(1);
   const [selection, setSelection] = useState(EMPTY_SELECTION);
   const [zipState, setZipState] = useState<"idle" | "preparing" | "error">("idle");
+  // Reviewing your own picks before telling the photographer which to retouch
+  // — the one view of the gallery that isn't "all of it, newest first".
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  // Chrome hides so the photo can be looked at, either because the viewer
+  // tapped it away or because they zoomed in — the transform itself lives in
+  // `LightboxPhoto`, which reports only this crossing back up.
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
 
   const optedOut = useSyncExternalStore(
     subscribeOptOut,
@@ -332,7 +763,27 @@ function GalleryViewInner({
     },
   });
 
-  const photos = useMemo(() => data.pages.flatMap((page) => page.items), [data]);
+  /** Every photo fetched so far. The grid and the lightbox both work off
+   * `photos` below, which is this list narrowed by the favourites filter;
+   * anything that means "the gallery as a whole" wants this one. */
+  const allPhotos = useMemo(() => data.pages.flatMap((page) => page.items), [data]);
+
+  /**
+   * What the grid and the lightbox actually show. The favourites filter can
+   * only narrow what has been fetched, so while it is on the effect below
+   * keeps pulling pages until the whole gallery is loaded — a hearted photo
+   * can sit on any page, and a filter that silently omits some of them is
+   * worse than no filter.
+   */
+  const photos = useMemo(
+    () => (favoritesOnly ? allPhotos.filter((photo) => favorites.has(photo.id)) : allPhotos),
+    [allPhotos, favoritesOnly, favorites],
+  );
+
+  useEffect(() => {
+    if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [favoritesOnly, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const report = useCallback(
     (type: "GALLERY_VIEW" | "PHOTO_VIEW", photoId?: string) => {
@@ -595,6 +1046,24 @@ function GalleryViewInner({
     return { rowIndexForPhoto, rowStarts };
   }, [rows]);
 
+  /**
+   * The width each photo's tile was rendered at, so the lightbox can show that
+   * exact thumbnail while the full-size image is still arriving.
+   *
+   * It has to be the *exact* width: `next/image` picks its srcset candidate
+   * from `sizes`, so asking for the same src at a different size fetches a
+   * different variant — a second download and a second billed transform,
+   * instead of the one already sitting in the browser's cache because the
+   * viewer just tapped it.
+   */
+  const tileWidths = useMemo(() => {
+    const widths = new Map<string, number>();
+    for (const row of rows) {
+      for (const entry of row.items) widths.set(entry.item.id, entry.width);
+    }
+    return widths;
+  }, [rows]);
+
   const onTileFocus = useCallback((index: number) => setRovingIndex(index), []);
 
   const moveRoving = useCallback(
@@ -722,6 +1191,11 @@ function GalleryViewInner({
   const openPhoto = useCallback(
     (index: number) => {
       setLightboxIndex(index);
+      // A freshly opened photo shows its controls, however the last one was
+      // left. Done here rather than in an effect: opening is an event, and an
+      // effect would only re-derive it a render later.
+      setChromeHidden(false);
+      setZoomed(false);
       const photo = photos[index];
       // A "photo view" is a lightbox open, not a thumbnail impression —
       // srcset prefetches would otherwise inflate the numbers.
@@ -745,9 +1219,13 @@ function GalleryViewInner({
   const move = useCallback(
     (delta: number) => {
       lastDirection.current = delta > 0 ? 1 : -1;
+      setZoomed(false);
       setLightboxIndex((current) => {
         if (current === null) return current;
-        const requested = current + delta;
+        // Clamped on the way in for the same reason `activeIndex` is clamped
+        // on the way out: the favourites filter can shrink the list under an
+        // open lightbox.
+        const requested = Math.min(current, photos.length - 1) + delta;
         if (requested >= photos.length) {
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
           return current;
@@ -764,7 +1242,33 @@ function GalleryViewInner({
     [photos, report, hasNextPage, isFetchingNextPage, fetchNextPage],
   );
 
-  const active = lightboxIndex === null ? null : photos[lightboxIndex];
+  /**
+   * Unhearting the photo you are looking at, while the favourites filter is
+   * on, takes it out of `photos` underneath the lightbox. Clamping here lands
+   * on its neighbour instead of on nothing; when it was the only one left,
+   * `active` goes null and the lightbox closes.
+   */
+  const activeIndex =
+    lightboxIndex === null || photos.length === 0
+      ? null
+      : Math.min(lightboxIndex, photos.length - 1);
+  const active = activeIndex === null ? null : photos[activeIndex];
+
+  /**
+   * The grid thumbnail to show under the opening photo. Null when the tile's
+   * width isn't known — a photo can only be opened from a tile, so that means
+   * the layout hasn't settled yet, and guessing a width here would fetch a
+   * variant nothing else uses rather than reusing the cached one.
+   */
+  const preview = useMemo(() => {
+    if (!active) return null;
+    const width = tileWidths.get(active.id);
+    if (!width) return null;
+    return {
+      src: srcFor(active.thumbObjectKey ?? active.objectKey, imageGrant),
+      sizes: `${Math.ceil(width)}px`,
+    };
+  }, [active, imageGrant, tileWidths]);
   const activeSelected = active ? selection.ids.has(active.id) : false;
   const lightboxRef = useRef<HTMLDivElement>(null);
   const isLightboxOpen = lightboxIndex !== null;
@@ -792,6 +1296,25 @@ function GalleryViewInner({
   }, []);
 
   const closeLightbox = useCallback(() => window.history.back(), []);
+
+  const toggleChrome = useCallback(() => setChromeHidden((hidden) => !hidden), []);
+
+  /** "15. 8. 2026 · 56 fotek", with either half omitted if it isn't known. */
+  const subtitle = [eventDate, photoCount > 0 ? pluralize(photoCount, FORMS.photo) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  /**
+   * Tapping the photo puts the controls away, and zooming in does too: at that
+   * point the viewer is looking at one corner of one photo, and a close button
+   * over it is in the way of the only thing they asked for. Hidden means
+   * non-interactive as well as invisible — chrome that is faded out but still
+   * swallowing taps is worse than chrome that is simply there.
+   */
+  const chromeClasses =
+    chromeHidden || zoomed
+      ? "pointer-events-none opacity-0 transition-opacity duration-200"
+      : "opacity-100 transition-opacity duration-200";
 
   /**
    * Takes back one of this viewer's own uploads. Irreversible, so it asks —
@@ -956,49 +1479,70 @@ function GalleryViewInner({
           <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
             {title}
           </h1>
-          {eventDate && (
-            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
+          {subtitle && (
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{subtitle}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {photos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {allowReactions && (favorites.size > 0 || favoritesOnly) && (
+            <IconButton
+              onClick={() => {
+                // A selection carries positions as well as ids, and the filter
+                // renumbers every position under it — shift-picking a range
+                // afterwards would select photos nobody pointed at.
+                setSelection(clearSelection());
+                setFavoritesOnly((prev) => !prev);
+              }}
+              aria-pressed={favoritesOnly}
+              label={String(favorites.size)}
+              title={favoritesOnly ? "Zobrazit všechny fotky" : "Zobrazit jen fotky se srdíčkem"}
+              className={favoritesOnly ? "border-brand-primary bg-brand-tint text-neutral-900" : ""}
+            >
+              <span className="sr-only">
+                {favoritesOnly ? "Zobrazit všechny fotky" : "Zobrazit jen oblíbené"}
+              </span>
+              <HeartIcon className="h-5 w-5" active={favoritesOnly} />
+            </IconButton>
+          )}
+          {allPhotos.length > 0 && (
             <IconButton
               onClick={() => setProjecting(true)}
-              aria-label="Projekce"
+              label="Projekce"
               title="Fotky na plátno — mění se samy, nové přibývají živě"
             >
               <ProjectorIcon />
             </IconButton>
           )}
+          {/* Only ever rendered when it can actually do something: a
+              single-photo gallery downloads directly, and a whole gallery needs
+              its pre-built archive (docs/TODO.md §7) to exist. A disabled
+              button explained only by a `title` is, on a phone, a dead control
+              with no explanation at all. */}
           {allowDownload &&
-            photos.length > 0 &&
             selection.ids.size === 0 &&
-            (photos.length > 1 && archiveZipUrl ? (
-              // A pre-built archive (docs/TODO.md §7) is a plain CDN link —
-              // no signed manifest, no Worker request, just a download.
-              <IconButtonLink
-                href={archiveZipUrl}
-                aria-label="Stáhnout vše (ZIP)"
-                title="Stáhnout vše (ZIP)"
-              >
+            (archiveZipUrl ? (
+              // A pre-built archive is a plain CDN link — no signed manifest,
+              // no Worker request, just a download.
+              <IconButtonLink href={archiveZipUrl} label="Stáhnout vše" title="Stáhnout vše (ZIP)">
                 <DownloadIcon />
               </IconButtonLink>
             ) : (
-              <IconButton
-                disabled={zipState === "preparing" || photos.length > 1}
-                onClick={() => void downloadZip([])}
-                aria-label={photos.length > 1 ? "Archiv se připravuje" : "Stáhnout fotku"}
-                title={
-                  photos.length > 1
-                    ? "Archiv se připravuje na pozadí — zkus to znovu za pár minut."
-                    : "Stáhnout fotku"
-                }
-              >
-                <DownloadIcon />
-              </IconButton>
+              allPhotos.length === 1 && (
+                <IconButton
+                  disabled={zipState === "preparing"}
+                  onClick={() => void downloadZip([])}
+                  label="Stáhnout"
+                  title="Stáhnout fotku"
+                >
+                  <DownloadIcon />
+                </IconButton>
+              )
             ))}
-          {photos.length > 0 && (
-            <OfflineIconButton token={token} objectKeys={photos.map((photo) => photo.objectKey)} />
+          {allPhotos.length > 0 && (
+            <OfflineIconButton
+              token={token}
+              objectKeys={allPhotos.map((photo) => photo.objectKey)}
+            />
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
@@ -1141,7 +1685,11 @@ function GalleryViewInner({
 
       {photos.length === 0 && (
         <p className={`${GUTTER} text-sm text-neutral-500 dark:text-neutral-400`}>
-          V galerii zatím nejsou žádné fotky.
+          {!favoritesOnly
+            ? "V galerii zatím nejsou žádné fotky."
+            : hasNextPage
+              ? "Hledám tvoje srdíčka ve zbytku galerie…"
+              : "Zatím tu nemáš žádnou fotku se srdíčkem."}
         </p>
       )}
 
@@ -1150,59 +1698,33 @@ function GalleryViewInner({
           ref={lightboxRef}
           role="dialog"
           aria-modal="true"
-          aria-label={active.fileName}
+          aria-label={`Fotka ${activeIndex! + 1} z ${photos.length}`}
           tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
           onClick={closeLightbox}
         >
-          <div
-            className="relative h-full w-full touch-pan-y bg-black"
-            onClick={(event) => event.stopPropagation()}
-            onTouchStart={(event) => {
-              const touch = event.touches[0];
-              touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-            }}
-            onTouchEnd={(event) => {
-              const start = touchStart.current;
-              const touch = event.changedTouches[0];
-              touchStart.current = null;
-              if (!start || !touch) return;
-
-              const dx = touch.clientX - start.x;
-              // A mostly-vertical drag is a scroll attempt, not a swipe.
-              if (Math.abs(touch.clientY - start.y) > SWIPE_MAX_VERTICAL_PX) return;
-              if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
-              move(dx < 0 ? 1 : -1);
-            }}
-          >
-            <Image
-              src={srcFor(active.objectKey, imageGrant)}
-              alt={active.fileName}
-              fill
-              sizes="100vw"
-              onLoad={() => setLoadedPhotoId(active.id)}
-              className={`object-contain transition-all duration-200 ${
-                activeSelected ? "scale-[0.93]" : ""
-              } ${loadedPhotoId === active.id ? "opacity-100" : "opacity-0"}`}
-              priority
-            />
-            {activeSelected && (
-              // Inset ring rather than a border on the image: the image is
-              // object-contain, so a border would frame the letterboxing, not
-              // the photo.
-              <span
-                aria-hidden
-                className="ring-brand-border/80 pointer-events-none absolute inset-4 ring-4 ring-inset"
-              />
-            )}
-          </div>
+          <LightboxPhoto
+            // Keyed by photo: a remount is what resets the zoom between photos,
+            // so no half-finished gesture can survive a swipe.
+            key={active.id}
+            photo={active}
+            src={srcFor(active.objectKey, imageGrant)}
+            preview={preview}
+            loaded={loadedPhotoId === active.id}
+            selected={activeSelected}
+            onLoad={() => setLoadedPhotoId(active.id)}
+            onSwipe={move}
+            onDismiss={closeLightbox}
+            onTap={toggleChrome}
+            onZoomChange={setZoomed}
+          />
 
           <NavButton
             onClick={(event) => {
               event.stopPropagation();
               move(-1);
             }}
-            className="absolute left-0"
+            className={`absolute left-0 ${chromeClasses}`}
             aria-label="Předchozí"
           >
             <ChevronLeftIcon />
@@ -1212,14 +1734,14 @@ function GalleryViewInner({
               event.stopPropagation();
               move(1);
             }}
-            disabled={lightboxIndex! >= photos.length - 1 && !hasNextPage}
-            className="absolute right-0"
+            disabled={activeIndex! >= photos.length - 1 && !hasNextPage}
+            className={`absolute right-0 ${chromeClasses}`}
             aria-label="Další"
           >
             <ChevronRightIcon />
           </NavButton>
           <div
-            className="absolute inset-x-0 top-0 flex items-center gap-3 p-4"
+            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 ${chromeClasses}`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md">
@@ -1246,7 +1768,7 @@ function GalleryViewInner({
               {allowDownload && (
                 <button
                   type="button"
-                  onClick={() => pick(lightboxIndex!, active.id, false)}
+                  onClick={() => pick(activeIndex!, active.id, false)}
                   aria-pressed={activeSelected}
                   aria-label={activeSelected ? "Vybráno" : "Vybrat"}
                   className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
@@ -1263,13 +1785,13 @@ function GalleryViewInner({
             </div>
 
             <span className="ml-auto text-sm text-white/70 tabular-nums">
-              {lightboxIndex! + 1} / {photos.length}
+              {activeIndex! + 1} / {photos.length}
               {hasNextPage && "+"}
             </span>
           </div>
 
           <div
-            className="absolute bottom-4 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md"
+            className={`absolute bottom-4 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md ${chromeClasses}`}
             onClick={(event) => event.stopPropagation()}
           >
             {allowReactions && (
@@ -1334,7 +1856,7 @@ function GalleryViewInner({
 
       {projecting && (
         <Slideshow
-          photos={photos}
+          photos={allPhotos}
           imageGrant={imageGrant}
           onClose={() => setProjecting(false)}
           onRefresh={() => {
@@ -1473,8 +1995,11 @@ const PhotoTile = memo(function PhotoTile({
         aria-label={selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`}
       >
         <Image
+          // The button around this image is what a screen reader announces
+          // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
+          // straight after it, which tells nobody anything.
+          alt=""
           src={src}
-          alt={photo.fileName}
           fill
           sizes={`${Math.ceil(width)}px`}
           priority={priority}
@@ -1509,6 +2034,17 @@ const PhotoTile = memo(function PhotoTile({
   );
 });
 
+/**
+ * The heart, on a tile and in the lightbox.
+ *
+ * On a tile it is deliberately almost nothing: a white heart with a shadow, no
+ * disc behind it. The disc it used to have put a 44 px dark circle on top of
+ * every photo in the gallery — the same objection `SelectCheck` below is
+ * already written to avoid — and a wedding gallery is not improved by five
+ * hundred of them sitting on people's faces. An unset heart therefore stays
+ * dim on touch and fades in on hover with a mouse; a *set* one is always at
+ * full strength, because that one is information rather than an affordance.
+ */
 function HeartButton({
   active,
   count,
@@ -1529,19 +2065,23 @@ function HeartButton({
   const sizeClasses =
     size === "lg"
       ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
-      : "min-h-11 min-w-11 px-2 py-1 text-xs";
-  const chromeClasses = bare
+      : "min-h-11 min-w-11 px-2 py-1 text-xs drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+  const restingClasses = bare
     ? "hover:bg-white/15"
-    : "bg-black/40 backdrop-blur-sm hover:bg-black/55";
+    : // Fades in under a mouse; a touch screen has no hover to wait for, so
+      // there it sits quietly at 60% rather than disappearing entirely.
+      "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
       aria-label={active ? "Odebrat z oblíbených" : "Přidat do oblíbených"}
-      className={`flex items-center justify-center gap-1 rounded-full text-white transition-colors ${sizeClasses} ${chromeClasses} ${className}`}
+      className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
+        active && !bare ? "opacity-100" : restingClasses
+      } ${className}`}
     >
-      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-3.5 w-3.5"} active={active} />
+      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} />
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>
   );
