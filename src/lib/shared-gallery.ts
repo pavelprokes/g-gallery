@@ -22,6 +22,9 @@ import {
 export interface GalleryViewData {
   title: string;
   eventDate: string | null;
+  /** Every confirmed photo, not just the first page — the header states how
+   * big the gallery is before any of it has scrolled into view. */
+  photoCount: number;
   initialPhotos: {
     id: string;
     objectKey: string;
@@ -51,6 +54,9 @@ export async function loadGalleryViewData(
       // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
       zipStatus: true,
       zipObjectKey: true,
+      // One filtered aggregate rides along with the row we are already
+      // fetching, so the header's "56 fotek" costs no extra round trip.
+      _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
       // One extra row over the page size tells us whether a next page exists
       // without a separate COUNT query — the same trick the cursor-paginated
       // API route uses for every subsequent page.
@@ -90,6 +96,7 @@ export async function loadGalleryViewData(
   return {
     title: gallery.title,
     eventDate: gallery.eventDate?.toLocaleDateString("cs-CZ") ?? null,
+    photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
