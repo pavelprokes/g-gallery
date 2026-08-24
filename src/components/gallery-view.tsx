@@ -600,6 +600,21 @@ function LightboxPhoto({
     reset();
   }, [photo.id, reset]);
 
+  // The held-frame swap above stays silent on purpose — a spinner on every
+  // swipe would fight the "no flicker" design. But past ~1.2s the still-shown
+  // photo stops reading as "instant" and starts reading as "stuck", so a
+  // slow-only indicator earns its place: it never appears on a normal
+  // connection, only once a fetch is actually running long. Keyed by photo id
+  // rather than a plain boolean so the flag clears on its own once a new
+  // photo arrives, with no synchronous reset inside the effect.
+  const [staleFor, setStaleFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (loaded) return;
+    const timer = setTimeout(() => setStaleFor(photo.id), 1200);
+    return () => clearTimeout(timer);
+  }, [photo.id, loaded]);
+  const showStale = staleFor === photo.id && !loaded;
+
   return (
     <div
       // `touch-none` hands every gesture in here to the handlers above: the
@@ -649,6 +664,14 @@ function LightboxPhoto({
           priority
         />
       </div>
+      {showStale && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-4 bottom-4 flex size-8 items-center justify-center rounded-full bg-black/60"
+        >
+          <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        </span>
+      )}
       {selected && (
         // Inset ring rather than a border on the image: the image is
         // object-contain, so a border would frame the letterboxing, not the

@@ -32,6 +32,16 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 14"] } },
+    // Low-end-Android stand-in: CPU/network throttling (see e2e/fixtures.ts)
+    // applied only within the gallery/lightbox spec, since that's the flow
+    // this is meant to stress (justified-grid layout, lazy-loaded tiles,
+    // lightbox navigation). CDP throttling is chromium-only, so this needs
+    // its own Chromium-based device rather than reusing mobile-safari.
+    {
+      name: "mobile-chrome-throttled",
+      testMatch: /gallery-view\.spec\.ts/,
+      use: { ...devices["Pixel 7"] },
+    },
   ],
   webServer: {
     command: "pnpm build && pnpm start",
