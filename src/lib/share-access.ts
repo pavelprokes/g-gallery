@@ -16,6 +16,7 @@ export interface ResolvedShareLink {
   allowReactions: boolean;
   /** Guests holding this link may add photos (docs/GUEST-GALLERIES.md §6). */
   allowUpload: boolean;
+  allowPrintSelection: boolean;
   hasPassword: boolean;
 }
 
@@ -25,6 +26,7 @@ interface ShareLinkRecord {
   allowDownload: boolean;
   allowReactions: boolean;
   allowUpload: boolean;
+  allowPrintSelection: boolean;
   passwordHash: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
@@ -67,6 +69,7 @@ const LINK_FIELDS = {
   allowDownload: true,
   allowReactions: true,
   allowUpload: true,
+  allowPrintSelection: true,
   passwordHash: true,
   expiresAt: true,
   revokedAt: true,
@@ -140,6 +143,7 @@ function toResolved(link: ShareLinkRecord): ResolvedShareLink {
     allowDownload: link.allowDownload,
     allowReactions: link.allowReactions,
     allowUpload: link.allowUpload,
+    allowPrintSelection: link.allowPrintSelection,
     hasPassword: link.passwordHash !== null,
   };
 }

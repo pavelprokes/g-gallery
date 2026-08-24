@@ -290,9 +290,10 @@ model Photo {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
-  favorites      Favorite[]
-  reactions      Reaction[]
-  activityEvents ActivityEvent[]
+  favorites       Favorite[]
+  reactions       Reaction[]
+  printSelections PrintSelection[]
+  activityEvents  ActivityEvent[]
 
   @@index([galleryId, status])
   /// Drives the per-gallery guest quota count and the admin's "from guests" view.
@@ -319,6 +320,10 @@ model ShareLink {
   revokedAt            DateTime?
   allowDownload        Boolean   @default(true)
   allowReactions       Boolean   @default(true)
+  /// Guests may mark photos for print with a quantity (1-99). Same risk profile
+  /// as allowReactions — a per-viewer mark, not a write of new content — so it
+  /// defaults on rather than off like allowUpload.
+  allowPrintSelection  Boolean   @default(true)
   /// Guests holding this link may add photos to the gallery
   /// (docs/GUEST-GALLERIES.md §6). Off by default: every link that existed
   /// before this column was read-only, and silently widening one would be the
@@ -354,6 +359,7 @@ enum ActivityType {
   REACTION
   FAVORITE
   DOWNLOAD
+  PRINT_SELECT
   VISITOR_IDENTIFIED
 
   @@schema("g_gallery")
@@ -373,11 +379,12 @@ model Viewer {
   firstSeenAt DateTime   @default(now())
   lastSeenAt  DateTime   @default(now())
 
-  sessions       ViewSession[]
-  favorites      Favorite[]
-  reactions      Reaction[]
-  activityEvents ActivityEvent[]
-  uploads        Photo[]         @relation("GuestUploads")
+  sessions        ViewSession[]
+  favorites       Favorite[]
+  reactions       Reaction[]
+  printSelections PrintSelection[]
+  activityEvents  ActivityEvent[]
+  uploads         Photo[]          @relation("GuestUploads")
 
   @@unique([galleryId, anonKey])
   @@schema("g_gallery")
@@ -405,6 +412,22 @@ model Favorite {
   createdAt DateTime @default(now())
 
   @@unique([photoId, viewerId])
+  @@schema("g_gallery")
+}
+
+model PrintSelection {
+  id        String   @id @default(cuid())
+  photoId   String
+  photo     Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// 1-99; the row is deleted once this would drop to 0 (mirrors Favorite toggle-off)
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([photoId, viewerId])
+  @@index([photoId])
   @@schema("g_gallery")
 }
 

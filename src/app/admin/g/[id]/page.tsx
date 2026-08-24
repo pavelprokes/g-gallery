@@ -4,8 +4,10 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
+import { printTotals } from "@/lib/print-selections";
 import { Uploader } from "@/components/uploader";
 import { DeletePhotoButton } from "@/components/delete-photo-button";
+import { CopyButton } from "@/components/copy-button";
 import { decryptToken } from "@/lib/token-cipher";
 import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
@@ -26,6 +28,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   if (!session) redirect("/sign-in");
 
   const { id } = await props.params;
+  const { print } = await props.searchParams;
+  const printOnly = print === "1";
 
   const gallery = await prisma.gallery.findFirst({
     where: { id, ownerId: session.user.id },
@@ -71,11 +75,17 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   });
   if (!gallery) notFound();
 
-  const [counts, perPhoto, reactions] = await Promise.all([
+  const [counts, perPhoto, reactions, printQuantities] = await Promise.all([
     galleryCounts(gallery.id),
     photoCounts(gallery.id),
     reactionTotals(gallery.id),
+    printTotals(gallery.id),
   ]);
+
+  const printMarkedPhotos = gallery.photos.filter(
+    (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
+  );
+  const visiblePhotos = printOnly ? printMarkedPhotos : gallery.photos;
 
   async function publish() {
     "use server";
@@ -143,10 +153,25 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       />
 
       <section>
-        <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
+          {printMarkedPhotos.length > 0 && (
+            <a
+              href={printOnly ? "?" : "?print=1"}
+              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${
+                printOnly
+                  ? "border-brand-primary bg-brand-tint text-brand-primary-dark"
+                  : "border-admin-border hover:border-brand-primary hover:text-brand-primary text-brand-primary-dark bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              }`}
+            >
+              🖨 {printOnly ? "Zobrazit vše" : `Jen pro tisk (${printMarkedPhotos.length})`}
+            </a>
+          )}
+        </div>
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {gallery.photos.map((photo) => {
+          {visiblePhotos.map((photo) => {
             const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
+            const printQuantity = printQuantities.get(photo.id) ?? 0;
             return (
               <li key={photo.id} className="space-y-1">
                 <div className="relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900">
@@ -172,15 +197,21 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   {(reactions.get(photo.id) ?? 0) > 0 && (
                     <span className="text-amber-600"> · {reactions.get(photo.id)} reakcí</span>
                   )}
+                  {printQuantity > 0 && (
+                    <span className="text-brand-primary-dark"> · 🖨 {printQuantity}</span>
+                  )}
                 </p>
+                {printQuantity > 0 && (
+                  <CopyButton value={photo.fileName} label="Kopírovat název souboru" />
+                )}
                 <DeletePhotoButton photoId={photo.id} />
               </li>
             );
           })}
         </ul>
-        {gallery.photos.length === 0 && (
+        {visiblePhotos.length === 0 && (
           <p className="text-admin-muted mt-3 text-sm dark:text-neutral-400">
-            Zatím žádné potvrzené fotky.
+            {printOnly ? "Žádná fotka není označená k tisku." : "Zatím žádné potvrzené fotky."}
           </p>
         )}
       </section>

@@ -71,6 +71,7 @@ import {
   CloseIcon,
   DownloadIcon,
   HeartIcon,
+  PrinterIcon,
   ProjectorIcon,
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
@@ -82,6 +83,7 @@ import {
   type PhotoReactionState,
   type ReactionKind,
 } from "@/lib/reactions-shared";
+import { nextPrintQuantity } from "@/lib/print-selections-shared";
 
 /** Distance a touch must travel before it counts as a swipe, not a tap. */
 const SWIPE_THRESHOLD_PX = 50;
@@ -747,6 +749,8 @@ interface GalleryViewProps {
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
   allowUpload: boolean;
+  /** Share link lets whoever holds it mark photos for print, with a quantity. */
+  allowPrintSelection: boolean;
   /** Set only when this gallery was opened from a wedding page that lists more
    * than one — the way back to the rozcestník. Absent on a plain `/g/` link,
    * which must never reveal that a wedding page exists. */
@@ -773,6 +777,7 @@ function GalleryViewInner({
   allowDownload,
   allowReactions,
   allowUpload,
+  allowPrintSelection,
   archiveZipUrl,
   backHref,
   backLabel,
@@ -798,6 +803,11 @@ function GalleryViewInner({
   const [reactions, setReactions] = useState<Map<string, PhotoReactionState>>(() => new Map());
   // Which reaction the name prompt interrupted, so it can be sent afterwards.
   const [pendingReaction, setPendingReaction] = useState<ReactionKind | null>(null);
+  // This viewer's own print quantities — per-viewer like favorites, so it
+  // can't be server-rendered either.
+  const [printSelections, setPrintSelections] = useState<Map<string, number>>(() => new Map());
+  // The quantity the name prompt interrupted, so it can be sent afterwards.
+  const [pendingPrint, setPendingPrint] = useState<number | null>(null);
   // Which way the viewer was last moving through the lightbox — the preload
   // effect uses this to warm a photo two steps ahead, not just one, so fast
   // repeated next/prev doesn't keep outrunning the network by exactly one.
@@ -908,6 +918,25 @@ function GalleryViewInner({
 
     return () => controller.abort();
   }, [allowReactions, token]);
+
+  // Print quantities are per-viewer, same reason as the hearts above.
+  useEffect(() => {
+    if (!allowPrintSelection) return;
+    const anonKey = getViewerId();
+    if (!anonKey) return;
+
+    const controller = new AbortController();
+    void fetch(`/api/g/${encodeURIComponent(token)}/print?anonKey=${encodeURIComponent(anonKey)}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : { quantities: {} }))
+      .then((data: { quantities: Record<string, number> }) =>
+        setPrintSelections(new Map(Object.entries(data.quantities))),
+      )
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [allowPrintSelection, token]);
 
   // Which photos are this viewer's own uploads. Only fetched where uploading
   // was possible at all — on a read-only link nobody has anything to take back.
@@ -1028,6 +1057,56 @@ function GalleryViewInner({
       void sendFavorite(photoId, next, getViewerName() ?? undefined);
     },
     [favorites, sendFavorite],
+  );
+
+  const sendPrintQuantity = useCallback(
+    async (photoId: string, quantity: number, displayName?: string) => {
+      const anonKey = getViewerId();
+      if (!anonKey) return;
+
+      const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anonKey, photoId, quantity, displayName }),
+      });
+      if (!response.ok) return;
+
+      // The server is authoritative — a 0 sent while the row didn't exist
+      // resolves the same way a rejected quantity would.
+      const data = (await response.json()) as { quantity: number };
+      setPrintSelections((prev) => {
+        const copy = new Map(prev);
+        if (data.quantity > 0) copy.set(photoId, data.quantity);
+        else copy.delete(photoId);
+        return copy;
+      });
+    },
+    [token],
+  );
+
+  const cyclePrintQuantity = useCallback(
+    (photoId: string) => {
+      const current = printSelections.get(photoId) ?? 0;
+      const next = nextPrintQuantity(current);
+
+      // Optimistic: the badge updates immediately, the server follows.
+      setPrintSelections((prev) => {
+        const copy = new Map(prev);
+        if (next > 0) copy.set(photoId, next);
+        else copy.delete(photoId);
+        return copy;
+      });
+
+      // Same "join" moment as the heart — asked once, always skippable.
+      if (next > 0 && !getViewerName() && !hasAnsweredNamePrompt()) {
+        setNamePromptFor(photoId);
+        setPendingPrint(next);
+        return;
+      }
+
+      void sendPrintQuantity(photoId, next, getViewerName() ?? undefined);
+    },
+    [printSelections, sendPrintQuantity],
   );
 
   const photoIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
@@ -1734,12 +1813,15 @@ function GalleryViewInner({
                     selected={selection.ids.has(photo.id)}
                     allowDownload={allowDownload}
                     allowReactions={allowReactions}
+                    allowPrintSelection={allowPrintSelection}
                     isFavorite={favorites.has(photo.id)}
                     favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
                     reactionState={reactions.get(photo.id)}
+                    printQuantity={printSelections.get(photo.id) ?? 0}
                     onPick={pick}
                     onOpen={openPhoto}
                     onToggleFavorite={toggleFavorite}
+                    onCyclePrint={cyclePrintQuantity}
                     onFocus={onTileFocus}
                     buttonRef={(el) => {
                       if (el) tileRefs.current.set(index, el);
@@ -1876,6 +1958,14 @@ function GalleryViewInner({
                 />
               </>
             )}
+            {allowPrintSelection && (
+              <PrinterButton
+                quantity={printSelections.get(active.id) ?? 0}
+                onClick={() => cyclePrintQuantity(active.id)}
+                size="lg"
+                bare
+              />
+            )}
             {allowDownload && (
               <button
                 type="button"
@@ -1898,13 +1988,17 @@ function GalleryViewInner({
           onSubmit={(name) => {
             const photoId = namePromptFor;
             const kind = pendingReaction;
+            const printQuantity = pendingPrint;
             setNamePromptFor(null);
             setPendingReaction(null);
+            setPendingPrint(null);
             if (name) setViewerName(name);
             else dismissNamePrompt();
 
             // The prompt interrupts exactly one action; resume that one only.
             if (kind) void sendReaction(photoId, kind, name || undefined);
+            else if (printQuantity !== null)
+              void sendPrintQuantity(photoId, printQuantity, name || undefined);
             else void sendFavorite(photoId, true, name || undefined);
           }}
         />
@@ -1962,12 +2056,15 @@ interface PhotoTileProps {
   selected: boolean;
   allowDownload: boolean;
   allowReactions: boolean;
+  allowPrintSelection: boolean;
   isFavorite: boolean;
   favoriteCount: number;
   reactionState: PhotoReactionState | undefined;
+  printQuantity: number;
   onPick: (index: number, id: string, shiftKey: boolean) => void;
   onOpen: (index: number) => void;
   onToggleFavorite: (photoId: string) => void;
+  onCyclePrint: (photoId: string) => void;
   onFocus: (index: number) => void;
   buttonRef: (el: HTMLButtonElement | null) => void;
 }
@@ -1990,12 +2087,15 @@ const PhotoTile = memo(function PhotoTile({
   selected,
   allowDownload,
   allowReactions,
+  allowPrintSelection,
   isFavorite,
   favoriteCount,
   reactionState,
+  printQuantity,
   onPick,
   onOpen,
   onToggleFavorite,
+  onCyclePrint,
   onFocus,
   buttonRef,
 }: PhotoTileProps) {
@@ -2093,6 +2193,13 @@ const PhotoTile = memo(function PhotoTile({
           fileName={photo.fileName}
         />
       )}
+      {allowPrintSelection && (
+        <PrinterButton
+          quantity={printQuantity}
+          onClick={() => onCyclePrint(photo.id)}
+          className="absolute top-2 right-2"
+        />
+      )}
       {allowReactions && (
         <>
           <HeartButton
@@ -2158,6 +2265,51 @@ function HeartButton({
     >
       <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} />
       {count > 0 && <span className="tabular-nums">{count}</span>}
+    </button>
+  );
+}
+
+/**
+ * The printer, top-right on a tile and in the lightbox — same "almost
+ * nothing unless set" treatment as HeartButton above. A tap always adds one
+ * copy; past 99 it wraps back to 0, so the same single tap target both sets
+ * and clears a selection without a second gesture.
+ */
+function PrinterButton({
+  quantity,
+  onClick,
+  className = "",
+  size = "sm",
+  bare = false,
+}: {
+  quantity: number;
+  onClick: () => void;
+  className?: string;
+  size?: "sm" | "lg";
+  /** True inside the lightbox's shared blurred bar, which already supplies the background. */
+  bare?: boolean;
+}) {
+  const t = useTranslations("gallery");
+  const active = quantity > 0;
+  const sizeClasses =
+    size === "lg"
+      ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
+      : "min-h-11 min-w-11 px-2 py-1 text-xs drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+  const restingClasses = bare
+    ? "hover:bg-white/15"
+    : "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={active ? t("printQuantity", { count: quantity }) : t("markForPrint")}
+      className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
+        active && !bare ? "opacity-100" : restingClasses
+      } ${className}`}
+    >
+      <PrinterIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
+      {active && <span className="tabular-nums">{quantity}</span>}
     </button>
   );
 }

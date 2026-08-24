@@ -158,6 +158,8 @@
     "openPhoto": "Open {fileName}",
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites",
+    "markForPrint": "Mark for print",
+    "printQuantity": "For print ({count}×)",
     "viewerChipsAriaLabel": "Who's viewed this gallery",
     "namePromptTitle": "Who's looking?",
     "namePromptHint": "Others will see this name on your favorited photos. Feel free to skip it.",

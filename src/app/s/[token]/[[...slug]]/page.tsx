@@ -112,6 +112,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
       allowUpload={access.shareLink.allowUpload}
+      allowPrintSelection={access.shareLink.allowPrintSelection}
       backHref={
         event.cards.length > 1 ? `/s/${encodeURIComponent(token)}/${event.slug}` : undefined
       }

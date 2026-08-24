@@ -158,6 +158,8 @@
     "openPhoto": "Otevřít {fileName}",
     "addToFavorites": "Přidat do oblíbených",
     "removeFromFavorites": "Odebrat z oblíbených",
+    "markForPrint": "Označit k tisku",
+    "printQuantity": "K tisku ({count}×)",
     "viewerChipsAriaLabel": "Kdo si galerii prohlédl",
     "namePromptTitle": "Kdo se dívá?",
     "namePromptHint": "Jméno uvidí ostatní u tvých oblíbených fotek. Můžeš ho i přeskočit.",

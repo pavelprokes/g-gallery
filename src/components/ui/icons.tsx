@@ -168,3 +168,23 @@ export function HeartIcon({
     </svg>
   );
 }
+
+/** Print selection — the paper tray between the two sheets is what reads as a printer at small size. */
+export function PrinterIcon({ className = DEFAULT_SIZE }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M7 8V4h10v4" />
+      <rect x="4" y="8" width="16" height="8" rx="1.5" />
+      <path d="M7 14h10v6H7z" />
+    </svg>
+  );
+}

@@ -75,6 +75,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
       allowUpload={access.shareLink.allowUpload}
+      allowPrintSelection={access.shareLink.allowPrintSelection}
     />
   );
 }
