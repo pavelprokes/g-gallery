@@ -225,11 +225,15 @@ const DISMISS_THRESHOLD_PX = 110;
  * transparent, so the gesture reads as "throwing the photo away". */
 const DISMISS_FADE_PX = 400;
 
-interface GestureHandlers {
-  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+interface LightboxGestures {
+  /** Puts the photo back to fitted; called when the photo itself changes. */
+  reset: () => void;
+  handlers: {
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+    onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
+    onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+  };
 }
 
 /**
@@ -245,9 +249,9 @@ interface GestureHandlers {
  *
  * The transform is written straight to `frameRef.current.style` instead of
  * through state: a pinch produces pointer events far faster than React can
- * re-render, and a photo that lags the fingers by a frame feels broken. The
- * component is keyed by photo id, so "reset when the photo changes" is a
- * remount rather than anything this has to undo.
+ * re-render, and a photo that lags the fingers by a frame feels broken.
+ * Changing photo calls `reset` rather than remounting the component — see
+ * `LightboxPhoto`, where the remount was itself a source of flicker.
  */
 function useLightboxGestures(
   frameRef: RefObject<HTMLElement | null>,
@@ -256,7 +260,7 @@ function useLightboxGestures(
   onDismiss: () => void,
   onTap: () => void,
   onZoomChange: (zoomed: boolean) => void,
-): GestureHandlers {
+): LightboxGestures {
   const scale = useRef(1);
   const pan = useRef<Point>({ x: 0, y: 0 });
   const rect = useRef({ left: 0, top: 0, width: 0, height: 0 });
@@ -507,6 +511,28 @@ function useLightboxGestures(
     [cancelTapTimer, onDismiss, onSwipe, onTap, paint, toCentre, toggleZoom],
   );
 
+  /**
+   * Back to the fitted photo, without going through `paint`: this runs when
+   * the photo changes, and the parent has already put its own zoom flag back.
+   * Writing the DOM and the refs directly keeps it out of React's hands
+   * entirely, which is what lets the images survive a photo change instead of
+   * being remounted.
+   */
+  const reset = useCallback(() => {
+    scale.current = 1;
+    pan.current = { x: 0, y: 0 };
+    gesture.current = null;
+    lastTap.current = null;
+    pointers.current.clear();
+    cancelTapTimer();
+
+    const frame = frameRef.current;
+    if (!frame) return;
+    frame.style.transition = "none";
+    frame.style.transform = "";
+    frame.style.opacity = "";
+  }, [cancelTapTimer, frameRef]);
+
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => endGesture(event, false),
     [endGesture],
@@ -516,7 +542,7 @@ function useLightboxGestures(
     [endGesture],
   );
 
-  return { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
+  return { reset, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } };
 }
 
 interface LightboxPhotoProps {
@@ -536,9 +562,14 @@ interface LightboxPhotoProps {
 /**
  * The photo itself inside the lightbox, and every gesture aimed at it.
  *
- * Its own component so that `key={photo.id}` in the parent is what resets the
- * zoom between photos: a remount cannot leave half a gesture behind, which an
- * effect undoing state one field at a time eventually would.
+ * Deliberately *not* keyed by photo id in the parent, and deliberately never
+ * hiding the full-size image while it loads. Both are flicker: a remount
+ * throws the `<img>` away, so the next photo has nothing to show until its
+ * own first paint, and an image held at `opacity-0` until `onLoad` is a black
+ * screen for exactly as long as the decode takes. Reusing the element means
+ * the browser holds the previous photo's pixels until the next one is ready
+ * to replace them — which is what every native photo viewer does, and the
+ * only way through a swipe without a gap.
  */
 function LightboxPhoto({
   photo,
@@ -553,7 +584,7 @@ function LightboxPhoto({
   onZoomChange,
 }: LightboxPhotoProps) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const gestures = useLightboxGestures(
+  const { reset, handlers } = useLightboxGestures(
     frameRef,
     aspectOf(photo),
     onSwipe,
@@ -562,6 +593,13 @@ function LightboxPhoto({
     onZoomChange,
   );
 
+  // The zoom belongs to the photo that was zoomed, so it goes back to fitted
+  // when a different one arrives. `move` and `openPhoto` in the parent have
+  // already put the zoom flag back; this is the transform itself.
+  useEffect(() => {
+    reset();
+  }, [photo.id, reset]);
+
   return (
     <div
       // `touch-none` hands every gesture in here to the handlers above: the
@@ -569,14 +607,16 @@ function LightboxPhoto({
       // fingers.
       className="relative h-full w-full touch-none bg-black select-none"
       onClick={(event) => event.stopPropagation()}
-      {...gestures}
+      {...handlers}
     >
       <div ref={frameRef} className="absolute inset-0">
         {/* The thumbnail the viewer just tapped, at the exact size the grid
             rendered it — already in the browser's cache, so it paints
-            immediately and the full-size photo resolves on top of it. Without
-            it, opening a photo on a wedding's mobile signal is a black screen
-            for as long as the original takes to arrive. */}
+            immediately and the full-size photo resolves on top of it. It only
+            shows through on the very first open, when the image above it has
+            no pixels yet; from then on that one holds the previous photo. It
+            is unmounted only once the full size is opaque over it, never
+            while anything is still fading. */}
         {preview && !loaded && (
           <Image
             alt=""
@@ -597,9 +637,15 @@ function LightboxPhoto({
           fill
           sizes="100vw"
           onLoad={onLoad}
-          className={`object-contain transition-opacity duration-200 ${
+          // No fade, and never hidden: an image that is transparent until it
+          // loads guarantees a black gap, and one that fades in over 200 ms
+          // guarantees a visible one. An `<img>` shows nothing until it has
+          // pixels and keeps its old ones until the new arrive, which is the
+          // behaviour wanted here — the thumbnail below covers the first case
+          // and the previous photo covers every case after it.
+          className={`object-contain transition-transform duration-200 ${
             selected ? "scale-[0.93]" : ""
-          } ${loaded ? "opacity-100" : "opacity-0"}`}
+          }`}
           priority
         />
       </div>
@@ -1704,9 +1750,6 @@ function GalleryViewInner({
           onClick={closeLightbox}
         >
           <LightboxPhoto
-            // Keyed by photo: a remount is what resets the zoom between photos,
-            // so no half-finished gesture can survive a swipe.
-            key={active.id}
             photo={active}
             src={srcFor(active.objectKey, imageGrant)}
             preview={preview}
