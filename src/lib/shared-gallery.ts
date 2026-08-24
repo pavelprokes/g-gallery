@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import type { Locale } from "@/i18n/locales";
 import type { ResolvedShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
 import {
@@ -43,6 +44,7 @@ export interface GalleryViewData {
 
 export async function loadGalleryViewData(
   access: ResolvedShareLink,
+  locale: Locale,
 ): Promise<GalleryViewData | null> {
   const gallery = await prisma.gallery.findUnique({
     where: { id: access.galleryId },
@@ -95,7 +97,7 @@ export async function loadGalleryViewData(
 
   return {
     title: gallery.title,
-    eventDate: gallery.eventDate?.toLocaleDateString("cs-CZ") ?? null,
+    eventDate: gallery.eventDate?.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ") ?? null,
     photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
       id: photo.id,

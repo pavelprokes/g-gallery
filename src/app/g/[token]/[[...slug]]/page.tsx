@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
@@ -25,11 +26,12 @@ export async function generateMetadata(
   props: PageProps<"/g/[token]/[[...slug]]">,
 ): Promise<Metadata> {
   const { token } = await props.params;
+  const t = await getTranslations("gallery");
 
   const access = await resolveShareLink(token);
 
   if (!access.ok) {
-    return { title: "Galerie", robots: { index: false, follow: false } };
+    return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
   }
 
   const gallery = await prisma.gallery.findUnique({
@@ -38,7 +40,7 @@ export async function generateMetadata(
   });
 
   return {
-    title: gallery?.title ?? "Galerie",
+    title: gallery?.title ?? t("untitledPlaceholder"),
     robots: { index: false, follow: false },
   };
 }
@@ -54,7 +56,8 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
     notFound();
   }
 
-  const data = await loadGalleryViewData(access.shareLink);
+  const locale = await getLocale();
+  const data = await loadGalleryViewData(access.shareLink, locale);
   if (!data) notFound();
 
   return (

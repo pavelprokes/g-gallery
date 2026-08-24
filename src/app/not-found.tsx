@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ContactLine, DeadEnd } from "@/components/dead-end";
@@ -20,6 +21,7 @@ import { buttonClasses } from "@/components/ui/button";
  */
 export default function NotFound() {
   const pathname = usePathname();
+  const t = useTranslations("errors");
 
   if (pathname.startsWith("/admin")) {
     return (
@@ -41,13 +43,13 @@ export default function NotFound() {
   if (pathname.startsWith("/g/") || pathname.startsWith("/s/")) {
     return (
       <DeadEnd
-        title="Tenhle odkaz nikam nevede"
-        lead="Nejspíš se z chatu zkopírovala jen část adresy — stává se to pořád. Zkus ji otevřít znovu přímo z původní zprávy, nebo naskenuj QR kód, jestli ho máš po ruce."
-        hint="Když to nepomůže, napiš novomanželům. Odkaz mají u sebe."
+        title={t("linkNotFoundTitle")}
+        lead={t("linkNotFoundLead")}
+        hint={t("linkNotFoundHint")}
         action={<ContactLine />}
       />
     );
   }
 
-  return <DeadEnd title="Tady nic není" lead="Tahle adresa nikam nevede." />;
+  return <DeadEnd title={t("genericNotFoundTitle")} lead={t("genericNotFoundLead")} />;
 }

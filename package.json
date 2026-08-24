@@ -29,6 +29,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@formatjs/intl-localematcher": "^0.8.13",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@supabase/supabase-js": "^2.112.3",
@@ -37,7 +38,9 @@
     "@vercel/analytics": "^2.0.1",
     "aws4fetch": "^1.0.20",
     "better-auth": "1.7.1",
+    "negotiator": "^1.1.0",
     "next": "16.3.1",
+    "next-intl": "^4.13.7",
     "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
     "pica": "^10.0.3",
@@ -54,6 +57,7 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@types/negotiator": "^0.6.5",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.23.1",

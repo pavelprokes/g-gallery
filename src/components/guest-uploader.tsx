@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import {
   dismissNamePrompt,
@@ -45,6 +46,8 @@ export function GuestUploader({
   /** Called once a run added at least one photo, so the grid can refetch. */
   onUploaded: () => void | Promise<void>;
 }) {
+  const t = useTranslations("guestUpload");
+  const tRejection = useTranslations("guestUpload.rejection");
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
@@ -105,16 +108,13 @@ export function GuestUploader({
           }
           update(index, patch);
         },
-        onFatal: (rejection) => setFatal(guestRejectionMessage(rejection)),
+        onFatal: (rejection) => setFatal(guestRejectionMessage(rejection, tRejection)),
         onSkipped: (rejection, count) => {
           // Nothing will ever make these acceptable, so they leave the queue
           // rather than being retried on every visit.
           for (const entry of queued) void dequeueUpload(entry.id);
-          setFatal(
-            count > 1
-              ? `${guestRejectionMessage(rejection)} (${count} souborů jsme přeskočili, ostatní nahráváme.)`
-              : guestRejectionMessage(rejection),
-          );
+          const message = guestRejectionMessage(rejection, tRejection);
+          setFatal(count > 1 ? `${message} ${t("skippedNote", { count })}` : message);
         },
       });
 
@@ -130,7 +130,7 @@ export function GuestUploader({
         if (!hasAnsweredNamePrompt() && anonKey) setAskName(true);
       }
     },
-    [onUploaded, token, update],
+    [onUploaded, t, tRejection, token, update],
   );
 
   const start = useCallback(
@@ -146,13 +146,13 @@ export function GuestUploader({
         // saw the bar go back to how it was has no idea whether it worked, and
         // the honest answer is that it did not.
         console.error("[g-gallery/upload] could not start:", error);
-        setFatal("Nahrávání se nepodařilo spustit. Zkus to prosím znovu.");
+        setFatal(t("startFailed"));
         setRunning(false);
       } finally {
         setPreparing(0);
       }
     },
-    [run, token],
+    [run, t, token],
   );
 
   /**
@@ -169,7 +169,7 @@ export function GuestUploader({
       void run(queued)
         .catch((error: unknown) => {
           console.error("[g-gallery/upload] could not resume:", error);
-          setFatal("Nedokončené nahrávání se nepodařilo dokončit.");
+          setFatal(t("resumeFailed"));
         })
         .finally(() => setResuming(false));
     });
@@ -228,15 +228,16 @@ export function GuestUploader({
                 aria-hidden
                 className="inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
               />
-              Připravuji {preparing === 1 ? "fotku" : `${preparing} fotek`}…
+              {t("preparing", { count: preparing })}
             </p>
           )}
 
           {running && (
             <div className="mb-2">
               <p className="text-sm">
-                {resuming ? "Dokončuji nahrávání" : "Nahrávám"} {done} z {items.length} · displej
-                nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíš.
+                {resuming
+                  ? t("resumingProgress", { done, total: items.length })
+                  : t("uploadingProgress", { done, total: items.length })}
                 {resuming && (
                   <button
                     type="button"
@@ -249,7 +250,7 @@ export function GuestUploader({
                       setResuming(false);
                     }}
                   >
-                    Zahodit zbytek
+                    {t("discardRest")}
                   </button>
                 )}
               </p>
@@ -264,9 +265,12 @@ export function GuestUploader({
 
           {finished && !fatal && (
             <p className="mb-2 text-sm">
-              {done > 0 ? "Nahráno. Uvidí to všichni na svatbě." : "Nic se nenahrálo."}
+              {done > 0 ? t("doneSome") : t("doneNone")}
               {failed > 0 && (
-                <span className="text-red-600 dark:text-red-400"> · {failed} se nepovedlo</span>
+                <span className="text-red-600 dark:text-red-400">
+                  {" "}
+                  · {t("failedSuffix", { count: failed })}
+                </span>
               )}
             </p>
           )}
@@ -285,13 +289,13 @@ export function GuestUploader({
                 running ? "pointer-events-none opacity-50" : "cursor-pointer"
               }`}
             >
-              Přidat fotky
+              {t("addPhotos")}
               <input
                 type="file"
                 multiple
                 accept="image/jpeg,image/png,image/webp"
                 disabled={running}
-                aria-label="Přidat fotky"
+                aria-label={t("addPhotos")}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 onChange={(event) => pick(event.target.files)}
               />
@@ -301,13 +305,13 @@ export function GuestUploader({
                 running ? "pointer-events-none opacity-50" : "cursor-pointer"
               }`}
             >
-              Vyfotit
+              {t("takePhoto")}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 capture="environment"
                 disabled={running}
-                aria-label="Vyfotit"
+                aria-label={t("takePhoto")}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 onChange={(event) => pick(event.target.files)}
               />
@@ -315,13 +319,13 @@ export function GuestUploader({
           </div>
 
           <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-            Nahráním potvrzuješ, že fotky můžeš sdílet. Nechceš některou v albu?{" "}
+            {t("consentPrefix")}{" "}
             {takedownEmail ? (
               <a href={`mailto:${takedownEmail}`} className="underline">
-                Napiš nám
+                {t("consentEmailLinkText")}
               </a>
             ) : (
-              "Řekni novomanželům, smažou ji hned"
+              t("consentNoEmailFallback")
             )}
             .
           </p>
@@ -334,6 +338,7 @@ export function GuestUploader({
 }
 
 function NameAsk({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const t = useTranslations("guestUpload");
   const [value, setValue] = useState(() => getViewerName() ?? "");
 
   return (
@@ -345,27 +350,25 @@ function NameAsk({ onSubmit }: { onSubmit: (name: string) => void }) {
           onSubmit(value.trim());
         }}
       >
-        <h2 className="text-lg font-medium">Komu za ně poděkovat?</h2>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          Napiš křestní jméno — objeví se u tvých fotek. Nechat prázdné je taky v pořádku.
-        </p>
+        <h2 className="text-lg font-medium">{t("nameAskTitle")}</h2>
+        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{t("nameAskHint")}</p>
         <input
           autoFocus
           value={value}
           maxLength={60}
           onChange={(event) => setValue(event.target.value)}
           className="mt-3 w-full rounded-lg border px-3 py-2 text-base"
-          placeholder="Jméno"
+          placeholder={t("nameAskPlaceholder")}
         />
         <div className="mt-4 flex gap-2">
           <button
             type="submit"
             className="flex-1 rounded-lg bg-neutral-900 px-4 py-2 font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            Uložit
+            {t("nameAskSave")}
           </button>
           <button type="button" className="px-4 py-2 underline" onClick={() => onSubmit("")}>
-            Přeskočit
+            {t("nameAskSkip")}
           </button>
         </div>
       </form>
@@ -374,31 +377,28 @@ function NameAsk({ onSubmit }: { onSubmit: (name: string) => void }) {
 }
 
 /** Guest-side wording. Every refusal says what happened and what to do next. */
-function guestRejectionMessage(rejection: UploadRejection): string {
+function guestRejectionMessage(
+  rejection: UploadRejection,
+  t: ReturnType<typeof useTranslations<"guestUpload.rejection">>,
+): string {
   switch (rejection.code) {
     case "unsupported_type":
-      if (rejection.detail.reason === "heic") {
-        return "Tenhle formát (HEIC) zatím neumíme. V Nastavení → Fotoaparát → Formáty přepni na „Nejkompatibilnější“ a zkus to znovu.";
-      }
-      if (rejection.detail.reason === "video") {
-        return "Videa zatím nepřijímáme, jen fotky.";
-      }
-      return "Tenhle typ souboru neumíme. Zkus jinou fotku.";
+      if (rejection.detail.reason === "heic") return t("unsupportedHeic");
+      if (rejection.detail.reason === "video") return t("unsupportedVideo");
+      return t("unsupportedGeneric");
     case "file_too_large":
-      return "Fotka je moc velká.";
+      return t("fileTooLarge");
     case "quota_exceeded":
-      return rejection.detail.reason === "VIEWER_FULL"
-        ? "Máš tu už hodně fotek — víc jich zatím přidat nejde. Díky!"
-        : "Album je zatím plné. Dej prosím vědět novomanželům.";
+      return rejection.detail.reason === "VIEWER_FULL" ? t("quotaViewerFull") : t("quotaAlbumFull");
     case "upload_denied":
       return rejection.detail.reason === "PASSWORD_REQUIRED"
-        ? "Načti prosím stránku znovu a zadej heslo."
-        : "Album už nové fotky nepřijímá.";
+        ? t("deniedPasswordRequired")
+        : t("deniedGeneric");
     case "rate_limited":
-      return "Posíláš je hodně najednou — dej tomu chvilku a zkus to znovu.";
+      return t("rateLimited");
     case "size_mismatch":
-      return "Fotka se nepřenesla celá. Zkoušíme to znovu.";
+      return t("sizeMismatch");
     default:
-      return "Nahrávání se nepovedlo. Zkus to prosím znovu, až budeš mít lepší signál.";
+      return t("genericFailure");
   }
 }

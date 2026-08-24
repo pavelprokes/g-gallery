@@ -1,0 +1,252 @@
+{
+  "localeSwitcher": {
+    "cs": "Čeština",
+    "en": "English"
+  },
+  "manifest": {
+    "name": "Fotogalerie ke svatbě",
+    "description": "Svatební fotky na jednom odkazu — od fotografa i od hostů."
+  },
+  "marketing": {
+    "pageTitle": "Svatební fotogalerie s QR kódem pro hosty",
+    "pageDescription": "Jedna galerie na svatební fotky — od fotografa jako hotové focení, nebo jako sdílená galerie, kam fotky nahrávají i hosté přes QR kód. Bez appky, bez registrace.",
+    "kicker": "Fotogalerie ke svatbě",
+    "heroTitle": "Svatební fotky na jednom odkazu — od fotografa i od hostů",
+    "heroLead": "Tuhle galerii vám poslal fotograf, nebo vám ji přeposlali snoubenci/novomanželé — obě strany mohou odkaz i QR kód sdílet dál. Tady je návod, jak se do ní dostat, co s ní jde dělat, a co dělat, když si nevíte rady.",
+    "backToMainSite": "← Zpět na svatebni-fotograf-cechy.cz",
+    "heroImageAlt": "Mřížka svatebních fotek v galerii na iPhonu",
+    "twoWaysHeading": "Dva způsoby, jak galerii dostanete",
+    "fromPhotographerTitle": "Galerie od fotografa",
+    "fromPhotographerBody": "Po focení vám fotograf pošle odkaz na hotové fotky ve vysokém rozlišení. Galerie zůstává dostupná dlouho po svatbě, stáhnete si ji jedním tlačítkem a nepotřebujete k tomu žádný účet.",
+    "fromGuestsTitle": "Bonus k focení: galerie od hostů",
+    "fromGuestsBody": "Součást balíčku ke svatebnímu focení. Hosté na místě naskenují QR kód na stole a nahrají svoje fotky ze svatby přímo do sdílené galerie — bez appky, bez registrace.",
+    "howItWorksHeading": "Jak to funguje",
+    "howItWorksSteps": [
+      {
+        "title": "1. Dostanete odkaz",
+        "body": "Od fotografa, nebo od snoubenců — e-mailem, SMS, nebo na kartičce s QR kódem. Někdy k němu patří i heslo."
+      },
+      {
+        "title": "2. Otevřete v prohlížeči",
+        "body": "Nic se neinstaluje a není potřeba žádný účet — funguje to na mobilu i na počítači."
+      },
+      {
+        "title": "3. Prohlížíte, stahujete, přidáváte",
+        "body": "Podle toho, co vám fotograf u dané galerie povolil — viz seznam funkcí níže."
+      }
+    ],
+    "highlightsHeading": "Dvě věci, které se hodí nejvíc",
+    "highlights": {
+      "download": {
+        "title": "Stažení všech fotek najednou",
+        "body": "Jedno tlačítko, jeden ZIP se všemi fotkami ve vysokém rozlišení — žádné klikání fotku po fotce."
+      },
+      "projector": {
+        "title": "Živá projekce na svatbě",
+        "body": "Fotky od hostů naskakují na plátně v reálném čase, hned jak je někdo nahraje — ideální na promítání během večera."
+      }
+    },
+    "faqHeading": "Rychlá nápověda",
+    "faq": [
+      {
+        "q": "Kde vezmu QR kód nebo odkaz na galerii?",
+        "a": "Buď od fotografa, nebo přímo od snoubenců/novomanželů — obě strany mohou odkaz i QR kód dál sdílet, třeba přeposlaný v rodinném chatu nebo na kartičce položené na stole u fotokoutku. Pokud odkaz nemáte, stačí napsat jednomu z nich."
+      },
+      {
+        "q": "Nevím heslo, co teď?",
+        "a": "Heslo zná jedině fotograf — je to jediný, kdo ho nastavil, a nikdo jiný ho nemůže obnovit ani obejít. Napište mu, ať vám ho pošle znovu. Nezkoušejte ho hádat: po pěti špatných pokusech se odkaz na chvíli zamkne úplně pro všechny, kdo ho mají."
+      },
+      {
+        "q": "Odkaz nefunguje, nebo píše, že vypršel.",
+        "a": "Galerie po čase přestává přijímat návštěvy nebo nahrávání fotek. Fotograf ji může kdykoliv znovu otevřít nebo prodloužit — stačí se mu ozvat."
+      },
+      {
+        "q": "Funguje to i bez signálu?",
+        "a": "Jakmile galerii jednou otevřete a zapnete offline režim (ikona stažení nahoře v liště), prohlížíte fotky i bez připojení — hodí se třeba na chatě v horách."
+      },
+      {
+        "q": "Jak stáhnu všechny fotky najednou?",
+        "a": "Tlačítkem „Stáhnout vše“ se galerie zabalí do ZIPu. U velkých galerií to chvíli trvá, sestavuje se na pozadí — stačí se za chvíli vrátit."
+      }
+    ],
+    "guestTipsHeading": "Tipy a triky pro focení jako host",
+    "guestTipsIntro": "Pokud fotograf nebo snoubenci povolili u galerie nahrávání, může kdokoli ze svatby přidat vlastní fotky přímo tam, kde skončí i ty od fotografa.",
+    "guestTipsImageAlt": "Cedulka s QR kódem na svatební tabuli, mezi svícny a talíři",
+    "guestTips": [
+      "Nic se neinstaluje. Odkaz nebo QR kód od fotografa či snoubenců, tlačítko „Přidat fotky“ a systémový výběr souborů nebo rovnou foťák.",
+      "Telefon klidně zamkněte uprostřed nahrávání — doběhne to na pozadí, jakmile se vrátíte.",
+      "Napište své jméno, když se galerie zeptá — pár pak u fotky uvidí, od koho je.",
+      "Fotku nahranou omylem si sami smažete přímo v galerii, nikam kvůli tomu psát nemusíte.",
+      "Fotky z iPhonu fungují bez potíží — do prohlížeče se samy pošlou v běžném formátu. Jen když máte v Nastavení → Fotky → Přenos do Mac nebo PC zapnuté „Zachovat originály“ (netýká se většiny lidí), může nahrávka výjimečně selhat — přepněte tam na „Automaticky“ a zkuste to znovu."
+    ],
+    "featuresHeading": "Co všechno galerie umí",
+    "featuresIntro": "Řazeno od toho, co využijete nejčastěji, po specialitky pro konkrétní chvíle svatby.",
+    "features": [
+      "Jeden odkaz, nic se neinstaluje — otevřete v běžném prohlížeči na mobilu i počítači.",
+      "Rychlá mřížka fotek a prohlížení na celou obrazovku, plynulé i na starším telefonu.",
+      "Stažení celé galerie jedním tlačítkem (ZIP).",
+      "Oblíbené a reakce — označte si fotky, které se vám nejvíc líbí.",
+      "Heslo a časové omezení — fotograf určuje, kdo a jak dlouho se do galerie dostane.",
+      "Offline režim — jednou stažené fotky uvidíte i bez signálu.",
+      "Upozornění na nové fotky, když je fotograf přidá.",
+      "Fotky od hostů — hosté přidávají vlastní snímky ze svatby přímo do galerie, bez appky a bez účtu.",
+      "Živá projekce — nové fotky od hostů naskakují na plátně v reálném čase.",
+      "Víc galerií pod jedním odkazem, který postupně roste — výběr, kompletní set i galerie od hostů, aniž byste dostávali nový odkaz."
+    ],
+    "footerText": "Tuhle galerii provozuje váš fotograf.",
+    "footerLinkText": "Svatební fotograf Čechy →"
+  },
+  "errors": {
+    "linkNotFoundTitle": "Tenhle odkaz nikam nevede",
+    "linkNotFoundLead": "Nejspíš se z chatu zkopírovala jen část adresy — stává se to pořád. Zkus ji otevřít znovu přímo z původní zprávy, nebo naskenuj QR kód, jestli ho máš po ruce.",
+    "linkNotFoundHint": "Když to nepomůže, napiš novomanželům. Odkaz mají u sebe.",
+    "genericNotFoundTitle": "Tady nic není",
+    "genericNotFoundLead": "Tahle adresa nikam nevede.",
+    "galleryErrorTitle": "Něco se pokazilo",
+    "galleryErrorLead": "Galerii se nepodařilo načíst. Zkus to prosím znovu.",
+    "tryAgain": "Zkusit znovu",
+    "contact": "Pořád nic? <a>Napiš mi</a>, mrknu se na to.",
+    "shareLinkDeadTitle": "Odkaz už neplatí",
+    "shareLinkDeadLead": "Galerie tu byla, ale přístup přes tenhle odkaz skončil.",
+    "shareLinkDeadHint": "Novomanželé nebo fotograf ti můžou poslat nový.",
+    "eventPartGoneTitle": "Tahle část už tu není",
+    "eventPartGoneLead": "Fotograf ji ze stránky svatby sundal. Zbytek tam ale pořád je."
+  },
+  "gallery": {
+    "untitledPlaceholder": "Galerie",
+    "photoCount": "{count, plural, one {# fotka} few {# fotky} other {# fotek}}",
+    "emptyEvent": "Zatím tu nic není. Až fotograf něco přidá, objeví se to na téhle adrese.",
+    "emptyCard": "Zatím prázdné",
+    "selectedCount": "{count, plural, one {# vybraná} few {# vybrané} other {# vybraných}}",
+    "zipPreparingAnnounce": "Připravuji stažení…",
+    "zipErrorAnnounce": "Stažení se nepodařilo připravit. Zkus to prosím znovu.",
+    "back": "Zpět",
+    "showAllPhotos": "Zobrazit všechny fotky",
+    "showFavoritesOnlyTitle": "Zobrazit jen fotky se srdíčkem",
+    "showFavoritesOnlySr": "Zobrazit jen oblíbené",
+    "slideshowButtonLabel": "Projekce",
+    "slideshowButtonTitle": "Fotky na plátno — mění se samy, nové přibývají živě",
+    "downloadAllLabel": "Stáhnout vše",
+    "downloadAllTitle": "Stáhnout vše (ZIP)",
+    "downloadOneLabel": "Stáhnout",
+    "downloadOneTitle": "Stáhnout fotku",
+    "clearSelection": "Zrušit výběr",
+    "deselectAll": "Odznačit vše",
+    "selectAllLoaded": "Vybrat vše načtené",
+    "downloadSelected": "{count, plural, one {Stáhnout # fotku} few {Stáhnout # fotky (ZIP)} other {Stáhnout # fotek (ZIP)}}",
+    "preparingShort": "Připravuji…",
+    "photosListAriaLabel": "Fotky v galerii",
+    "loadingMorePhotos": "Načítám další fotky…",
+    "emptyGallery": "V galerii zatím nejsou žádné fotky.",
+    "searchingFavorites": "Hledám tvoje srdíčka ve zbytku galerie…",
+    "noFavoritesYet": "Zatím tu nemáš žádnou fotku se srdíčkem.",
+    "lightboxAriaLabel": "Fotka {index} z {total}",
+    "previous": "Předchozí",
+    "next": "Další",
+    "close": "Zavřít",
+    "deleting": "Mažu…",
+    "deleteMyPhoto": "Smazat mou fotku",
+    "deleteConfirm": "Smazat tuhle fotku z alba? Tohle už nejde vzít zpět.",
+    "selected": "Vybráno",
+    "select": "Vybrat",
+    "preparingDownload": "Připravuji stažení",
+    "downloadOriginal": "Stáhnout originál",
+    "privacyNotice": "Návštěvu počítáme anonymně, jen přes tenhle prohlížeč — bez IP adresy.",
+    "optOut": "Nepočítat mě",
+    "optedOutNotice": "Tvoje návštěvy se nepočítají.",
+    "selectPhoto": "Vybrat {fileName}",
+    "openPhoto": "Otevřít {fileName}",
+    "addToFavorites": "Přidat do oblíbených",
+    "removeFromFavorites": "Odebrat z oblíbených",
+    "viewerChipsAriaLabel": "Kdo si galerii prohlédl",
+    "namePromptTitle": "Kdo se dívá?",
+    "namePromptHint": "Jméno uvidí ostatní u tvých oblíbených fotek. Můžeš ho i přeskočit.",
+    "namePromptPlaceholder": "Např. Petra",
+    "namePromptSkip": "Přeskočit",
+    "namePromptSave": "Uložit",
+    "reactions": {
+      "LOVE": "Srdce",
+      "WOW": "Úžas",
+      "LAUGH": "Smích",
+      "SAD": "Dojetí",
+      "CLAP": "Potlesk"
+    },
+    "offline": {
+      "unsupported": "Tenhle prohlížeč offline galerie nepodporuje.",
+      "notEnoughSpace": "V zařízení není dost místa. Galerie potřebuje zhruba {needed}.",
+      "notEnoughSpaceWithFree": "V zařízení není dost místa. Galerie potřebuje zhruba {needed}, volno je {free}.",
+      "tryAgain": "Zkusit znovu",
+      "downloading": "Stahuji do zařízení… {percent}%",
+      "downloadingWithBytes": "Stahuji do zařízení… {percent}% · {bytes}",
+      "downloadingAriaLabel": "Stahování galerie pro offline přístup",
+      "downloadStarted": "Stahování zahájeno, {percent} %.",
+      "availableOffline": "✓ Galerie je dostupná offline",
+      "availableOfflineWithBytes": "✓ Galerie je dostupná offline ({bytes})",
+      "availableOfflineNote": "Uložené fotky jsou ve zmenšené velikosti pro tuhle obrazovku, ne originály. Prohlížeč je může po čase sám uvolnit — na iPhonu zhruba po týdnu bez otevření; pak stačí stáhnout znovu.",
+      "removeFromDevice": "Odstranit ze zařízení",
+      "availableOfflineAnnounce": "Staženo, galerie je dostupná offline.",
+      "downloadFailed": "Stažení se nepodařilo dokončit.",
+      "downloadFailedAnnounce": "Stažení se nepodařilo.",
+      "saveOffline": "Ulož si {count, plural, one {# fotku} few {# fotky} other {# fotek}} do zařízení a prohlížej je i bez signálu.",
+      "estimatedSize": "Zabere zhruba {size}. Ukládá se velikost pro tuhle obrazovku, ne originály.",
+      "makeAvailable": "Zpřístupnit offline",
+      "iconLabel": "Offline",
+      "iconTitle": "Uložit fotky do zařízení pro prohlížení bez signálu",
+      "panelTitle": "Offline přístup"
+    },
+    "slideshow": {
+      "ariaLabel": "Projekce",
+      "empty": "Zatím tu nejsou žádné fotky.",
+      "exit": "Ukončit"
+    }
+  },
+  "guestUpload": {
+    "addPhotos": "Přidat fotky",
+    "takePhoto": "Vyfotit",
+    "preparing": "{count, plural, one {Připravuji fotku…} few {Připravuji # fotek…} other {Připravuji # fotek…}}",
+    "uploadingProgress": "Nahrávám {done} z {total} · displej nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíš.",
+    "resumingProgress": "Dokončuji nahrávání {done} z {total} · displej nechám svítit. Kdyby se to přerušilo, dopošle se, až se sem vrátíš.",
+    "discardRest": "Zahodit zbytek",
+    "doneSome": "Nahráno. Uvidí to všichni na svatbě.",
+    "doneNone": "Nic se nenahrálo.",
+    "failedSuffix": "{count} se nepovedlo",
+    "skippedNote": "({count} souborů jsme přeskočili, ostatní nahráváme.)",
+    "startFailed": "Nahrávání se nepodařilo spustit. Zkus to prosím znovu.",
+    "resumeFailed": "Nedokončené nahrávání se nepodařilo dokončit.",
+    "consentPrefix": "Nahráním potvrzuješ, že fotky můžeš sdílet. Nechceš některou v albu?",
+    "consentEmailLinkText": "Napiš nám",
+    "consentNoEmailFallback": "Řekni novomanželům, smažou ji hned",
+    "nameAskTitle": "Komu za ně poděkovat?",
+    "nameAskHint": "Napiš křestní jméno — objeví se u tvých fotek. Nechat prázdné je taky v pořádku.",
+    "nameAskPlaceholder": "Jméno",
+    "nameAskSave": "Uložit",
+    "nameAskSkip": "Přeskočit",
+    "rejection": {
+      "unsupportedHeic": "Tenhle formát (HEIC) zatím neumíme. V Nastavení → Fotoaparát → Formáty přepni na „Nejkompatibilnější“ a zkus to znovu.",
+      "unsupportedVideo": "Videa zatím nepřijímáme, jen fotky.",
+      "unsupportedGeneric": "Tenhle typ souboru neumíme. Zkus jinou fotku.",
+      "fileTooLarge": "Fotka je moc velká.",
+      "quotaViewerFull": "Máš tu už hodně fotek — víc jich zatím přidat nejde. Díky!",
+      "quotaAlbumFull": "Album je zatím plné. Dej prosím vědět novomanželům.",
+      "deniedPasswordRequired": "Načti prosím stránku znovu a zadej heslo.",
+      "deniedGeneric": "Album už nové fotky nepřijímá.",
+      "rateLimited": "Posíláš je hodně najednou — dej tomu chvilku a zkus to znovu.",
+      "sizeMismatch": "Fotka se nepřenesla celá. Zkoušíme to znovu.",
+      "genericFailure": "Nahrávání se nepovedlo. Zkus to prosím znovu, až budeš mít lepší signál."
+    }
+  },
+  "presence": {
+    "someone": "Někdo se právě dívá",
+    "count": "{count, plural, one {# člověk} few {# lidé} other {# lidí}} se právě dívá",
+    "named": "{names} {count, plural, one {se dívá} other {se dívají}}"
+  },
+  "sharePassword": {
+    "title": "Galerie je chráněná heslem",
+    "hint": "Heslo ti poslal fotograf spolu s odkazem.",
+    "placeholder": "Heslo",
+    "verifying": "Ověřuji…",
+    "submit": "Zobrazit galerii",
+    "missingPassword": "Zadej heslo.",
+    "wrongPassword": "Nesprávné heslo. Zkus to prosím později."
+  }
+}

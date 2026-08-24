@@ -1,9 +1,10 @@
+import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import Link from "next/link";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import type { ResolvedEvent } from "@/lib/event-access";
 import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
-import { FORMS, pluralize } from "@/lib/czech-plural";
 
 /**
  * The wedding page's rozcestník (docs/GUEST-GALLERIES.md §2).
@@ -23,20 +24,25 @@ export async function EventHub({
   // One grant per gallery: a grant covers a single storagePrefix, and each
   // gallery has its own. Cheap — an HMAC each, no database work.
   const grants = await Promise.all(event.cards.map((card) => mintImageGrant(card.storagePrefix)));
+  const locale = await getLocale();
+  const t = await getTranslations("gallery");
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mb-4 flex justify-end">
+        <LocaleSwitcher />
+      </div>
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">{event.title}</h1>
         <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          {[event.eventDate?.toLocaleDateString("cs-CZ"), event.venue].filter(Boolean).join(" · ")}
+          {[event.eventDate?.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ"), event.venue]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </header>
 
       {event.cards.length === 0 ? (
-        <p className="mt-10 text-sm text-neutral-500">
-          Zatím tu nic není. Až fotograf něco přidá, objeví se to na téhle adrese.
-        </p>
+        <p className="mt-10 text-sm text-neutral-500">{t("emptyEvent")}</p>
       ) : (
         <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {event.cards.map((card, index) => (
@@ -67,9 +73,10 @@ export async function EventHub({
                   <p className="font-medium">{card.title}</p>
                   <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                     {card.photoCount > 0
-                      ? pluralize(card.photoCount, FORMS.photo)
-                      : "Zatím prázdné"}
-                    {card.latestPhotoAt && ` · ${card.latestPhotoAt.toLocaleDateString("cs-CZ")}`}
+                      ? t("photoCount", { count: card.photoCount })
+                      : t("emptyCard")}
+                    {card.latestPhotoAt &&
+                      ` · ${card.latestPhotoAt.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ")}`}
                   </p>
                 </div>
               </Link>

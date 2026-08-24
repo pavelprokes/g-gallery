@@ -28,7 +28,11 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
-  use: { baseURL, trace: "on-first-retry" },
+  // Pins the default browser locale to Czech (Accept-Language + Intl), so
+  // existing specs asserting on Czech UI text keep passing under the
+  // Accept-Language-based locale autodetection (src/i18n/request.ts) — only
+  // e2e/locale-switch.spec.ts overrides this per-test to exercise English.
+  use: { baseURL, trace: "on-first-retry", locale: "cs-CZ" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 14"] } },

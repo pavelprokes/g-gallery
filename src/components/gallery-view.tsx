@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -41,7 +42,6 @@ import {
   selectRange,
   toggleOne,
 } from "@/lib/selection";
-import { FORMS, pluralize } from "@/lib/czech-plural";
 import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
@@ -57,6 +57,7 @@ import {
   zoomAround,
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineIconButton } from "@/components/offline-toggle";
@@ -76,8 +77,8 @@ import type { SignedImageGrant } from "@/lib/image-signing";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
-  REACTION_LABEL,
   totalReactions,
+  useReactionLabels,
   type PhotoReactionState,
   type ReactionKind,
 } from "@/lib/reactions-shared";
@@ -776,6 +777,7 @@ function GalleryViewInner({
   backHref,
   backLabel,
 }: GalleryViewProps) {
+  const t = useTranslations("gallery");
   const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // Which photo's full-res image has actually finished loading — drives the
@@ -1369,7 +1371,7 @@ function GalleryViewInner({
   const toggleChrome = useCallback(() => setChromeHidden((hidden) => !hidden), []);
 
   /** "15. 8. 2026 · 56 fotek", with either half omitted if it isn't known. */
-  const subtitle = [eventDate, photoCount > 0 ? pluralize(photoCount, FORMS.photo) : null]
+  const subtitle = [eventDate, photoCount > 0 ? t("photoCount", { count: photoCount }) : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -1395,7 +1397,7 @@ function GalleryViewInner({
     async (photoId: string) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
-      if (!confirm("Smazat tuhle fotku z alba? Tohle už nejde vzít zpět.")) return;
+      if (!confirm(t("deleteConfirm"))) return;
 
       setDeleting(true);
       try {
@@ -1419,7 +1421,7 @@ function GalleryViewInner({
         setDeleting(false);
       }
     },
-    [closeLightbox, queryClient, token],
+    [closeLightbox, queryClient, t, token],
   );
 
   useEffect(() => {
@@ -1527,11 +1529,11 @@ function GalleryViewInner({
   return (
     <main className="mx-auto max-w-[1600px] px-0 pt-5 pb-10 sm:px-1 sm:pt-10 sm:pb-14 lg:pt-12">
       <div aria-live="polite" className="sr-only">
-        {selection.ids.size > 0 ? pluralize(selection.ids.size, FORMS.selected) : ""}
+        {selection.ids.size > 0 ? t("selectedCount", { count: selection.ids.size }) : ""}
       </div>
       <div aria-live="polite" className="sr-only">
-        {zipState === "preparing" && "Připravuji stažení…"}
-        {zipState === "error" && "Stažení se nepodařilo připravit. Zkus to prosím znovu."}
+        {zipState === "preparing" && t("zipPreparingAnnounce")}
+        {zipState === "error" && t("zipErrorAnnounce")}
       </div>
       <header
         className={`${GUTTER} mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 sm:mb-5`}
@@ -1542,7 +1544,7 @@ function GalleryViewInner({
               href={backHref}
               className="mb-1 inline-block text-sm text-neutral-500 underline dark:text-neutral-400"
             >
-              ← {backLabel ?? "Zpět"}
+              ← {backLabel ?? t("back")}
             </a>
           )}
           <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
@@ -1564,11 +1566,11 @@ function GalleryViewInner({
               }}
               aria-pressed={favoritesOnly}
               label={String(favorites.size)}
-              title={favoritesOnly ? "Zobrazit všechny fotky" : "Zobrazit jen fotky se srdíčkem"}
+              title={favoritesOnly ? t("showAllPhotos") : t("showFavoritesOnlyTitle")}
               className={favoritesOnly ? "border-brand-primary bg-brand-tint text-neutral-900" : ""}
             >
               <span className="sr-only">
-                {favoritesOnly ? "Zobrazit všechny fotky" : "Zobrazit jen oblíbené"}
+                {favoritesOnly ? t("showAllPhotos") : t("showFavoritesOnlySr")}
               </span>
               <HeartIcon className="h-5 w-5" active={favoritesOnly} />
             </IconButton>
@@ -1576,8 +1578,8 @@ function GalleryViewInner({
           {allPhotos.length > 0 && (
             <IconButton
               onClick={() => setProjecting(true)}
-              label="Projekce"
-              title="Fotky na plátno — mění se samy, nové přibývají živě"
+              label={t("slideshowButtonLabel")}
+              title={t("slideshowButtonTitle")}
             >
               <ProjectorIcon />
             </IconButton>
@@ -1592,7 +1594,11 @@ function GalleryViewInner({
             (archiveZipUrl ? (
               // A pre-built archive is a plain CDN link — no signed manifest,
               // no Worker request, just a download.
-              <IconButtonLink href={archiveZipUrl} label="Stáhnout vše" title="Stáhnout vše (ZIP)">
+              <IconButtonLink
+                href={archiveZipUrl}
+                label={t("downloadAllLabel")}
+                title={t("downloadAllTitle")}
+              >
                 <DownloadIcon />
               </IconButtonLink>
             ) : (
@@ -1600,8 +1606,8 @@ function GalleryViewInner({
                 <IconButton
                   disabled={zipState === "preparing"}
                   onClick={() => void downloadZip([])}
-                  label="Stáhnout"
-                  title="Stáhnout fotku"
+                  label={t("downloadOneLabel")}
+                  title={t("downloadOneTitle")}
                 >
                   <DownloadIcon />
                 </IconButton>
@@ -1615,13 +1621,12 @@ function GalleryViewInner({
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
+          <LocaleSwitcher />
         </div>
       </header>
 
       {zipState === "error" && selection.ids.size === 0 && (
-        <p className={`${GUTTER} -mt-1 mb-3 text-xs text-red-600`}>
-          Stažení se nepodařilo připravit. Zkus to prosím znovu.
-        </p>
+        <p className={`${GUTTER} -mt-1 mb-3 text-xs text-red-600`}>{t("zipErrorAnnounce")}</p>
       )}
 
       {allowDownload && photos.length > 0 && selection.ids.size > 0 && (
@@ -1629,13 +1634,13 @@ function GalleryViewInner({
           <button
             type="button"
             onClick={() => setSelection(clearSelection())}
-            aria-label="Zrušit výběr"
+            aria-label={t("clearSelection")}
             className="rounded-full border px-2 py-1 text-sm"
           >
             ✕
           </button>
           <span className="text-sm font-medium">
-            {pluralize(selection.ids.size, FORMS.selected)}
+            {t("selectedCount", { count: selection.ids.size })}
           </span>
           <button
             type="button"
@@ -1646,7 +1651,7 @@ function GalleryViewInner({
             }
             className="text-sm underline"
           >
-            {isAllSelected(selection, photoIds) ? "Odznačit vše" : "Vybrat vše načtené"}
+            {isAllSelected(selection, photoIds) ? t("deselectAll") : t("selectAllLoaded")}
           </button>
           <button
             type="button"
@@ -1655,15 +1660,11 @@ function GalleryViewInner({
             className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
           >
             {zipState === "preparing"
-              ? "Připravuji…"
-              : `Stáhnout ${pluralize(selection.ids.size, FORMS.photoAccusative)}${
-                  selection.ids.size > 1 ? " (ZIP)" : ""
-                }`}
+              ? t("preparingShort")
+              : t("downloadSelected", { count: selection.ids.size })}
           </button>
           {zipState === "error" && (
-            <span className="w-full text-xs text-red-600">
-              Stažení se nepodařilo připravit. Zkus to prosím znovu.
-            </span>
+            <span className="w-full text-xs text-red-600">{t("zipErrorAnnounce")}</span>
           )}
         </div>
       )}
@@ -1677,7 +1678,7 @@ function GalleryViewInner({
         ref={listRef}
         className="relative flex flex-col"
         style={{ height: rowVirtualizer.getTotalSize() }}
-        aria-label="Fotky v galerii"
+        aria-label={t("photosListAriaLabel")}
         onKeyDown={onGridKeyDown}
       >
         {virtualRows.map((virtualRow) => {
@@ -1693,7 +1694,7 @@ function GalleryViewInner({
                   transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
                 }}
               >
-                Načítám další fotky…
+                {t("loadingMorePhotos")}
               </li>
             );
           }
@@ -1755,10 +1756,10 @@ function GalleryViewInner({
       {photos.length === 0 && (
         <p className={`${GUTTER} text-sm text-neutral-500 dark:text-neutral-400`}>
           {!favoritesOnly
-            ? "V galerii zatím nejsou žádné fotky."
+            ? t("emptyGallery")
             : hasNextPage
-              ? "Hledám tvoje srdíčka ve zbytku galerie…"
-              : "Zatím tu nemáš žádnou fotku se srdíčkem."}
+              ? t("searchingFavorites")
+              : t("noFavoritesYet")}
         </p>
       )}
 
@@ -1767,7 +1768,7 @@ function GalleryViewInner({
           ref={lightboxRef}
           role="dialog"
           aria-modal="true"
-          aria-label={`Fotka ${activeIndex! + 1} z ${photos.length}`}
+          aria-label={t("lightboxAriaLabel", { index: activeIndex! + 1, total: photos.length })}
           tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
           onClick={closeLightbox}
@@ -1791,7 +1792,7 @@ function GalleryViewInner({
               move(-1);
             }}
             className={`absolute left-0 ${chromeClasses}`}
-            aria-label="Předchozí"
+            aria-label={t("previous")}
           >
             <ChevronLeftIcon />
           </NavButton>
@@ -1802,7 +1803,7 @@ function GalleryViewInner({
             }}
             disabled={activeIndex! >= photos.length - 1 && !hasNextPage}
             className={`absolute right-0 ${chromeClasses}`}
-            aria-label="Další"
+            aria-label={t("next")}
           >
             <ChevronRightIcon />
           </NavButton>
@@ -1814,7 +1815,7 @@ function GalleryViewInner({
               <button
                 type="button"
                 onClick={closeLightbox}
-                aria-label="Zavřít"
+                aria-label={t("close")}
                 className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
               >
                 <CloseIcon className="h-5 w-5" />
@@ -1827,7 +1828,7 @@ function GalleryViewInner({
                   onClick={() => void deleteMine(active.id)}
                   className="flex h-11 items-center rounded-full px-3 text-sm text-white transition-colors hover:bg-white/15 disabled:opacity-50"
                 >
-                  {deleting ? "Mažu…" : "Smazat mou fotku"}
+                  {deleting ? t("deleting") : t("deleteMyPhoto")}
                 </button>
               )}
 
@@ -1836,7 +1837,7 @@ function GalleryViewInner({
                   type="button"
                   onClick={() => pick(activeIndex!, active.id, false)}
                   aria-pressed={activeSelected}
-                  aria-label={activeSelected ? "Vybráno" : "Vybrat"}
+                  aria-label={activeSelected ? t("selected") : t("select")}
                   className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
                     activeSelected ? "" : "hover:bg-white/15"
                   }`}
@@ -1880,7 +1881,9 @@ function GalleryViewInner({
                 type="button"
                 disabled={zipState === "preparing"}
                 onClick={() => void downloadZip([active.id])}
-                aria-label={zipState === "preparing" ? "Připravuji stažení" : "Stáhnout originál"}
+                aria-label={
+                  zipState === "preparing" ? t("preparingDownload") : t("downloadOriginal")
+                }
                 className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 disabled:opacity-50"
               >
                 <DownloadIcon className="h-5 w-5" />
@@ -1910,13 +1913,13 @@ function GalleryViewInner({
       <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-3 dark:text-neutral-400">
         {!optedOut ? (
           <p>
-            Návštěvu počítáme anonymně, jen přes tenhle prohlížeč — bez IP adresy.{" "}
+            {t("privacyNotice")}{" "}
             <button type="button" className="underline" onClick={optOut}>
-              Nepočítat mě
+              {t("optOut")}
             </button>
           </p>
         ) : (
-          <p>Tvoje návštěvy se nepočítají.</p>
+          <p>{t("optedOutNotice")}</p>
         )}
       </footer>
 
@@ -1996,6 +1999,7 @@ const PhotoTile = memo(function PhotoTile({
   onFocus,
   buttonRef,
 }: PhotoTileProps) {
+  const t = useTranslations("gallery");
   // Local to this tile, not shared — a touch gesture and the synthetic click
   // that follows it always target the same DOM node, so there is no reason
   // for this to live in the parent (and mutating a ref passed down as a prop
@@ -2058,7 +2062,11 @@ const PhotoTile = memo(function PhotoTile({
         // The tile carries the photo's own average colour, so the grid fills
         // in with the picture's palette instead of grey holes.
         style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
-        aria-label={selectionActive ? `Vybrat ${photo.fileName}` : `Otevřít ${photo.fileName}`}
+        aria-label={
+          selectionActive
+            ? t("selectPhoto", { fileName: photo.fileName })
+            : t("openPhoto", { fileName: photo.fileName })
+        }
       >
         <Image
           // The button around this image is what a screen reader announces
@@ -2128,6 +2136,7 @@ function HeartButton({
   /** True inside the lightbox's shared blurred bar, which already supplies the background. */
   bare?: boolean;
 }) {
+  const t = useTranslations("gallery");
   const sizeClasses =
     size === "lg"
       ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
@@ -2142,7 +2151,7 @@ function HeartButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      aria-label={active ? "Odebrat z oblíbených" : "Přidat do oblíbených"}
+      aria-label={active ? t("removeFromFavorites") : t("addToFavorites")}
       className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
         active && !bare ? "opacity-100" : restingClasses
       } ${className}`}
@@ -2173,12 +2182,13 @@ function SelectCheck({
   onPick: (shiftKey: boolean) => void;
   fileName: string;
 }) {
+  const t = useTranslations("gallery");
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={selected}
-      aria-label={`Vybrat ${fileName}`}
+      aria-label={t("selectPhoto", { fileName })}
       // Stops the tile's own handler from also firing and opening the lightbox.
       onClick={(event) => {
         event.stopPropagation();
@@ -2208,6 +2218,7 @@ function ReactionBar({
   state: PhotoReactionState | undefined;
   onPick: (kind: ReactionKind) => void;
 }) {
+  const reactionLabels = useReactionLabels();
   return (
     <div className="flex items-center gap-1">
       {REACTION_KINDS.map((kind) => {
@@ -2219,8 +2230,8 @@ function ReactionBar({
             type="button"
             onClick={() => onPick(kind)}
             aria-pressed={mine}
-            aria-label={REACTION_LABEL[kind]}
-            title={REACTION_LABEL[kind]}
+            aria-label={reactionLabels[kind]}
+            title={reactionLabels[kind]}
             className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-sm transition-transform ${
               mine ? "scale-110 bg-white/25" : "hover:bg-white/15"
             }`}
@@ -2251,8 +2262,9 @@ function ReactionBadge({ state }: { state: PhotoReactionState | undefined }) {
 }
 
 function ViewerChips({ viewers }: { viewers: GalleryViewer[] }) {
+  const t = useTranslations("gallery");
   return (
-    <div className="flex items-center -space-x-2" aria-label="Kdo si galerii prohlédl">
+    <div className="flex items-center -space-x-2" aria-label={t("viewerChipsAriaLabel")}>
       {viewers.map((viewer) => (
         <span
           key={viewer.id}
@@ -2267,6 +2279,7 @@ function ViewerChips({ viewers }: { viewers: GalleryViewer[] }) {
 }
 
 function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const t = useTranslations("gallery");
   const [value, setValue] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(containerRef, true);
@@ -2297,23 +2310,21 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
         }}
       >
         <h2 id="name-prompt-title" className="text-lg font-semibold">
-          Kdo se dívá?
+          {t("namePromptTitle")}
         </h2>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Jméno uvidí ostatní u tvých oblíbených fotek. Můžeš ho i přeskočit.
-        </p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}
           maxLength={60}
-          placeholder="Např. Petra"
+          placeholder={t("namePromptPlaceholder")}
           className="w-full rounded border px-3 py-2"
         />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onSubmit("")}>
-            Přeskočit
+            {t("namePromptSkip")}
           </Button>
-          <Button type="submit">Uložit</Button>
+          <Button type="submit">{t("namePromptSave")}</Button>
         </div>
       </form>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GalleryPhoto } from "@/components/gallery-view";
@@ -38,6 +39,7 @@ export function Slideshow({
   // shown, so it is decoded by the time it fades in — a single <img> whose src
   // changes flashes white on a slow connection, which on a five-metre screen is
   // the one thing everyone notices.
+  const t = useTranslations("gallery.slideshow");
   const [slots, setSlots] = useState<[GalleryPhoto | null, GalleryPhoto | null]>([
     photos[0] ?? null,
     photos[1] ?? null,
@@ -123,7 +125,7 @@ export function Slideshow({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Projekce"
+      aria-label={t("ariaLabel")}
       className="fixed inset-0 z-50 bg-black"
       onClick={onClose}
     >
@@ -147,7 +149,7 @@ export function Slideshow({
 
       {photos.length === 0 && (
         <p className="absolute inset-0 flex items-center justify-center text-white/70">
-          Zatím tu nejsou žádné fotky.
+          {t("empty")}
         </p>
       )}
 
@@ -157,7 +159,7 @@ export function Slideshow({
         onClick={onClose}
         className="absolute top-4 right-4 rounded-full bg-white/10 px-3 py-2 text-sm text-white opacity-0 transition-opacity duration-300 hover:opacity-100 focus-visible:opacity-100"
       >
-        Ukončit
+        {t("exit")}
       </button>
     </div>
   );

@@ -1,5 +1,6 @@
 "use server";
 
+import { getTranslations } from "next-intl/server";
 import { verifySharePassword } from "@/lib/share-access";
 import { setUnlockCookie } from "@/lib/share-unlock";
 
@@ -19,11 +20,12 @@ export async function unlockShareLink(
 ): Promise<UnlockState> {
   const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
+  const t = await getTranslations("sharePassword");
 
-  if (!token || !password) return { error: "Zadej heslo." };
+  if (!token || !password) return { error: t("missingPassword") };
 
   const result = await verifySharePassword(token, password);
-  if (!result.ok) return { error: "Nesprávné heslo. Zkus to prosím později." };
+  if (!result.ok) return { error: t("wrongPassword") };
 
   await setUnlockCookie(result.shareLinkId, result.passwordHash);
   return {};

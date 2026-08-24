@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import { resolveEvent } from "@/lib/event-access";
 import { resolveShareLink } from "@/lib/share-access";
@@ -37,11 +38,12 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { token } = await props.params;
   const event = await resolveEvent(token);
+  const t = await getTranslations("gallery");
 
   // Never leak a title for a token that does not resolve, and never let this
   // page into an index — same unconditional rule as every share surface.
   return {
-    title: event?.title ?? "Galerie",
+    title: event?.title ?? t("untitledPlaceholder"),
     robots: { index: false, follow: false },
   };
 }
@@ -91,7 +93,8 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
     );
   }
 
-  const data = await loadGalleryViewData(access.shareLink);
+  const locale = await getLocale();
+  const data = await loadGalleryViewData(access.shareLink, locale);
   if (!data) notFound();
 
   return (

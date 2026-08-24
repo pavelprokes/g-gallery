@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 /**
  * Reaction vocabulary shared by the browser and the server.
  *
@@ -19,14 +21,17 @@ export const REACTION_EMOJI: Record<ReactionKind, string> = {
   CLAP: "👏",
 };
 
-/** Czech labels for screen readers and tooltips. */
-export const REACTION_LABEL: Record<ReactionKind, string> = {
-  LOVE: "Srdce",
-  WOW: "Úžas",
-  LAUGH: "Smích",
-  SAD: "Dojetí",
-  CLAP: "Potlesk",
-};
+/** Labels for screen readers and tooltips, in the viewer's chosen locale. */
+export function useReactionLabels(): Record<ReactionKind, string> {
+  const t = useTranslations("gallery.reactions");
+  return {
+    LOVE: t("LOVE"),
+    WOW: t("WOW"),
+    LAUGH: t("LAUGH"),
+    SAD: t("SAD"),
+    CLAP: t("CLAP"),
+  };
+}
 
 export interface PhotoReactionState {
   /** kind -> number of distinct viewers */

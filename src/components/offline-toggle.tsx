@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   cacheKeyForToken,
@@ -12,7 +13,6 @@ import {
   requestPersistence,
   type OfflineProgress,
 } from "@/lib/offline";
-import { FORMS, pluralize } from "@/lib/czech-plural";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IconButton } from "@/components/ui/icon-button";
@@ -39,6 +39,7 @@ export function OfflineToggle({
   // client's first (pre-hydration) pass has a real one and would compute
   // "checking" — a straight SSR/CSR content mismatch. Both sides start at
   // "checking" (renders nothing) and the real answer arrives after mount.
+  const t = useTranslations("gallery.offline");
   const [state, setState] = useState<State>("checking");
   const [progress, setProgress] = useState<OfflineProgress | null>(null);
   const [free, setFree] = useState<number | null>(null);
@@ -135,26 +136,24 @@ export function OfflineToggle({
   if (state === "unsupported") {
     return (
       <>
-        <Note>Tenhle prohlížeč offline galerie nepodporuje.</Note>
-        <LiveRegion>Tenhle prohlížeč offline galerie nepodporuje.</LiveRegion>
+        <Note>{t("unsupported")}</Note>
+        <LiveRegion>{t("unsupported")}</LiveRegion>
       </>
     );
   }
 
   if (state === "no_space") {
+    const message =
+      free !== null
+        ? t("notEnoughSpaceWithFree", { needed: formatBytes(estimated), free: formatBytes(free) })
+        : t("notEnoughSpace", { needed: formatBytes(estimated) });
     return (
       <div className="space-y-2">
-        <Note>
-          V zařízení není dost místa. Galerie potřebuje zhruba {formatBytes(estimated)}
-          {free !== null && `, volno je ${formatBytes(free)}`}.
-        </Note>
+        <Note>{message}</Note>
         <Button variant="secondary" onClick={() => setState("off")}>
-          Zkusit znovu
+          {t("tryAgain")}
         </Button>
-        <LiveRegion>
-          Nedostatek místa v úložišti. Galerie potřebuje zhruba {formatBytes(estimated)}
-          {free !== null && `, volno je ${formatBytes(free)}`}.
-        </LiveRegion>
+        <LiveRegion>{message}</LiveRegion>
       </div>
     );
   }
@@ -166,12 +165,13 @@ export function OfflineToggle({
     return (
       <div className="space-y-2">
         <p className="text-sm">
-          Stahuji do zařízení… {percent}%
-          {progress && progress.bytes > 0 && ` · ${formatBytes(progress.bytes)}`}
+          {progress && progress.bytes > 0
+            ? t("downloadingWithBytes", { percent, bytes: formatBytes(progress.bytes) })
+            : t("downloading", { percent })}
         </p>
         <div
           role="progressbar"
-          aria-label="Stahování galerie pro offline přístup"
+          aria-label={t("downloadingAriaLabel")}
           aria-valuenow={percent}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -182,7 +182,7 @@ export function OfflineToggle({
             style={{ width: `${percent}%` }}
           />
         </div>
-        <LiveRegion>Stahování zahájeno, {percent} %.</LiveRegion>
+        <LiveRegion>{t("downloadStarted", { percent })}</LiveRegion>
       </div>
     );
   }
@@ -191,18 +191,15 @@ export function OfflineToggle({
     return (
       <div className="space-y-2">
         <p className="text-sm">
-          ✓ Galerie je dostupná offline
-          {progress && progress.bytes > 0 && ` (${formatBytes(progress.bytes)})`}
+          {progress && progress.bytes > 0
+            ? t("availableOfflineWithBytes", { bytes: formatBytes(progress.bytes) })
+            : t("availableOffline")}
         </p>
-        <p className="text-xs text-neutral-500">
-          Uložené fotky jsou ve zmenšené velikosti pro tuhle obrazovku, ne originály. Prohlížeč je
-          může po čase sám uvolnit — na iPhonu zhruba po týdnu bez otevření; pak stačí stáhnout
-          znovu.
-        </p>
+        <p className="text-xs text-neutral-500">{t("availableOfflineNote")}</p>
         <Button variant="secondary" onClick={() => void remove()}>
-          Odstranit ze zařízení
+          {t("removeFromDevice")}
         </Button>
-        <LiveRegion>Staženo, galerie je dostupná offline.</LiveRegion>
+        <LiveRegion>{t("availableOfflineAnnounce")}</LiveRegion>
       </div>
     );
   }
@@ -210,26 +207,22 @@ export function OfflineToggle({
   if (state === "error") {
     return (
       <div className="space-y-2">
-        <Note>Stažení se nepodařilo dokončit.</Note>
+        <Note>{t("downloadFailed")}</Note>
         <Button variant="secondary" onClick={() => void start()}>
-          Zkusit znovu
+          {t("tryAgain")}
         </Button>
-        <LiveRegion>Stažení se nepodařilo.</LiveRegion>
+        <LiveRegion>{t("downloadFailedAnnounce")}</LiveRegion>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <p className="text-sm">
-        Ulož si {pluralize(objectKeys.length, FORMS.photoAccusative)} do zařízení a prohlížej je i
-        bez signálu.
-      </p>
+      <p className="text-sm">{t("saveOffline", { count: objectKeys.length })}</p>
       <p className="text-xs text-neutral-500">
-        Zabere zhruba {formatBytes(estimated)}. Ukládá se velikost pro tuhle obrazovku, ne
-        originály.
+        {t("estimatedSize", { size: formatBytes(estimated) })}
       </p>
-      <Button onClick={() => void start()}>Zpřístupnit offline</Button>
+      <Button onClick={() => void start()}>{t("makeAvailable")}</Button>
     </div>
   );
 }
@@ -242,6 +235,7 @@ export function OfflineToggle({
  * render inside this panel exactly as they did in the footer card.
  */
 export function OfflineIconButton(props: { token: string; objectKeys: readonly string[] }) {
+  const t = useTranslations("gallery.offline");
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -258,16 +252,16 @@ export function OfflineIconButton(props: { token: string; objectKeys: readonly s
     <div ref={panelRef} className="relative">
       <IconButton
         onClick={() => setOpen((prev) => !prev)}
-        label="Offline"
+        label={t("iconLabel")}
         aria-expanded={open}
-        title="Uložit fotky do zařízení pro prohlížení bez signálu"
+        title={t("iconTitle")}
       >
         <OfflineIcon />
       </IconButton>
       {open && (
         <Card className="absolute top-full right-0 z-20 mt-2 w-72 bg-white dark:bg-neutral-900">
           <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
-            Offline přístup
+            {t("panelTitle")}
           </p>
           <OfflineToggle token={props.token} objectKeys={props.objectKeys} />
         </Card>

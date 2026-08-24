@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { ContactLine, DeadEnd } from "@/components/dead-end";
 import { buttonClasses } from "@/components/ui/button";
@@ -9,11 +10,12 @@ import { buttonClasses } from "@/components/ui/button";
  * photographer cut somebody off deliberately, which is nobody else's business.
  */
 export function ShareLinkDead() {
+  const t = useTranslations("errors");
   return (
     <DeadEnd
-      title="Odkaz už neplatí"
-      lead="Galerie tu byla, ale přístup přes tenhle odkaz skončil."
-      hint="Novomanželé nebo fotograf ti můžou poslat nový."
+      title={t("shareLinkDeadTitle")}
+      lead={t("shareLinkDeadLead")}
+      hint={t("shareLinkDeadHint")}
       action={<ContactLine />}
     />
   );
@@ -29,10 +31,11 @@ export function ShareLinkDead() {
  * component above offers no such thing.
  */
 export function EventPartGone({ backHref, eventTitle }: { backHref: string; eventTitle: string }) {
+  const t = useTranslations("errors");
   return (
     <DeadEnd
-      title="Tahle část už tu není"
-      lead="Fotograf ji ze stránky svatby sundal. Zbytek tam ale pořád je."
+      title={t("eventPartGoneTitle")}
+      lead={t("eventPartGoneLead")}
       action={
         <Link href={backHref} className={buttonClasses()}>
           ← {eventTitle}

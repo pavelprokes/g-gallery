@@ -1,0 +1,252 @@
+{
+  "localeSwitcher": {
+    "cs": "Čeština",
+    "en": "English"
+  },
+  "manifest": {
+    "name": "Wedding photo gallery",
+    "description": "Wedding photos in one link — from the photographer and from guests."
+  },
+  "marketing": {
+    "pageTitle": "Wedding photo gallery with a QR code for guests",
+    "pageDescription": "One gallery for all your wedding photos — the finished set from your photographer, or a shared gallery guests add their own photos to via QR code. No app, no account.",
+    "kicker": "Wedding photo gallery",
+    "heroTitle": "All your wedding photos, one link — from the photographer and from your guests",
+    "heroLead": "This gallery was sent to you by your photographer, or forwarded by the couple — either side can share the link or QR code onward. Here's how to get into it, what you can do once you're in, and what to do if you get stuck.",
+    "backToMainSite": "← Back to svatebni-fotograf-cechy.cz",
+    "heroImageAlt": "A grid of wedding photos in the gallery, shown on an iPhone",
+    "twoWaysHeading": "Two ways you might get a gallery",
+    "fromPhotographerTitle": "Gallery from the photographer",
+    "fromPhotographerBody": "After the shoot, your photographer sends you a link to the finished, high-resolution photos. The gallery stays up long after the wedding, downloads in one click, and needs no account.",
+    "fromGuestsTitle": "Bonus with the shoot: a gallery from guests",
+    "fromGuestsBody": "Included with the wedding photography package. Guests scan a QR code on the table and add their own wedding photos straight into a shared gallery — no app, no sign-up.",
+    "howItWorksHeading": "How it works",
+    "howItWorksSteps": [
+      {
+        "title": "1. You get a link",
+        "body": "From the photographer or the couple — by email, text, or on a printed card with a QR code. Sometimes there's a password too."
+      },
+      {
+        "title": "2. Open it in your browser",
+        "body": "Nothing to install, no account needed — works on your phone or your computer."
+      },
+      {
+        "title": "3. Browse, download, add photos",
+        "body": "Depending on what the photographer enabled for this gallery — see the full list of features below."
+      }
+    ],
+    "highlightsHeading": "Two things guests use the most",
+    "highlights": {
+      "download": {
+        "title": "Download every photo at once",
+        "body": "One button, one ZIP with every photo in full resolution — no clicking through them one by one."
+      },
+      "projector": {
+        "title": "Live slideshow at the wedding",
+        "body": "Guest photos appear on the screen in real time, the moment someone uploads them — great for a slideshow running through the evening."
+      }
+    },
+    "faqHeading": "Quick answers",
+    "faq": [
+      {
+        "q": "Where do I get the QR code or gallery link?",
+        "a": "Either from the photographer or straight from the couple — both can share the link or QR code onward, forwarded in a family chat or printed on a card at the photo table. If you don't have it, just ask one of them."
+      },
+      {
+        "q": "I don't know the password — now what?",
+        "a": "Only the photographer knows it — they're the only one who set it, and nobody else can reset or bypass it. Message them and ask for it again. Don't try guessing: after five wrong attempts, the link locks for a while for everyone who has it."
+      },
+      {
+        "q": "The link doesn't work, or says it's expired.",
+        "a": "After a while, a gallery stops accepting visits or uploads. The photographer can reopen or extend it any time — just reach out to them."
+      },
+      {
+        "q": "Does it work without signal?",
+        "a": "Once you've opened the gallery and turned on offline mode (the download icon in the top bar), you can browse photos without a connection — handy on a chalet with no signal."
+      },
+      {
+        "q": "How do I download every photo at once?",
+        "a": "The \"Download all\" button packs the gallery into a ZIP. For big galleries this takes a moment and builds in the background — just check back shortly."
+      }
+    ],
+    "guestTipsHeading": "Tips and tricks for shooting as a guest",
+    "guestTipsIntro": "If the photographer or the couple enabled uploads on this gallery, anyone at the wedding can add their own photos, right alongside the photographer's.",
+    "guestTipsImageAlt": "A table card with a QR code on the wedding table, among candles and place settings",
+    "guestTips": [
+      "Nothing to install. Just the link or QR code from the photographer or couple, the \"Add photos\" button, and your phone's regular file picker or camera.",
+      "Feel free to lock your phone mid-upload — it keeps going in the background and picks up once you're back.",
+      "Add your name if the gallery asks — it lets the couple see whose photo it is later.",
+      "Uploaded something by mistake? Delete it yourself right in the gallery — no need to message anyone.",
+      "iPhone photos work without any fuss — they're sent to the browser in a standard format automatically. The only exception: if Settings → Photos → Transfer to Mac or PC has \"Keep Originals\" turned on (most people don't have this), an upload can occasionally fail — switch it to \"Automatic\" and try again."
+    ],
+    "featuresHeading": "Everything the gallery can do",
+    "featuresIntro": "Ordered from what you'll use most, down to the extras for specific moments of the wedding.",
+    "features": [
+      "One link, nothing to install — opens in any regular browser, on phone or computer.",
+      "A fast photo grid and full-screen viewing, smooth even on an older phone.",
+      "Download the whole gallery in one click (ZIP).",
+      "Favorites and reactions — mark the photos you like best.",
+      "Password and time limits — the photographer controls who gets in, and for how long.",
+      "Offline mode — once downloaded, photos stay viewable without signal.",
+      "Notifications when the photographer adds new photos.",
+      "Photos from guests — guests add their own wedding shots straight into the gallery, no app, no account.",
+      "Live slideshow — new guest photos appear on screen in real time.",
+      "Multiple galleries under one growing link — a curated selection, the full set, and the guest gallery, all without sending out a new link."
+    ],
+    "footerText": "This gallery is run by your photographer.",
+    "footerLinkText": "Wedding Photographer Czechia →"
+  },
+  "errors": {
+    "linkNotFoundTitle": "This link doesn't go anywhere",
+    "linkNotFoundLead": "Chat apps often cut links in half when they're pasted — it happens all the time. Try opening it again straight from the original message, or scan the QR code if you've got it handy.",
+    "linkNotFoundHint": "Still no luck? Message the couple — they have the link.",
+    "genericNotFoundTitle": "There's nothing here",
+    "genericNotFoundLead": "This address doesn't lead anywhere.",
+    "galleryErrorTitle": "Something went wrong",
+    "galleryErrorLead": "The gallery couldn't load. Please try again.",
+    "tryAgain": "Try again",
+    "contact": "Still nothing? <a>Email me</a> and I'll take a look.",
+    "shareLinkDeadTitle": "This link no longer works",
+    "shareLinkDeadLead": "The gallery was here, but access through this link has ended.",
+    "shareLinkDeadHint": "The couple or the photographer can send you a new one.",
+    "eventPartGoneTitle": "This part isn't here anymore",
+    "eventPartGoneLead": "The photographer took it down from the wedding page. The rest is still there."
+  },
+  "gallery": {
+    "untitledPlaceholder": "Gallery",
+    "photoCount": "{count, plural, one {# photo} other {# photos}}",
+    "emptyEvent": "Nothing here yet. Once the photographer adds something, it'll show up at this address.",
+    "emptyCard": "Empty for now",
+    "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+    "zipPreparingAnnounce": "Preparing the download…",
+    "zipErrorAnnounce": "The download couldn't be prepared. Please try again.",
+    "back": "Back",
+    "showAllPhotos": "Show all photos",
+    "showFavoritesOnlyTitle": "Show only photos you've hearted",
+    "showFavoritesOnlySr": "Show favorites only",
+    "slideshowButtonLabel": "Slideshow",
+    "slideshowButtonTitle": "Photos on the big screen — change on their own, new ones appear live",
+    "downloadAllLabel": "Download all",
+    "downloadAllTitle": "Download all (ZIP)",
+    "downloadOneLabel": "Download",
+    "downloadOneTitle": "Download photo",
+    "clearSelection": "Clear selection",
+    "deselectAll": "Deselect all",
+    "selectAllLoaded": "Select all loaded",
+    "downloadSelected": "{count, plural, one {Download # photo} other {Download # photos (ZIP)}}",
+    "preparingShort": "Preparing…",
+    "photosListAriaLabel": "Photos in the gallery",
+    "loadingMorePhotos": "Loading more photos…",
+    "emptyGallery": "There are no photos in this gallery yet.",
+    "searchingFavorites": "Looking for your hearted photos in the rest of the gallery…",
+    "noFavoritesYet": "You haven't hearted any photos yet.",
+    "lightboxAriaLabel": "Photo {index} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "close": "Close",
+    "deleting": "Deleting…",
+    "deleteMyPhoto": "Delete my photo",
+    "deleteConfirm": "Delete this photo from the album? This can't be undone.",
+    "selected": "Selected",
+    "select": "Select",
+    "preparingDownload": "Preparing download",
+    "downloadOriginal": "Download original",
+    "privacyNotice": "We count visits anonymously, through this browser only — no IP address.",
+    "optOut": "Don't count me",
+    "optedOutNotice": "Your visits aren't being counted.",
+    "selectPhoto": "Select {fileName}",
+    "openPhoto": "Open {fileName}",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "viewerChipsAriaLabel": "Who's viewed this gallery",
+    "namePromptTitle": "Who's looking?",
+    "namePromptHint": "Others will see this name on your favorited photos. Feel free to skip it.",
+    "namePromptPlaceholder": "E.g. Emma",
+    "namePromptSkip": "Skip",
+    "namePromptSave": "Save",
+    "reactions": {
+      "LOVE": "Heart",
+      "WOW": "Wow",
+      "LAUGH": "Laugh",
+      "SAD": "Touched",
+      "CLAP": "Applause"
+    },
+    "offline": {
+      "unsupported": "This browser doesn't support offline galleries.",
+      "notEnoughSpace": "Not enough space on this device. The gallery needs about {needed}.",
+      "notEnoughSpaceWithFree": "Not enough space on this device. The gallery needs about {needed}, and {free} is free.",
+      "tryAgain": "Try again",
+      "downloading": "Downloading to device… {percent}%",
+      "downloadingWithBytes": "Downloading to device… {percent}% · {bytes}",
+      "downloadingAriaLabel": "Downloading the gallery for offline access",
+      "downloadStarted": "Download started, {percent}%.",
+      "availableOffline": "✓ Gallery is available offline",
+      "availableOfflineWithBytes": "✓ Gallery is available offline ({bytes})",
+      "availableOfflineNote": "Saved photos are sized for this screen, not the originals. The browser may free them up after a while on its own — on iPhone, roughly a week without opening the gallery — just download again if that happens.",
+      "removeFromDevice": "Remove from device",
+      "availableOfflineAnnounce": "Downloaded — the gallery is available offline.",
+      "downloadFailed": "The download couldn't finish.",
+      "downloadFailedAnnounce": "The download failed.",
+      "saveOffline": "Save {count, plural, one {# photo} other {# photos}} to this device and browse them without signal.",
+      "estimatedSize": "Takes about {size}. Saves the size for this screen, not the originals.",
+      "makeAvailable": "Make available offline",
+      "iconLabel": "Offline",
+      "iconTitle": "Save photos to this device for viewing without signal",
+      "panelTitle": "Offline access"
+    },
+    "slideshow": {
+      "ariaLabel": "Slideshow",
+      "empty": "There are no photos here yet.",
+      "exit": "Exit"
+    }
+  },
+  "guestUpload": {
+    "addPhotos": "Add photos",
+    "takePhoto": "Take a photo",
+    "preparing": "{count, plural, one {Preparing a photo…} other {Preparing # photos…}}",
+    "uploadingProgress": "Uploading {done} of {total} · keeping the screen on. If this gets interrupted, it'll pick up again once you're back.",
+    "resumingProgress": "Finishing your upload — {done} of {total} · keeping the screen on. If this gets interrupted, it'll pick up again once you're back.",
+    "discardRest": "Discard the rest",
+    "doneSome": "Uploaded. Everyone at the wedding will see it.",
+    "doneNone": "Nothing was uploaded.",
+    "failedSuffix": "{count} didn't make it",
+    "skippedNote": "(We skipped {count} files — the rest are still uploading.)",
+    "startFailed": "Couldn't start the upload. Please try again.",
+    "resumeFailed": "Couldn't finish an upload left over from before.",
+    "consentPrefix": "By uploading, you're confirming you're allowed to share these photos. Want one taken down?",
+    "consentEmailLinkText": "Email us",
+    "consentNoEmailFallback": "Ask the couple — they can delete it right away",
+    "nameAskTitle": "Who should get the credit?",
+    "nameAskHint": "Add your first name and it'll show up on your photos. Leaving it blank is fine too.",
+    "nameAskPlaceholder": "Name",
+    "nameAskSave": "Save",
+    "nameAskSkip": "Skip",
+    "rejection": {
+      "unsupportedHeic": "We can't handle this format (HEIC) yet. In Settings → Camera → Formats, switch to \"Most Compatible\" and try again.",
+      "unsupportedVideo": "We don't accept videos yet, just photos.",
+      "unsupportedGeneric": "We can't handle this file type. Try a different photo.",
+      "fileTooLarge": "That photo is too large.",
+      "quotaViewerFull": "You've already added a lot of photos — you can't add more for now. Thanks!",
+      "quotaAlbumFull": "The album is full for now. Please let the couple know.",
+      "deniedPasswordRequired": "Please reload the page and enter the password.",
+      "deniedGeneric": "This album isn't accepting new photos anymore.",
+      "rateLimited": "You're sending a lot at once — give it a moment and try again.",
+      "sizeMismatch": "The photo didn't fully transfer. We're trying again.",
+      "genericFailure": "The upload didn't go through. Please try again once you have a better signal."
+    }
+  },
+  "presence": {
+    "someone": "Someone is viewing right now",
+    "count": "{count, plural, one {# person} other {# people}} are viewing right now",
+    "named": "{names} {count, plural, one {is viewing} other {are viewing}}"
+  },
+  "sharePassword": {
+    "title": "This gallery is password-protected",
+    "hint": "The photographer sent you the password along with the link.",
+    "placeholder": "Password",
+    "verifying": "Checking…",
+    "submit": "View gallery",
+    "missingPassword": "Enter a password.",
+    "wrongPassword": "Wrong password. Please try again later."
+  }
+}

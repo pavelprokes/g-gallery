@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   channelForGallery,
@@ -21,6 +22,7 @@ import { getViewerId, getViewerName } from "@/lib/viewer-id";
  * worse than no strip.
  */
 export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; optedOut: boolean }) {
+  const t = useTranslations("presence");
   const [others, setOthers] = useState<{ count: number; names: string[] }>({
     count: 0,
     names: [],
@@ -89,10 +91,10 @@ export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; opte
 
   const label =
     others.names.length > 0
-      ? `${others.names.slice(0, 3).join(", ")} ${others.names.length === 1 ? "se dívá" : "se dívají"}`
+      ? t("named", { names: others.names.slice(0, 3).join(", "), count: others.names.length })
       : others.count === 1
-        ? "Někdo se právě dívá"
-        : `${others.count} lidí se právě dívá`;
+        ? t("someone")
+        : t("count", { count: others.count });
 
   return (
     <span className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">

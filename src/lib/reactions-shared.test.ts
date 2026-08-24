@@ -1,19 +1,27 @@
 import { describe, expect, it } from "vitest";
+import cs from "../../messages/cs.json";
+import en from "../../messages/en.json";
 import {
   isReactionKind,
   REACTION_EMOJI,
   REACTION_KINDS,
-  REACTION_LABEL,
   totalReactions,
   type PhotoReactionState,
 } from "./reactions-shared";
 
 describe("reaction vocabulary", () => {
-  it("has an emoji and a label for every kind", () => {
+  it("has an emoji for every kind", () => {
     // A missing entry would render `undefined` into the picker rather than fail.
     for (const kind of REACTION_KINDS) {
       expect(REACTION_EMOJI[kind]).toBeTruthy();
-      expect(REACTION_LABEL[kind]).toBeTruthy();
+    }
+  });
+
+  it("has a translated label for every kind, in every locale", () => {
+    for (const messages of [cs, en]) {
+      for (const kind of REACTION_KINDS) {
+        expect(messages.gallery.reactions[kind]).toBeTruthy();
+      }
     }
   });
 

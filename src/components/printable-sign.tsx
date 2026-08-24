@@ -2,8 +2,37 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { Locale } from "@/i18n/locales";
 
 type Variant = "table" | "corner";
+
+/**
+ * The sign's own language, chosen here by the photographer previewing it —
+ * deliberately independent of their own admin-session locale cookie. What
+ * matters is which language the *guests* at the print-out will read, not
+ * which language the photographer happens to be browsing the admin in.
+ */
+const UI_STRINGS: Record<
+  Locale,
+  { print: string; sharedGallery: string; leadsTo: string; printerTip: string; qrAlt: string }
+> = {
+  cs: {
+    print: "Vytisknout",
+    sharedGallery: "sdílená galerie",
+    leadsTo: "Vede na:",
+    printerTip:
+      "Tip: barvy se na inkoustových tiskárnách někdy posouvají. Než vytiskneš víc kopií, zkus nejdřív jednu na svůj papír.",
+    qrAlt: "QR kód na galerii {target}",
+  },
+  en: {
+    print: "Print",
+    sharedGallery: "shared gallery",
+    leadsTo: "Links to:",
+    printerTip:
+      "Tip: colors can shift on inkjet printers. Before printing several copies, try one on your own paper first.",
+    qrAlt: "QR code for the {target} gallery",
+  },
+};
 
 /**
  * Guest-facing copy (docs/GUEST-GALLERIES.md F7 / GUEST-GALLERIES-RESEARCH.md
@@ -26,20 +55,36 @@ type Variant = "table" | "corner";
  * since that was exactly the fact that wasn't landing.
  */
 const COPY: Record<
-  Variant,
-  { label: string; headline: string; cta: string; caption: string | null }
+  Locale,
+  Record<Variant, { label: string; headline: string; cta: string; caption: string | null }>
 > = {
-  table: {
-    label: "Na stůl (kratší)",
-    headline: "Dnes fotíš i ty — přidej se do galerie.",
-    cta: "Nahraj fotky →",
-    caption: null,
+  cs: {
+    table: {
+      label: "Na stůl (kratší)",
+      headline: "Dnes fotíš i ty — přidej se do galerie.",
+      cta: "Nahraj fotky →",
+      caption: null,
+    },
+    corner: {
+      label: "Do fotokoutku (delší)",
+      headline: "Nejkrásnější momenty večera možná neuvidíme. Nahraj svoje do naší galerie.",
+      cta: "Nahraj fotky →",
+      caption: "Bez appky, bez přihlašování — přidá kdokoli s telefonem.",
+    },
   },
-  corner: {
-    label: "Do fotokoutku (delší)",
-    headline: "Nejkrásnější momenty večera možná neuvidíme. Nahraj svoje do naší galerie.",
-    cta: "Nahraj fotky →",
-    caption: "Bez appky, bez přihlašování — přidá kdokoli s telefonem.",
+  en: {
+    table: {
+      label: "Table card (shorter)",
+      headline: "You're the photographer tonight too — join the gallery.",
+      cta: "Upload photos →",
+      caption: null,
+    },
+    corner: {
+      label: "Photo corner (longer)",
+      headline: "We might miss the best moments of the night. Add yours to our gallery.",
+      cta: "Upload photos →",
+      caption: "No app, no sign-up — anyone with a phone can add photos.",
+    },
   },
 };
 
@@ -76,7 +121,9 @@ export function PrintableSign({
   readinessNote?: { ok: boolean; text: string };
 }) {
   const [variant, setVariant] = useState<Variant>("table");
-  const copy = COPY[variant];
+  const [locale, setLocale] = useState<Locale>("cs");
+  const copy = COPY[locale][variant];
+  const ui = UI_STRINGS[locale];
 
   return (
     <div>
@@ -99,7 +146,7 @@ export function PrintableSign({
       `}</style>
 
       <div className="no-print mb-6 flex flex-wrap items-center gap-3">
-        {(Object.keys(COPY) as Variant[]).map((key) => (
+        {(Object.keys(COPY[locale]) as Variant[]).map((key) => (
           <button
             key={key}
             type="button"
@@ -111,10 +158,29 @@ export function PrintableSign({
                 : "hover:border-brand-primary border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
             }`}
           >
-            {COPY[key].label}
+            {COPY[locale][key].label}
           </button>
         ))}
-        <Button onClick={() => window.print()}>Vytisknout</Button>
+        {/* The sign's own language — independent of the photographer's admin
+            locale, since what matters is what the guests will read. */}
+        <div role="group" aria-label="Sign language / Jazyk cedulky" className="flex gap-1">
+          {(["cs", "en"] as const).map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => setLocale(code)}
+              aria-pressed={locale === code}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                locale === code
+                  ? "border-brand-primary bg-brand-tint text-brand-ink"
+                  : "hover:border-brand-primary border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+              }`}
+            >
+              {code.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        <Button onClick={() => window.print()}>{ui.print}</Button>
       </div>
 
       {readinessNote && (
@@ -127,16 +193,13 @@ export function PrintableSign({
               : "text-amber-700 dark:text-amber-500"
           }`}
         >
-          Vede na: {targetLabel} · {readinessNote.text}
+          {ui.leadsTo} {targetLabel} · {readinessNote.text}
         </p>
       )}
 
       {/* Round-2 photographer finding: warm brand colors can drift on a home
           inkjet printer more than plain black text does. */}
-      <p className="no-print mb-6 text-xs text-neutral-500">
-        Tip: barvy se na inkoustových tiskárnách někdy posouvají. Než vytiskneš víc kopií, zkus
-        nejdřív jednu na svůj papír.
-      </p>
+      <p className="no-print mb-6 text-xs text-neutral-500">{ui.printerTip}</p>
 
       <div
         id="printable-sign"
@@ -145,7 +208,7 @@ export function PrintableSign({
       >
         <div>
           <p className="text-brand-primary text-xs font-semibold tracking-[0.15em] uppercase">
-            {targetLabel} · sdílená galerie
+            {targetLabel} · {ui.sharedGallery}
           </p>
           <p className="text-brand-ink mt-2 text-xl leading-snug font-semibold">{copy.headline}</p>
         </div>
@@ -155,7 +218,7 @@ export function PrintableSign({
         <div className="rounded-md bg-white p-3 shadow-sm">
           <div
             role="img"
-            aria-label={`QR kód na galerii ${targetLabel}`}
+            aria-label={ui.qrAlt.replace("{target}", targetLabel)}
             className="h-[40mm] w-[40mm] [&>svg]:h-full [&>svg]:w-full"
             // The server-rendered SVG is built from our own token-derived URL
             // (src/lib/qr.ts), never from guest- or client-supplied text.

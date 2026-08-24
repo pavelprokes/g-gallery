@@ -1,13 +1,15 @@
 import type { MetadataRoute } from "next";
+import { getTranslations } from "next-intl/server";
 
 // Icons mirror svatebni-fotograf-cechy-2.0/public/favicon (Pavel's main site) — see
 // src/app/favicon.ico / icon.png / apple-icon.png for the browser-tab/bookmark set,
 // which Next picks up automatically by filename convention.
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const t = await getTranslations("manifest");
   return {
-    name: "Fotogalerie ke svatbě",
+    name: t("name"),
     short_name: "g-gallery",
-    description: "Svatební fotky na jednom odkazu — od fotografa i od hostů.",
+    description: t("description"),
     start_url: "/",
     display: "standalone",
     background_color: "#fdf8f5",

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 
@@ -68,16 +69,19 @@ export function DeadEnd({
 
 /** Contact for the photographer, when the deployment has one configured. */
 export function ContactLine() {
+  const t = useTranslations("errors");
   const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
   if (!email) return null;
 
   return (
     <p className="mt-6 text-sm text-neutral-500 dark:text-neutral-400">
-      Pořád nic?{" "}
-      <a href={`mailto:${email}`} className="underline">
-        Napiš mi
-      </a>
-      , mrknu se na to.
+      {t.rich("contact", {
+        a: (chunks) => (
+          <a href={`mailto:${email}`} className="underline">
+            {chunks}
+          </a>
+        ),
+      })}
     </p>
   );
 }
