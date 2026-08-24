@@ -129,6 +129,15 @@ function itemsPerRow(containerWidth: number): number | undefined {
  * thing being looked at. */
 const GAP = 4;
 
+/**
+ * Horizontal gutter for the page's text chrome — header, selection toolbar,
+ * footer. The grid gets no gutter of its own: it runs edge to edge on a
+ * phone and keeps only the container's 4 px above `sm`, so text would
+ * otherwise sit against the screen edge. `sm:px-3` lands on the same 16 px
+ * as the phone once the container's own 4 px is added.
+ */
+const GUTTER = "px-4 sm:px-3";
+
 /** Photos uploaded before dimensions were captured fall back to 3:2. */
 const FALLBACK_ASPECT = 1.5;
 
@@ -920,8 +929,11 @@ function GalleryViewInner({
     };
   }, [active?.id, lightboxIndex, photos, imageGrant]);
 
+  // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
+  // an outer margin — the page edge matches the seam between two photos
+  // instead of framing the grid, which is what Google Photos does.
   return (
-    <main className="mx-auto max-w-[1600px] p-8 sm:p-16">
+    <main className="mx-auto max-w-[1600px] px-0 pt-5 pb-10 sm:px-1 sm:pt-10 sm:pb-14 lg:pt-12">
       <div aria-live="polite" className="sr-only">
         {selection.ids.size > 0 ? pluralize(selection.ids.size, FORMS.selected) : ""}
       </div>
@@ -929,7 +941,9 @@ function GalleryViewInner({
         {zipState === "preparing" && "Připravuji stažení…"}
         {zipState === "error" && "Stažení se nepodařilo připravit. Zkus to prosím znovu."}
       </div>
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <header
+        className={`${GUTTER} mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 sm:mb-5`}
+      >
         <div>
           {backHref && (
             <a
@@ -939,9 +953,11 @@ function GalleryViewInner({
               ← {backLabel ?? "Zpět"}
             </a>
           )}
-          <h1 className="text-2xl font-semibold">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+            {title}
+          </h1>
           {eventDate && (
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
+            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{eventDate}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -990,13 +1006,13 @@ function GalleryViewInner({
       </header>
 
       {zipState === "error" && selection.ids.size === 0 && (
-        <p className="-mt-4 mb-4 text-xs text-red-600">
+        <p className={`${GUTTER} -mt-1 mb-3 text-xs text-red-600`}>
           Stažení se nepodařilo připravit. Zkus to prosím znovu.
         </p>
       )}
 
       {allowDownload && photos.length > 0 && selection.ids.size > 0 && (
-        <div className="sticky top-0 z-30 -mx-8 mb-4 flex flex-wrap items-center gap-3 border-b bg-white/90 px-8 py-3 backdrop-blur sm:-mx-16 sm:px-16 dark:bg-neutral-950/90">
+        <div className="sticky top-0 z-30 mb-3 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-1 dark:bg-neutral-950/90">
           <button
             type="button"
             onClick={() => setSelection(clearSelection())}
@@ -1124,7 +1140,7 @@ function GalleryViewInner({
       </ul>
 
       {photos.length === 0 && (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        <p className={`${GUTTER} text-sm text-neutral-500 dark:text-neutral-400`}>
           V galerii zatím nejsou žádné fotky.
         </p>
       )}
@@ -1303,7 +1319,7 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="mt-10 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
+      <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-3 dark:text-neutral-400">
         {!optedOut ? (
           <p>
             Návštěvu počítáme anonymně, jen přes tenhle prohlížeč — bez IP adresy.{" "}
