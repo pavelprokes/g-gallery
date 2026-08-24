@@ -138,6 +138,14 @@ services or leave it unset and accept that preview deployments cannot sign in �
 what must not happen is a preview build writing to the production database with
 a different `BETTER_AUTH_URL`, which silently breaks the OAuth callback.
 
+A **dev/preview deployment behind its own custom domain is still a Preview (or
+custom) environment** — attaching a domain does not give it Production's
+variables. With no `DATABASE_URL` there, every database-backed page throws at
+request time; `src/lib/db.ts` names the missing variable rather than letting pg
+fall back to its own `localhost:5432` default, which used to surface as a
+baffling `P1001 — Can't reach database server at 127.0.0.1:5432` (an address
+this project never uses: local dev is `:5433`, production `:6543`).
+
 `DIRECT_URL` is also needed by the GitHub Actions backup workflow, but as a
 repository secret (`BACKUP_DATABASE_URL`), not a Vercel variable —
 `docs/SETUP.md` §13.
