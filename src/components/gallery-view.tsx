@@ -131,12 +131,12 @@ const GAP = 4;
 
 /**
  * Horizontal gutter for the page's text chrome — header, selection toolbar,
- * footer. The grid itself deliberately gets none of it on a phone: Google
- * Photos runs its tiles edge to edge, and 32 px of padding on each side of a
- * 390 px screen spends a sixth of every photo's width on nothing. From `sm`
- * up the gutter comes from the page container instead, so this collapses.
+ * footer. The grid gets no gutter of its own: it runs edge to edge on a
+ * phone and keeps only the container's 4 px above `sm`, so text would
+ * otherwise sit against the screen edge. `sm:px-3` lands on the same 16 px
+ * as the phone once the container's own 4 px is added.
  */
-const GUTTER = "px-4 sm:px-0";
+const GUTTER = "px-4 sm:px-3";
 
 /** Photos uploaded before dimensions were captured fall back to 3:2. */
 const FALLBACK_ASPECT = 1.5;
@@ -929,8 +929,11 @@ function GalleryViewInner({
     };
   }, [active?.id, lightboxIndex, photos, imageGrant]);
 
+  // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
+  // an outer margin — the page edge matches the seam between two photos
+  // instead of framing the grid, which is what Google Photos does.
   return (
-    <main className="mx-auto max-w-[1600px] px-0 pt-5 pb-10 sm:px-6 sm:pt-10 sm:pb-14 lg:px-10 lg:pt-12">
+    <main className="mx-auto max-w-[1600px] px-0 pt-5 pb-10 sm:px-1 sm:pt-10 sm:pb-14 lg:pt-12">
       <div aria-live="polite" className="sr-only">
         {selection.ids.size > 0 ? pluralize(selection.ids.size, FORMS.selected) : ""}
       </div>
@@ -1009,7 +1012,7 @@ function GalleryViewInner({
       )}
 
       {allowDownload && photos.length > 0 && selection.ids.size > 0 && (
-        <div className="sticky top-0 z-30 mb-3 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 dark:bg-neutral-950/90">
+        <div className="sticky top-0 z-30 mb-3 flex flex-wrap items-center gap-3 border-b bg-white/90 px-4 py-3 backdrop-blur sm:-mx-1 dark:bg-neutral-950/90">
           <button
             type="button"
             onClick={() => setSelection(clearSelection())}
@@ -1316,7 +1319,7 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-0 dark:text-neutral-400">
+      <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-3 dark:text-neutral-400">
         {!optedOut ? (
           <p>
             Návštěvu počítáme anonymně, jen přes tenhle prohlížeč — bez IP adresy.{" "}
