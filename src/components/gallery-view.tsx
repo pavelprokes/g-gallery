@@ -125,8 +125,9 @@ function itemsPerRow(containerWidth: number): number | undefined {
 
 /** Gap between tiles, both within a row and between rows — the layout
  * algorithm and the row's own flex gap must agree, or rows would overlap
- * or leave a seam. */
-const GAP = 8;
+ * or leave a seam. Tight on purpose: the photos, not the grid, are the
+ * thing being looked at. */
+const GAP = 4;
 
 /** Photos uploaded before dimensions were captured fall back to 3:2. */
 const FALLBACK_ASPECT = 1.5;
@@ -1175,7 +1176,7 @@ function GalleryViewInner({
               // the photo.
               <span
                 aria-hidden
-                className="ring-brand-border/80 pointer-events-none absolute inset-4 rounded-lg ring-4 ring-inset"
+                className="ring-brand-border/80 pointer-events-none absolute inset-4 ring-4 ring-inset"
               />
             )}
           </div>
@@ -1449,7 +1450,7 @@ const PhotoTile = memo(function PhotoTile({
           }
           onOpen(index);
         }}
-        className="relative block h-full w-full overflow-hidden rounded-xl"
+        className="relative block h-full w-full overflow-hidden"
         // The tile carries the photo's own average colour, so the grid fills
         // in with the picture's palette instead of grey holes.
         style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
@@ -1465,7 +1466,7 @@ const PhotoTile = memo(function PhotoTile({
           // sized to the photo's own aspect ratio, so `fill` + the exact
           // rendered box is enough; no crop, no letterbox.
           className={`object-cover transition-transform duration-200 ${
-            selected ? "scale-90 rounded-xl" : "hover:scale-105"
+            selected ? "scale-90" : "hover:scale-105"
           }`}
         />
       </button>
