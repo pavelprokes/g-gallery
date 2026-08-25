@@ -25,7 +25,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang={locale}>
-      <body className={bitterFont.variable}>
+      {/* suppressHydrationWarning: browser extensions (e.g. ColorZilla) inject
+          attributes like cz-shortcut-listen onto <body> before React
+          hydrates — a false-positive mismatch React can't avoid on its own. */}
+      <body className={bitterFont.variable} suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <LocaleBootstrap locale={locale} persistedByCookie={persistedByCookie} />
           {children}
