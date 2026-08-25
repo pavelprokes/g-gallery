@@ -868,6 +868,23 @@ function GalleryViewInner({
     void fetchNextPage();
   }, [favoritesOnly, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  /** Photos this viewer has favourited, reacted to, marked for print, or has
+   * currently grid-selected — the narrower set offline access can offer
+   * instead of the whole gallery. */
+  const engagedObjectKeys = useMemo(
+    () =>
+      allPhotos
+        .filter(
+          (photo) =>
+            favorites.has(photo.id) ||
+            reactions.get(photo.id)?.mine != null ||
+            (printSelections.get(photo.id) ?? 0) > 0 ||
+            selection.ids.has(photo.id),
+        )
+        .map((photo) => photo.objectKey),
+    [allPhotos, favorites, reactions, printSelections, selection.ids],
+  );
+
   const report = useCallback(
     (type: "GALLERY_VIEW" | "PHOTO_VIEW", photoId?: string) => {
       const anonKey = getViewerId();
@@ -1710,6 +1727,7 @@ function GalleryViewInner({
             <OfflineIconButton
               token={token}
               objectKeys={allPhotos.map((photo) => photo.objectKey)}
+              engagedObjectKeys={engagedObjectKeys}
             />
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />

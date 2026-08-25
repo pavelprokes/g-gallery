@@ -193,6 +193,7 @@
       "downloadFailedAnnounce": "Stažení se nepodařilo.",
       "saveOffline": "Ulož si {count, plural, one {# fotku} few {# fotky} other {# fotek}} do zařízení a prohlížej je i bez signálu.",
       "estimatedSize": "Zabere zhruba {size}. Ukládá se velikost pro tuhle obrazovku, ne originály.",
+      "onlyEngagedOption": "Jen fotky, na které jsem reagovala, vybrala k tisku nebo označila ({count, plural, one {# fotka} few {# fotky} other {# fotek}})",
       "makeAvailable": "Zpřístupnit offline",
       "iconLabel": "Offline",
       "iconTitle": "Uložit fotky do zařízení pro prohlížení bez signálu",

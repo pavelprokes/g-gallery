@@ -30,9 +30,11 @@ type State = "checking" | "unsupported" | "off" | "downloading" | "on" | "no_spa
 export function OfflineToggle({
   token,
   objectKeys,
+  engagedObjectKeys,
 }: {
   token: string;
   objectKeys: readonly string[];
+  engagedObjectKeys: readonly string[];
 }) {
   // `offlineSupport()` reads `window`, so it can't run in the initializer:
   // the server has no `window` and would compute "unsupported" while the
@@ -43,8 +45,17 @@ export function OfflineToggle({
   const [state, setState] = useState<State>("checking");
   const [progress, setProgress] = useState<OfflineProgress | null>(null);
   const [free, setFree] = useState<number | null>(null);
-  const [estimated, setEstimated] = useState(0);
+  const [perPhotoBytes, setPerPhotoBytes] = useState(0);
+  // Checked by default: narrowing to what the viewer actually engaged with
+  // (reaction, print pick, grid selection) is the assumed intent once there
+  // is anything to narrow to. Until then there's nothing to filter down to,
+  // so it falls back to the whole gallery regardless of this flag.
+  const [onlyEngaged, setOnlyEngaged] = useState(true);
   const keyRef = useRef<string | null>(null);
+
+  const effectiveOnlyEngaged = onlyEngaged && engagedObjectKeys.length > 0;
+  const activeObjectKeys = effectiveOnlyEngaged ? engagedObjectKeys : objectKeys;
+  const estimated = perPhotoBytes * activeObjectKeys.length;
 
   useEffect(() => {
     let cancelled = false;
@@ -64,8 +75,9 @@ export function OfflineToggle({
       }
       keyRef.current = key;
       // Computed here, not during render: the estimate depends on the screen,
-      // and the server-side render has no screen.
-      setEstimated(estimateBytes(objectKeys.length));
+      // and the server-side render has no screen. One photo's worth, so the
+      // total can be re-derived cheaply when the scope toggle changes.
+      setPerPhotoBytes(estimateBytes(1));
 
       // A cache with roughly the expected number of entries means a previous
       // download finished. Safari may have evicted it in the meantime, which is
@@ -85,7 +97,13 @@ export function OfflineToggle({
     if (!key) return;
 
     setState("downloading");
-    setProgress({ done: 0, failed: 0, total: objectKeys.length * 2, bytes: 0, aborted: null });
+    setProgress({
+      done: 0,
+      failed: 0,
+      total: activeObjectKeys.length * 2,
+      bytes: 0,
+      aborted: null,
+    });
 
     const space = await checkSpace(estimated);
     setFree(space.free);
@@ -119,9 +137,9 @@ export function OfflineToggle({
     worker.postMessage({
       type: "PRECACHE",
       key,
-      urls: offlineUrls(objectKeys, window.location.href),
+      urls: offlineUrls(activeObjectKeys, window.location.href),
     });
-  }, [estimated, objectKeys]);
+  }, [estimated, activeObjectKeys]);
 
   const remove = useCallback(async () => {
     const key = keyRef.current;
@@ -218,11 +236,24 @@ export function OfflineToggle({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm">{t("saveOffline", { count: objectKeys.length })}</p>
+      <p className="text-sm">{t("saveOffline", { count: activeObjectKeys.length })}</p>
       <p className="text-xs text-neutral-500">
         {t("estimatedSize", { size: formatBytes(estimated) })}
       </p>
-      <Button onClick={() => void start()}>{t("makeAvailable")}</Button>
+      {engagedObjectKeys.length > 0 && (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4"
+            checked={onlyEngaged}
+            onChange={(event) => setOnlyEngaged(event.target.checked)}
+          />
+          {t("onlyEngagedOption", { count: engagedObjectKeys.length })}
+        </label>
+      )}
+      <Button onClick={() => void start()} disabled={activeObjectKeys.length === 0}>
+        {t("makeAvailable")}
+      </Button>
     </div>
   );
 }
@@ -234,10 +265,53 @@ export function OfflineToggle({
  * all its states (checking a previous download, progress, no-space, error)
  * render inside this panel exactly as they did in the footer card.
  */
-export function OfflineIconButton(props: { token: string; objectKeys: readonly string[] }) {
+export function OfflineIconButton(props: {
+  token: string;
+  objectKeys: readonly string[];
+  engagedObjectKeys: readonly string[];
+}) {
   const t = useTranslations("gallery.offline");
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Anchored by coordinates rather than CSS `right-0`: the button can sit
+  // anywhere in the wrapped header row (it isn't always the row's last
+  // item), so a fixed-width panel pinned to its right edge can run off the
+  // left of the viewport on a narrow phone. Clamping to the viewport here
+  // keeps it on-screen regardless of where the button ends up.
+  const [panelStyle, setPanelStyle] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 288,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+
+    function updatePosition() {
+      const rect = panelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const margin = 16;
+      // Below the `sm` breakpoint the panel fills the width instead of
+      // sitting in a narrow 288px popover with wasted space beside it.
+      const width =
+        window.innerWidth < 640
+          ? window.innerWidth - margin * 2
+          : Math.min(288, window.innerWidth - margin * 2);
+      const left = Math.min(
+        Math.max(margin, rect.right - width),
+        window.innerWidth - margin - width,
+      );
+      setPanelStyle({ top: rect.bottom + 8, left, width });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -259,11 +333,18 @@ export function OfflineIconButton(props: { token: string; objectKeys: readonly s
         <OfflineIcon />
       </IconButton>
       {open && (
-        <Card className="absolute top-full right-0 z-20 mt-2 w-72 bg-white dark:bg-neutral-900">
+        <Card
+          className="fixed z-20 bg-white dark:bg-neutral-900"
+          style={{ top: panelStyle.top, left: panelStyle.left, width: panelStyle.width }}
+        >
           <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
             {t("panelTitle")}
           </p>
-          <OfflineToggle token={props.token} objectKeys={props.objectKeys} />
+          <OfflineToggle
+            token={props.token}
+            objectKeys={props.objectKeys}
+            engagedObjectKeys={props.engagedObjectKeys}
+          />
         </Card>
       )}
     </div>

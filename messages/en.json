@@ -193,6 +193,7 @@
       "downloadFailedAnnounce": "The download failed.",
       "saveOffline": "Save {count, plural, one {# photo} other {# photos}} to this device and browse them without signal.",
       "estimatedSize": "Takes about {size}. Saves the size for this screen, not the originals.",
+      "onlyEngagedOption": "Only photos I reacted to, picked for print, or selected ({count, plural, one {# photo} other {# photos}})",
       "makeAvailable": "Make available offline",
       "iconLabel": "Offline",
       "iconTitle": "Save photos to this device for viewing without signal",
