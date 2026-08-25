@@ -71,6 +71,8 @@ import {
   CloseIcon,
   DownloadIcon,
   HeartIcon,
+  MinusIcon,
+  PlusIcon,
   PrinterIcon,
   ProjectorIcon,
 } from "@/components/ui/icons";
@@ -83,7 +85,7 @@ import {
   type PhotoReactionState,
   type ReactionKind,
 } from "@/lib/reactions-shared";
-import { nextPrintQuantity } from "@/lib/print-selections-shared";
+import { MAX_PRINT_QUANTITY, clampPrintQuantity } from "@/lib/print-selections-shared";
 
 /** Distance a touch must travel before it counts as a swipe, not a tap. */
 const SWIPE_THRESHOLD_PX = 50;
@@ -1084,10 +1086,11 @@ function GalleryViewInner({
     [token],
   );
 
-  const cyclePrintQuantity = useCallback(
-    (photoId: string) => {
+  const adjustPrintQuantity = useCallback(
+    (photoId: string, delta: 1 | -1) => {
       const current = printSelections.get(photoId) ?? 0;
-      const next = nextPrintQuantity(current);
+      const next = clampPrintQuantity(current + delta);
+      if (next === current) return;
 
       // Optimistic: the badge updates immediately, the server follows.
       setPrintSelections((prev) => {
@@ -1097,7 +1100,9 @@ function GalleryViewInner({
         return copy;
       });
 
-      // Same "join" moment as the heart — asked once, always skippable.
+      // Same "join" moment as the heart — asked once, always skippable. Only
+      // reachable on an increment: a decrement implies a copy was already
+      // set, so the prompt was already shown or skipped.
       if (next > 0 && !getViewerName() && !hasAnsweredNamePrompt()) {
         setNamePromptFor(photoId);
         setPendingPrint(next);
@@ -1107,6 +1112,15 @@ function GalleryViewInner({
       void sendPrintQuantity(photoId, next, getViewerName() ?? undefined);
     },
     [printSelections, sendPrintQuantity],
+  );
+
+  const incrementPrintQuantity = useCallback(
+    (photoId: string) => adjustPrintQuantity(photoId, 1),
+    [adjustPrintQuantity],
+  );
+  const decrementPrintQuantity = useCallback(
+    (photoId: string) => adjustPrintQuantity(photoId, -1),
+    [adjustPrintQuantity],
   );
 
   const photoIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
@@ -1714,9 +1728,11 @@ function GalleryViewInner({
             type="button"
             onClick={() => setSelection(clearSelection())}
             aria-label={t("clearSelection")}
-            className="rounded-full border px-2 py-1 text-sm"
+            // Same 44px icon-button shape as the lightbox's own close button.
+            className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
           >
-            ✕
+            {/* Same 20px glyph the lightbox's own close button uses. */}
+            <CloseIcon className="h-5 w-5" />
           </button>
           <span className="text-sm font-medium">
             {t("selectedCount", { count: selection.ids.size })}
@@ -1728,7 +1744,7 @@ function GalleryViewInner({
                 isAllSelected(prev, photoIds) ? clearSelection() : selectAll(photoIds),
               )
             }
-            className="text-sm underline"
+            className="flex min-h-11 items-center text-sm underline"
           >
             {isAllSelected(selection, photoIds) ? t("deselectAll") : t("selectAllLoaded")}
           </button>
@@ -1736,7 +1752,7 @@ function GalleryViewInner({
             type="button"
             disabled={zipState === "preparing"}
             onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
-            className="ml-auto rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="ml-auto flex min-h-11 items-center rounded-full bg-neutral-900 px-4 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
           >
             {zipState === "preparing"
               ? t("preparingShort")
@@ -1821,7 +1837,8 @@ function GalleryViewInner({
                     onPick={pick}
                     onOpen={openPhoto}
                     onToggleFavorite={toggleFavorite}
-                    onCyclePrint={cyclePrintQuantity}
+                    onIncrementPrint={incrementPrintQuantity}
+                    onDecrementPrint={decrementPrintQuantity}
                     onFocus={onTileFocus}
                     buttonRef={(el) => {
                       if (el) tileRefs.current.set(index, el);
@@ -1933,9 +1950,15 @@ function GalleryViewInner({
               )}
             </div>
 
-            <span className="ml-auto text-sm text-white/70 tabular-nums">
-              {activeIndex! + 1} / {photos.length}
-              {hasNextPage && "+"}
+            {/* `photoCount` is the gallery's real, server-side total — unlike
+                `photos.length`, it doesn't depend on how many pages of the
+                infinite scroll have loaded yet, so the counter never needs a
+                "+" to hedge an incomplete count. Favoriting filters the list
+                to a subset `photoCount` doesn't describe, so that case keeps
+                the old loaded-so-far behaviour. */}
+            <span className="ml-auto rounded-full bg-black/40 px-3 py-1.5 text-sm text-white/70 tabular-nums backdrop-blur-md">
+              {activeIndex! + 1} / {favoritesOnly ? photos.length : photoCount}
+              {favoritesOnly && hasNextPage && "+"}
             </span>
           </div>
 
@@ -1961,7 +1984,8 @@ function GalleryViewInner({
             {allowPrintSelection && (
               <PrinterButton
                 quantity={printSelections.get(active.id) ?? 0}
-                onClick={() => cyclePrintQuantity(active.id)}
+                onIncrement={() => incrementPrintQuantity(active.id)}
+                onDecrement={() => decrementPrintQuantity(active.id)}
                 size="lg"
                 bare
               />
@@ -2064,7 +2088,8 @@ interface PhotoTileProps {
   onPick: (index: number, id: string, shiftKey: boolean) => void;
   onOpen: (index: number) => void;
   onToggleFavorite: (photoId: string) => void;
-  onCyclePrint: (photoId: string) => void;
+  onIncrementPrint: (photoId: string) => void;
+  onDecrementPrint: (photoId: string) => void;
   onFocus: (index: number) => void;
   buttonRef: (el: HTMLButtonElement | null) => void;
 }
@@ -2095,7 +2120,8 @@ const PhotoTile = memo(function PhotoTile({
   onPick,
   onOpen,
   onToggleFavorite,
-  onCyclePrint,
+  onIncrementPrint,
+  onDecrementPrint,
   onFocus,
   buttonRef,
 }: PhotoTileProps) {
@@ -2158,10 +2184,14 @@ const PhotoTile = memo(function PhotoTile({
           }
           onOpen(index);
         }}
-        className="relative block h-full w-full overflow-hidden"
-        // The tile carries the photo's own average colour, so the grid fills
-        // in with the picture's palette instead of grey holes.
-        style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
+        // Selected uses one fixed brand colour for every tile — matching the
+        // checkbox's own `bg-brand-primary` — instead of each photo's own
+        // placeholder colour showing through the frame the shrink leaves.
+        // Unselected keeps that placeholder as its background so the grid
+        // still fills in with the picture's own palette instead of grey
+        // holes while the photo is loading.
+        className={`relative block h-full w-full overflow-hidden ${selected ? "bg-brand-primary" : ""}`}
+        style={selected ? undefined : { backgroundColor: placeholderStyle(photo.placeholder) }}
         aria-label={
           selectionActive
             ? t("selectPhoto", { fileName: photo.fileName })
@@ -2196,7 +2226,8 @@ const PhotoTile = memo(function PhotoTile({
       {allowPrintSelection && (
         <PrinterButton
           quantity={printQuantity}
-          onClick={() => onCyclePrint(photo.id)}
+          onIncrement={() => onIncrementPrint(photo.id)}
+          onDecrement={() => onDecrementPrint(photo.id)}
           className="absolute top-2 right-2"
         />
       )}
@@ -2270,20 +2301,30 @@ function HeartButton({
 }
 
 /**
- * The printer, top-right on a tile and in the lightbox — same "almost
- * nothing unless set" treatment as HeartButton above. A tap always adds one
- * copy; past 99 it wraps back to 0, so the same single tap target both sets
- * and clears a selection without a second gesture.
+ * The printer, top-right on a tile and in the lightbox.
+ *
+ * Unset, it is a single round tap target — same "almost nothing" treatment
+ * as HeartButton above. The first tap sets one copy, which is where this
+ * used to stop: a second tap on the same spot meant "one more copy," so
+ * undoing a misclick meant clicking through the whole range again up to 99.
+ * Once a quantity is set it therefore expands into a stepper — minus, count,
+ * plus — the same "Add" → quantity-stepper switch used by cart UIs (Uber
+ * Eats, Instacart, most grocery-delivery apps): a single control that both
+ * sets and corrects a count, with the correction exactly as cheap as the
+ * mistake. Minus at 1 removes the selection and the stepper collapses back
+ * to the plain icon.
  */
 function PrinterButton({
   quantity,
-  onClick,
+  onIncrement,
+  onDecrement,
   className = "",
   size = "sm",
   bare = false,
 }: {
   quantity: number;
-  onClick: () => void;
+  onIncrement: () => void;
+  onDecrement: () => void;
   className?: string;
   size?: "sm" | "lg";
   /** True inside the lightbox's shared blurred bar, which already supplies the background. */
@@ -2291,26 +2332,72 @@ function PrinterButton({
 }) {
   const t = useTranslations("gallery");
   const active = quantity > 0;
-  const sizeClasses =
-    size === "lg"
-      ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
-      : "min-h-11 min-w-11 px-2 py-1 text-xs drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
-  const restingClasses = bare
-    ? "hover:bg-white/15"
-    : "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+
+  if (!active) {
+    const idleSizeClasses =
+      size === "lg" ? "h-11 w-11" : "h-11 w-11 drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+    const restingClasses = bare
+      ? "hover:bg-white/15"
+      : // Fades in under a mouse; a touch screen has no hover to wait for, so
+        // there it sits quietly at 60% rather than disappearing entirely.
+        "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+    return (
+      <button
+        type="button"
+        onClick={onIncrement}
+        aria-label={t("markForPrint")}
+        className={`flex items-center justify-center rounded-full text-white transition-opacity ${idleSizeClasses} ${restingClasses} ${className}`}
+      >
+        <PrinterIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
+      </button>
+    );
+  }
+
+  // Active: always fully visible (this is now information, not just an
+  // affordance) and always the same three-segment stepper on touch and with
+  // a mouse alike — no state that only reveals itself on hover, since a
+  // phone has no hover to reveal it.
+  //
+  // Apple HIG, Buttons: "a button needs a hit region of at least 44x44 pt...
+  // as a general rule" — no carve-out for grouped controls, so every segment
+  // stays at 44px even on a tile. Checked against the tile grid's own
+  // narrowest realistic width (2-up on a phone, src/components/gallery-view.tsx
+  // `itemsPerRow`): the stepper's ~140px still clears the select checkbox in
+  // the opposite corner with room to spare.
+  const stepBtnSize = "h-11 w-11";
+  // Same sm/lg glyph sizes as every other icon in the app (Heart, Printer,
+  // the select checkmark) — the stepper icons had drifted a notch smaller.
+  const stepIconSize = size === "lg" ? "h-5 w-5" : "h-4 w-4";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      aria-label={active ? t("printQuantity", { count: quantity }) : t("markForPrint")}
-      className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
-        active && !bare ? "opacity-100" : restingClasses
-      } ${className}`}
+    <div
+      role="group"
+      aria-label={t("printQuantity", { count: quantity })}
+      className={`flex items-center rounded-full text-white ${bare ? "bg-white/10" : "bg-black/55"} ${className}`}
     >
-      <PrinterIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
-      {active && <span className="tabular-nums">{quantity}</span>}
-    </button>
+      <button
+        type="button"
+        onClick={onDecrement}
+        aria-label={t("decreasePrintQuantity")}
+        className={`flex items-center justify-center rounded-full hover:bg-white/20 ${stepBtnSize}`}
+      >
+        <MinusIcon className={stepIconSize} />
+      </button>
+      <span
+        className={`tabular-nums ${size === "lg" ? "min-w-[1.5em] text-sm" : "min-w-[1.25em] text-xs"} text-center`}
+        aria-live="polite"
+      >
+        {quantity}
+      </span>
+      <button
+        type="button"
+        onClick={onIncrement}
+        disabled={quantity >= MAX_PRINT_QUANTITY}
+        aria-label={t("increasePrintQuantity")}
+        className={`flex items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent ${stepBtnSize}`}
+      >
+        <PlusIcon className={stepIconSize} />
+      </button>
+    </div>
   );
 }
 
@@ -2321,6 +2408,14 @@ function PrinterButton({
  * over the photos. Tailwind 4 gates `hover:` behind `(hover: hover)`, so on a
  * phone the hover rule never fires and the checkbox appears only once
  * selection mode has been entered by long press.
+ *
+ * Same `CheckIcon` glyph, same size, in both states — like `HeartIcon`'s own
+ * `active` toggle, selection doesn't swap to a different icon, so it never
+ * visibly grows or shrinks when picked. `text-brand-primary` alone read as
+ * barely-there on some photos, so selected adds a plain white ring — the
+ * same 44px the tap zone already is, `border-2`, no fill — around the same
+ * glyph instead of trying to make the glyph's own colour carry all the
+ * contrast.
  */
 function SelectCheck({
   selected,
@@ -2346,15 +2441,15 @@ function SelectCheck({
         event.stopPropagation();
         onPick(event.shiftKey);
       }}
-      className={`absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs transition-opacity ${
+      className={`absolute top-2 left-2 flex h-11 w-11 items-center justify-center rounded-full border-2 transition-opacity ${
         selected
-          ? "bg-brand-primary border-white text-white opacity-100"
-          : `border-white/80 bg-black/25 text-transparent hover:bg-black/45 ${
-              pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-            }`
+          ? "border-white opacity-100"
+          : pinned
+            ? "border-transparent opacity-100"
+            : "border-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
       }`}
     >
-      ✓
+      <CheckIcon className="h-4 w-4 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]" />
     </button>
   );
 }

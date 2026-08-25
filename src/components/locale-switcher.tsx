@@ -31,7 +31,10 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     <div
       role="group"
       aria-label={`${t("cs")} / ${t("en")}`}
-      className={`inline-flex h-11 shrink-0 items-center gap-0.5 rounded-full border border-neutral-300 p-1 dark:border-neutral-700 ${className ?? ""}`}
+      // The outer pill is un-padded — padding here would shrink each segment
+      // below the button below its own 44px, since the two segments share
+      // this box's height. `gap-0.5` alone keeps CS/EN visually separated.
+      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border border-neutral-300 dark:border-neutral-700 ${className ?? ""}`}
     >
       {LOCALES.map((code) => (
         <button
@@ -40,7 +43,10 @@ export function LocaleSwitcher({ className }: { className?: string }) {
           disabled={pending}
           onClick={() => choose(code)}
           aria-pressed={locale === code}
-          className={`flex h-full min-w-9 items-center justify-center rounded-full px-3 text-xs font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          // Apple HIG (Buttons): "a button needs a hit region of at least
+          // 44x44 pt ... as a general rule" — h-11/min-w-11 here, not on the
+          // wrapper, is what actually guarantees it per segment.
+          className={`flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             locale === code
               ? "bg-brand-primary text-white"
               : "hover:bg-brand-tint hover:text-brand-ink text-neutral-500 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"

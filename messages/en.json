@@ -160,6 +160,8 @@
     "removeFromFavorites": "Remove from favorites",
     "markForPrint": "Mark for print",
     "printQuantity": "For print ({count}×)",
+    "decreasePrintQuantity": "Remove a print copy",
+    "increasePrintQuantity": "Add a print copy",
     "viewerChipsAriaLabel": "Who's viewed this gallery",
     "namePromptTitle": "Who's looking?",
     "namePromptHint": "Others will see this name on your favorited photos. Feel free to skip it.",
