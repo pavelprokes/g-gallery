@@ -3,16 +3,16 @@ import { decodeCursor, encodeCursor } from "./photo-cursor";
 
 describe("photo cursor", () => {
   it("round-trips a cursor", () => {
-    const createdAt = new Date("2026-08-12T10:30:00.000Z");
-    const token = encodeCursor({ createdAt, id: "abc123" });
+    const takenAt = new Date("2026-08-12T10:30:00.000Z");
+    const token = encodeCursor({ takenAt, id: "abc123" });
     const decoded = decodeCursor(token);
     expect(decoded).not.toBeNull();
-    expect(decoded!.createdAt.toISOString()).toBe(createdAt.toISOString());
+    expect(decoded!.takenAt.toISOString()).toBe(takenAt.toISOString());
     expect(decoded!.id).toBe("abc123");
   });
 
   it("is opaque base64url, not a readable id", () => {
-    const token = encodeCursor({ createdAt: new Date(), id: "abc123" });
+    const token = encodeCursor({ takenAt: new Date(), id: "abc123" });
     expect(token).not.toContain("abc123");
     expect(token).toMatch(/^[A-Za-z0-9_-]+$/);
   });
@@ -24,14 +24,14 @@ describe("photo cursor", () => {
   });
 
   it("rejects a cursor with a missing field", () => {
-    const token = Buffer.from(JSON.stringify({ createdAt: new Date().toISOString() })).toString(
+    const token = Buffer.from(JSON.stringify({ takenAt: new Date().toISOString() })).toString(
       "base64url",
     );
     expect(decodeCursor(token)).toBeNull();
   });
 
   it("rejects a cursor with an invalid date", () => {
-    const token = Buffer.from(JSON.stringify({ createdAt: "not-a-date", id: "x" })).toString(
+    const token = Buffer.from(JSON.stringify({ takenAt: "not-a-date", id: "x" })).toString(
       "base64url",
     );
     expect(decodeCursor(token)).toBeNull();

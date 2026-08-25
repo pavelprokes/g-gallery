@@ -50,7 +50,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
       status: "CONFIRMED",
       ...(photoIds.length > 0 ? { id: { in: photoIds } } : {}),
     },
-    orderBy: { createdAt: "asc" },
+    // Same capture-order timeline the gallery shows, so the archive unpacks
+    // in the order the day happened.
+    orderBy: [{ takenAt: "asc" }, { id: "asc" }],
     select: { id: true, objectKey: true, fileName: true, sizeBytes: true, crc32: true },
   });
 

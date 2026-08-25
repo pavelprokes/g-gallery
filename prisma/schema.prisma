@@ -287,6 +287,11 @@ model Photo {
   /// must forget who uploaded a photo without deleting the photo itself.
   uploadedByViewerId String?
   uploadedBy         Viewer?     @relation("GuestUploads", fields: [uploadedByViewerId], references: [id], onDelete: SetNull)
+  /// When the shot was taken: EXIF DateTimeOriginal read in the browser at
+  /// upload, falling back to the file's mtime, then to confirm time. Drives
+  /// the gallery timeline (oldest first — the day as it happened). Null only
+  /// while a row is still PENDING; confirm always sets it.
+  takenAt            DateTime?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -296,6 +301,8 @@ model Photo {
   activityEvents  ActivityEvent[]
 
   @@index([galleryId, status])
+  /// Timeline ordering for the guest gallery and the ZIP entry order.
+  @@index([galleryId, status, takenAt])
   /// Drives the per-gallery guest quota count and the admin's "from guests" view.
   @@index([galleryId, source])
   @@index([uploadedByViewerId])

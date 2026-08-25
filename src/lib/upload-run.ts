@@ -4,6 +4,7 @@ import { crc32HexOfBlob } from "@/lib/crc32";
 import { classifyContentType } from "@/lib/upload-content-types";
 import { makeThumbnail } from "@/lib/thumbnail";
 import { stripGpsFromFile } from "@/lib/exif-gps";
+import { readTakenAtFromFile } from "@/lib/exif-taken-at";
 import { averageColorOf } from "@/lib/placeholder";
 
 /**
@@ -183,6 +184,15 @@ async function uploadOne(
   // GPS is stripped before the bytes ever leave the browser, and the CRC32 is
   // computed on the exact bytes that get stored so the ZIP writer can trust it.
   const body = await stripGpsFromFile(file);
+  // Capture time drives the gallery timeline (oldest shot first). EXIF where
+  // the file has it; the file's own mtime otherwise — for a camera-roll pick
+  // that is the capture time too, and it beats "when the upload ran" for
+  // everything else. The server falls back to confirm time if both are junk.
+  const takenAt =
+    (await readTakenAtFromFile(file)) ??
+    (Number.isFinite(file.lastModified) && file.lastModified > 0
+      ? new Date(file.lastModified)
+      : null);
   const crc32 = await crc32HexOfBlob(body);
   const dimensions = await readDimensions(body);
   // Cosmetic, so a failure here never blocks the upload.
@@ -232,6 +242,7 @@ async function uploadOne(
           height: dimensions?.height,
           placeholder,
           thumb: thumbStored,
+          takenAt: takenAt?.toISOString(),
         }),
       });
       if (!confirm.ok) throw await rejectionFrom(confirm);

@@ -64,10 +64,12 @@ export async function loadGalleryViewData(
       // API route uses for every subsequent page.
       photos: {
         where: { status: "CONFIRMED" },
-        // Newest upload first (2026-08-23, Pavel's call) — must match the
-        // cursor-paginated API route's own orderBy exactly, or scrolling
-        // past the first page would reshuffle what the viewer already saw.
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        // Capture order, oldest shot first (2026-08-25, Pavel's call —
+        // replaces newest-upload-first): the gallery reads as the day
+        // happened. Must match the cursor-paginated API route's own orderBy
+        // exactly, or scrolling past the first page would reshuffle what the
+        // viewer already saw.
+        orderBy: [{ takenAt: "asc" }, { id: "asc" }],
         take: PHOTOS_PAGE_SIZE + 1,
         select: {
           id: true,
@@ -77,6 +79,7 @@ export async function loadGalleryViewData(
           width: true,
           height: true,
           placeholder: true,
+          takenAt: true,
           createdAt: true,
           _count: { select: { favorites: true } },
         },
@@ -110,7 +113,9 @@ export async function loadGalleryViewData(
       favoriteCount: photo._count.favorites,
     })),
     initialCursor:
-      hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+      hasMore && last
+        ? encodeCursor({ takenAt: last.takenAt ?? last.createdAt, id: last.id })
+        : null,
     imageGrant: await mintImageGrant(gallery.storagePrefix),
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
     archiveZipUrl: archiveUrl(gallery.zipStatus, gallery.zipObjectKey),

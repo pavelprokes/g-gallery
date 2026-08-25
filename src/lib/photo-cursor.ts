@@ -14,26 +14,29 @@
  * batch or a chatty one-row-at-a-time trickle. */
 export const PHOTOS_PAGE_SIZE = 60;
 
+/** Timeline position: capture time first, id as the burst tiebreaker
+ * (2026-08-25 — the gallery reads oldest shot first, the day as it happened,
+ * replacing the newest-upload-first ordering of 2026-08-23). */
 export interface PhotoCursor {
-  createdAt: Date;
+  takenAt: Date;
   id: string;
 }
 
 export function encodeCursor(cursor: PhotoCursor): string {
-  const json = JSON.stringify({ createdAt: cursor.createdAt.toISOString(), id: cursor.id });
+  const json = JSON.stringify({ takenAt: cursor.takenAt.toISOString(), id: cursor.id });
   return Buffer.from(json, "utf8").toString("base64url");
 }
 
 export function decodeCursor(token: string): PhotoCursor | null {
   try {
     const raw = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as {
-      createdAt?: unknown;
+      takenAt?: unknown;
       id?: unknown;
     };
-    if (typeof raw.createdAt !== "string" || typeof raw.id !== "string" || !raw.id) return null;
-    const createdAt = new Date(raw.createdAt);
-    if (Number.isNaN(createdAt.getTime())) return null;
-    return { createdAt, id: raw.id };
+    if (typeof raw.takenAt !== "string" || typeof raw.id !== "string" || !raw.id) return null;
+    const takenAt = new Date(raw.takenAt);
+    if (Number.isNaN(takenAt.getTime())) return null;
+    return { takenAt, id: raw.id };
   } catch {
     return null;
   }

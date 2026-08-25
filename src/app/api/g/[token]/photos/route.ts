@@ -12,12 +12,12 @@ const querySchema = z.object({
 });
 
 /**
- * Keyset (cursor) pagination over a gallery's confirmed photos, newest
- * upload first (`createdAt desc`, 2026-08-23) — the same ordering the first
- * server-rendered page already uses (`src/app/g/[token]/[[...slug]]/page.tsx`),
- * so switching pages never reshuffles what the viewer has already seen.
- * `id` is the tiebreaker: two photos confirmed in the same upload batch can
- * share a millisecond `createdAt`.
+ * Keyset (cursor) pagination over a gallery's confirmed photos, in capture
+ * order — oldest shot first (`takenAt asc`, 2026-08-25), the day as it
+ * happened. The same ordering the first server-rendered page already uses
+ * (`src/app/g/[token]/[[...slug]]/page.tsx`), so switching pages never
+ * reshuffles what the viewer has already seen. `id` is the tiebreaker: EXIF
+ * time is second-resolution, so a burst shares a `takenAt`.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/photos">) {
   const { token } = await ctx.params;
@@ -40,13 +40,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       ...(cursor
         ? {
             OR: [
-              { createdAt: { lt: cursor.createdAt } },
-              { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+              { takenAt: { gt: cursor.takenAt } },
+              { takenAt: cursor.takenAt, id: { gt: cursor.id } },
             ],
           }
         : {}),
     },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ takenAt: "asc" }, { id: "asc" }],
     take: PHOTOS_PAGE_SIZE + 1,
     select: {
       id: true,
@@ -56,6 +56,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       width: true,
       height: true,
       placeholder: true,
+      takenAt: true,
       createdAt: true,
       _count: { select: { favorites: true } },
     },
@@ -76,6 +77,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
     })),
-    nextCursor: hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+    // `takenAt` is set on every confirm and backfilled for the back catalogue;
+    // `createdAt` covers the impossible null without throwing away the page.
+    nextCursor:
+      hasMore && last
+        ? encodeCursor({ takenAt: last.takenAt ?? last.createdAt, id: last.id })
+        : null,
   });
 }

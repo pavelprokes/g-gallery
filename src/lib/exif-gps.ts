@@ -10,18 +10,18 @@
 // untouched original — this is the only place GPS gets sanitized.
 
 const GPS_IFD_POINTER_TAG = 0x8825;
-const IFD_ENTRY_BYTES = 12;
+export const IFD_ENTRY_BYTES = 12;
 
 /** TIFF field type -> bytes per component. Index is the type code. */
-const TYPE_SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8] as const;
+export const TYPE_SIZES = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8] as const;
 
-interface ExifSegment {
+export interface ExifSegment {
   /** Offset of the TIFF header (byte-order marker) within the JPEG. */
   tiffStart: number;
   tiffEnd: number;
 }
 
-function findExifSegment(bytes: Uint8Array): ExifSegment | null {
+export function findExifSegment(bytes: Uint8Array): ExifSegment | null {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null; // not a JPEG
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -61,12 +61,12 @@ function findExifSegment(bytes: Uint8Array): ExifSegment | null {
   return null;
 }
 
-interface TiffHeader {
+export interface TiffHeader {
   littleEndian: boolean;
   ifd0Offset: number;
 }
 
-function readTiffHeader(view: DataView, tiffStart: number): TiffHeader | null {
+export function readTiffHeader(view: DataView, tiffStart: number): TiffHeader | null {
   const byteOrder = view.getUint16(tiffStart, false);
   const littleEndian = byteOrder === 0x4949; // "II"
   if (!littleEndian && byteOrder !== 0x4d4d) return null; // neither II nor MM

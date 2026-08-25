@@ -53,6 +53,9 @@ async function main() {
         placeholder: "#a37c5c",
         status: "CONFIRMED",
         sizeBytes: 1_000_000,
+        // Confirm always sets a capture time in production; a minute apart in
+        // index order keeps the timeline deterministic for the specs.
+        takenAt: new Date(Date.UTC(2026, 7, 22, 12, i)),
       },
     });
   }
@@ -218,6 +221,7 @@ async function makeEventGallery(
         placeholder: "#a37c5c",
         status: "CONFIRMED",
         sizeBytes: 900_000,
+        takenAt: new Date(Date.UTC(2026, 7, 22, 12, i)),
       },
     });
   }

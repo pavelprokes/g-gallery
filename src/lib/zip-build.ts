@@ -59,6 +59,8 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
       storagePrefix: true,
       photos: {
         where: { status: "CONFIRMED" },
+        // Capture order — the archive unpacks in the order the day happened.
+        orderBy: [{ takenAt: "asc" }, { id: "asc" }],
         select: { objectKey: true, fileName: true, sizeBytes: true, crc32: true },
       },
     },

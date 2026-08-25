@@ -24,7 +24,23 @@ const commonSchema = {
   height: z.number().int().positive().optional(),
   /** Which grid thumbnail the browser managed to upload, if any. */
   thumb: z.enum(["webp", "jpeg"]).nullish(),
+  /** Capture time (EXIF, or the file's mtime) — drives the gallery timeline. */
+  takenAt: z.iso.datetime().nullish(),
 };
+
+/**
+ * Client-supplied capture times are advisory: a camera with a dead clock says
+ * 1970, a mis-set one says 2085. Outside a sane window the confirm timestamp
+ * is the honest fallback — same as a photo with no EXIF at all.
+ */
+function saneTakenAt(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (parsed.getTime() < Date.UTC(1990, 0, 1)) return null;
+  if (parsed.getTime() > Date.now() + 24 * 60 * 60 * 1000) return null;
+  return parsed;
+}
 
 // Same two callers as the presign route. The share token is re-verified here
 // rather than trusted from the presign step: confirm is what makes a row
@@ -51,7 +67,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { photoId, etag, crc32, sizeBytes, width, height, placeholder, thumb } = parsed.data;
+  const { photoId, etag, crc32, sizeBytes, width, height, placeholder, thumb, takenAt } =
+    parsed.data;
 
   let photo: { id: string; galleryId: string; objectKey: string } | null;
 
@@ -118,6 +135,8 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
+      // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
+      takenAt: saneTakenAt(takenAt) ?? new Date(),
       // Derived from the key we issued: the client only says which format it
       // managed, never where to write it.
       thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,

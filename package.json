@@ -25,6 +25,7 @@
     "smoke:storage": "tsx --conditions=react-server scripts/smoke-storage.ts",
     "auth:tables": "tsx --conditions=react-server scripts/dump-auth-tables.ts",
     "backfill:placeholders": "tsx --conditions=react-server scripts/backfill-placeholders.ts",
+    "backfill:taken-at": "tsx --conditions=react-server scripts/backfill-taken-at.ts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },

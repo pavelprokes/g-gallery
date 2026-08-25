@@ -40,7 +40,8 @@ Measured before building anything: a 500-photo page is **223 kB of HTML over the
 wire** (brotli crushes the repeated URLs), and every tile below the fold is
 already lazy, so the browser does viewport prioritisation for free. The stable
 order this was asked for **already exists** on the client surface — the share
-page orders by `createdAt`; only the _admin_ grid sorts by favourite
+page orders by `takenAt` (capture time, since 2026-08-25; `createdAt` before
+that); only the _admin_ grid sorts by favourite
 count, and that is Pavel's own view, not one a client scrolls while others
 favourite. (`sortOrder` itself was removed 2026-08-21 — see `docs/AUDIT.md`
 §3.5/§8 P2 — it was never written, so it never actually contributed to this
