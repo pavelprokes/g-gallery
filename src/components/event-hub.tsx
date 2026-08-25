@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import Link from "next/link";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import type { ResolvedEvent } from "@/lib/event-access";
 import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
@@ -84,6 +85,10 @@ export async function EventHub({
           ))}
         </ul>
       )}
+
+      <footer className="mt-10 border-t pt-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <SiteFooterIdentity />
+      </footer>
     </main>
   );
 }

@@ -58,6 +58,7 @@ import {
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineIconButton } from "@/components/offline-toggle";
@@ -2057,6 +2058,7 @@ function GalleryViewInner({
         ) : (
           <p>{t("optedOutNotice")}</p>
         )}
+        <SiteFooterIdentity className="mt-4" />
       </footer>
 
       {projecting && (

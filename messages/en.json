@@ -3,6 +3,15 @@
     "cs": "Čeština",
     "en": "English"
   },
+  "siteFooter": {
+    "role": "wedding photographer",
+    "businessId": "Company ID: 87877601",
+    "address": "Křižíkova 424/127, 186 00 Praha 8 – Karlín, Czech Republic",
+    "email": "pavel@pavelprokes.cz",
+    "website": "svatebni-fotograf-cechy.cz",
+    "copyright": "© {year} Pavel Prokeš. All rights reserved.",
+    "builtBy": "This website was built by Pavel Prokeš himself."
+  },
   "manifest": {
     "name": "Wedding photo gallery",
     "description": "Wedding photos in one link — from the photographer and from guests."

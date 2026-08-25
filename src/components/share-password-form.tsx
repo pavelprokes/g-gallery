@@ -3,13 +3,14 @@
 import { useTranslations } from "next-intl";
 import { useActionState } from "react";
 import { unlockShareLink, type UnlockState } from "@/app/g/[token]/actions";
+import { SiteFooterIdentity } from "@/components/site-footer-identity";
 
 export function SharePasswordForm({ token }: { token: string }) {
   const t = useTranslations("sharePassword");
   const [state, action, pending] = useActionState<UnlockState, FormData>(unlockShareLink, {});
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-8">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-10 p-8">
       <form action={action} className="w-full max-w-sm space-y-4">
         <div>
           <h1 className="text-xl font-semibold">{t("title")}</h1>
@@ -37,6 +38,8 @@ export function SharePasswordForm({ token }: { token: string }) {
           {pending ? t("verifying") : t("submit")}
         </button>
       </form>
+
+      <SiteFooterIdentity className="max-w-sm text-center text-xs text-neutral-500" />
     </main>
   );
 }

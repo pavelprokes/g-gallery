@@ -3,6 +3,15 @@
     "cs": "Čeština",
     "en": "English"
   },
+  "siteFooter": {
+    "role": "svatební fotograf",
+    "businessId": "IČO: 87877601",
+    "address": "Křižíkova 424/127, 186 00 Praha 8 – Karlín",
+    "email": "pavel@pavelprokes.cz",
+    "website": "svatebni-fotograf-cechy.cz",
+    "copyright": "© {year} Pavel Prokeš. Všechna práva vyhrazena.",
+    "builtBy": "Tenhle web si sám naprogramoval Pavel Prokeš."
+  },
   "manifest": {
     "name": "Fotogalerie ke svatbě",
     "description": "Svatební fotky na jednom odkazu — od fotografa i od hostů."

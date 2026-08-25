@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { Card } from "@/components/ui/card";
 
 /**
@@ -30,7 +31,7 @@ export function DeadEnd({
   action?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
       <Card className="w-full max-w-sm p-8 text-center">
         <span
           aria-hidden
@@ -63,6 +64,7 @@ export function DeadEnd({
         {hint && <p className="mt-2 text-sm/6 text-neutral-500 dark:text-neutral-400">{hint}</p>}
         {action && <div className="mt-6 flex justify-center">{action}</div>}
       </Card>
+      <SiteFooterIdentity className="max-w-sm text-center text-xs text-neutral-500" />
     </main>
   );
 }
