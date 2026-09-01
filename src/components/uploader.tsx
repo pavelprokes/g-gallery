@@ -12,6 +12,7 @@ import {
 } from "@/lib/upload-run";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardTitle } from "@/components/ui/card";
+import { UploadProgressRing } from "@/components/upload-progress-ring";
 
 // The transport lives in src/lib/upload-run.ts, shared with the guest uploader
 // (docs/GUEST-GALLERIES.md §6) — this component is the photographer's UI over it.
@@ -123,15 +124,16 @@ export function Uploader({ galleryId }: { galleryId: string }) {
 
       {items.length > 0 && (
         <div className="mt-4 space-y-2">
-          <p className="text-admin-muted text-sm dark:text-neutral-400">
-            {done}/{items.length} nahráno
-            {failed > 0 && <span className="text-red-600"> · {failed} selhalo</span>}
-          </p>
-          <div className="bg-admin-accent-soft h-1.5 w-full overflow-hidden rounded-full dark:bg-neutral-800">
-            <div
-              className="motion-loop bg-brand-primary duration-move ease-standard h-full transition-[width]"
-              style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
+          <div className="mt-4 flex items-center gap-2">
+            <UploadProgressRing
+              done={done}
+              total={items.length}
+              className="text-brand-primary size-6"
             />
+            <p className="text-admin-muted text-sm dark:text-neutral-400">
+              {done}/{items.length} nahráno
+              {failed > 0 && <span className="text-red-600"> · {failed} selhalo</span>}
+            </p>
           </div>
           {failed > 0 && (
             <ul className="max-h-32 overflow-y-auto text-xs text-red-600">

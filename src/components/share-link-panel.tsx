@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/format-date";
 import { createShareLink, revokeShareLink, updateShareLinkPermissions } from "@/app/admin/actions";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { Alert } from "@/components/ui/alert";
@@ -249,7 +250,7 @@ export function ShareLinkPanel({
                     {link.revokedAt
                       ? "Zrušen"
                       : link.expiresAt
-                        ? `Platí do ${link.expiresAt.toLocaleDateString("cs-CZ")}`
+                        ? `Platí do ${formatDate(link.expiresAt, "cs")}`
                         : "Bez expirace"}
                     {link.passwordHash && " · chráněno heslem"}
                     {granted.length > 0

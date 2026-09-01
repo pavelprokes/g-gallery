@@ -125,6 +125,7 @@
   },
   "gallery": {
     "untitledPlaceholder": "Gallery",
+    "galleryOgDescription": "Wedding photos on one link. Open, browse, download.",
     "photoCount": "{count, plural, one {# photo} other {# photos}}",
     "emptyEvent": "Nothing here yet. Once the photographer adds something, it'll show up at this address.",
     "emptyCard": "Empty for now",
@@ -174,7 +175,7 @@
     "decreasePrintQuantity": "Remove a print copy",
     "increasePrintQuantity": "Add a print copy",
     "viewerChipsAriaLabel": "Who's viewed this gallery",
-    "namePromptTitle": "Who's looking?",
+    "namePromptTitle": "Who should get the credit?",
     "namePromptHint": "Others will see this name on your favorited photos. Feel free to skip it.",
     "namePromptPlaceholder": "E.g. Emma",
     "namePromptSkip": "Skip",

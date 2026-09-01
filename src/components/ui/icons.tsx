@@ -100,7 +100,8 @@ export function CheckCircleIcon({ className = DEFAULT_SIZE }: IconProps) {
       <circle cx="12" cy="12" r="10" fill="currentColor" />
       <path
         d="M7.5 12.3l3 3 6-6.2"
-        stroke="white"
+        stroke="currentColor"
+        className="text-brand-tint"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { sendMail, type MailResult } from "@/lib/mailer";
+import { formatDigestDay } from "@/lib/format-date";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 
 /**
@@ -130,11 +131,7 @@ export function renderDigest(
   data: DigestData,
   baseUrl: string,
 ): { subject: string; html: string; text: string } {
-  const day = data.since.toLocaleDateString("cs-CZ", {
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Prague",
-  });
+  const day = formatDigestDay(data.since);
 
   const headline =
     data.galleries.length === 1 && data.galleries[0]

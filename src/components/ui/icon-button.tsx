@@ -1,7 +1,7 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 
 const ICON_BUTTON_CLASSES =
-  "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-neutral-300 px-3 text-sm text-neutral-700 transition-colors hover:border-brand-primary hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-neutral-300 disabled:hover:bg-transparent dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800";
+  "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border px-3 text-body text-brand-ink transition-colors hover:border-brand-primary hover:bg-brand-tint disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-brand-border disabled:hover:bg-transparent dark:text-brand-tint dark:hover:bg-brand-ink/40";
 
 /**
  * A row of unlabelled circles is a guessing game: a projector, a download and

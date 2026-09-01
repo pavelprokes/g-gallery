@@ -9,6 +9,7 @@ import {
   type SignedImageGrant,
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
+import { formatDate } from "@/lib/format-date";
 
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
@@ -148,7 +149,7 @@ export async function loadGalleryViewData(
 
   return {
     title: gallery.title,
-    eventDate: gallery.eventDate?.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ") ?? null,
+    eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
     photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
       id: photo.id,

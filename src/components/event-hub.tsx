@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
+import { formatDate } from "@/lib/format-date";
 import type { ResolvedEvent } from "@/lib/event-access";
 import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
@@ -36,7 +37,7 @@ export async function EventHub({
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">{event.title}</h1>
         <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          {[event.eventDate?.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ"), event.venue]
+          {[event.eventDate ? formatDate(event.eventDate, locale) : null, event.venue]
             .filter(Boolean)
             .join(" · ")}
         </p>
@@ -76,8 +77,7 @@ export async function EventHub({
                     {card.photoCount > 0
                       ? t("photoCount", { count: card.photoCount })
                       : t("emptyCard")}
-                    {card.latestPhotoAt &&
-                      ` · ${card.latestPhotoAt.toLocaleDateString(locale === "en" ? "en-US" : "cs-CZ")}`}
+                    {card.latestPhotoAt && ` · ${formatDate(card.latestPhotoAt, locale)}`}
                   </p>
                 </div>
               </Link>

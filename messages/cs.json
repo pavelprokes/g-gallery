@@ -125,6 +125,7 @@
   },
   "gallery": {
     "untitledPlaceholder": "Galerie",
+    "galleryOgDescription": "Fotky ze svatby na jednom odkazu. Otevři, prohlédni si je, stáhni.",
     "photoCount": "{count, plural, one {# fotka} few {# fotky} other {# fotek}}",
     "emptyEvent": "Zatím tu nic není. Až fotograf něco přidá, objeví se to na téhle adrese.",
     "emptyCard": "Zatím prázdné",
@@ -174,7 +175,7 @@
     "decreasePrintQuantity": "Ubrat kopii k tisku",
     "increasePrintQuantity": "Přidat kopii k tisku",
     "viewerChipsAriaLabel": "Kdo si galerii prohlédl",
-    "namePromptTitle": "Kdo se dívá?",
+    "namePromptTitle": "Komu za ně poděkovat?",
     "namePromptHint": "Jméno uvidí ostatní u tvých oblíbených fotek. Můžeš ho i přeskočit.",
     "namePromptPlaceholder": "Např. Petra",
     "namePromptSkip": "Přeskočit",

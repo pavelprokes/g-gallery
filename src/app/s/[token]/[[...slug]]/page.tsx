@@ -5,6 +5,7 @@ import { resolveEvent } from "@/lib/event-access";
 import { resolveShareLink } from "@/lib/share-access";
 import { compositeToken } from "@/lib/event-token";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
+import { eventShareMetadata, galleryShareMetadata } from "@/lib/share-metadata";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { EventPartGone } from "@/components/share-link-dead";
@@ -36,16 +37,29 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(
   props: PageProps<"/s/[token]/[[...slug]]">,
 ): Promise<Metadata> {
-  const { token } = await props.params;
+  const { token, slug } = await props.params;
   const event = await resolveEvent(token);
   const t = await getTranslations("gallery");
 
-  // Never leak a title for a token that does not resolve, and never let this
-  // page into an index — same unconditional rule as every share surface.
-  return {
-    title: event?.title ?? t("untitledPlaceholder"),
-    robots: { index: false, follow: false },
-  };
+  if (!event) {
+    return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
+  }
+
+  const segments = slug ?? [];
+  const requestedKey = segments[1];
+  const inlineCard = !requestedKey && event.cards.length === 1 ? event.cards[0] : undefined;
+  const card = inlineCard ?? event.cards.find((c) => c.eventKey === requestedKey);
+
+  if (card?.eventKey) {
+    const galleryToken = compositeToken(token, card.eventKey);
+    const access = await resolveShareLink(galleryToken);
+    if (access.ok) {
+      return galleryShareMetadata(access.shareLink.galleryId, t);
+    }
+  }
+
+  const hubCover = event.cards.find((c) => c.cover)?.cover?.objectKey;
+  return eventShareMetadata(event.title, hubCover, t);
 }
 
 export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug]]">) {

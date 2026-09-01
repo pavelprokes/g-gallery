@@ -13,12 +13,13 @@
  * per day" in one pass.
  */
 
+import { TIME_ZONE } from "@/lib/format-date";
+
 /** Two weeks: long enough to show the tail after a link goes out, short enough
  *  that a 6px column per day still fits beside a list row. */
 export const SERIES_DAYS = 14;
 
 /** Every day boundary in this app is the photographer's day, not UTC's. */
-const TIME_ZONE = "Europe/Prague";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import {
@@ -70,9 +71,17 @@ import { srcFor } from "@/lib/image-src";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { ViewerTransferPanel } from "@/components/viewer-transfer-panel";
-import { Slideshow } from "@/components/slideshow";
-import { GuestUploader } from "@/components/guest-uploader";
-import { OfflineIconButton } from "@/components/offline-toggle";
+
+const Slideshow = dynamic(() =>
+  import("@/components/slideshow").then((module) => module.Slideshow),
+);
+const GuestUploader = dynamic(
+  () => import("@/components/guest-uploader").then((module) => module.GuestUploader),
+  { ssr: false },
+);
+const OfflineIconButton = dynamic(() =>
+  import("@/components/offline-toggle").then((module) => module.OfflineIconButton),
+);
 import { Button } from "@/components/ui/button";
 import { IconButton, IconButtonLink, NavButton } from "@/components/ui/icon-button";
 import {
@@ -897,6 +906,26 @@ function GalleryViewInner({
   const lastDirection = useRef<1 | -1>(1);
   const [selection, setSelection] = useState(EMPTY_SELECTION);
   const [zipState, setZipState] = useState<"idle" | "preparing" | "error">("idle");
+
+  useEffect(() => {
+    if (zipState !== "preparing") return;
+
+    const clear = () => setZipState("idle");
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") clear();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", clear);
+    const timeout = window.setTimeout(clear, 10_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", clear);
+      window.clearTimeout(timeout);
+    };
+  }, [zipState]);
   // Reviewing your own picks before telling the photographer which to retouch
   // — the one view of the gallery that isn't "all of it, newest first".
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -1392,6 +1421,10 @@ function GalleryViewInner({
   const [rovingIndex, setRovingIndex] = useState(0);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const registerTileRef = useCallback((index: number, el: HTMLButtonElement | null) => {
+    if (el) tileRefs.current.set(index, el);
+    else tileRefs.current.delete(index);
+  }, []);
 
   // Which row holds each photo, and which photos sit in each row left to
   // right. Built from the justified rows rather than by arithmetic on the flat
@@ -1530,8 +1563,6 @@ function GalleryViewInner({
         document.body.append(form);
         form.submit();
         form.remove();
-
-        setZipState("idle");
       } catch (error) {
         console.error("ZIP manifest request threw", error);
         setZipState("error");
@@ -1862,7 +1893,7 @@ function GalleryViewInner({
           {backHref && (
             <a
               href={backHref}
-              className="text-body mb-1 inline-block text-neutral-500 underline dark:text-neutral-400"
+              className="text-body text-brand-ink/60 dark:text-brand-tint/60 mb-1 inline-block underline"
             >
               ← {backLabel ?? t("back")}
             </a>
@@ -1871,7 +1902,7 @@ function GalleryViewInner({
             {title}
           </h1>
           {subtitle && (
-            <p className="text-body mt-0.5 text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+            <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-0.5">{subtitle}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1887,7 +1918,7 @@ function GalleryViewInner({
               aria-pressed={favoritesOnly}
               label={String(favorites.size)}
               title={favoritesOnly ? t("showAllPhotos") : t("showFavoritesOnlyTitle")}
-              className={favoritesOnly ? "border-brand-primary bg-brand-tint text-neutral-900" : ""}
+              className={favoritesOnly ? "border-brand-primary bg-brand-tint text-brand-ink" : ""}
             >
               <span className="sr-only">
                 {favoritesOnly ? t("showAllPhotos") : t("showFavoritesOnlySr")}
@@ -1974,7 +2005,7 @@ function GalleryViewInner({
             onClick={() => setSelection(clearSelection())}
             aria-label={t("clearSelection")}
             // Same 44px icon-button shape as the lightbox's own close button.
-            className="flex h-11 w-11 items-center justify-center rounded-full border transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            className="hover:bg-brand-tint dark:hover:bg-brand-ink/40 flex h-11 w-11 items-center justify-center rounded-full border transition-colors"
           >
             {/* Same 20px glyph the lightbox's own close button uses. */}
             <CloseIcon className="h-5 w-5" />
@@ -2028,7 +2059,7 @@ function GalleryViewInner({
               <li
                 key="loading"
                 aria-hidden
-                className="text-body absolute top-0 left-0 flex w-full items-center justify-center text-neutral-500 dark:text-neutral-400"
+                className="text-body text-brand-ink/60 dark:text-brand-tint/60 absolute top-0 left-0 flex w-full items-center justify-center"
                 style={{
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
@@ -2109,10 +2140,7 @@ function GalleryViewInner({
                     onIncrementPrint={incrementPrintQuantity}
                     onDecrementPrint={decrementPrintQuantity}
                     onFocus={onTileFocus}
-                    buttonRef={(el) => {
-                      if (el) tileRefs.current.set(index, el);
-                      else tileRefs.current.delete(index);
-                    }}
+                    registerTileRef={registerTileRef}
                   />
                 );
               })}
@@ -2122,7 +2150,7 @@ function GalleryViewInner({
       </ul>
 
       {photos.length === 0 && (
-        <p className={`${GUTTER} text-body text-neutral-500 dark:text-neutral-400`}>
+        <p className={`${GUTTER} text-body text-brand-ink/60 dark:text-brand-tint/60`}>
           {!favoritesOnly
             ? t("emptyGallery")
             : hasNextPage
@@ -2188,7 +2216,7 @@ function GalleryViewInner({
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md">
+            <div className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1.5 pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
               <button
                 ref={lightboxCloseRef}
                 type="button"
@@ -2235,7 +2263,7 @@ function GalleryViewInner({
                 "+" to hedge an incomplete count. Favoriting filters the list
                 to a subset `photoCount` doesn't describe, so that case keeps
                 the old loaded-so-far behaviour. */}
-            <span className="ml-auto rounded-full bg-black/40 px-3 py-1.5 text-sm text-white/70 tabular-nums backdrop-blur-md">
+            <span className="ml-auto rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/70 tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
               {activeIndex! + 1} / {favoritesOnly ? photos.length : photoCount}
               {favoritesOnly && hasNextPage && "+"}
             </span>
@@ -2249,7 +2277,7 @@ function GalleryViewInner({
               of. `bottom` clears the home indicator — the guest uploader was
               the only surface in the app already doing this. */}
           <div
-            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
+            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/55 px-2 py-1.5 [-ms-overflow-style:none] pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
@@ -2321,7 +2349,7 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="text-caption mx-4 mt-10 border-t pt-4 text-neutral-500 sm:mx-3 dark:text-neutral-400">
+      <footer className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mx-4 mt-10 border-t pt-4 sm:mx-3">
         {!optedOut ? (
           <p>
             {t("privacyNotice")}{" "}
@@ -2401,7 +2429,7 @@ interface PhotoTileProps {
   onIncrementPrint: (photoId: string) => void;
   onDecrementPrint: (photoId: string) => void;
   onFocus: (index: number) => void;
-  buttonRef: (el: HTMLButtonElement | null) => void;
+  registerTileRef: (index: number, el: HTMLButtonElement | null) => void;
 }
 
 /**
@@ -2435,9 +2463,15 @@ const PhotoTile = memo(function PhotoTile({
   onIncrementPrint,
   onDecrementPrint,
   onFocus,
-  buttonRef,
+  registerTileRef,
 }: PhotoTileProps) {
   const t = useTranslations("gallery");
+  const setButtonRef = useCallback(
+    (el: HTMLButtonElement | null) => {
+      registerTileRef(index, el);
+    },
+    [index, registerTileRef],
+  );
   // A thumbnail can be recorded on the row while its object is gone from the
   // bucket. Without this the tile stays empty for good, even though the
   // original is right there and every other surface can render it.
@@ -2461,7 +2495,7 @@ const PhotoTile = memo(function PhotoTile({
 
   return (
     <div
-      className="group relative shrink-0 select-none"
+      className="group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:opacity-0 after:transition-opacity group-focus-within:after:opacity-100 group-hover:after:opacity-100 pointer-coarse:after:opacity-100"
       style={{ width, height }}
       onTouchStart={() => {
         if (!allowDownload) return;
@@ -2481,7 +2515,7 @@ const PhotoTile = memo(function PhotoTile({
       }}
     >
       <button
-        ref={buttonRef}
+        ref={setButtonRef}
         type="button"
         tabIndex={tabbable ? 0 : -1}
         onFocus={() => onFocus(index)}
@@ -2612,7 +2646,7 @@ function HeartButton({
     ? "hover:bg-white/15"
     : // Fades in under a mouse; a touch screen has no hover to wait for, so
       // there it sits quietly at 60% rather than disappearing entirely.
-      "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+      "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
   return (
     <button
       type="button"
@@ -2669,7 +2703,7 @@ function PrinterButton({
       ? "hover:bg-white/15"
       : // Fades in under a mouse; a touch screen has no hover to wait for, so
         // there it sits quietly at 60% rather than disappearing entirely.
-        "opacity-60 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+        "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
     return (
       <button
         type="button"
@@ -2891,7 +2925,7 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
         <h2 id="name-prompt-title" className="text-lg font-semibold">
           {t("namePromptTitle")}
         </h2>
-        <p className="text-body text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
+        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">{t("namePromptHint")}</p>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}
