@@ -1,5 +1,6 @@
 "use client";
 
+import { UploadProgressRing } from "@/components/upload-progress-ring";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -254,11 +255,8 @@ export function GuestUploader({
                   </button>
                 )}
               </p>
-              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
-                <div
-                  className="motion-loop duration-move ease-standard h-full bg-neutral-900 transition-[width] dark:bg-neutral-100"
-                  style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
-                />
+              <div className="mt-1 flex items-center gap-2">
+                <UploadProgressRing done={done} total={items.length} />
               </div>
             </div>
           )}

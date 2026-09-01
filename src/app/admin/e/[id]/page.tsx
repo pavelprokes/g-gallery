@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { formatDate } from "@/lib/format-date";
 import { getAdminSession } from "@/lib/auth-guard";
 import {
   attachGalleryToEvent,
@@ -111,8 +112,9 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
         title={event.title}
         crumbs={eventCrumbs(event)}
         subtitle={
-          [event.eventDate?.toLocaleDateString("cs-CZ"), event.venue].filter(Boolean).join(" · ") ||
-          "Bez data a místa"
+          [event.eventDate ? formatDate(event.eventDate, "cs") : null, event.venue]
+            .filter(Boolean)
+            .join(" · ") || "Bez data a místa"
         }
         actions={
           <>
@@ -238,7 +240,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                   {gallery.shareLinks.map((link) => {
                     const token = decryptToken(link.tokenCipher);
                     const note = [
-                      link.label ?? link.createdAt.toLocaleDateString("cs-CZ"),
+                      link.label ?? formatDate(link.createdAt, "cs"),
                       link.allowUpload ? "hosté nahrávají" : null,
                     ]
                       .filter(Boolean)
@@ -283,7 +285,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                       <option value="">— žádný —</option>
                       {gallery.shareLinks.map((link) => (
                         <option key={link.id} value={link.id}>
-                          {link.label ?? link.createdAt.toLocaleDateString("cs-CZ")}
+                          {link.label ?? formatDate(link.createdAt, "cs")}
                           {link.allowUpload ? " · hosté nahrávají" : ""}
                         </option>
                       ))}

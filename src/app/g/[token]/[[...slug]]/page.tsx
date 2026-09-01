@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { ShareLinkDead } from "@/components/share-link-dead";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
+import { galleryShareMetadata } from "@/lib/share-metadata";
 
 // Dynamic by definition: token validity, expiry, revocation, and the password
 // unlock cookie are checked server-side on every request (docs/PLAN.md §4).
@@ -34,15 +34,7 @@ export async function generateMetadata(
     return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
   }
 
-  const gallery = await prisma.gallery.findUnique({
-    where: { id: access.shareLink.galleryId },
-    select: { title: true },
-  });
-
-  return {
-    title: gallery?.title ?? t("untitledPlaceholder"),
-    robots: { index: false, follow: false },
-  };
+  return galleryShareMetadata(access.shareLink.galleryId, t);
 }
 
 export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {

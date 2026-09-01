@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { formatDateTime } from "@/lib/format-date";
 import { getAdminSession } from "@/lib/auth-guard";
 import { ownerFeed, markFeedRead, type FeedEntry } from "@/lib/feed";
 import { REACTION_EMOJI } from "@/lib/reactions-shared";
@@ -112,10 +113,5 @@ function describe(entry: FeedEntry): string {
 }
 
 function formatWhen(date: Date): string {
-  return date.toLocaleString("cs-CZ", {
-    day: "numeric",
-    month: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(date, "cs");
 }

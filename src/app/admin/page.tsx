@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PhotoStatus } from "@/generated/prisma/enums";
 import { pickCover } from "@/lib/event-access";
+import { formatDate } from "@/lib/format-date";
 import { getAdminSession } from "@/lib/auth-guard";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
@@ -193,7 +194,7 @@ export default async function AdminPage() {
                         {[
                           pluralize(event.galleries.length, FORMS.gallery),
                           event.venue,
-                          event.eventDate?.toLocaleDateString("cs-CZ"),
+                          event.eventDate ? formatDate(event.eventDate, "cs") : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")}
@@ -241,7 +242,7 @@ export default async function AdminPage() {
                   <span>
                     {[
                       pluralize(gallery._count.photos, FORMS.photo),
-                      gallery.eventDate?.toLocaleDateString("cs-CZ"),
+                      gallery.eventDate ? formatDate(gallery.eventDate, "cs") : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
