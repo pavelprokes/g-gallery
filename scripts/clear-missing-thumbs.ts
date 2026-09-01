@@ -76,7 +76,9 @@ function encodeKey(objectKey: string): string {
 /** A network failure counts as present: never drop a key on a flaky read. */
 async function exists(url: string): Promise<boolean> {
   try {
-    const response = await fetch(url, { method: "HEAD" });
+    // GET + Range, not HEAD: Cloudflare/R2 on this custom domain answers HEAD
+    // with 404 for objects that a ranged GET returns as 206.
+    const response = await fetch(url, { headers: { Range: "bytes=0-0" } });
     return response.status !== 404;
   } catch {
     return true;
