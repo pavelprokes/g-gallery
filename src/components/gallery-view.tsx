@@ -929,6 +929,27 @@ function GalleryViewInner({
   // Reviewing your own picks before telling the photographer which to retouch
   // — the one view of the gallery that isn't "all of it, newest first".
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+
+  /**
+   * Marking mode: pin the heart and the printer onto every tile.
+   *
+   * Off, the grid is browsed — nothing idle is drawn over the photos, which is
+   * how a phone should read a gallery someone is looking through. On, it is
+   * picked from, which is the job the proofing galleries build their whole
+   * grid around (Pixieset keeps a heart in the corner of every photo;
+   * ShootProof's mobile redesign moved the proofing controls to a thumb-height
+   * bar rather than hiding them). This gallery is browsed *and* picked from,
+   * so it does both and lets the viewer say which.
+   *
+   * A visible toggle rather than a gesture. Double-tap-to-mark was the
+   * alternative and it cannot work here: a tile's single tap already opens the
+   * lightbox, so recognising a double tap would mean delaying every open by
+   * ~300ms; the browser reserves the same gesture for zoom; and under
+   * VoiceOver a double tap *is* "activate", so it never reaches the page at
+   * all. Long press is already the download selection's, which is where
+   * Google Photos puts it too.
+   */
+  const [markingMode, setMarkingMode] = useState(false);
   // Chrome hides so the photo can be looked at, either because the viewer
   // tapped it away or because they zoomed in — the transform itself lives in
   // `LightboxPhoto`, which reports only this crossing back up.
@@ -1906,6 +1927,40 @@ function GalleryViewInner({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Touch only: a mouse already reveals both icons on hover, so on a
+              desktop this button would be a control for a problem that isn't
+              there. `hidden` + `pointer-coarse:contents` on a wrapper rather
+              than on the button itself — `IconButton`'s own `inline-flex`
+              would otherwise fight an unprefixed `hidden` for the same
+              property, and which won would come down to Tailwind's output
+              order. On the wrapper the override sits inside a media query, so
+              it reliably wins (the `hidden md:block` idiom). */}
+          {(allowReactions || allowPrintSelection) && allPhotos.length > 0 && (
+            <span className="hidden pointer-coarse:contents">
+              <IconButton
+                onClick={() => setMarkingMode((prev) => !prev)}
+                aria-pressed={markingMode}
+                label={t("markingModeLabel")}
+                title={markingMode ? t("markingModeOnTitle") : t("markingModeOffTitle")}
+                className={markingMode ? "border-brand-primary bg-brand-tint text-brand-ink" : ""}
+              >
+                {/* The glyphs the button reveals, shown literally — with both
+                    enabled a lone heart here would read as a second copy of
+                    the favourites filter next to it. */}
+                <span className="flex items-center gap-0.5">
+                  {allowReactions && (
+                    <HeartIcon
+                      className={allowPrintSelection ? "h-4 w-4" : "h-5 w-5"}
+                      active={markingMode}
+                    />
+                  )}
+                  {allowPrintSelection && (
+                    <PrinterIcon className={allowReactions ? "h-4 w-4" : "h-5 w-5"} />
+                  )}
+                </span>
+              </IconButton>
+            </span>
+          )}
           {allowReactions && (favorites.size > 0 || favoritesOnly) && (
             <IconButton
               onClick={() => {
@@ -2129,6 +2184,7 @@ function GalleryViewInner({
                     allowDownload={allowDownload}
                     allowReactions={allowReactions}
                     allowPrintSelection={allowPrintSelection}
+                    markingMode={markingMode}
                     isFavorite={favorites.has(photo.id)}
                     favoritePulse={savedPulseId === photo.id}
                     favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
@@ -2417,6 +2473,8 @@ interface PhotoTileProps {
   allowDownload: boolean;
   allowReactions: boolean;
   allowPrintSelection: boolean;
+  /** Marking mode: pin the heart and the printer onto every tile. */
+  markingMode: boolean;
   isFavorite: boolean;
   /** The server just confirmed this photo's favourite — the heart pops once. */
   favoritePulse: boolean;
@@ -2452,6 +2510,7 @@ const PhotoTile = memo(function PhotoTile({
   allowDownload,
   allowReactions,
   allowPrintSelection,
+  markingMode,
   isFavorite,
   favoritePulse,
   favoriteCount,
@@ -2493,9 +2552,21 @@ const PhotoTile = memo(function PhotoTile({
     }
   }, []);
 
+  // The scrim behind the bottom-right heart, so a white glyph survives a bright
+  // photo. It was written as `group-hover:after:` / `group-focus-within:after:`,
+  // which Tailwind compiles to `:is(:where(.group):hover *)::after` — matching a
+  // *descendant* of `.group`. This div carries `.group` itself and has no
+  // `.group` above it, so neither rule could ever match: the scrim only ever
+  // appeared through the `pointer-coarse:after:opacity-100` that put it on
+  // every phone permanently. Plain `hover:` / `focus-within:` is the
+  // self-referential form that actually fires.
+  const scrimClasses = markingMode
+    ? "after:opacity-100"
+    : "after:opacity-0 hover:after:opacity-100 focus-within:after:opacity-100";
+
   return (
     <div
-      className="group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:opacity-0 after:transition-opacity group-focus-within:after:opacity-100 group-hover:after:opacity-100 pointer-coarse:after:opacity-100"
+      className={`group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:transition-opacity ${scrimClasses}`}
       style={{ width, height }}
       onTouchStart={() => {
         if (!allowDownload) return;
@@ -2587,6 +2658,7 @@ const PhotoTile = memo(function PhotoTile({
           quantity={printQuantity}
           onIncrement={() => onIncrementPrint(photo.id)}
           onDecrement={() => onDecrementPrint(photo.id)}
+          pinned={markingMode}
           className="absolute top-2 right-2"
         />
       )}
@@ -2597,6 +2669,7 @@ const PhotoTile = memo(function PhotoTile({
             count={favoriteCount}
             onClick={() => onToggleFavorite(photo.id)}
             pulse={favoritePulse}
+            pinned={markingMode}
             className="absolute right-2 bottom-2"
           />
           <ReactionBadge state={reactionState} />
@@ -2613,15 +2686,36 @@ const PhotoTile = memo(function PhotoTile({
  * disc behind it. The disc it used to have put a 44 px dark circle on top of
  * every photo in the gallery — the same objection `SelectCheck` below is
  * already written to avoid — and a wedding gallery is not improved by five
- * hundred of them sitting on people's faces. An unset heart therefore stays
- * dim on touch and fades in on hover with a mouse; a *set* one is always at
- * full strength, because that one is information rather than an affordance.
+ * hundred of them sitting on people's faces.
+ *
+ * An *unset* heart is an affordance, so with a mouse it fades in on hover and
+ * on touch it is not rendered at all: the grid on a phone shows state, never a
+ * menu of actions, which is how Google Photos and Apple Photos treat a
+ * thumbnail — nothing but state badges, favouriting happens in the detail
+ * view. Substituting permanent visibility for the missing hover put two icons
+ * over every photo in the gallery. Touch reaches the same heart through the
+ * lightbox, where it is a full-size control on a bar of its own.
+ *
+ * Note that the proofing galleries do *not* settle it this way: Pixieset keeps
+ * a heart in the corner of every photo, and ShootProof moves the proofing
+ * controls to a thumb-height bar on mobile rather than hiding them. Their
+ * grid's job is picking, not browsing, and this one's is both — so if marking
+ * a long gallery on a phone turns out to be the common case, the answer is a
+ * visible mode that pins these back onto the tiles, not a hidden gesture.
+ *
+ * A *set* heart, or one carrying somebody else's count, is information rather
+ * than an affordance, so that one stays at full strength everywhere.
+ *
+ * Exported for its colocated test only: whether a tile's control is reachable
+ * on touch is decided entirely by these class strings, so that is what the
+ * test asserts.
  */
-function HeartButton({
+export function HeartButton({
   active,
   count,
   onClick,
   pulse = false,
+  pinned = false,
   className = "",
   size = "sm",
   bare = false,
@@ -2631,6 +2725,8 @@ function HeartButton({
   onClick: () => void;
   /** The server just confirmed this favourite — play the one-shot pop. */
   pulse?: boolean;
+  /** Marking mode is on, so every heart shows without waiting for a hover. */
+  pinned?: boolean;
   className?: string;
   /** "lg" is the lightbox's larger badge; "sm" (default) is the compact grid-tile badge — both keep a ≥44px touch target. */
   size?: "sm" | "lg";
@@ -2642,11 +2738,16 @@ function HeartButton({
     size === "lg"
       ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
       : "min-h-11 min-w-11 px-2 py-1 text-xs drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+  // Somebody else's heart on the photo is a count worth reading, so a tile
+  // with one stays visible even before this viewer has hearted it — as does
+  // every heart once the viewer has asked for marking mode.
+  const alwaysOn = !bare && (pinned || active || count > 0);
   const restingClasses = bare
     ? "hover:bg-white/15"
-    : // Fades in under a mouse; a touch screen has no hover to wait for, so
-      // there it sits quietly at 60% rather than disappearing entirely.
-      "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+    : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
+      // `opacity-0`, so a phone is not left with an invisible 44px tap target
+      // sitting in the corner of every photo.
+      "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:hidden";
   return (
     <button
       type="button"
@@ -2654,7 +2755,7 @@ function HeartButton({
       aria-pressed={active}
       aria-label={active ? t("removeFromFavorites") : t("addToFavorites")}
       className={`on-media duration-flip flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
-        active && !bare ? "opacity-100" : restingClasses
+        alwaysOn ? "opacity-100" : restingClasses
       } ${className}`}
     >
       <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} pulse={pulse} />
@@ -2667,9 +2768,12 @@ function HeartButton({
  * The printer, top-right on a tile and in the lightbox.
  *
  * Unset, it is a single round tap target — same "almost nothing" treatment
- * as HeartButton above. The first tap sets one copy, which is where this
- * used to stop: a second tap on the same spot meant "one more copy," so
- * undoing a misclick meant clicking through the whole range again up to 99.
+ * as HeartButton above, including its touch rule: an idle printer is an
+ * affordance, so it fades in on hover with a mouse and is not rendered on a
+ * phone at all (the lightbox carries the full-size one). The first tap sets
+ * one copy, which is where this used to stop: a second tap on the same spot
+ * meant "one more copy," so undoing a misclick meant clicking through the
+ * whole range again up to 99.
  * Once a quantity is set it therefore expands into a stepper — minus, count,
  * plus — the same "Add" → quantity-stepper switch used by cart UIs (Uber
  * Eats, Instacart, most grocery-delivery apps): a single control that both
@@ -2677,10 +2781,11 @@ function HeartButton({
  * mistake. Minus at 1 removes the selection and the stepper collapses back
  * to the plain icon.
  */
-function PrinterButton({
+export function PrinterButton({
   quantity,
   onIncrement,
   onDecrement,
+  pinned = false,
   className = "",
   size = "sm",
   bare = false,
@@ -2688,6 +2793,8 @@ function PrinterButton({
   quantity: number;
   onIncrement: () => void;
   onDecrement: () => void;
+  /** Marking mode is on, so an idle printer shows without waiting for a hover. */
+  pinned?: boolean;
   className?: string;
   size?: "sm" | "lg";
   /** True inside the lightbox's shared blurred bar, which already supplies the background. */
@@ -2701,9 +2808,12 @@ function PrinterButton({
       size === "lg" ? "h-11 w-11" : "h-11 w-11 drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
     const restingClasses = bare
       ? "hover:bg-white/15"
-      : // Fades in under a mouse; a touch screen has no hover to wait for, so
-        // there it sits quietly at 60% rather than disappearing entirely.
-        "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+      : pinned
+        ? "opacity-100"
+        : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
+          // `opacity-0`, so a phone is not left with an invisible 44px tap
+          // target sitting in the corner of every photo.
+          "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:hidden";
     return (
       <button
         type="button"
