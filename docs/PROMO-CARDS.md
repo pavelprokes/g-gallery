@@ -103,11 +103,66 @@ The link carries `rel="noopener noreferrer"`. `noreferrer` is the load-bearing h
 share token in the URL would reach the photographer's own analytics as a `Referer`, against
 invariant #7.
 
+## Type sizing
+
+Every size is `clamp(floor, Ncqi, ceiling)`. The first version tuned the `cqi`
+terms for a desktop tile and left the floors where they happened to land, which
+meant that on a **phone tile every single one bottomed out at its floor** — at
+193 px the headline's `6.4cqi` computes to 12.4 px against a 13 px floor, the
+link's `3.2cqi` to 6.2 px against 10 px, the eyebrow's to 4.8 px against 8 px.
+The fluid term did nothing at the size that matters most, and the card read as
+small. Corrected 2026-09-01: headline `clamp(1rem, 8.5cqi, 2rem)`, body
+`clamp(0.8125rem, 4cqi, 1.0625rem)`, link `clamp(0.75rem, 4cqi, 1rem)`, eyebrow
+`clamp(0.625rem, 2.8cqi, 0.8125rem)`.
+
+The content is centred with **`justify-content: safe center`**, not
+`space-between`. Pushed to the edges, any tile taller than its copy had a void
+down the middle, which made the card read as small whatever the type size.
+`safe` is the load-bearing half: it centres while the content fits and falls
+back to start alignment once it does not, so text grown by a user stylesheet is
+only ever cut off the bottom, never the top. A browser that does not know the
+keyword drops the declaration and keeps plain centring.
+
 ## Accessibility
 
 The card is a plain **Tab stop**, not part of the roving tabindex — which covers photos only. Arrow
 keys move between photos and step over it; a row that is nothing but a promo is skipped entirely
 (`photoInAdjacentRow`), or everything below it would be unreachable by keyboard.
+
+### WCAG 2.1 AA
+
+Audited 2026-09-01 with axe-core 4 across all three themes at four tile widths (193/240/330/420 px),
+in three passes: baseline, the **1.4.12 Text Spacing** override the criterion mandates
+(line-height 1.5, letter-spacing 0.12em, word-spacing 0.16em, paragraph spacing 2em), and
+**1.4.4 Resize text** at 200% root font size. **Zero violations in all three**, and no tile clips
+under the override — verified by comparing `scrollHeight` against `clientHeight` on every one.
+
+This is why the headline is **never line-clamped**. It is the primary content, and a clamp on it
+fails both criteria outright: content is lost the moment a user raises line-height or text size.
+The body line-clamp stays, because the body is supplementary by design — it is already hidden
+outright below 240 px.
+
+**1.4.3 Contrast**, measured against the alpha-composited colour rather than the nominal one,
+which is where the risk actually sits:
+
+| Theme | eyebrow | headline | body | link  |
+| ----- | ------- | -------- | ---- | ----- |
+| LIGHT | 6.20    | 15.43    | 7.03 | 8.24  |
+| DARK  | 10.18   | 15.43    | 9.13 | 10.18 |
+| BRAND | 4.85    | 6.54     | 5.25 | 6.54  |
+
+All over the 4.5:1 required; the terracotta eyebrow at 4.85:1 is the tightest and is why that
+theme's eyebrow is not taken any further down in opacity. axe reports these as _incomplete_ rather
+than passing — it cannot resolve a background it sees as overlapped once the mandated paragraph
+margins apply — so they are computed by hand.
+
+**1.4.11 Non-text Contrast.** The focus ring sits on the tile's **outer** box, outside its edge,
+and is the same dual-tone indicator the photo tiles use (`.on-media`) rather than one of its own:
+a keyboard user tabbing across the grid should not see the marker change shape at one tile. Inset
+it would have needed a different colour per theme — the global brown measures 1.87:1 on the DARK
+tile and 1.33:1 on the BRAND one, both under 3:1 — and it read as a picture frame drawn around the
+card. `:focus-within` is required because the focusable element is the link inside, and an outline
+on the link is clipped by the tile's own `overflow-hidden`.
 
 ## Not shown in favourites-only mode
 
