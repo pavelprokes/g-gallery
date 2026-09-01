@@ -1934,7 +1934,15 @@ function GalleryViewInner({
               would otherwise fight an unprefixed `hidden` for the same
               property, and which won would come down to Tailwind's output
               order. On the wrapper the override sits inside a media query, so
-              it reliably wins (the `hidden md:block` idiom). */}
+              it reliably wins (the `hidden md:block` idiom).
+
+              Gated on the pointer rather than on `(hover: none)`, matching the
+              `pointer-coarse:hidden` that hides the idle controls and the rest
+              of this file. The two disagree only on a stylus-primary browser
+              (`pointer: fine` with no hover), which gets neither the toggle
+              nor a hover to reveal the icons with; marking there means opening
+              the photo. Phones, tablets and desktops all land on the right
+              side of it, so this is a known trade rather than an oversight. */}
           {(allowReactions || allowPrintSelection) && allPhotos.length > 0 && (
             <span className="hidden pointer-coarse:contents">
               <IconButton
