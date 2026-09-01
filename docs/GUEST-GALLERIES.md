@@ -297,6 +297,15 @@ stack: a 148 kB photo yields a 32 kB thumbnail.
 - The key is derived from the one the server issued; the client only reports _which format_ it
   managed, never where to write it. R2 storage and egress are unaffected (egress is free, and guest photos are small
   relative to the photographer's 12 MB exports).
+- **The orphan sweep deleted every one of these once** (2026-09-01). `sweepOrphanObjects`
+  (`src/lib/reconcile.ts`) removes anything under `galleries/` that the database does not account
+  for, and its live set was built from `Photo.objectKey` alone — so the thumbnail sitting beside
+  the original, and every `_archive.zip`, looked like debris on the first weekly run after upload.
+  The rows kept pointing at objects that were gone, which on Cloudflare renders as an empty tile:
+  a thumbnail key is served straight from the bucket, with no transform behind it to fall back on.
+  See docs/PLAN.md §5a for the fix and why it is shaped the way it is. The grid now also falls
+  back to the transformed original when a thumbnail 404s, and `pnpm clear:missing-thumbs` clears
+  the column for thumbnails already lost.
 
 ## 10. Privacy and law
 
