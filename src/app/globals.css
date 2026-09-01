@@ -358,3 +358,65 @@ button:disabled,
     transition-duration: var(--transition-duration-move) !important;
   }
 }
+
+/*
+ * The two confirmation animations (docs/AUDIT.md — "where animation earns its keep").
+ *
+ * Both are one-shot, transform/opacity only, and under the 320 ms ceiling the motion
+ * tokens above set. They deliberately do NOT carry `.motion-loop`: a viewer who asked
+ * for reduced motion should get the state change without the flourish, and the blanket
+ * reset above already collapses them to an instant switch. They are confirmations of
+ * something that also happened in text and colour, never the only signal.
+ *
+ * `transform-box: fill-box` is what makes `transform-origin: center` mean "the middle of
+ * this path" rather than "the middle of the SVG viewport" — without it an SVG child
+ * scales around the wrong point, which is the usual reason a heart animation drifts
+ * sideways as it grows.
+ */
+@keyframes heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes heart-burst {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/*
+ * The checkmark draws itself. `pathLength="1"` on the path normalises its length to 1
+ * regardless of the actual geometry, so the dash offset can animate from 1 to 0 without
+ * anyone measuring the path — the standard trick, and the reason the value is unitless.
+ */
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@theme {
+  --animate-heart-pop: heart-pop var(--transition-duration-toggle) var(--ease-pop);
+  --animate-heart-burst: heart-burst var(--transition-duration-enter) var(--ease-out) forwards;
+  --animate-check-draw: check-draw 180ms var(--ease-out) forwards;
+}
+
+.svg-origin-center {
+  transform-box: fill-box;
+  transform-origin: center;
+}

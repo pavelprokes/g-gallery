@@ -1,7 +1,9 @@
 import { withTimeout } from "@/lib/with-timeout";
 
 /**
- * The grid thumbnail the phone makes for itself (docs/GUEST-GALLERIES.md §9).
+ * The grid thumbnail the browser makes for itself (docs/GUEST-GALLERIES.md §9),
+ * on both the guest path and the photographer's own upload — see
+ * `ThumbProfile` for why the two are not the same size.
  *
  * Why the browser and not the CDN: every distinct (photo × width × quality) is
  * a billable Cloudflare transformation, 5 000/month free, and one wedding with
@@ -16,12 +18,92 @@ import { withTimeout } from "@/lib/with-timeout";
  * transformation of the original. No device ends up worse off than it is today.
  */
 
+/**
+ * Which grid the thumbnail is for. The two differ only in how big the tile
+ * gets on screen, which is enough to want different pixels:
+ *
+ * - `guest` — the wedding-day feed, looked at on the phone that shot it. A
+ *   two-column grid at 2× lands inside 512 px.
+ * - `owner` — the delivery gallery the couple browses on a laptop. A desktop
+ *   tile is ~330 CSS px, i.e. **660 device px on a 2× display**, so a 512 px
+ *   thumbnail was being upscaled ~1.29× — and the grid is where the couple
+ *   decides whether the photographer is sharp, before they open anything.
+ */
+export type ThumbProfile = "owner" | "guest";
+
 /** Long edge in pixels. Covers a two-column grid at 2× without visible softness. */
 export const THUMB_MAX_PX = 512;
 
-const WEBP_QUALITY = 0.72;
-/** JPEG needs a touch more to avoid ringing on the same content. */
-const JPEG_QUALITY = 0.78;
+/**
+ * Long edge for the desktop delivery grid: 1024 covers a ~330 CSS px tile at
+ * 2× with headroom, instead of upscaling into it.
+ */
+export const OWNER_THUMB_MAX_PX = 1024;
+
+interface ThumbProfileSettings {
+  /** Long edge cap handed to `thumbSize`. */
+  maxPx: number;
+  webpQuality: number;
+  /** JPEG needs a touch more than WebP to avoid ringing on the same content. */
+  jpegQuality: number;
+}
+
+/**
+ * Four times the pixels are paid for with quality, not with bytes: 0.72 → 0.65
+ * on the owner path. This is the "compressive images" trade — a larger image at
+ * a lower quality is both smaller on the wire and perceptibly sharper on a 2×
+ * display, because the JPEG/WebP artefacts land below one device pixel.
+ *
+ * The cost that is *not* bytes: **decode memory**. A 500-photo grid of 1024 px
+ * thumbnails holds roughly 4× the bitmap memory of today's 512 px ones, so if
+ * anything regresses on a low-end phone scrolling a large owner gallery, this
+ * is the line to look at first.
+ *
+ * The JPEG fallback takes the same 0.07 drop, keeping the gap that stops JPEG
+ * ringing where WebP is clean.
+ */
+export const THUMB_PROFILES: Record<ThumbProfile, ThumbProfileSettings> = {
+  owner: { maxPx: OWNER_THUMB_MAX_PX, webpQuality: 0.65, jpegQuality: 0.71 },
+  guest: { maxPx: THUMB_MAX_PX, webpQuality: 0.72, jpegQuality: 0.78 },
+};
+
+/**
+ * Post-resize sharpening, identical on both paths.
+ *
+ * `filter` is pinned to pica's own default rather than left implicit: pica's
+ * README says `mks2013` (Magic Kernel Sharp 2013) "does both resize and
+ * sharpening, it's optimal and not recommended to change", so lanczos3 is not
+ * an upgrade here — and pinning means a future change to pica's default cannot
+ * quietly change what every gallery looks like.
+ *
+ * Because mks2013 already sharpens, the README's standalone starting point of
+ * `unsharpAmount: 160` does not apply — that number assumes an unsharpened
+ * filter and would visibly over-sharpen on top of this one.
+ *
+ * - `unsharpAmount` is a **percentage, exactly like Photoshop's Amount %** —
+ *   pica computes `amountFp = amount / 100 * 4096`. It runs *after* the resize
+ *   and only on the **HSV V channel**, so hue and saturation are untouched,
+ *   which is what makes it safe on skin.
+ * - `unsharpRadius` is valid in 0.5–2.0 and **silently switches the unsharp
+ *   mask off below 0.5**. 0.6 is pica's own suggested radius.
+ * - `unsharpThreshold` is 0–255; 2 keeps sensor noise and smooth skin out of
+ *   the sharpening, mirroring SmugMug's non-zero threshold and libvips'
+ *   `m1 = 0` ("no sharpening in flat areas") screen-output default.
+ *
+ * **60 is triangulated, not vendor-published** — nobody publishes a number for
+ * "mks2013 + unsharp". It is the top of a sensible 40–80 band derived from the
+ * three vendors that do publish, all of them gentle: Cloudflare recommends
+ * `sharpen=1` on a 0–10 scale for downscaled images, SmugMug uses Amount 0.200
+ * after Lanczos, libvips ships `m1=0, m2=3` for screen output. The failure mode
+ * to watch for when tuning inside that band is **halos on skin and along a veil
+ * edge, which are worse than softness** (docs/PLAN.md §6).
+ */
+export const THUMB_RESIZE_OPTIONS = {
+  filter: "mks2013",
+  unsharpAmount: 60,
+  unsharpRadius: 0.6,
+  unsharpThreshold: 2,
+} as const;
 
 export type ThumbFormat = "webp" | "jpeg";
 
@@ -98,10 +180,21 @@ let picaPromise: Promise<{ resize: PicaResize } | null> | null = null;
  */
 let picaDisabled = false;
 
+/**
+ * Only the fields this module uses. The unsharp trio has to be here or
+ * `THUMB_RESIZE_OPTIONS` would not type-check against it.
+ */
+interface PicaResizeOptions {
+  filter?: string;
+  unsharpAmount?: number;
+  unsharpRadius?: number;
+  unsharpThreshold?: number;
+}
+
 type PicaResize = (
   from: ImageBitmap,
   to: HTMLCanvasElement,
-  options?: { filter?: string },
+  options?: PicaResizeOptions,
 ) => Promise<HTMLCanvasElement>;
 
 async function loadPica(): Promise<{ resize: PicaResize } | null> {
@@ -150,9 +243,10 @@ function canvasToBlob(
  */
 export async function makeThumbnail(
   source: Blob,
+  profile: ThumbProfile = "guest",
 ): Promise<{ blob: Blob; format: ThumbFormat } | null> {
   try {
-    return await withTimeout(buildThumbnail(source), THUMBNAIL_TIMEOUT_MS, "thumbnail");
+    return await withTimeout(buildThumbnail(source, profile), THUMBNAIL_TIMEOUT_MS, "thumbnail");
   } catch (error) {
     // The one outcome the guest must never notice: no thumbnail simply means
     // the grid asks Cloudflare to make one, exactly as it did before any of
@@ -162,15 +256,20 @@ export async function makeThumbnail(
   }
 }
 
-async function buildThumbnail(source: Blob): Promise<{ blob: Blob; format: ThumbFormat } | null> {
+async function buildThumbnail(
+  source: Blob,
+  profile: ThumbProfile,
+): Promise<{ blob: Blob; format: ThumbFormat } | null> {
   if (typeof createImageBitmap !== "function" || typeof document === "undefined") return null;
+
+  const settings = THUMB_PROFILES[profile];
 
   let bitmap: ImageBitmap | null = null;
   try {
     // Decoding happens off the main thread, and EXIF orientation is applied —
     // a portrait shot from a phone must not come out on its side.
     bitmap = await createImageBitmap(source);
-    const size = thumbSize(bitmap.width, bitmap.height);
+    const size = thumbSize(bitmap.width, bitmap.height, settings.maxPx);
 
     // A plain canvas rather than OffscreenCanvas: Safari only got the latter in
     // 16.4, and this path should reach as many phones as possible.
@@ -178,14 +277,19 @@ async function buildThumbnail(source: Blob): Promise<{ blob: Blob; format: Thumb
     canvas.width = size.width;
     canvas.height = size.height;
 
-    // pica resamples properly (Lanczos-family with mild sharpening) in a
-    // worker. Scaling 4000 px straight to 512 px with one drawImage aliases
-    // badly on detailed subjects — lace, foliage — which is most of a wedding.
+    // pica resamples properly (mks2013, which resizes and sharpens in one
+    // pass) in a worker, plus the gentle unsharp pass in THUMB_RESIZE_OPTIONS.
+    // Scaling 4000 px straight to the tile with one drawImage aliases badly on
+    // detailed subjects — lace, foliage — which is most of a wedding.
     const pica = await loadPica();
     let resized = false;
     if (pica) {
       try {
-        await withTimeout(pica.resize(bitmap, canvas), PICA_RESIZE_TIMEOUT_MS, "pica resize");
+        await withTimeout(
+          pica.resize(bitmap, canvas, { ...THUMB_RESIZE_OPTIONS }),
+          PICA_RESIZE_TIMEOUT_MS,
+          "pica resize",
+        );
         resized = true;
       } catch (error) {
         // A late completion would draw into a canvas nobody reads any more, so
@@ -212,7 +316,7 @@ async function buildThumbnail(source: Blob): Promise<{ blob: Blob; format: Thumb
     // wrong content type — hence checking the type it actually produced.
     for (const format of ["webp", "jpeg"] as const) {
       const type = THUMB_CONTENT_TYPES[format];
-      const quality = format === "webp" ? WEBP_QUALITY : JPEG_QUALITY;
+      const quality = format === "webp" ? settings.webpQuality : settings.jpegQuality;
       const blob = await canvasToBlob(canvas, type, quality);
       if (!blob || blob.type !== type) continue;
       // If the "thumbnail" is not smaller, it has no reason to exist.

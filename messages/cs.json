@@ -111,6 +111,8 @@
     "linkNotFoundHint": "Když to nepomůže, napiš tomu, kdo ti odkaz poslal. Má ho u sebe.",
     "genericNotFoundTitle": "Tady nic není",
     "genericNotFoundLead": "Tahle adresa nikam nevede.",
+    "adminNotFoundLead": "Tahle adresa v administraci neexistuje.",
+    "adminNotFoundAction": "Zpátky na přehled",
     "galleryErrorTitle": "Něco se pokazilo",
     "galleryErrorLead": "Galerii se nepodařilo načíst. Zkus to prosím znovu.",
     "tryAgain": "Zkusit znovu",
@@ -260,8 +262,10 @@
     "named": "{names} {count, plural, one {se dívá} other {se dívají}}"
   },
   "sharePassword": {
+    "eyebrow": "Pavel Prokeš · svatební fotograf",
     "title": "Galerie je chráněná heslem",
     "hint": "Heslo ti poslal fotograf spolu s odkazem.",
+    "passwordLabel": "Heslo ke galerii",
     "placeholder": "Heslo",
     "verifying": "Ověřuji…",
     "submit": "Zobrazit galerii",

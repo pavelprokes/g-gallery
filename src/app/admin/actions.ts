@@ -57,11 +57,16 @@ export async function publishGallery(galleryId: string) {
   revalidatePath(`/admin/g/${galleryId}`);
 }
 
-const createShareLinkSchema = z.object({
-  galleryId: z.string().min(1),
-  label: z.string().max(200).optional(),
-  password: z.string().min(4).max(200).optional(),
-  expiresInDays: z.coerce.number().int().positive().max(3650).optional(),
+/**
+ * The four switches every viewer surface already reads. An unticked checkbox
+ * sends nothing at all, so every one of them is absent-means-off here: a
+ * hand-rolled POST that names no permission produces a view-only link, which is
+ * the only direction that is safe to get wrong.
+ */
+const shareLinkPermissionsSchema = z.object({
+  allowDownload: z.coerce.boolean().optional(),
+  allowReactions: z.coerce.boolean().optional(),
+  allowPrintSelection: z.coerce.boolean().optional(),
   /**
    * Guests holding this link may add photos (docs/GUEST-GALLERIES.md §6).
    * Off unless the checkbox was ticked: this opens an anonymous write path
@@ -69,6 +74,23 @@ const createShareLinkSchema = z.object({
    */
   allowUpload: z.coerce.boolean().optional(),
 });
+
+const createShareLinkSchema = shareLinkPermissionsSchema.extend({
+  galleryId: z.string().min(1),
+  label: z.string().max(200).optional(),
+  password: z.string().min(4).max(200).optional(),
+  expiresInDays: z.coerce.number().int().positive().max(3650).optional(),
+});
+
+/** Ticked checkboxes arrive as a value, unticked ones not at all. */
+function readPermissions(formData: FormData) {
+  return {
+    allowDownload: formData.get("allowDownload") ? true : undefined,
+    allowReactions: formData.get("allowReactions") ? true : undefined,
+    allowPrintSelection: formData.get("allowPrintSelection") ? true : undefined,
+    allowUpload: formData.get("allowUpload") ? true : undefined,
+  };
+}
 
 /**
  * Returns the raw token, and also stores it encrypted so the admin can show it
@@ -87,7 +109,7 @@ export async function createShareLink(
     label: formData.get("label") || undefined,
     password: formData.get("password") || undefined,
     expiresInDays: formData.get("expiresInDays") || undefined,
-    allowUpload: formData.get("allowUpload") ? true : undefined,
+    ...readPermissions(formData),
   });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
@@ -110,6 +132,9 @@ export async function createShareLink(
       expiresAt: parsed.data.expiresInDays
         ? new Date(Date.now() + parsed.data.expiresInDays * 86_400_000)
         : null,
+      allowDownload: parsed.data.allowDownload ?? false,
+      allowReactions: parsed.data.allowReactions ?? false,
+      allowPrintSelection: parsed.data.allowPrintSelection ?? false,
       allowUpload: parsed.data.allowUpload ?? false,
       slug,
     },
@@ -117,6 +142,40 @@ export async function createShareLink(
 
   revalidatePath(`/admin/g/${gallery.id}`);
   return { token, slug };
+}
+
+/**
+ * Changes what an already-issued link may do.
+ *
+ * Without this the only way to turn a download off is to revoke and reissue,
+ * which kills a URL the couple has already forwarded to eighty people. A link's
+ * *identity* (token, slug, password, expiry) is deliberately untouched here —
+ * only the four switches move, so the address in everyone's inbox keeps working
+ * and means something slightly different from the next request onwards.
+ */
+export async function updateShareLinkPermissions(shareLinkId: string, formData: FormData) {
+  const session = await requireAdmin();
+
+  const parsed = shareLinkPermissionsSchema.safeParse(readPermissions(formData));
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const link = await prisma.shareLink.findFirst({
+    where: { id: shareLinkId, gallery: { ownerId: session.user.id } },
+    select: { id: true, galleryId: true },
+  });
+  if (!link) throw new Error("NOT_FOUND");
+
+  await prisma.shareLink.update({
+    where: { id: link.id },
+    data: {
+      allowDownload: parsed.data.allowDownload ?? false,
+      allowReactions: parsed.data.allowReactions ?? false,
+      allowPrintSelection: parsed.data.allowPrintSelection ?? false,
+      allowUpload: parsed.data.allowUpload ?? false,
+    },
+  });
+
+  revalidatePath(`/admin/g/${link.galleryId}`);
 }
 
 /** Revoking is the only true way to cut off access to an already-shared link. */
@@ -640,6 +699,52 @@ export async function updateGallery(galleryId: string, formData: FormData) {
       eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       description: parsed.data.description ?? null,
     },
+  });
+
+  revalidatePath(`/admin/g/${gallery.id}`);
+  revalidatePath("/admin");
+  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+}
+
+const setGalleryCoverSchema = z.object({
+  galleryId: z.string().min(1),
+  /** Null clears the choice and hands the cover back to the newest-first rule. */
+  photoId: z.string().min(1).nullable(),
+});
+
+/**
+ * Picks the photo a gallery leads with.
+ *
+ * Until now the cover was whatever was uploaded last, which at a wedding is the
+ * sparkler exit at ISO 12800 — and it is the one frame the couple's whole
+ * family sees before anything else. The chosen photo has to be a CONFIRMED
+ * photo of *this* gallery: a cover pointing at a row whose bytes never landed
+ * would render an empty tile, and one borrowed from another gallery would leak
+ * a frame across a share link that was never given it.
+ */
+export async function setGalleryCover(galleryId: string, photoId: string | null) {
+  const session = await requireAdmin();
+
+  const parsed = setGalleryCoverSchema.safeParse({ galleryId, photoId });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: parsed.data.galleryId, ownerId: session.user.id },
+    select: { id: true, eventId: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  if (parsed.data.photoId) {
+    const photo = await prisma.photo.findFirst({
+      where: { id: parsed.data.photoId, galleryId: gallery.id, status: "CONFIRMED" },
+      select: { id: true },
+    });
+    if (!photo) throw new Error("NOT_FOUND");
+  }
+
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: { coverPhotoId: parsed.data.photoId },
   });
 
   revalidatePath(`/admin/g/${gallery.id}`);

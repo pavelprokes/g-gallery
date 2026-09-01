@@ -135,6 +135,51 @@ Custom R2 domain and Image Transformations both require it
 - Wide-gamut note: ICC profiles are applied but sRGB conversion isn't formally guaranteed —
   **export galleries in sRGB** (standard practice) and keep one wide-gamut test image in QA.
 
+### 6a. Browser-made grid thumbnails — two profiles (2026-09-01)
+
+`src/lib/thumbnail.ts` produces the grid tile in the browser and `src/lib/image-loader.ts` serves
+it straight from R2 (`isThumbKey` bypasses the Cloudflare transform), so whatever the browser
+encodes _is_ what the grid shows at every requested width. One size for both callers was wrong on
+the desktop delivery grid: a tile is ~330 CSS px = **660 device px at 2×**, so the 512 px thumbnail
+was being upscaled ~1.29× — and the grid is where the couple judges sharpness, before opening
+anything.
+
+| path                                 | long edge       | WebP quality     | JPEG fallback |
+| ------------------------------------ | --------------- | ---------------- | ------------- |
+| owner upload (desktop delivery grid) | **1024**        | **0.65**         | 0.71          |
+| guest phone photo (wedding-day feed) | 512 (unchanged) | 0.72 (unchanged) | 0.78          |
+
+Both paths resize with pica at `filter: 'mks2013'` plus `unsharpAmount: 60`, `unsharpRadius: 0.6`,
+`unsharpThreshold: 2`. Reasoning, with sources:
+
+- **Filter stays `mks2013`** (pica's default). pica's README: it "does both resize and sharpening,
+  it's optimal and not recommended to change" — so lanczos3 is not an upgrade, and the README's
+  standalone starting point of `unsharpAmount: 160` does not apply, because that number assumes an
+  _unsharpened_ filter. It is pinned explicitly in code so a future change to pica's default cannot
+  silently restyle every gallery.
+- **`unsharpAmount` is a percentage, like Photoshop's Amount %** — verified in pica's source
+  (`amountFp = amount / 100 * 4096`). It runs after the resize and only on the **HSV V channel**,
+  so hue and saturation are untouched; that is what makes it safe on skin.
+- **`unsharpRadius` 0.5–2.0, and below 0.5 the unsharp mask silently turns off.** 0.6 is pica's own
+  suggested radius.
+- **`unsharpThreshold` is 0–255**; 2 keeps sensor noise and smooth skin out of the sharpening,
+  mirroring SmugMug's non-zero threshold and libvips' `m1 = 0` ("no sharpening in flat areas")
+  screen-output default.
+- **60 is triangulated, not vendor-published** — nobody publishes a number for "mks2013 + unsharp".
+  It is the top of a sensible **40–80 A/B range**, derived from the three vendors that do publish
+  and are all gentle: Cloudflare recommends `sharpen=1` on a 0–10 scale for downscaled images,
+  SmugMug uses Amount 0.200 after Lanczos, libvips ships `m1=0, m2=3` for screen output. When
+  tuning inside that band, the failure mode to watch for is **halos on skin and along a veil edge,
+  which are worse than softness**.
+- **Quality 0.72 → 0.65 on the owner path pays for the 4× pixels** ("compressive images": a larger
+  image at lower quality can be both smaller on the wire and perceptibly sharper on a 2× display).
+  The caveat is **decode memory**, not bytes — a 500-photo grid of 1024 px thumbs holds roughly 4×
+  the bitmap memory of the 512 px ones, so that is the first thing to measure if a low-end phone
+  regresses on a large owner gallery.
+
+`thumbSize()` still never upscales, so a small original yields a small thumbnail on both profiles.
+The presign route is unchanged: it signs one PUT per format and never sees a size.
+
 ## 7. ZIP delivery (Worker)
 
 - Store-only streaming **ZIP64** writer (~300 lines) on **Workers Paid ($5/mo)**; R2 bucket binding.

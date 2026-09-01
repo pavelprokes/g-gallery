@@ -194,7 +194,13 @@ model Gallery {
   description       String?
   eventDate         DateTime?
   status            GalleryStatus @default(DRAFT)
+  /// The photo the couple's family sees first. Chosen in the admin, because
+  /// "whatever was uploaded last" is the sparkler exit at ISO 12800 as often as
+  /// it is the portrait. SetNull, never Cascade: deleting the chosen photo must
+  /// leave the gallery alone and drop it back to the newest-first fallback,
+  /// which is also why the dangling-id case cannot happen at all.
   coverPhotoId      String?
+  coverPhoto        Photo?        @relation("GalleryCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
   /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
   storagePrefix     String        @unique
   publishedAt       DateTime?
@@ -242,7 +248,7 @@ model Gallery {
   eventLinkId   String?
   eventLink     ShareLink? @relation("EventCardLink", fields: [eventLinkId], references: [id], onDelete: SetNull)
 
-  photos         Photo[]
+  photos         Photo[]         @relation("GalleryPhotos")
   shareLinks     ShareLink[]     @relation("GalleryShareLinks")
   viewers        Viewer[]
   sessions       ViewSession[]
@@ -259,7 +265,7 @@ model Gallery {
 model Photo {
   id                 String      @id @default(cuid())
   galleryId          String
-  gallery            Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery            Gallery     @relation("GalleryPhotos", fields: [galleryId], references: [id], onDelete: Cascade)
   /// Full R2 object key ("<storagePrefix>/<random-uuid>.jpg")
   objectKey          String      @unique
   /// Original filename, used for ZIP entries and downloads
@@ -301,6 +307,8 @@ model Photo {
   reactions       Reaction[]
   printSelections PrintSelection[]
   activityEvents  ActivityEvent[]
+  /// Galleries using this photo as their cover — at most one in practice.
+  coverOf         Gallery[]        @relation("GalleryCover")
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.

@@ -111,6 +111,8 @@
     "linkNotFoundHint": "Still no luck? Message whoever sent you the link — they still have it.",
     "genericNotFoundTitle": "There's nothing here",
     "genericNotFoundLead": "This address doesn't lead anywhere.",
+    "adminNotFoundLead": "This address doesn't exist in the admin area.",
+    "adminNotFoundAction": "Back to the dashboard",
     "galleryErrorTitle": "Something went wrong",
     "galleryErrorLead": "The gallery couldn't load. Please try again.",
     "tryAgain": "Try again",
@@ -260,8 +262,10 @@
     "named": "{names} {count, plural, one {is viewing} other {are viewing}}"
   },
   "sharePassword": {
+    "eyebrow": "Pavel Prokeš · wedding photographer",
     "title": "This gallery is password-protected",
     "hint": "The photographer sent you the password along with the link.",
+    "passwordLabel": "Gallery password",
     "placeholder": "Password",
     "verifying": "Checking…",
     "submit": "View gallery",

@@ -201,8 +201,19 @@ const photoIdOf = (photo: GalleryPhoto) => photo.id;
  * Traps Tab/Shift+Tab inside a modal container and restores focus to
  * whatever was focused before it opened. Shared by the lightbox and the name
  * prompt, which can each appear stacked over the grid.
+ *
+ * `initialFocus` names the control that should receive focus on open. Without
+ * it the first focusable element wins, which in the lightbox is whichever nav
+ * button happens to be enabled: on photo 1 "Předchozí" is disabled and focus
+ * fell through to "Další", while anywhere else it landed on "Předchozí" —
+ * so the same action put the keyboard in two different places depending on
+ * which photo was opened. A modal's initial focus has to be predictable.
  */
-function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, active: boolean) {
+function useFocusTrap<T extends HTMLElement>(
+  containerRef: RefObject<T | null>,
+  active: boolean,
+  initialFocusRef?: RefObject<HTMLElement | null>,
+) {
   useEffect(() => {
     if (!active) return;
     const container = containerRef.current;
@@ -216,9 +227,14 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
         container.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ),
-      ).filter((el) => el.offsetParent !== null);
+      ).filter(
+        // `inert` is how the lightbox hides its chrome; its subtree must not be
+        // a Tab stop or a focus target, and `offsetParent` alone does not
+        // exclude it (nor does it exclude an `opacity-0` element).
+        (el) => el.offsetParent !== null && !el.closest("[inert]"),
+      );
 
-    (getFocusable()[0] ?? container).focus();
+    (initialFocusRef?.current ?? getFocusable()[0] ?? container).focus();
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Tab") return;
@@ -241,7 +257,7 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
       container.removeEventListener("keydown", onKeyDown);
       restoreTarget?.focus();
     };
-  }, [active, containerRef]);
+  }, [active, containerRef, initialFocusRef]);
 }
 
 /** Movement under this is still a tap, not a drag — fingers are never still. */
@@ -850,6 +866,16 @@ function GalleryViewInner({
    * a ref rather than state because nothing renders from it.
    */
   const pendingRevert = useRef<Revert | null>(null);
+  /**
+   * The photo whose favourite the server just confirmed, so its heart can pop.
+   *
+   * Deliberately driven by the confirmation rather than by the tap: the fill
+   * already flips optimistically, so this is the receipt, and its *absence* on
+   * a failed save is then meaningful too. Cleared on a timer because it is a
+   * one-shot animation, not a state.
+   */
+  const [savedPulseId, setSavedPulseId] = useState<string | null>(null);
+  const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
   const [projecting, setProjecting] = useState(false);
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
@@ -1127,6 +1153,9 @@ function GalleryViewInner({
         const data = (await response.json()) as { count: number };
         setCounts((prev) => new Map(prev).set(photoId, data.count));
         setSaveFailed(false);
+        // Only on the way in: un-favouriting is a removal, and a celebration
+        // for it would read as the opposite of what just happened.
+        if (favorite) setSavedPulseId(photoId);
       } catch (error) {
         console.error(error);
         revert();
@@ -1168,6 +1197,14 @@ function GalleryViewInner({
     },
     [favorites, sendFavorite],
   );
+
+  useEffect(() => {
+    if (!savedPulseId) return;
+    // Comfortably past the 320 ms burst, so the class is gone before the same
+    // photo could plausibly be favourited again and need to replay it.
+    const timer = window.setTimeout(() => setSavedPulseId(null), 600);
+    return () => clearTimeout(timer);
+  }, [savedPulseId]);
 
   const sendPrintQuantity = useCallback(
     async (photoId: string, quantity: number, displayName: string | undefined, revert: Revert) => {
@@ -1592,7 +1629,9 @@ function GalleryViewInner({
   const activeSelected = active ? selection.ids.has(active.id) : false;
   const lightboxRef = useRef<HTMLDivElement>(null);
   const isLightboxOpen = lightboxIndex !== null;
-  useFocusTrap(lightboxRef, isLightboxOpen);
+  // Close is the one control that is always present and always enabled, so it
+  // is the only stable landing spot for focus when the lightbox opens.
+  useFocusTrap(lightboxRef, isLightboxOpen, lightboxCloseRef);
 
   /**
    * One history entry per open lightbox, not per photo browsed inside it, so
@@ -1822,7 +1861,7 @@ function GalleryViewInner({
           {backHref && (
             <a
               href={backHref}
-              className="mb-1 inline-block text-sm text-neutral-500 underline dark:text-neutral-400"
+              className="text-body mb-1 inline-block text-neutral-500 underline dark:text-neutral-400"
             >
               ← {backLabel ?? t("back")}
             </a>
@@ -1831,7 +1870,7 @@ function GalleryViewInner({
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+            <p className="text-body mt-0.5 text-neutral-500 dark:text-neutral-400">{subtitle}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1957,14 +1996,14 @@ function GalleryViewInner({
             type="button"
             disabled={zipState === "preparing"}
             onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
-            className="ml-auto flex min-h-11 items-center rounded-full bg-neutral-900 px-4 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="bg-brand-primary hover:bg-brand-primary-dark text-body duration-flip ml-auto flex min-h-11 items-center rounded-full px-4 font-semibold text-white transition-colors disabled:opacity-50"
           >
             {zipState === "preparing"
               ? t("preparingShort")
               : t("downloadSelected", { count: selection.ids.size })}
           </button>
           {zipState === "error" && (
-            <span className="w-full text-xs text-red-600">{t("zipErrorAnnounce")}</span>
+            <span className="text-caption text-admin-danger w-full">{t("zipErrorAnnounce")}</span>
           )}
         </div>
       )}
@@ -1988,7 +2027,7 @@ function GalleryViewInner({
               <li
                 key="loading"
                 aria-hidden
-                className="absolute top-0 left-0 flex w-full items-center justify-center text-sm text-neutral-400"
+                className="text-body absolute top-0 left-0 flex w-full items-center justify-center text-neutral-500 dark:text-neutral-400"
                 style={{
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
@@ -2055,6 +2094,7 @@ function GalleryViewInner({
                     allowReactions={allowReactions}
                     allowPrintSelection={allowPrintSelection}
                     isFavorite={favorites.has(photo.id)}
+                    favoritePulse={savedPulseId === photo.id}
                     favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
                     reactionState={reactions.get(photo.id)}
                     printQuantity={printSelections.get(photo.id) ?? 0}
@@ -2077,7 +2117,7 @@ function GalleryViewInner({
       </ul>
 
       {photos.length === 0 && (
-        <p className={`${GUTTER} text-sm text-neutral-500 dark:text-neutral-400`}>
+        <p className={`${GUTTER} text-body text-neutral-500 dark:text-neutral-400`}>
           {!favoritesOnly
             ? t("emptyGallery")
             : hasNextPage
@@ -2145,6 +2185,7 @@ function GalleryViewInner({
           >
             <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md">
               <button
+                ref={lightboxCloseRef}
                 type="button"
                 onClick={closeLightbox}
                 aria-label={t("close")}
@@ -2213,6 +2254,7 @@ function GalleryViewInner({
                   active={favorites.has(active.id)}
                   count={counts.get(active.id) ?? active.favoriteCount}
                   onClick={() => toggleFavorite(active.id)}
+                  pulse={savedPulseId === active.id}
                   size="lg"
                   bare
                 />
@@ -2274,7 +2316,7 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-3 dark:text-neutral-400">
+      <footer className="text-caption mx-4 mt-10 border-t pt-4 text-neutral-500 sm:mx-3 dark:text-neutral-400">
         {!optedOut ? (
           <p>
             {t("privacyNotice")}{" "}
@@ -2329,6 +2371,8 @@ interface PhotoTileProps {
   allowReactions: boolean;
   allowPrintSelection: boolean;
   isFavorite: boolean;
+  /** The server just confirmed this photo's favourite — the heart pops once. */
+  favoritePulse: boolean;
   favoriteCount: number;
   reactionState: PhotoReactionState | undefined;
   printQuantity: number;
@@ -2361,6 +2405,7 @@ const PhotoTile = memo(function PhotoTile({
   allowReactions,
   allowPrintSelection,
   isFavorite,
+  favoritePulse,
   favoriteCount,
   reactionState,
   printQuantity,
@@ -2491,6 +2536,7 @@ const PhotoTile = memo(function PhotoTile({
             active={isFavorite}
             count={favoriteCount}
             onClick={() => onToggleFavorite(photo.id)}
+            pulse={favoritePulse}
             className="absolute right-2 bottom-2"
           />
           <ReactionBadge state={reactionState} />
@@ -2515,6 +2561,7 @@ function HeartButton({
   active,
   count,
   onClick,
+  pulse = false,
   className = "",
   size = "sm",
   bare = false,
@@ -2522,6 +2569,8 @@ function HeartButton({
   active: boolean;
   count: number;
   onClick: () => void;
+  /** The server just confirmed this favourite — play the one-shot pop. */
+  pulse?: boolean;
   className?: string;
   /** "lg" is the lightbox's larger badge; "sm" (default) is the compact grid-tile badge — both keep a ≥44px touch target. */
   size?: "sm" | "lg";
@@ -2548,7 +2597,7 @@ function HeartButton({
         active && !bare ? "opacity-100" : restingClasses
       } ${className}`}
     >
-      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} />
+      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} pulse={pulse} />
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>
   );
@@ -2703,7 +2752,10 @@ function SelectCheck({
             : "border-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
       }`}
     >
-      <CheckIcon className="h-4 w-4 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]" />
+      <CheckIcon
+        className="h-4 w-4 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
+        draw={selected}
+      />
     </button>
   );
 }
@@ -2813,7 +2865,7 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
         <h2 id="name-prompt-title" className="text-lg font-semibold">
           {t("namePromptTitle")}
         </h2>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
+        <p className="text-body text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}

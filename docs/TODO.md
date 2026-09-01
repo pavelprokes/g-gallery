@@ -17,6 +17,22 @@ broken twice already — needs a signed-in session, and this repo has no test-au
 real Google OAuth test account or a documented bypass is a prerequisite before that flow can be
 covered; not attempted yet.
 
+Added 2026-09-01: `e2e/promo-tile.spec.ts` (4 cases) covers the credit tile's inertness claims —
+it must not be openable, arrow-navigable, selectable or countable
+(`docs/PROMO-CARDS.md`). The seed places one at slot 5 in the _same_ gallery
+`gallery-view.spec.ts` asserts on, so that file's existing expectations double as proof that a
+non-photo tile in the grid disturbs none of them.
+
+Two things from the 2026-09-01 review are known-untested and want a case each once the above
+bypass exists, because neither is reachable from Vitest (no layout, no server):
+
+- **Virtualizer row alignment across a resize.** Set the viewport 390 → 375 and assert no two
+  row `<li>` bounding boxes overlap. This regressed silently before (`estimateSize` is not a
+  memo dependency of `getMeasurements`) and would regress silently again.
+- **The optimistic-write rollback.** Stub the favourite endpoint to 403, tap a heart, and assert
+  the heart empties again _and_ the alert appears. The failure mode being guarded is a viewer
+  marking sixty photos that reach nobody, which is invisible to every other kind of test.
+
 ## 1. Offline access — **done 2026-08-21**
 
 Opt-in per gallery, in the gallery footer. Pavel accepted the revocation
