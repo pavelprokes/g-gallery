@@ -2618,11 +2618,17 @@ const PhotoTile = memo(function PhotoTile({
  * An *unset* heart is an affordance, so with a mouse it fades in on hover and
  * on touch it is not rendered at all: the grid on a phone shows state, never a
  * menu of actions, which is how Google Photos and Apple Photos treat a
- * thumbnail (nothing but state badges; favouriting happens in the detail view)
- * and how the photographer galleries — Pixieset, Pic-Time, ShootProof — treat
- * theirs. Substituting permanent visibility for the missing hover put two
- * icons over every photo in the gallery. Touch reaches the same heart through
- * the lightbox, where it is a full-size control on a bar of its own.
+ * thumbnail — nothing but state badges, favouriting happens in the detail
+ * view. Substituting permanent visibility for the missing hover put two icons
+ * over every photo in the gallery. Touch reaches the same heart through the
+ * lightbox, where it is a full-size control on a bar of its own.
+ *
+ * Note that the proofing galleries do *not* settle it this way: Pixieset keeps
+ * a heart in the corner of every photo, and ShootProof moves the proofing
+ * controls to a thumb-height bar on mobile rather than hiding them. Their
+ * grid's job is picking, not browsing, and this one's is both — so if marking
+ * a long gallery on a phone turns out to be the common case, the answer is a
+ * visible mode that pins these back onto the tiles, not a hidden gesture.
  *
  * A *set* heart, or one carrying somebody else's count, is information rather
  * than an affordance, so that one stays at full strength everywhere.
