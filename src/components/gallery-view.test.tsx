@@ -1,11 +1,19 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// These two controls carry no copy of their own beyond an aria-label; echoing
-// the key keeps the test about behaviour rather than about wording.
+// These controls carry no copy of their own beyond an aria-label; echoing the
+// key keeps the tests about behaviour rather than about wording.
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
+vi.mock("next/image", () => ({
+  default: (props: { src: string }) => (
+    // A tile only needs something that paints in jsdom; next/image needs a loader.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt="" src={props.src} />
+  ),
+}));
 
-import { HeartButton, PrinterButton } from "@/components/gallery-view";
+import { HeartButton, PhotoTile, PrinterButton } from "@/components/gallery-view";
+import type { GalleryPhoto } from "@/components/gallery-view";
 
 /**
  * Whether a tile's heart or printer is reachable on a phone is decided purely
@@ -77,4 +85,77 @@ describe("PrinterButton on a tile", () => {
     expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
+});
+
+describe("a long press on a tile", () => {
+  const photo: GalleryPhoto = {
+    id: "photo_1",
+    objectKey: "g/1/a.jpg",
+    thumbObjectKey: null,
+    fileName: "DSC_1234.jpg",
+    width: 3000,
+    height: 2000,
+    placeholder: null,
+    favoriteCount: 0,
+  };
+
+  const renderTile = (onPick: (index: number, id: string, shift: boolean) => void) => {
+    render(
+      <PhotoTile
+        photo={photo}
+        src="a.jpg"
+        fallbackSrc="a.jpg"
+        width={170}
+        height={120}
+        index={0}
+        priority={false}
+        tabbable
+        selectionActive={false}
+        selected={false}
+        allowDownload
+        allowReactions
+        allowPrintSelection
+        markingMode
+        isFavorite={false}
+        favoritePulse={false}
+        favoriteCount={0}
+        reactionState={undefined}
+        printQuantity={0}
+        onPick={onPick}
+        onOpen={() => {}}
+        onToggleFavorite={() => {}}
+        onIncrementPrint={() => {}}
+        onDecrementPrint={() => {}}
+        onFocus={() => {}}
+        registerTileRef={() => {}}
+      />,
+    );
+  };
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("starts the download selection when the press is on the photo", () => {
+    const onPick = vi.fn();
+    renderTile(onPick);
+    fireEvent.touchStart(screen.getByLabelText("openPhoto"));
+    vi.advanceTimersByTime(600);
+    expect(onPick).toHaveBeenCalledWith(0, "photo_1", false);
+  });
+
+  // The heart, the printer and the checkbox sit over the tile's button but are
+  // still children of the same div, so their touchstart bubbles to its
+  // handler. Holding the heart used to favourite the photo *and* drop the
+  // viewer into the download selection — and marking mode puts a heart on
+  // every tile in the gallery.
+  it.each(["addToFavorites", "markForPrint", "selectPhoto"])(
+    "leaves it alone when the press is on the %s control",
+    (label) => {
+      const onPick = vi.fn();
+      renderTile(onPick);
+      fireEvent.touchStart(screen.getByLabelText(label));
+      vi.advanceTimersByTime(600);
+      expect(onPick).not.toHaveBeenCalled();
+    },
+  );
 });

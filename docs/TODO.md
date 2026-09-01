@@ -33,6 +33,21 @@ bypass exists, because neither is reachable from Vitest (no layout, no server):
   the heart empties again _and_ the alert appears. The failure mode being guarded is a viewer
   marking sixty photos that reach nobody, which is invisible to every other kind of test.
 
+Added 2026-09-01, from the touch-icons work: **marking mode has no E2E case.** On a coarse
+pointer the grid no longer draws an idle heart or printer at all, and the header's `Označit`
+toggle is what pins them back. Vitest covers the class strings the visibility hangs off
+(`src/components/gallery-view.test.tsx`) and the CSS was checked in Chromium against the compiled
+stylesheet, but nothing exercises the real thing on a real engine. Wanted, in `mobile-safari`
+where the project already runs E2E:
+
+- The toggle is visible on a coarse pointer and absent on a fine one, and no idle heart or
+  printer is hit-testable on a tile until it is pressed. The regression this guards is an
+  invisible 44px tap target over every photo — `pointer-coarse:hidden` rather than `opacity-0`
+  is the whole fix, and nothing outside that one class prevents it coming back.
+- A long press on a pinned heart favourites the photo _without_ also entering the download
+  selection. The controls are children of the div that handles the press, so their `touchstart`
+  bubbles into it; the guard is one `contains` check that a refactor could quietly drop.
+
 ## 1. Offline access — **done 2026-08-21**
 
 Opt-in per gallery, in the gallery footer. Pavel accepted the revocation

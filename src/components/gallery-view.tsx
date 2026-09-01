@@ -1934,7 +1934,15 @@ function GalleryViewInner({
               would otherwise fight an unprefixed `hidden` for the same
               property, and which won would come down to Tailwind's output
               order. On the wrapper the override sits inside a media query, so
-              it reliably wins (the `hidden md:block` idiom). */}
+              it reliably wins (the `hidden md:block` idiom).
+
+              Gated on the pointer rather than on `(hover: none)`, matching the
+              `pointer-coarse:hidden` that hides the idle controls and the rest
+              of this file. The two disagree only on a stylus-primary browser
+              (`pointer: fine` with no hover), which gets neither the toggle
+              nor a hover to reveal the icons with; marking there means opening
+              the photo. Phones, tablets and desktops all land on the right
+              side of it, so this is a known trade rather than an oversight. */}
           {(allowReactions || allowPrintSelection) && allPhotos.length > 0 && (
             <span className="hidden pointer-coarse:contents">
               <IconButton
@@ -2495,8 +2503,10 @@ interface PhotoTileProps {
  * different photo, the selection toolbar, the lightbox) doesn't re-render
  * every other tile — only the primitives a specific tile actually depends on
  * are passed in, and every callback is a stable top-level reference.
+ *
+ * Exported for its colocated test only.
  */
-const PhotoTile = memo(function PhotoTile({
+export const PhotoTile = memo(function PhotoTile({
   photo,
   src,
   fallbackSrc,
@@ -2525,8 +2535,12 @@ const PhotoTile = memo(function PhotoTile({
   registerTileRef,
 }: PhotoTileProps) {
   const t = useTranslations("gallery");
+  // Kept alongside the parent's registration so the long press below can ask
+  // whether a touch actually landed on the photo — see `onTouchStart`.
+  const tileButton = useRef<HTMLButtonElement | null>(null);
   const setButtonRef = useCallback(
     (el: HTMLButtonElement | null) => {
+      tileButton.current = el;
       registerTileRef(index, el);
     },
     [index, registerTileRef],
@@ -2568,8 +2582,17 @@ const PhotoTile = memo(function PhotoTile({
     <div
       className={`group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:transition-opacity ${scrimClasses}`}
       style={{ width, height }}
-      onTouchStart={() => {
+      onTouchStart={(event) => {
         if (!allowDownload) return;
+        // Only a touch on the photo itself arms the long press. The heart, the
+        // printer and the checkbox are absolutely positioned siblings *over*
+        // the tile's button but still children of this div, so their
+        // `touchstart` bubbles here — and a press held on the heart would both
+        // toggle the favourite and drop the viewer into the download
+        // selection. Reachable before only on a set heart or the print
+        // stepper, since nothing idle was drawn on touch; marking mode puts
+        // one of these on every tile in the gallery.
+        if (!tileButton.current?.contains(event.target as Node)) return;
         longPress.current.fired = false;
         longPress.current.timer = window.setTimeout(() => {
           longPress.current.fired = true;
