@@ -218,32 +218,33 @@ function PromoPreview({
 
   return (
     <div
-      className={`@container flex flex-col justify-between overflow-hidden ${theme.surface}`}
+      className={`@container flex flex-col justify-center overflow-hidden ${theme.surface}`}
       style={{
         width,
         height: Math.round(width / 1.5),
-        padding: "clamp(0.625rem, 5.5cqi, 1.75rem)",
+        padding: "clamp(0.6rem, 5cqi, 1.5rem)",
+        justifyContent: "safe center",
       }}
     >
       <div className="min-h-0">
         {values.eyebrow && (
           <p
             className={`truncate font-semibold tracking-[0.14em] uppercase ${theme.eyebrow}`}
-            style={{ fontSize: "clamp(0.5rem, 2.5cqi, 0.75rem)", lineHeight: 1.5 }}
+            style={{ fontSize: "clamp(0.625rem, 2.8cqi, 0.8125rem)", lineHeight: 1.5 }}
           >
             {values.eyebrow}
           </p>
         )}
         <p
           className={`mt-[0.35em] font-semibold text-balance ${theme.headline}`}
-          style={{ fontSize: "clamp(0.8125rem, 6.4cqi, 1.875rem)", lineHeight: 1.22 }}
+          style={{ fontSize: "clamp(1rem, 8.5cqi, 2rem)", lineHeight: 1.2 }}
         >
           {values.headline || "Nadpis karty"}
         </p>
       </div>
       <p
-        className={`mt-[0.5em] flex shrink-0 items-center gap-[0.4em] font-semibold ${theme.cta}`}
-        style={{ fontSize: "clamp(0.625rem, 3.2cqi, 0.9375rem)", lineHeight: 1.4 }}
+        className={`mt-[0.9em] flex shrink-0 items-center gap-[0.4em] font-semibold ${theme.cta}`}
+        style={{ fontSize: "clamp(0.75rem, 4cqi, 1rem)", lineHeight: 1.4 }}
       >
         <span className="truncate underline decoration-from-font underline-offset-[0.3em]">
           {cta}

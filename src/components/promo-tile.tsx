@@ -95,7 +95,7 @@ export function PromoTile({
 
   return (
     <div
-      className="group/promo @container relative shrink-0 overflow-hidden select-none"
+      className="group/promo promo-focus @container relative shrink-0 overflow-hidden select-none"
       style={{ width, height }}
       data-promo-tile={promo.id}
     >
@@ -113,11 +113,23 @@ export function PromoTile({
         onAuxClick={(event) => {
           if (event.button === 1) reportClick();
         }}
-        className={`flex h-full w-full flex-col justify-between overflow-hidden text-left ${theme.surface}`}
+        // Centred rather than pushed to the edges. `justify-between` pinned the
+        // text to the top and the link to the bottom, leaving a void between
+        // them on any tile taller than the copy — which made the card read as
+        // small even at a perfectly good type size. Centred, it reads as one
+        // deliberate block at every tile height.
+        className={`flex h-full w-full flex-col justify-center overflow-hidden text-left ${theme.surface}`}
         style={{
+          // `safe` keeps centring only while the content fits and switches to
+          // start alignment once it overflows — without it, text grown by a
+          // user stylesheet or a 200% text setting would be cut off at the
+          // *top* as well as the bottom, losing the headline first. A browser
+          // that does not understand it drops the declaration and keeps the
+          // plain `center` from the class above.
+          justifyContent: "safe center",
           // Padding tracks the tile, so a 190 px phone tile is not eaten by a
           // gutter sized for a 340 px desktop one.
-          padding: "clamp(0.625rem, 5.5cqi, 1.75rem)",
+          padding: "clamp(0.6rem, 5cqi, 1.5rem)",
         }}
         aria-label={t("cardAriaLabel", { headline: promo.headline, cta: ctaLabel })}
       >
@@ -127,17 +139,27 @@ export function PromoTile({
               // Hidden on the smallest tiles: below ~200 px the eyebrow costs a
               // line the headline needs more.
               className={`truncate font-semibold tracking-[0.14em] uppercase @max-[13rem]:hidden ${theme.eyebrow}`}
-              style={{ fontSize: "clamp(0.5rem, 2.5cqi, 0.75rem)", lineHeight: 1.5 }}
+              style={{ fontSize: "clamp(0.625rem, 2.8cqi, 0.8125rem)", lineHeight: 1.5 }}
             >
               {promo.eyebrow}
             </p>
           )}
 
           <p
+            // Deliberately NOT line-clamped. WCAG 2.1 AA 1.4.12 (Text Spacing)
+            // requires content to survive a user stylesheet raising
+            // line-height to 1.5 with no loss, and 1.4.4 the same at 200%
+            // text size — a clamp on the primary content fails both. A
+            // headline too long for the tile is an authoring problem the admin
+            // preview shows immediately, not one to hide by truncating.
             className={`mt-[0.35em] font-semibold text-balance ${theme.headline}`}
             style={{
-              fontSize: "clamp(0.8125rem, 6.4cqi, 1.875rem)",
-              lineHeight: 1.22,
+              // Every one of these used to bottom out at its `clamp()` floor on
+              // a phone tile — 6.4% of 193 px is 12 px, so the `cqi` term did
+              // nothing and the floor decided everything. The floors were set
+              // for the desktop case and were far too low.
+              fontSize: "clamp(1rem, 8.5cqi, 2rem)",
+              lineHeight: 1.2,
               // Czech stacks caron and acute above the x-height; a serif
               // headline at 1.22 needs the extra room or `ě`/`ů` clip.
               paddingTop: "0.06em",
@@ -149,8 +171,8 @@ export function PromoTile({
           {promo.body && (
             <p
               // Two lines on a phone tile, three once there is room for them.
-              className={`mt-[0.6em] line-clamp-2 @max-[15rem]:hidden @min-[20rem]:line-clamp-3 ${theme.body}`}
-              style={{ fontSize: "clamp(0.625rem, 3.1cqi, 0.9375rem)", lineHeight: 1.55 }}
+              className={`mt-[0.6em] line-clamp-2 @max-[15rem]:hidden @min-[24rem]:line-clamp-3 ${theme.body}`}
+              style={{ fontSize: "clamp(0.8125rem, 4cqi, 1.0625rem)", lineHeight: 1.5 }}
             >
               {promo.body}
             </p>
@@ -158,8 +180,8 @@ export function PromoTile({
         </div>
 
         <p
-          className={`mt-[0.5em] flex shrink-0 items-center gap-[0.5em] font-semibold ${theme.cta}`}
-          style={{ fontSize: "clamp(0.625rem, 3.2cqi, 0.9375rem)", lineHeight: 1.4 }}
+          className={`mt-[0.9em] flex shrink-0 items-center gap-[0.5em] font-semibold ${theme.cta}`}
+          style={{ fontSize: "clamp(0.75rem, 4cqi, 1rem)", lineHeight: 1.4 }}
         >
           <span className="truncate underline decoration-from-font underline-offset-[0.3em]">
             {ctaLabel}
