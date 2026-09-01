@@ -28,7 +28,7 @@ error to notice.
 | Variable                          | Scope     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | --------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                    | runtime   | Supavisor **transaction** pooler, `:6543`, keep `?pgbouncer=true`                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `DIRECT_URL`                      | runtime   | Supavisor **session** pooler, `:5432` — migrations and CLI                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `DIRECT_URL`                      | **both**  | Supavisor **session** pooler, `:5432` — migrations and CLI. Needed at **build** since 2026-09-01 (§Migrations applies migrations during a production build) and still at runtime, because `src/lib/env.ts` validates it. A variable marked **Sensitive** on Vercel is runtime-only and will fail the production build.                                                                                                                                                            |
 | `BETTER_AUTH_SECRET`              | runtime   | `openssl rand -base64 32`                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `BETTER_AUTH_URL`                 | runtime   | `https://photos.svatebni-fotograf-cechy.cz` — **not** the apex, see below                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `GOOGLE_CLIENT_ID`                | runtime   | Add the production redirect URI in Google Cloud (below)                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -62,25 +62,76 @@ development as well — just add `http://localhost:3000/...` alongside.
 
 ## Migrations
 
-`pnpm build` is `prisma generate && next build`. **Nothing runs `prisma migrate deploy`**, and
-adding it to the build script is worse than it looks: preview deployments share the production
-environment variables, so every pull request would migrate the production database.
+**Automatic since 2026-09-01.** `pnpm build` is
+`prisma generate && node scripts/vercel-migrate.mjs && next build`, and that middle step applies
+pending migrations — but only on a Vercel **production** build.
 
-So the order on every deploy that carries a schema change is: **migrate first, merge second.**
-Vercel deploys on push to `main`, and code that reaches production before its columns do makes
-every page 500.
+This used to be done by hand, on the rule "migrate first, merge second", because the obvious
+automation is genuinely dangerous: preview deployments run the same build script, so a bare
+`prisma migrate deploy &&` in it would let **every pull request migrate the production database.**
+`scripts/vercel-migrate.mjs` exists to answer that objection rather than ignore it. Three gates:
+
+| Situation                               | What happens                               |
+| --------------------------------------- | ------------------------------------------ |
+| `pnpm build` on your own machine        | skipped — no `VERCEL` in the environment   |
+| Preview / branch deployment             | skipped — `VERCEL_ENV` is not `production` |
+| Production deploy, `DIRECT_URL` visible | **migrations applied**, then `next build`  |
+| Production deploy, `DIRECT_URL` missing | **build fails**                            |
+
+The last row is the important one. Skipping quietly there would reproduce the exact failure the
+whole arrangement prevents: the code ships, its columns do not, and every page 500s with the cause
+three steps upstream. A failed build is a deploy that never happened.
+
+Note the preview gate does **not** depend on the dashboard being scoped correctly — `VERCEL_ENV`
+is checked regardless of which environments can see `DIRECT_URL`. Scoping it to Production only is
+still worth doing as a second line, but the script does not rely on it.
+
+### The one setting this needs
+
+`DIRECT_URL` has to be readable by the Production **build**, not just at runtime. On Vercel a
+variable marked **Sensitive** is runtime-only and will not reach the build container — if that is
+how `DIRECT_URL` is stored, the build now fails with the message above until it is changed. It
+must stay available at runtime too: `src/lib/env.ts` requires it, so every cron route and every R2
+operation validates against it even though only the Prisma CLI actually connects with it.
+
+### Ordering, and what breaks
+
+The build runs before a deployment is promoted, so migrations land before the code that needs them
+— the old "migrate first, merge second" rule, now enforced instead of remembered. If
+`migrate deploy` fails, the build fails and nothing is promoted. If it succeeds and `next build`
+then fails, the database is ahead of the running code.
+
+That last state is harmless only while migrations stay **additive** — new tables, new nullable
+columns, new columns with defaults. The running production code ignores what it does not know
+about. **A migration that drops or narrows a column still has to be split across two deploys**;
+automation does not change that.
+
+Two production builds racing cannot interleave: `migrate deploy` takes a Postgres advisory lock,
+and the loser fails its build after a fixed 10-second timeout rather than corrupting anything.
+
+### Doing it by hand anyway
+
+Still supported, and still the right move when you want to see what a migration will do before it
+does it — the script no-ops off Vercel, so nothing conflicts.
 
 ```bash
 # the URL is only in .env.production.local, which is gitignored
 export DIRECT_URL="$(grep '^DIRECT_URL=' .env.production.local | cut -d= -f2- | tr -d '"')"
 
 pnpm exec prisma migrate status   # read-only: what is pending
-pnpm exec prisma migrate deploy   # apply
+pnpm migrate:deploy               # apply
 ```
 
-Migrating ahead of the deploy is only safe while migrations stay **additive** — new tables, new
-nullable columns, new columns with defaults. The running production code ignores what it does not
-know about. A migration that drops or narrows a column has to be split across two deploys instead.
+If you instead run the raw SQL in the Supabase editor, Prisma's `_prisma_migrations` table will not
+know about it and the next deploy will try to apply the same migration again. Tell it, once per
+migration:
+
+```bash
+pnpm exec prisma migrate resolve --applied <migration_folder_name>
+```
+
+`migrate resolve` computes the correct checksum itself, which is why the bookkeeping row should
+never be inserted by hand.
 
 ## Cron
 

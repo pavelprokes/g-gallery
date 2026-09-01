@@ -7,7 +7,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // `scripts/` is included for the build-time helpers whose logic decides
+    // whether something happens to the production database — those want a test
+    // as much as anything under `src/` does.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.{test,spec}.{ts,mts,mjs}"],
     globals: true,
   },
   resolve: {
