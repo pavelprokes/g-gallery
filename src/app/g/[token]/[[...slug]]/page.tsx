@@ -67,7 +67,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       title={data.title}
       eventDate={data.eventDate}
       photoCount={data.photoCount}
-      archiveZipUrl={data.archiveZipUrl}
+      archive={data.archive}
       initialPhotos={data.initialPhotos}
       initialCursor={data.initialCursor}
       imageGrant={data.imageGrant}

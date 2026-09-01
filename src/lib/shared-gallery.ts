@@ -44,7 +44,27 @@ export interface GalleryViewData {
    * Loaded whole rather than per page — there are at most a handful, and their
    * slots are resolved against the entire gallery. */
   promos: GalleryPromo[];
-  archiveZipUrl: string | null;
+  archive: GalleryArchive;
+}
+
+/**
+ * The state of the pre-built "download all" archive, as the viewer needs to
+ * understand it (docs/TODO.md §7).
+ *
+ * Replaces a bare `archiveZipUrl: string | null`, which the UI turned into
+ * "render the button, or render nothing at all". That meant the single thing
+ * a client opened the link for was *absent* for the whole window between the
+ * photographer sending the gallery and the 15-minute cron getting to it — and
+ * absent again, for everyone, every time a guest added a photo.
+ */
+export interface GalleryArchive {
+  /** Direct CDN link to a complete archive, or null while none exists. */
+  url: string | null;
+  /** The archive on offer predates the newest photos; a rebuild is queued. */
+  stale: boolean;
+  /** Size of the archive at `url`, for a label the viewer can act on — a
+   * 8 GB download is a different decision on a phone than a 300 MB one. */
+  sizeBytes: number | null;
 }
 
 export async function loadGalleryViewData(
@@ -61,6 +81,7 @@ export async function loadGalleryViewData(
       // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
       zipStatus: true,
       zipObjectKey: true,
+      zipSizeBytes: true,
       // One filtered aggregate rides along with the row we are already
       // fetching, so the header's "56 fotek" costs no extra round trip.
       _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
@@ -160,7 +181,7 @@ export async function loadGalleryViewData(
         ctaUrl: placement.promoCard.ctaUrl,
         theme: placement.promoCard.theme,
       })),
-    archiveZipUrl: archiveUrl(gallery.zipStatus, gallery.zipObjectKey),
+    archive: archiveFor(gallery.zipStatus, gallery.zipObjectKey, gallery.zipSizeBytes),
   };
 }
 
@@ -168,11 +189,40 @@ export async function loadGalleryViewData(
  * The finished archive is a plain CDN link — no Worker involved at download
  * time (docs/TODO.md §7). Built server-side since NEXT_PUBLIC_PHOTOS_BASE_URL
  * is the same public, build-time value the custom image loader already uses.
+ *
+ * ## Why PENDING still serves a link, and BUILDING does not
+ *
+ * Any photo added or removed flips a READY gallery back to PENDING
+ * (`api/uploads/confirm`, `admin/actions`), but neither clears `zipObjectKey`
+ * and nothing deletes the object — so while a rebuild is merely *queued*, the
+ * previous archive is still complete and still there. Serving it, flagged as
+ * `stale`, beats hiding the feature for up to 15 minutes per cron tick: the
+ * viewer gets everything except the last few photos, which is what they came
+ * for, instead of a gallery with no download button.
+ *
+ * BUILDING is different and must not be served. `startNextZipBuild` overwrites
+ * `zipObjectKey` with the *new* key at kickoff, so from that moment the column
+ * names a multipart upload that is still being assembled; a link to it would
+ * 404 or hand over a truncated ZIP. FAILED is excluded for the same reason —
+ * the key it left behind is the failed build's.
  */
-function archiveUrl(zipStatus: string, zipObjectKey: string | null): string | null {
+function archiveFor(
+  zipStatus: string,
+  zipObjectKey: string | null,
+  zipSizeBytes: number | null,
+): GalleryArchive {
   const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
-  if (zipStatus !== "READY" || !zipObjectKey || !base) return null;
-  return `${base.replace(/\/$/, "")}/${zipObjectKey.split("/").map(encodeURIComponent).join("/")}`;
+  const servable = zipStatus === "READY" || zipStatus === "PENDING";
+  if (!servable || !zipObjectKey || !base) return { url: null, stale: false, sizeBytes: null };
+
+  const path = zipObjectKey.split("/").map(encodeURIComponent).join("/");
+  return {
+    url: `${base.replace(/\/$/, "")}/${path}`,
+    stale: zipStatus !== "READY",
+    // Describes the object at `url` — during PENDING that is still the old
+    // archive, and so is this number. They stay consistent.
+    sizeBytes: zipSizeBytes,
+  };
 }
 
 /**

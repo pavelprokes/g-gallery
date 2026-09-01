@@ -129,7 +129,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
           </p>
           <div className="bg-admin-accent-soft h-1.5 w-full overflow-hidden rounded-full dark:bg-neutral-800">
             <div
-              className="bg-brand-primary h-full transition-all"
+              className="motion-loop bg-brand-primary duration-move ease-standard h-full transition-[width]"
               style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
             />
           </div>

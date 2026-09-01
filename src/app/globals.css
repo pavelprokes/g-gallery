@@ -35,6 +35,79 @@
   --color-admin-success: #42611f;
   --color-admin-success-soft: #edf4e4;
   --color-admin-success-border: #cfe0b8;
+
+  /*
+   * Type scale. Before this, `text-sm` and `text-xs` carried ~85% of the app's type and
+   * nothing set a line-height at all, so every guest surface ran at Tailwind's default
+   * 1.25. That is too tight for Czech: the caron and the acute stack above the x-height
+   * and `ů`'s ring sits above the cap height, so a wrapped line of "Pořídíme příští
+   * týden" collides with the descenders of the line above it. Bitter — the guest-facing
+   * serif, src/lib/fonts.ts — has a tall x-height on top of that, which eats the same
+   * space from the other side. Hence the hard floor: **body copy on guest surfaces never
+   * goes below 1.6**. Headings may go tighter only because a heading is short, is set
+   * once, and rarely wraps.
+   *
+   * Sizes are named for the job, not the pixels, so a call site cannot quietly promote
+   * a caption to a heading by nudging a number.
+   *
+   * Tailwind 4 pairs a size with its line-height and tracking through the `--text-*`
+   * namespace plus `--line-height` / `--letter-spacing` sub-keys. Verified against the
+   * installed tailwindcss 4.3.3 (its `text` handler resolves `--text` with
+   * ["--line-height","--letter-spacing","--font-weight"]) and by compiling: unlike the
+   * --font-brand case documented below, this convention really does emit utilities —
+   * `text-body` sets font-size and line-height together, and the `text-body/7` modifier
+   * still overrides the paired line-height when a one-off needs it.
+   */
+  --text-caption: 0.75rem; /* timestamps, counts, metadata — never a full sentence */
+  --text-caption--line-height: 1.5;
+  --text-body: 0.875rem; /* the default: anything that is read rather than scanned */
+  --text-body--line-height: 1.6;
+  --text-lead: 1rem; /* intro paragraph, empty states, the one line that explains a screen */
+  --text-lead--line-height: 1.55;
+  --text-title: 1.25rem; /* section and card headings */
+  --text-title--line-height: 1.3;
+  --text-title--letter-spacing: -0.005em;
+  --text-page: 1.75rem; /* one per page — the page's own name */
+  --text-page--line-height: 1.2;
+  --text-page--letter-spacing: -0.014em;
+  --text-display: 2.25rem; /* gallery / wedding-hub cover title only */
+  --text-display--line-height: 1.12;
+  --text-display--letter-spacing: -0.02em;
+
+  /*
+   * Motion tokens. Durations were hand-typed per call site (200ms ×3, 300ms ×2, plus
+   * three `transition-all` progress bars with no duration at all), so nothing moved like
+   * it belonged to the same product. Named by what the motion *is*, so a call site cannot
+   * reach for 300ms on a hover.
+   *
+   * Naming trap, and it is the same trap as --font-brand below: `duration-*` utilities do
+   * NOT read a `--duration-*` theme key. The generator resolves them against
+   * `--transition-duration`, so `--duration-flip` would have compiled to absolutely
+   * nothing. `ease-*` genuinely is `--ease-*`. Both checked against tailwindcss 4.3.3's
+   * utility table and confirmed by compiling the sheet.
+   *
+   * How to use them:
+   *   - Transform and opacity only. Anything that animates layout drops frames on the
+   *     mid-range phone that is most of this audience.
+   *   - Nothing above 320ms. A gallery is used in bursts of dozens of taps; a duration
+   *     that reads as elegant once reads as sluggish the fortieth time.
+   *   - Grid tiles never animate on mount or on scroll. The grid is virtualized
+   *     (@tanstack/react-virtual), so rows mount mid-fling — fading them in reads as
+   *     flicker, not as polish.
+   *
+   * Overriding Tailwind's own `--ease-out` / `--ease-in` is deliberate: the stock curves
+   * are shallow enough to read as linear at these durations. The single `ease-out` call
+   * site today (src/components/promo-tile.tsx) wants the sharper one.
+   */
+  --transition-duration-flip: 90ms; /* hover, chrome opacity — must not read as animation */
+  --transition-duration-toggle: 160ms; /* heart, select check, tile scale */
+  --transition-duration-move: 240ms; /* progress fills, steppers, anything with a value */
+  --transition-duration-enter: 320ms; /* lightbox and modal entrances — the ceiling */
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* arriving */
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45); /* leaving */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* moving while staying on screen */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoots — the heart toggle, nothing else */
 }
 
 /*
@@ -86,6 +159,51 @@ body {
 }
 
 /*
+ * Tailwind 4 also dropped the preflight rule that defaulted `border-color` to gray-200;
+ * a bare `border` / `border-t` now paints in `currentColor`. Nine places on the guest
+ * surfaces use a bare border, so they were drawing near-black hairlines in light mode and
+ * pure white ones in dark — a divider louder than the text it divides. Same reasoning as
+ * the `cursor: pointer` block below: restore it once, centrally, rather than sprinkling
+ * `border-brand-border` on every one of them and still missing the tenth.
+ *
+ * Two deliberate differences from that block, both about not winning too hard:
+ *   - This lives in `@layer base`, NOT unlayered. Every `border-*` utility sits in
+ *     `@layer utilities`, which the cascade resolves after `base` regardless of
+ *     specificity, so an explicit `border-red-500` always beats this. An unlayered rule
+ *     here — the shape the cursor block uses — would silently override all of them.
+ *   - The colour goes through an inherited custom property rather than being repeated per
+ *     scope, so the admin shell can restate it once for its own subtree. Admin borders are
+ *     #e6dad2 and guest borders are #dfc8bf; they are two colours on purpose (see the
+ *     token block above), and the shell is light-only, so its value must not follow
+ *     prefers-color-scheme the way the guest one does.
+ */
+@layer base {
+  :root {
+    --hairline: var(--color-brand-border);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* #dfc8bf on a near-black ground is a bright warm line, not a hairline. This is the
+         same value the components already reach for by hand as `dark:border-neutral-700`. */
+      --hairline: var(--color-neutral-700);
+    }
+  }
+
+  /* Declared after the media query and on a descendant of :root, so the light-only admin
+     shell keeps its own border colour in either system scheme. */
+  [data-admin-shell] {
+    --hairline: var(--color-admin-border);
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--hairline);
+  }
+}
+
+/*
  * Tailwind 4 dropped the preflight rule that gave buttons `cursor: pointer`,
  * so every button in the app inherited the browser default (`default`) and
  * only the handful with an explicit `cursor-pointer` class looked clickable.
@@ -119,9 +237,44 @@ button:disabled,
   cursor: default;
 }
 
+/*
+ * Default keyboard focus ring. Stays brand brown: on the admin portal's cream and on the
+ * gallery's white chrome it is a comfortable ~7:1 and it looks like the brand rather than
+ * like a browser default.
+ */
 :focus-visible {
   outline: 2px solid var(--color-brand-primary-dark);
   outline-offset: 2px;
+}
+
+/*
+ * ...but that ring stops working the moment a control sits on a photo. #69422d against
+ * bg-black/90 is about 1.9:1, and against an arbitrary photograph it is a coin flip, so a
+ * keyboard user navigating the lightbox is effectively navigating blind — they can hear
+ * the screen reader but cannot see where they are. The failure is invisible in review
+ * because the brown ring *does* show up over the one dark test image everybody uses.
+ *
+ * `.on-media` is the opt-in for those controls: a white ring for the dark half of any
+ * photograph, plus a dark outer halo for the bright half, so it survives a snow-white
+ * wedding dress and a black suit in the same frame. The halo is a box-shadow because
+ * only one `outline` exists per element; its 6px spread clears the 2px offset plus the
+ * 2px ring, leaving a visible 2px of dark.
+ *
+ * Apply it to every control whose background can be a photo:
+ *   src/components/gallery-view.tsx — the tile <button>, SelectCheck, HeartButton,
+ *     PrinterButton, and the lightbox chrome (close, counter, action row)
+ *   src/components/ui/icon-button.tsx — NavButton
+ * IconButton/IconButtonLink stay on the default ring: they live in the light header
+ * toolbar, never over an image.
+ *
+ * Caveat for whoever applies it: the halo is drawn outside the border box, so it is
+ * clipped by an ancestor with `overflow-hidden`. On the tile, put the class on the button
+ * itself and keep the clipping on the inner image wrapper.
+ */
+.on-media:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgb(0 0 0 / 0.65);
 }
 
 /*
@@ -155,6 +308,32 @@ button:disabled,
   }
 }
 
+/*
+ * Reduced motion. The blanket reset below is kept as-is and is doing real work — it is
+ * what stops decorative transitions, the lightbox entrance and smooth scrolling from
+ * triggering someone's vestibular symptoms.
+ *
+ * What it should never have done is take the feedback with it. Collapsing `animate-spin`
+ * to 0.01ms freezes the spinner into a static grey arc and collapsing a progress bar's
+ * transition makes the fill teleport; a reduced-motion guest uploading 200 wedding photos
+ * on hotel wifi then has no signal at all that anything is happening, and taps upload a
+ * second time. Reduced motion means no vestibular triggers, not no feedback — a 16px
+ * spinner rotating in place has no parallax, no travel and no scale, so it is not one of
+ * the triggers.
+ *
+ * `.motion-loop` is the opt-in that keeps looping. It must be added to:
+ *   src/components/gallery-view.tsx — the `animate-spin` load-more spinner
+ *   src/components/guest-uploader.tsx — the `animate-spin` upload spinner
+ *   src/components/presence-strip.tsx — the `animate-ping` presence dot
+ *   any progress bar (currently the three `transition-all` fills in uploader.tsx,
+ *     guest-uploader.tsx and offline-toggle.tsx)
+ * Nothing else. If a loop is decorative, it does not get the class.
+ *
+ * The loop is deliberately slowed rather than restored to its authored speed: at reduced
+ * motion the point is "still working", not urgency. `[role="progressbar"]` is matched
+ * directly as well so a correctly-labelled progress element keeps its determinate fill
+ * even if someone forgets the class — the role is already required for accessibility.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -163,5 +342,19 @@ button:disabled,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Class selectors outrank the `*` above, and both carry !important, so these win. */
+  .motion-loop,
+  .motion-loop::before,
+  .motion-loop::after {
+    animation-duration: 1.4s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .motion-loop,
+  [role="progressbar"],
+  [role="progressbar"] * {
+    transition-duration: var(--transition-duration-move) !important;
   }
 }

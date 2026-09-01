@@ -46,9 +46,15 @@ export function justifyRows<T>(
       const chunk = items.slice(i, i + itemsPerRow);
       const partial = chunk.length < itemsPerRow;
       const aspectSum = chunk.reduce((sum, entry) => sum + entry.aspect, 0);
-      const height = partial
-        ? targetRowHeight
-        : (containerWidth - gap * (chunk.length - 1)) / aspectSum;
+      // A partial row keeps the target height rather than being stretched to
+      // fill the width — but never *past* the width. Without the clamp a final
+      // lone panorama renders `aspect * targetRowHeight` wide (a 5:1 shot at
+      // height 120 is 600 px), and since the row is `flex w-full` with
+      // `shrink-0` tiles, the whole page then scrolls sideways on a phone.
+      // The adaptive branch below cannot hit this: it only emits a full row
+      // once the accumulated width reaches the container.
+      const fitHeight = (containerWidth - gap * (chunk.length - 1)) / aspectSum;
+      const height = partial ? Math.min(targetRowHeight, fitHeight) : fitHeight;
       rows.push({
         items: chunk.map((entry) => ({ item: entry.item, width: entry.aspect * height, height })),
         height,
