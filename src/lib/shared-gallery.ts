@@ -8,6 +8,7 @@ import {
   signImageAccess,
   type SignedImageGrant,
 } from "@/lib/image-signing";
+import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
 
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
@@ -39,6 +40,10 @@ export interface GalleryViewData {
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
   viewers: { id: string; displayName: string }[];
+  /** The owner's credit cards placed in this gallery (docs/PROMO-CARDS.md).
+   * Loaded whole rather than per page — there are at most a handful, and their
+   * slots are resolved against the entire gallery. */
+  promos: GalleryPromo[];
   archiveZipUrl: string | null;
 }
 
@@ -90,6 +95,28 @@ export async function loadGalleryViewData(
         take: 12,
         select: { id: true, displayName: true },
       },
+      // The photographer's own credit tiles (docs/PROMO-CARDS.md). Ordered by
+      // slot so `buildGridEntries` receives them in the order they appear —
+      // it sorts defensively anyway, but a stable order out of the database
+      // keeps the two from ever disagreeing.
+      promos: {
+        where: { enabled: true },
+        orderBy: [{ slot: "asc" }, { id: "asc" }],
+        select: {
+          id: true,
+          slot: true,
+          promoCard: {
+            select: {
+              eyebrow: true,
+              headline: true,
+              body: true,
+              ctaLabel: true,
+              ctaUrl: true,
+              theme: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!gallery) return null;
@@ -118,6 +145,21 @@ export async function loadGalleryViewData(
         : null,
     imageGrant: await mintImageGrant(gallery.storagePrefix),
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
+    // Filtered here as well as on write: a row can predate a validation rule,
+    // and this value is rendered as an `href` into pages held by people who
+    // are not the owner. Dropping the tile is the safe failure.
+    promos: gallery.promos
+      .filter((placement) => isSafePromoUrl(placement.promoCard.ctaUrl))
+      .map((placement) => ({
+        id: placement.id,
+        slot: placement.slot,
+        eyebrow: placement.promoCard.eyebrow,
+        headline: placement.promoCard.headline,
+        body: placement.promoCard.body,
+        ctaLabel: placement.promoCard.ctaLabel,
+        ctaUrl: placement.promoCard.ctaUrl,
+        theme: placement.promoCard.theme,
+      })),
     archiveZipUrl: archiveUrl(gallery.zipStatus, gallery.zipObjectKey),
   };
 }

@@ -262,5 +262,8 @@
     "submit": "Zobrazit galerii",
     "missingPassword": "Zadej heslo.",
     "wrongPassword": "Nesprávné heslo. Zkus to prosím později."
+  },
+  "promo": {
+    "cardAriaLabel": "{headline} – otevře {cta} v novém okně"
   }
 }

@@ -39,6 +39,7 @@ model User {
   galleries         Gallery[]
   events            Event[]
   pushSubscriptions PushSubscription[]
+  promoCards        PromoCard[]
 
   @@map("user")
   @@schema("g_gallery")
@@ -246,6 +247,7 @@ model Gallery {
   viewers        Viewer[]
   sessions       ViewSession[]
   activityEvents ActivityEvent[]
+  promos         GalleryPromo[]
 
   @@unique([eventId, eventKey])
   @@index([ownerId, status])
@@ -351,6 +353,88 @@ model ShareLink {
   eventCardFor Gallery[] @relation("EventCardLink")
 
   @@index([galleryId])
+  @@schema("g_gallery")
+}
+
+// ---------------------------------------------------------------------------
+// Promo cards — the photographer's own credit tile inside the grid
+// ---------------------------------------------------------------------------
+
+/// How a promo tile is painted. Three fixed looks rather than a colour picker:
+/// the tile sits between the photographer's own photos, and the one thing it
+/// must never do is clash with them.
+enum PromoTheme {
+  /// Brand ink on a warm near-white — reads as a caption card, not an ad.
+  LIGHT
+  /// Warm near-white on brand ink — the strongest of the three.
+  DARK
+  /// White on brand terracotta.
+  BRAND
+
+  @@schema("g_gallery")
+}
+
+/// Reusable "who photographed this" card the owner writes once and places into
+/// any gallery's grid (see `GalleryPromo` for the placement). Content lives
+/// here so fixing a typo or a moved URL fixes every gallery at once, rather
+/// than needing every delivered gallery re-edited.
+///
+/// Deliberately text-only: the tile shares a row with actual photographs, and
+/// a second image competing with them is exactly what makes a gallery look
+/// like a website with ads in it.
+model PromoCard {
+  id        String     @id @default(cuid())
+  ownerId   String
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Admin-only name, never shown to a viewer — how the owner tells two cards
+  /// apart in the picker ("Web 2026", "Instagram").
+  name      String
+  /// Small line above the headline ("Fotografie"), optional.
+  eyebrow   String?
+  headline  String
+  body      String?
+  /// Call-to-action label; falls back to the bare host name of `ctaUrl`.
+  ctaLabel  String?
+  /// Absolute http(s) URL. Validated on write — it is rendered as a link into
+  /// pages held by people who are not the owner.
+  ctaUrl    String
+  theme     PromoTheme @default(LIGHT)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  placements GalleryPromo[]
+
+  @@index([ownerId])
+  @@schema("g_gallery")
+}
+
+/// One card placed in one gallery. Separate from `PromoCard` because the slot
+/// is a property of the gallery, not of the card: the same "about me" card sits
+/// 5th in a 60-photo gallery and 5th in an 800-photo one, but either could be
+/// moved without touching the other.
+model GalleryPromo {
+  id          String    @id @default(cuid())
+  galleryId   String
+  gallery     Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  promoCardId String
+  promoCard   PromoCard @relation(fields: [promoCardId], references: [id], onDelete: Cascade)
+  /// 1-based position in the grid: `slot = 5` makes the card the 5th tile, so
+  /// what used to be the 5th photo becomes the 6th. Clamped to the end of the
+  /// stream when the gallery holds fewer photos than that (see
+  /// `src/lib/promo-card.ts`). 1-based on purpose — it is a position a person
+  /// types into the admin, and a 0-based one there is a bug generator.
+  slot        Int       @default(5)
+  /// Off keeps the placement (and its slot) while taking the tile out of the
+  /// grid — the same switch shape as `Gallery.listedOnEvent`.
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  /// One placement per card per gallery. Placing the same card twice is always
+  /// a mistake; two *different* cards in one gallery stays legal.
+  @@unique([galleryId, promoCardId])
+  @@index([galleryId, enabled])
+  @@index([promoCardId])
   @@schema("g_gallery")
 }
 

@@ -72,6 +72,28 @@ async function main() {
     },
   });
 
+  // The owner's credit tile, placed in the *viewer-flow* gallery on purpose
+  // (docs/PROMO-CARDS.md): every existing assertion in gallery-view.spec.ts —
+  // tile count, lightbox "1 / N", arrow-key roving, shift-click ranges — then
+  // doubles as proof that a non-photo tile in the grid disturbs none of them.
+  const promoCard = await prisma.promoCard.create({
+    data: {
+      ownerId: user.id,
+      name: "E2E Promo",
+      eyebrow: "Fotografie",
+      headline: "Fotil E2E Fotograf",
+      body: "Svatby po celé republice.",
+      ctaLabel: "Portfolio",
+      ctaUrl: "https://example.com/portfolio",
+      theme: "LIGHT",
+    },
+    select: { id: true },
+  });
+  const promoSlot = 5;
+  await prisma.galleryPromo.create({
+    data: { galleryId: gallery.id, promoCardId: promoCard.id, slot: promoSlot, enabled: true },
+  });
+
   // A second gallery for the guest-upload flow (docs/GUEST-GALLERIES.md §6),
   // kept apart from the viewer-flow one so an upload never changes the photo
   // count the grid/lightbox tests assert on.
@@ -151,6 +173,9 @@ async function main() {
       token,
       slug,
       photoCount: aspects.length,
+      promoSlot,
+      promoHeadline: "Fotil E2E Fotograf",
+      promoCtaUrl: "https://example.com/portfolio",
       guestGalleryId: guestGallery.id,
       uploadToken,
       uploadSlug,

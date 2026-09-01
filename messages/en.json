@@ -262,5 +262,8 @@
     "submit": "View gallery",
     "missingPassword": "Enter a password.",
     "wrongPassword": "Wrong password. Please try again later."
+  },
+  "promo": {
+    "cardAriaLabel": "{headline} — opens {cta} in a new window"
   }
 }

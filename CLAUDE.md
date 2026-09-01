@@ -6,6 +6,9 @@ before changing architecture, storage, auth, or billing-relevant code.
 **`docs/GUEST-GALLERIES.md`** is the authority for guest uploads and wedding hubs (adopted
 2026-08-23, Phase 6) — read it before touching share-link resolution, the presign routes, or
 anything that assumes one share link means one gallery.
+**`docs/PROMO-CARDS.md`** is the authority for the photographer's credit tile in the grid (adopted
+2026-09-01) — read it before touching the grid's item stream, the justified layout's input, or
+anything that assumes every tile in the gallery is a photo.
 
 ## Commands
 

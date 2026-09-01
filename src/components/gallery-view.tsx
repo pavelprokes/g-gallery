@@ -47,6 +47,15 @@ import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
+  buildGridEntries,
+  buildGridNavigation,
+  gridEntryKey,
+  photoInAdjacentRow,
+  type GridEntry,
+} from "@/lib/gallery-grid";
+import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
+import { PromoTile } from "@/components/promo-tile";
+import {
   clampPan,
   clampScale,
   distance,
@@ -162,6 +171,13 @@ function aspectOf(photo: GalleryPhoto): number {
   if (!photo.width || !photo.height) return FALLBACK_ASPECT;
   return photo.width / photo.height;
 }
+
+/** A promo tile packs as a landscape frame; a photo packs as itself. */
+function entryAspect(entry: GridEntry<GalleryPhoto>): number {
+  return entry.kind === "promo" ? PROMO_ASPECT : aspectOf(entry.photo);
+}
+
+const photoIdOf = (photo: GalleryPhoto) => photo.id;
 
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
@@ -748,6 +764,11 @@ interface GalleryViewProps {
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
   viewers: GalleryViewer[];
+  /** The owner's credit cards placed in this gallery (docs/PROMO-CARDS.md).
+   * Sent once with the page rather than per photo page: slots are resolved
+   * against the whole gallery, so a card at slot 5 is the 5th tile from the
+   * first paint and does not jump when the next page arrives. */
+  promos: GalleryPromo[];
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -777,6 +798,7 @@ function GalleryViewInner({
   initialCursor,
   imageGrant,
   viewers,
+  promos,
   allowDownload,
   allowReactions,
   allowUpload,
@@ -1175,16 +1197,30 @@ function GalleryViewInner({
     return () => observer.disconnect();
   }, [selectionActive]);
 
-  const rows = useMemo<JustifiedRow<GalleryPhoto>[]>(() => {
+  /**
+   * The tiles the grid lays out: every photo, plus the owner's promo cards at
+   * their slots (docs/PROMO-CARDS.md). Promos are *layout* participants only —
+   * `photos` itself is untouched, so the lightbox, selection, favourites,
+   * print marks and the ZIP manifest never see one.
+   *
+   * Favourites-only mode drops them: that view is the viewer's own shortlist,
+   * and a credit card in the middle of it is neither theirs nor a favourite.
+   */
+  const entries = useMemo<GridEntry<GalleryPhoto>[]>(
+    () => buildGridEntries(photos, favoritesOnly ? [] : promos),
+    [photos, promos, favoritesOnly],
+  );
+
+  const rows = useMemo<JustifiedRow<GridEntry<GalleryPhoto>>[]>(() => {
     if (containerWidth <= 0) return [];
     return justifyRows(
-      photos.map((photo) => ({ item: photo, aspect: aspectOf(photo) })),
+      entries.map((entry) => ({ item: entry, aspect: entryAspect(entry) })),
       containerWidth,
       targetRowHeight(containerWidth),
       GAP,
       itemsPerRow(containerWidth),
     );
-  }, [photos, containerWidth]);
+  }, [entries, containerWidth]);
 
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length + (hasNextPage ? 1 : 0),
@@ -1211,22 +1247,11 @@ function GalleryViewInner({
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  // `rowStarts[i]` is the flat photo index of row i's first tile — together
-  // with `rowIndexForPhoto` this is enough to convert a flat index to a
-  // (row, column) position and back, which ArrowUp/ArrowDown need below:
-  // justified rows vary in length, so a flat-index step by "the current
-  // row's length" over/undershoots into the wrong row.
-  const { rowIndexForPhoto, rowStarts } = useMemo(() => {
-    const rowIndexForPhoto = new Map<number, number>();
-    const rowStarts: number[] = [];
-    let seen = 0;
-    rows.forEach((row, rowIndex) => {
-      rowStarts.push(seen);
-      row.items.forEach((_, offset) => rowIndexForPhoto.set(seen + offset, rowIndex));
-      seen += row.items.length;
-    });
-    return { rowIndexForPhoto, rowStarts };
-  }, [rows]);
+  // Which row holds each photo, and which photos sit in each row left to
+  // right. Built from the justified rows rather than by arithmetic on the flat
+  // index, because rows vary in length and may also contain a promo tile that
+  // occupies a column without being a navigable photo (src/lib/gallery-grid.ts).
+  const nav = useMemo(() => buildGridNavigation(rows), [rows]);
 
   /**
    * The width each photo's tile was rendered at, so the lightbox can show that
@@ -1241,7 +1266,9 @@ function GalleryViewInner({
   const tileWidths = useMemo(() => {
     const widths = new Map<string, number>();
     for (const row of rows) {
-      for (const entry of row.items) widths.set(entry.item.id, entry.width);
+      for (const entry of row.items) {
+        if (entry.item.kind === "photo") widths.set(entry.item.photo.id, entry.width);
+      }
     }
     return widths;
   }, [rows]);
@@ -1257,11 +1284,11 @@ function GalleryViewInner({
         existing.focus();
         return;
       }
-      const rowIndex = rowIndexForPhoto.get(nextIndex);
+      const rowIndex = nav.rowIndexForPhoto.get(nextIndex);
       if (rowIndex !== undefined) rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
       setPendingFocusIndex(nextIndex);
     },
-    [photos.length, rowIndexForPhoto, rowVirtualizer],
+    [photos.length, nav, rowVirtualizer],
   );
 
   useEffect(() => {
@@ -1294,16 +1321,13 @@ function GalleryViewInner({
       // ArrowDown/ArrowUp: move to the same visual column in the adjacent
       // row rather than stepping the flat index by a row's length — rows
       // vary in length (justified layout), so a flat step over/undershoots
-      // into the wrong row from anywhere but the first column.
-      const rowIndex = rowIndexForPhoto.get(rovingIndex);
-      if (rowIndex === undefined) return;
-      const targetRow = rowIndex + (key === "ArrowDown" ? 1 : -1);
-      if (targetRow < 0 || targetRow >= rows.length) return;
-      const column = rovingIndex - rowStarts[rowIndex]!;
-      const targetColumn = Math.min(column, rows[targetRow]!.items.length - 1);
-      moveRoving(rowStarts[targetRow]! + targetColumn);
+      // into the wrong row from anywhere but the first column. A promo tile
+      // occupies a column without being a landing spot, and a row that is
+      // nothing but a promo is stepped over entirely.
+      const target = photoInAdjacentRow(nav, rovingIndex, key === "ArrowDown" ? 1 : -1);
+      if (target !== null) moveRoving(target);
     },
-    [photos.length, rovingIndex, rows, rowIndexForPhoto, rowStarts, moveRoving],
+    [photos.length, rovingIndex, nav, moveRoving],
   );
 
   const pick = useCallback(
@@ -1813,12 +1837,9 @@ function GalleryViewInner({
             );
           }
 
-          let indexOffset = 0;
-          for (let i = 0; i < virtualRow.index; i += 1) indexOffset += rows[i]!.items.length;
-
           return (
             <li
-              key={row.items[0]?.item.id ?? virtualRow.index}
+              key={row.items[0] ? gridEntryKey(row.items[0].item, photoIdOf) : virtualRow.index}
               className="absolute top-0 left-0 flex w-full"
               style={{
                 height: virtualRow.size,
@@ -1826,9 +1847,31 @@ function GalleryViewInner({
                 transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
               }}
             >
-              {row.items.map((entry, offset) => {
-                const index = indexOffset + offset;
-                const photo = entry.item;
+              {row.items.map((entry) => {
+                // Taken before the narrowing below: inside the promo branch the
+                // entry's photo type is no longer referenced, so `P` would
+                // infer as `unknown` and the id accessor with it.
+                const key = gridEntryKey(entry.item, photoIdOf);
+
+                // The photographer's credit card (docs/PROMO-CARDS.md). It packs
+                // as a landscape frame and is otherwise inert: no photo index,
+                // so nothing downstream — lightbox, selection, favourites,
+                // print, ZIP — can reach it.
+                if (entry.item.kind === "promo") {
+                  return (
+                    <PromoTile
+                      key={key}
+                      promo={entry.item.promo}
+                      width={entry.width}
+                      height={entry.height}
+                    />
+                  );
+                }
+
+                // Carried on the entry rather than recomputed by summing the
+                // lengths of every preceding row — that was both O(rows²) per
+                // render and, once a row can hold a non-photo, wrong.
+                const { photo, photoIndex: index } = entry.item;
                 return (
                   <PhotoTile
                     key={photo.id}

@@ -13,6 +13,7 @@ import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
+import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
 import { publishGallery, restoreGallery } from "../../actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -71,9 +72,27 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           tokenCipher: true,
         },
       },
+      promos: {
+        orderBy: { slot: "asc" },
+        select: {
+          id: true,
+          slot: true,
+          enabled: true,
+          promoCard: { select: { id: true, name: true, headline: true } },
+        },
+      },
     },
   });
   if (!gallery) notFound();
+
+  // The whole card library, so the picker can offer one that is not placed
+  // here yet — and so the panel can tell "no cards written" from "all of them
+  // already placed", which are two different empty states.
+  const promoCards = await prisma.promoCard.findMany({
+    where: { ownerId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true },
+  });
 
   const [counts, perPhoto, reactions, printQuantities] = await Promise.all([
     galleryCounts(gallery.id),
@@ -150,6 +169,20 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         })}
         published={gallery.status === "PUBLISHED"}
         hostedByEvent={gallery.eventId !== null}
+      />
+
+      <GalleryPromoPanel
+        galleryId={gallery.id}
+        photoCount={gallery.photos.length}
+        placed={gallery.promos.map((placement) => ({
+          placementId: placement.id,
+          promoCardId: placement.promoCard.id,
+          name: placement.promoCard.name,
+          headline: placement.promoCard.headline,
+          slot: placement.slot,
+          enabled: placement.enabled,
+        }))}
+        available={promoCards}
       />
 
       <section>
