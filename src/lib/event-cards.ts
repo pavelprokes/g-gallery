@@ -49,3 +49,20 @@ export function visibleEventCards<T extends EventGalleryRow>(rows: T[], now: Dat
     .filter((row) => isCardVisible(row, now))
     .sort((a, b) => a.position - b.position || a.title.localeCompare(b.title, "cs"));
 }
+
+/**
+ * The wedding page shows two kinds of card (docs/GUEST-GALLERIES.md §2): the
+ * photographer's galleries as large cover tiles, and the guests' as a compact
+ * row underneath. What tells them apart is whether the designated link accepts
+ * uploads — the same rule the printable sign uses to pick the gallery its QR
+ * leads to (src/app/admin/e/[id]/sign/page.tsx). Order within each group is
+ * preserved, so `position` still decides.
+ */
+export function splitEventCards<T extends { acceptsUploads: boolean }>(
+  cards: T[],
+): { main: T[]; guest: T[] } {
+  return {
+    main: cards.filter((card) => !card.acceptsUploads),
+    guest: cards.filter((card) => card.acceptsUploads),
+  };
+}

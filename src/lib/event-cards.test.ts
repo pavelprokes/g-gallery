@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isCardVisible, visibleEventCards, type EventGalleryRow } from "./event-cards";
+import {
+  isCardVisible,
+  splitEventCards,
+  visibleEventCards,
+  type EventGalleryRow,
+} from "./event-cards";
 
 const NOW = new Date("2026-08-23T12:00:00Z");
 
@@ -86,5 +91,27 @@ describe("visibleEventCards", () => {
     const input = [row({ id: "a", position: 5 }), row({ id: "b", position: 1 })];
     visibleEventCards(input, NOW);
     expect(input.map((r) => r.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("splitEventCards", () => {
+  const card = (id: string, acceptsUploads: boolean) => ({ id, acceptsUploads });
+
+  it("keeps the photographer's galleries apart from the guests', in order", () => {
+    const { main, guest } = splitEventCards([
+      card("preview", false),
+      card("guests", true),
+      card("full", false),
+    ]);
+    expect(main.map((c) => c.id)).toEqual(["preview", "full"]);
+    expect(guest.map((c) => c.id)).toEqual(["guests"]);
+  });
+
+  it("copes with either group being empty", () => {
+    expect(splitEventCards([card("guests", true)])).toEqual({
+      main: [],
+      guest: [card("guests", true)],
+    });
+    expect(splitEventCards([])).toEqual({ main: [], guest: [] });
   });
 });

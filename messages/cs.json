@@ -129,6 +129,7 @@
     "photoCount": "{count, plural, one {# fotka} few {# fotky} other {# fotek}}",
     "emptyEvent": "Zatím tu nic není. Až fotograf něco přidá, objeví se to na téhle adrese.",
     "emptyCard": "Zatím prázdné",
+    "guestCardHint": "Přidej i svoje fotky z mobilu",
     "selectedCount": "{count, plural, one {# vybraná} few {# vybrané} other {# vybraných}}",
     "zipPreparingAnnounce": "Připravuji stažení…",
     "zipErrorAnnounce": "Stažení se nepodařilo připravit. Zkus to prosím znovu.",

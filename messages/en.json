@@ -129,6 +129,7 @@
     "photoCount": "{count, plural, one {# photo} other {# photos}}",
     "emptyEvent": "Nothing here yet. Once the photographer adds something, it'll show up at this address.",
     "emptyCard": "Empty for now",
+    "guestCardHint": "Add your own phone photos too",
     "selectedCount": "{count, plural, one {# selected} other {# selected}}",
     "zipPreparingAnnounce": "Preparing the download…",
     "zipErrorAnnounce": "The download couldn't be prepared. Please try again.",

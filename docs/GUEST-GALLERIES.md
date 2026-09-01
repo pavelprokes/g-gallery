@@ -48,15 +48,31 @@ One unlisted page per wedding. Whoever gets the link is in; so is everyone they 
 photos.svatebni-fotograf-cechy.cz/s/{token}/pavel-a-patricie-statek-benice-2026-08-12
 
   Pavel a Patricie · 12. 8. 2026 · Statek Benice
-  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-  │ Od hostů      │ │ První výběr   │ │ Kompletní set │
-  │ 412 · přibývá │ │ 30 · 15. 8.   │ │ 500 · 2. 9.   │
-  └───────────────┘ └───────────────┘ └───────────────┘
+  ┌───────────────────────┐ ┌───────────────────────┐
+  │                       │ │                       │
+  │ První výběr           │ │ Kompletní set         │
+  │ 30 · 15. 8.           │ │ 500 · 2. 9.           │
+  └───────────────────────┘ └───────────────────────┘
+  ┌───┐ Od hostů
+  │   │ 412 · 15. 8.                                 ›
+  └───┘ Přidej i svoje fotky z mobilu
 ```
 
 The identity belongs in the header, once. Naming each card with the full
 "12. 8. 2026 Pavel a Patricie, Statek Benice — …" stacks three near-identical paragraphs on a
 phone with the distinguishing word at the end of each. Cards carry only what differs.
+
+**Two weights of card (adopted 2026-09-01).** A wedding page holds one to three galleries: one
+or two from the photographer and, beside them, the guests'. The photographer's are large cover
+tiles with the caption over the photo — the tile's height comes from its aspect ratio alone, so
+two side by side are always the same height whatever their titles do (a lone tile, or the odd
+one at the end of a row, spans the full width at 2:1; on a phone they stack at 4:3). The guests'
+gallery is a compact row underneath: thumbnail, count, and the one line that says what it is
+for. It is the bonus, not the delivery, and as a third full-size tile it read as a third set of
+professional photos. Which is which comes from the designated link's `allowUpload` — the same
+rule the printable sign uses to pick where its QR leads (`splitEventCards`,
+`src/lib/event-cards.ts`). No section headings: the guest gallery is called "Od hostů" by
+default, and a heading above it would say the same thing twice.
 
 Galleries come and go under the event — a preview set gets pulled, the full set arrives, the guest
 gallery closes after a year. Therefore **the event page is the stable address, not any gallery**:

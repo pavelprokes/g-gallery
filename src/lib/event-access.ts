@@ -17,6 +17,8 @@ export interface EventCard extends EventGalleryRow {
   cover: { objectKey: string; placeholder: string | null } | null;
   storagePrefix: string;
   latestPhotoAt: Date | null;
+  /** The designated link lets viewers add photos — a guest gallery, shown as a compact row. */
+  acceptsUploads: boolean;
 }
 
 /**
@@ -69,7 +71,7 @@ export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | 
           status: true,
           trashedAt: true,
           storagePrefix: true,
-          eventLink: { select: { revokedAt: true, expiresAt: true } },
+          eventLink: { select: { revokedAt: true, expiresAt: true, allowUpload: true } },
           _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
           // The photographer's pick, when there is one ({@link pickCover}).
           coverPhoto: { select: { objectKey: true, placeholder: true, status: true } },
@@ -102,6 +104,7 @@ export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | 
       photoCount: gallery._count.photos,
       cover: cover ? { objectKey: cover.objectKey, placeholder: cover.placeholder } : null,
       latestPhotoAt: gallery.photos[0]?.createdAt ?? null,
+      acceptsUploads: gallery.eventLink?.allowUpload === true,
     };
   });
 
