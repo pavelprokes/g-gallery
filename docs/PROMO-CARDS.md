@@ -119,15 +119,49 @@ favourite.
 `src/lib/promo-card.test.ts` and `src/lib/gallery-grid.test.ts` cover the slot maths, URL safety,
 interleaving, key namespacing and the keyboard-navigation maps (27 cases).
 
+`src/components/promo-tile.test.tsx` and `src/app/api/g/[token]/activity/route.test.ts` cover the
+click beacon: that it fires, that it never blocks the navigation, that it is inert without a token
+or for an opted-out viewer, and that the route rejects a promo click carrying a photo id.
+
 `e2e/promo-tile.spec.ts` covers the inertness claims in a real browser. The seed places a card at
 slot 5 in the **same gallery `gallery-view.spec.ts` uses**, on purpose: that file's existing
 assertions — tile count, lightbox `1 / N`, roving tabindex, shift-click ranges — then double as
 proof that a non-photo tile in the grid disturbs none of them.
 
+## Click tracking
+
+Built 2026-09-01. A click on the tile is beaconed to the existing activity route as
+`ActivityType.PROMO_CLICK` — the same `navigator.sendBeacon` path the gallery already uses for
+`GALLERY_VIEW`/`PHOTO_VIEW`, with the same `fetch(keepalive)` fallback.
+
+The navigation never waits on it: nothing calls `preventDefault`, nothing is awaited, and a
+`sendBeacon` that refuses the payload changes nothing about the click. That is the reason for
+`sendBeacon` rather than `fetch` — the tab loses focus the instant the link opens.
+
+A middle-click fires `auxclick` rather than `click`, so it is reported too; the right button is
+excluded, because a context menu is not a visit.
+
+`getViewerId()` gates the beacon, so a viewer who opted out is not counted, exactly as with views.
+`rel="noreferrer"` stays: the click is counted first-party precisely so the share token never has
+to travel to the photographer's own analytics.
+
+### Counted per gallery, not per placement
+
+`ActivityEvent` can point at a gallery, a photo and a viewer. A promo click is neither a photo nor
+attributable to a `GalleryPromo`, and there is no column that could hold one — so the event is
+recorded at gallery level and carries no promo id at all. The beacon therefore sends none, rather
+than sending one the write would drop.
+
+In practice this reads exactly, because a gallery almost always holds one card. Where a gallery
+holds two, its clicks belong to both, and `/admin/promo` says so on the line rather than splitting
+the number. **`ActivityEvent.galleryPromoId` (nullable, `onDelete: SetNull`, indexed with `type`)
+is the one column that would make it exact.**
+
+The admin shows a real zero for a placed card nobody has clicked — that is the finding, not a
+missing row.
+
 ## Not built (deliberate)
 
-- **Click tracking.** Worth having — the photographer should know whether the card works — but it
-  means an `ActivityType` enum value and a beacon path, and it is not needed to ship the tile.
 - **An "end of gallery" card.** A different placement with a different job (a closing CTA rather
   than a credit); the model already supports it via a large slot, but nothing in the UI offers it.
 - **Per-gallery content overrides.** The card is reusable by design; if one wedding needs different

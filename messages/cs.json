@@ -219,7 +219,23 @@
     "downloadAllLabelSized": "Stáhnout vše ({size})",
     "downloadAllStaleTitle": "Stáhne všechny fotky kromě těch úplně nejnovějších – archiv se právě obnovuje.",
     "archivePreparingLabel": "Připravujeme archiv",
-    "archivePreparingTitle": "Archiv se všemi fotkami se ještě připravuje. Vyber si zatím fotky a stáhni je hned, nebo se sem za chvíli vrať."
+    "archivePreparingTitle": "Archiv se všemi fotkami se ještě připravuje. Vyber si zatím fotky a stáhni je hned, nebo se sem za chvíli vrať.",
+    "transfer": {
+      "startTitle": "Pokračovat na jiném zařízení",
+      "haveCode": "Mám kód",
+      "codeTitle": "Zadej tenhle kód na druhém zařízení",
+      "codeHint": "Kód platí 15 minut a použije se jen jednou. Přenese tvoje oblíbené, reakce i výběr k tisku.",
+      "enterTitle": "Kód z prvního zařízení",
+      "enterHint": "Osm znaků. Na velikosti písmen ani na pomlčce nezáleží.",
+      "submit": "Přenést",
+      "adopted": "Hotovo",
+      "close": "Zavřít",
+      "errorNothingYet": "Zatím tu nemáš nic označeného, takže není co přenášet. Dej fotce srdíčko a zkus to znovu.",
+      "errorWrongCode": "Tenhle kód nesedí. Zkontroluj ho a zkus to znovu.",
+      "errorExpired": "Platnost kódu vypršela. Nech si na prvním zařízení vygenerovat nový.",
+      "errorNoIdentity": "Prohlížeč nedovolil uložit data. Zkontroluj, jestli nemáš zakázané ukládání pro tuhle stránku.",
+      "errorGeneric": "Přenos se teď nepovedl. Zkus to prosím za chvíli znovu."
+    }
   },
   "guestUpload": {
     "addPhotos": "Přidat fotky",

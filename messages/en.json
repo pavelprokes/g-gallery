@@ -219,7 +219,23 @@
     "downloadAllLabelSized": "Download all ({size})",
     "downloadAllStaleTitle": "Downloads every photo except the very newest — the archive is being rebuilt.",
     "archivePreparingLabel": "Preparing archive",
-    "archivePreparingTitle": "The full archive is still being prepared. Pick the photos you want and download those now, or check back shortly."
+    "archivePreparingTitle": "The full archive is still being prepared. Pick the photos you want and download those now, or check back shortly.",
+    "transfer": {
+      "startTitle": "Continue on another device",
+      "haveCode": "I have a code",
+      "codeTitle": "Enter this code on the other device",
+      "codeHint": "The code is valid for 15 minutes and works once. It moves your favorites, reactions and print selection.",
+      "enterTitle": "Code from the first device",
+      "enterHint": "Eight characters. Capitals and the dash don't matter.",
+      "submit": "Transfer",
+      "adopted": "Done",
+      "close": "Close",
+      "errorNothingYet": "You haven't marked anything here yet, so there's nothing to move. Favorite a photo and try again.",
+      "errorWrongCode": "That code doesn't match. Check it and try again.",
+      "errorExpired": "The code has expired. Generate a new one on the first device.",
+      "errorNoIdentity": "Your browser wouldn't let us store anything. Check whether site data is blocked for this page.",
+      "errorGeneric": "The transfer didn't work just now. Please try again shortly."
+    }
   },
   "guestUpload": {
     "addPhotos": "Add photos",

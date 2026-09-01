@@ -460,6 +460,10 @@ enum ActivityType {
   DOWNLOAD
   PRINT_SELECT
   VISITOR_IDENTIFIED
+  /// A viewer followed the photographer's credit tile out to their site
+  /// (docs/PROMO-CARDS.md). Without it the card is placed blind — there is no
+  /// way to tell a card that works from one nobody notices.
+  PROMO_CLICK
 
   @@schema("g_gallery")
 }
@@ -484,8 +488,39 @@ model Viewer {
   printSelections PrintSelection[]
   activityEvents  ActivityEvent[]
   uploads         Photo[]          @relation("GuestUploads")
+  transfer        ViewerTransfer?
 
   @@unique([galleryId, anonKey])
+  @@schema("g_gallery")
+}
+
+/// A one-shot code that moves a viewer's identity to another device
+/// (docs/PLAN.md §8a).
+///
+/// Favourites, reactions and print marks all hang off `Viewer`, which is keyed
+/// by a localStorage `anonKey` — so they are trapped in one browser. The bride
+/// goes through 700 photos on her phone across three evenings, then they sit
+/// down at the laptop together to finish, and the laptop shows nothing. Her
+/// mother, who wants six prints, is on a third device. Without this the album
+/// selection is a demo rather than a workflow.
+///
+/// Deliberately narrow: redeeming a code adopts one `Viewer` row inside one
+/// gallery the holder can already open. It carries no email, no account, and
+/// nothing that outlives the gallery.
+model ViewerTransfer {
+  id        String   @id @default(cuid())
+  /// One live code per viewer — asking again replaces the previous one, which
+  /// is also how a mistyped or shoulder-surfed code is cancelled.
+  viewerId  String   @unique
+  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// SHA-256 of `{galleryId}:{code}`, never the code itself — the same rule
+  /// share tokens follow (CLAUDE.md invariant #5). Salting with the gallery id
+  /// means a precomputed table has to be built per gallery.
+  codeHash  String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
   @@schema("g_gallery")
 }
 

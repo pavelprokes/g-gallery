@@ -9,11 +9,23 @@ import { resolveShareLink } from "@/lib/share-access";
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
-const bodySchema = z.object({
-  anonKey: z.uuid(),
-  type: z.enum(["GALLERY_VIEW", "PHOTO_VIEW"]),
-  photoId: z.string().min(1).optional(),
-});
+// PROMO_CLICK deliberately carries no identifier of its own. The click belongs
+// to a `GalleryPromo` placement, but `ActivityEvent` has nowhere to put one
+// (see `promoClickCounts` in src/lib/activity.ts), and accepting a field the
+// write then drops would look like attribution that does not exist.
+const bodySchema = z
+  .object({
+    anonKey: z.uuid(),
+    type: z.enum(["GALLERY_VIEW", "PHOTO_VIEW", "PROMO_CLICK"]),
+    photoId: z.string().min(1).optional(),
+  })
+  // A promo tile is never a photo (docs/PROMO-CARDS.md), so a promo click that
+  // arrives carrying a photo id is a caller bug; storing it would put a
+  // PROMO_CLICK into the per-photo counts.
+  .refine((body) => body.type !== "PROMO_CLICK" || body.photoId === undefined, {
+    error: "photo_id_on_promo_click",
+    path: ["photoId"],
+  });
 
 export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/activity">) {
   const { token } = await ctx.params;

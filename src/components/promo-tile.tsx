@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { type GalleryPromo, isSafePromoUrl, promoCtaFallback } from "@/lib/promo-card";
+import { getViewerId } from "@/lib/viewer-id";
 
 /**
  * The photographer's credit tile, sitting in the grid where a landscape photo
@@ -26,17 +27,62 @@ import { type GalleryPromo, isSafePromoUrl, promoCtaFallback } from "@/lib/promo
  * so the headline is always the right size *for the box it is in*, with no
  * measurement, no JS, and no resize listener. `clamp()` keeps it readable at
  * the extremes.
+ *
+ * ## Click tracking
+ *
+ * `token` is optional so the tile stays renderable without it (tests, previews,
+ * any future surface that has no share link). Without one there is nothing to
+ * report to and the tile is simply silent — the link works either way, which is
+ * the property that matters here.
  */
 export function PromoTile({
   promo,
   width,
   height,
+  token,
 }: {
   promo: GalleryPromo;
   width: number;
   height: number;
+  /** Share token of the gallery this tile is being shown in; enables the
+   * click beacon. Never leaves the first party — see `rel` on the link. */
+  token?: string;
 }) {
   const t = useTranslations("promo");
+
+  /**
+   * Tells the photographer whether the card works at all — the one thing they
+   * cannot see from the outside (docs/PROMO-CARDS.md).
+   *
+   * The navigation must not depend on this in any way: no `preventDefault`, no
+   * awaiting, no re-dispatching the click after a fetch resolves. `sendBeacon`
+   * hands the request to the browser, which delivers it even as this document
+   * goes to the background, and returns synchronously; the anchor's default
+   * action then happens as it always would, beacon or no beacon.
+   */
+  function reportClick() {
+    if (!token) return;
+
+    const anonKey = getViewerId();
+    if (!anonKey) return; // opted out, or no storage — nothing to attribute.
+
+    const payload = JSON.stringify({ anonKey, type: "PROMO_CLICK" });
+    const url = `/api/g/${encodeURIComponent(token)}/activity`;
+
+    // Same shape as the gallery's GALLERY_VIEW / PHOTO_VIEW beacons.
+    if (typeof navigator.sendBeacon === "function") {
+      navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } else {
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {
+        // A lost click is not worth an unhandled rejection in a guest's tab.
+      });
+    }
+  }
 
   // Checked again on render, not only on write: a row can predate a validation
   // rule, and a bad href here would land in pages held by people who are not
@@ -60,6 +106,13 @@ export function PromoTile({
         // in the URL from being handed to the photographer's own analytics as
         // a Referer (CLAUDE.md invariant #7 — tokens must not leak off-site).
         rel="noopener noreferrer"
+        onClick={reportClick}
+        // Middle-click opens the link in a background tab without firing
+        // `click` at all. `auxclick` also fires for the right button, which
+        // opens a context menu rather than following the link — hence the guard.
+        onAuxClick={(event) => {
+          if (event.button === 1) reportClick();
+        }}
         className={`flex h-full w-full flex-col justify-between overflow-hidden text-left ${theme.surface}`}
         style={{
           // Padding tracks the tile, so a 190 px phone tile is not eaten by a

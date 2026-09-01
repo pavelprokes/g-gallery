@@ -69,6 +69,7 @@ import {
 import { srcFor } from "@/lib/image-src";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
+import { ViewerTransferPanel } from "@/components/viewer-transfer-panel";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineIconButton } from "@/components/offline-toggle";
@@ -2065,6 +2066,9 @@ function GalleryViewInner({
                       promo={entry.item.promo}
                       width={entry.width}
                       height={entry.height}
+                      // Lets the tile beacon a PROMO_CLICK before the new tab
+                      // takes over — without it the card is placed blind.
+                      token={token}
                     />
                   );
                 }
@@ -2327,6 +2331,18 @@ function GalleryViewInner({
         ) : (
           <p>{t("optedOutNotice")}</p>
         )}
+
+        {/* Moving a selection to another device (docs/PLAN.md §8a). In the
+            footer rather than the toolbar: it is something a viewer goes
+            looking for once, after noticing their hearts are missing on the
+            laptop — not a control that should sit over the photos. Hidden for
+            an opted-out viewer, who by definition has nothing stored to move. */}
+        {!optedOut && (allowReactions || allowPrintSelection) && (
+          <div className="mt-4">
+            <ViewerTransferPanel token={token} />
+          </div>
+        )}
+
         <SiteFooterIdentity className="mt-4" />
       </footer>
 
