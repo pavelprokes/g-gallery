@@ -13,7 +13,8 @@ import { ShareLinkPanel } from "@/components/share-link-panel";
 import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
-import { publishGallery, restoreGallery } from "../../actions";
+import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
+import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       status: true,
       trashedAt: true,
       eventId: true,
+      coverPhotoId: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
       event: { select: { id: true, title: true } },
       photos: {
@@ -65,15 +67,36 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           expiresAt: true,
           revokedAt: true,
           passwordHash: true,
+          allowDownload: true,
+          allowReactions: true,
+          allowPrintSelection: true,
           allowUpload: true,
           createdAt: true,
           slug: true,
           tokenCipher: true,
         },
       },
+      promos: {
+        orderBy: { slot: "asc" },
+        select: {
+          id: true,
+          slot: true,
+          enabled: true,
+          promoCard: { select: { id: true, name: true, headline: true } },
+        },
+      },
     },
   });
   if (!gallery) notFound();
+
+  // The whole card library, so the picker can offer one that is not placed
+  // here yet — and so the panel can tell "no cards written" from "all of them
+  // already placed", which are two different empty states.
+  const promoCards = await prisma.promoCard.findMany({
+    where: { ownerId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true },
+  });
 
   const [counts, perPhoto, reactions, printQuantities] = await Promise.all([
     galleryCounts(gallery.id),
@@ -152,9 +175,30 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         hostedByEvent={gallery.eventId !== null}
       />
 
+      <GalleryPromoPanel
+        galleryId={gallery.id}
+        photoCount={gallery.photos.length}
+        placed={gallery.promos.map((placement) => ({
+          placementId: placement.id,
+          promoCardId: placement.promoCard.id,
+          name: placement.promoCard.name,
+          headline: placement.promoCard.headline,
+          slot: placement.slot,
+          enabled: placement.enabled,
+        }))}
+        available={promoCards}
+      />
+
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
+          {!printOnly && (
+            <p className="text-admin-muted text-caption dark:text-neutral-400">
+              {gallery.coverPhotoId
+                ? "Titulní fotka je vybraná ručně."
+                : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
+            </p>
+          )}
           {printMarkedPhotos.length > 0 && (
             <a
               href={printOnly ? "?" : "?print=1"}
@@ -172,9 +216,16 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           {visiblePhotos.map((photo) => {
             const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
             const printQuantity = printQuantities.get(photo.id) ?? 0;
+            const isCover = gallery.coverPhotoId === photo.id;
             return (
               <li key={photo.id} className="space-y-1">
-                <div className="relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900">
+                <div
+                  // Outline rather than a ring: it is drawn outside the tile, so
+                  // the cropped photo underneath keeps its full square.
+                  className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
+                    isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
+                  }`}
+                >
                   <Image
                     src={photo.objectKey}
                     alt={photo.fileName}
@@ -182,6 +233,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     sizes="(max-width: 640px) 50vw, 200px"
                     className="object-cover"
                   />
+                  {isCover && (
+                    <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
+                      Titulní
+                    </span>
+                  )}
                 </div>
                 {photo.source === "GUEST" && (
                   <p className="text-xs text-emerald-700 dark:text-emerald-400">
@@ -204,13 +260,18 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                 {printQuantity > 0 && (
                   <CopyButton value={photo.fileName} label="Kopírovat název souboru" />
                 )}
+                <form action={setGalleryCover.bind(null, gallery.id, isCover ? null : photo.id)}>
+                  <Button type="submit" variant={isCover ? "ghost" : "secondary"} size="sm">
+                    {isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
+                  </Button>
+                </form>
                 <DeletePhotoButton photoId={photo.id} />
               </li>
             );
           })}
         </ul>
         {visiblePhotos.length === 0 && (
-          <p className="text-admin-muted mt-3 text-sm dark:text-neutral-400">
+          <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">
             {printOnly ? "Žádná fotka není označená k tisku." : "Zatím žádné potvrzené fotky."}
           </p>
         )}

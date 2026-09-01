@@ -83,6 +83,36 @@ export function optOut(): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Adopts an identity handed over from another device (docs/PLAN.md §8a).
+ *
+ * This overwrites the `anonKey`, which is the whole point: the marks live on
+ * the server against the *old* key, so the second device has to become that
+ * viewer rather than merge into it. Anything this device had marked on its own
+ * key is left behind — in practice that is nothing, since a viewer only
+ * redeems a code on a device where their marks are missing, which is exactly
+ * the complaint that sends them here.
+ *
+ * Returns false when storage is unavailable or the viewer has opted out, so
+ * the caller can say so rather than silently appearing to succeed.
+ */
+export function adoptViewerId(anonKey: string, displayName: string | null): boolean {
+  if (hasOptedOut()) return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, anonKey);
+    // The name travels with the identity — being asked "who's watching?" again
+    // on the laptop, having already answered on the phone, reads as the
+    // transfer not having worked.
+    if (displayName) {
+      window.localStorage.setItem(NAME_KEY, displayName);
+      window.localStorage.setItem(NAME_ASKED_KEY, "1");
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Returns null when the viewer opted out or storage is unavailable. */
 export function getViewerId(): string | null {
   if (hasOptedOut()) return null;

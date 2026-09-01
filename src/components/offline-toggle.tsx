@@ -196,7 +196,7 @@ export function OfflineToggle({
           className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"
         >
           <div
-            className="h-full bg-neutral-900 transition-all dark:bg-neutral-100"
+            className="motion-loop duration-move ease-standard h-full bg-neutral-900 transition-[width] dark:bg-neutral-100"
             style={{ width: `${percent}%` }}
           />
         </div>

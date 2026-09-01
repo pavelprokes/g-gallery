@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { pendingQuery, runUploads } from "./upload-run";
 
+// The thumbnail itself is covered in thumbnail.test.ts; what matters here is
+// that the owner/guest split this module already carries reaches it, because
+// the two profiles produce different pixels (1024/0.65 vs 512/0.72).
+const makeThumbnail = vi.hoisted(() =>
+  // Arguments are typed, not omitted, so `mock.calls[0][1]` is the profile
+  // rather than an index into an empty tuple.
+  vi.fn(async (source: Blob, profile?: "owner" | "guest") => {
+    void source;
+    void profile;
+    return null;
+  }),
+);
+vi.mock("@/lib/thumbnail", () => ({ makeThumbnail }));
+
 describe("pendingQuery", () => {
   it("identifies the owner by gallery", () => {
     expect(pendingQuery({ kind: "owner", galleryId: "gal_1" })).toBe("galleryId=gal_1");
@@ -106,5 +120,59 @@ describe("runUploads — unsupported files", () => {
     expect(skippedCount).toBe(2);
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("runUploads — thumbnail profile", () => {
+  function jpeg(name: string): File {
+    return new File([new Uint8Array([1, 2, 3])], name, { type: "image/jpeg" });
+  }
+
+  async function uploadAs(credentials: Parameters<typeof runUploads>[0]["credentials"]) {
+    makeThumbnail.mockClear();
+    const presigned = {
+      photoId: "p1",
+      objectKey: "galleries/g/p1.jpg",
+      url: "https://r2.example/put",
+      headers: {},
+      thumbTargets: { webp: { url: "https://r2.example/thumb", headers: {} } },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/uploads/presign")) {
+          return new Response(JSON.stringify({ uploads: [presigned] }), { status: 200 });
+        }
+        if (url.includes("/api/uploads/confirm")) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        return new Response(null, { status: 200, headers: { etag: '"abc"' } });
+      }),
+    );
+
+    try {
+      await runUploads({
+        files: [jpeg("ok.jpg")],
+        credentials,
+        resumeIds: [undefined],
+        onItem: () => undefined,
+        onFatal: () => undefined,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+
+  it("asks for the owner profile when the photographer uploads", async () => {
+    await uploadAs({ kind: "owner", galleryId: "gal_1" });
+    expect(makeThumbnail).toHaveBeenCalledTimes(1);
+    expect(makeThumbnail.mock.calls[0]![1]).toBe("owner");
+  });
+
+  it("asks for the guest profile when a share token authorises the upload", async () => {
+    await uploadAs({ kind: "guest", shareToken: "tok", anonKey: "abc" });
+    expect(makeThumbnail).toHaveBeenCalledTimes(1);
+    expect(makeThumbnail.mock.calls[0]![1]).toBe("guest");
   });
 });

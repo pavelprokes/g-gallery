@@ -107,5 +107,55 @@ describe("justifyRows", () => {
       expect(rows[1]!.height).toBe(TARGET);
       expect(rows[1]!.items).toHaveLength(1);
     });
+
+    // The bug this guards: a *partial* row kept the target height with no width
+    // clamp, so a trailing panorama rendered `aspect * targetRowHeight` wide —
+    // 600 px inside a 390 px phone — and the page scrolled sideways, because
+    // the row is `flex w-full` with `shrink-0` tiles.
+    it("never renders a partial row wider than the container", () => {
+      const rows = justifyRows(items([1.5, 1.5, 5]), 390, 120, 4, 2);
+      const last = rows.at(-1)!;
+      expect(last.partial).toBe(true);
+      expect(last.items[0]!.width).toBeLessThanOrEqual(390);
+    });
+
+    it("holds that for every aspect ratio a camera or phone can produce", () => {
+      // 1:3 vertical panorama through 5:1 horizontal, at a phone width.
+      for (const aspect of [0.33, 0.5, 0.667, 0.75, 1, 1.33, 1.5, 1.78, 2, 3, 5]) {
+        const rows = justifyRows(items([1.5, 1.5, aspect]), 390, 120, 4, 2);
+        const last = rows.at(-1)!;
+        const total = last.items.reduce((sum, i) => sum + i.width, 0) + 4 * (last.items.length - 1);
+        expect(total, `aspect ${aspect} overflows`).toBeLessThanOrEqual(390 + 0.001);
+      }
+    });
+
+    it("still never crops a clamped partial row", () => {
+      // Clamping must scale the whole tile, not letterbox it.
+      const rows = justifyRows(items([1.5, 1.5, 5]), 390, 120, 4, 2);
+      const tile = rows.at(-1)!.items[0]!;
+      expect(tile.width / tile.height).toBeCloseTo(5, 5);
+    });
+
+    it("leaves a partial row that already fits at the target height", () => {
+      // The clamp is a ceiling, not a resize — a portrait tile is unaffected.
+      const rows = justifyRows(items([1.5, 1.5, 0.667]), 390, 120, 4, 2);
+      expect(rows.at(-1)!.height).toBe(120);
+    });
+  });
+
+  // The adaptive branch cannot overflow by construction — its loop only emits a
+  // full row once the accumulated width reaches the container, so whatever is
+  // left over is narrower than the container by definition. Asserted rather
+  // than assumed, since the fixed-column branch above proves the assumption is
+  // easy to get wrong.
+  it("never renders any row wider than the container, adaptive branch", () => {
+    const aspects = [5, 0.33, 1.5, 3, 0.5, 1.78, 2.4, 1, 0.667, 4];
+    for (const width of [320, 390, 768, 1440]) {
+      const rows = justifyRows(items(aspects), width, TARGET, GAP, undefined);
+      for (const row of rows) {
+        const total = row.items.reduce((sum, i) => sum + i.width, 0) + GAP * (row.items.length - 1);
+        expect(total, `width ${width}`).toBeLessThanOrEqual(width + 0.001);
+      }
+    }
   });
 });

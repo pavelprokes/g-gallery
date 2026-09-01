@@ -60,7 +60,19 @@ export function CloseIcon({ className = DEFAULT_SIZE }: IconProps) {
   );
 }
 
-export function CheckIcon({ className = DEFAULT_SIZE }: IconProps) {
+/**
+ * `draw` makes the tick draw itself left to right instead of appearing whole.
+ *
+ * `pathLength="1"` normalises the path's length to 1 whatever its real
+ * geometry, so the dash offset animates 1 → 0 with nobody measuring anything.
+ * It is a paint-only change on a 16 px box, and the state it confirms is also
+ * carried by colour and by `aria-checked` — so a reduced-motion viewer, whose
+ * blanket reset collapses this to an instant switch, loses nothing.
+ */
+export function CheckIcon({
+  className = DEFAULT_SIZE,
+  draw = false,
+}: IconProps & { draw?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -72,7 +84,11 @@ export function CheckIcon({ className = DEFAULT_SIZE }: IconProps) {
       className={className}
       aria-hidden
     >
-      <path d="M5 12.5l4.5 4.5L19 7" />
+      <path
+        d="M5 12.5l4.5 4.5L19 7"
+        pathLength={draw ? 1 : undefined}
+        className={draw ? "animate-check-draw [stroke-dasharray:1]" : undefined}
+      />
     </svg>
   );
 }
@@ -149,10 +165,23 @@ export function OfflineIcon({ className = DEFAULT_SIZE }: IconProps) {
   );
 }
 
+/**
+ * `pulse` plays a one-shot pop and a burst ring.
+ *
+ * It is fired by a **confirmed save**, not by the tap (see `sendFavorite` in
+ * `gallery-view.tsx`). The fill already flips optimistically on touch, so the
+ * viewer gets instant feedback either way; this is the receipt on top of it,
+ * which makes the animation carry information rather than decorate. When the
+ * server refuses, there is no pop — the heart empties again and an alert says
+ * why.
+ *
+ * Two properties, both compositor-friendly, on a 16 px glyph.
+ */
 export function HeartIcon({
   className = DEFAULT_SIZE,
   active = false,
-}: IconProps & { active?: boolean }) {
+  pulse = false,
+}: IconProps & { active?: boolean; pulse?: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -164,7 +193,21 @@ export function HeartIcon({
       className={className}
       aria-hidden
     >
-      <path d="M12 20.3c-.3 0-.6-.1-.8-.3C7.3 16.9 3 13 3 8.9 3 5.9 5.2 4 8 4c1.7 0 3.2.9 4 2.3C12.8 5 14.3 4 16 4c2.8 0 5 1.9 5 4.9 0 4.1-4.3 8-8.2 11.1-.2.2-.5.3-.8.3Z" />
+      {pulse && (
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className="svg-origin-center animate-heart-burst"
+        />
+      )}
+      <path
+        d="M12 20.3c-.3 0-.6-.1-.8-.3C7.3 16.9 3 13 3 8.9 3 5.9 5.2 4 8 4c1.7 0 3.2.9 4 2.3C12.8 5 14.3 4 16 4c2.8 0 5 1.9 5 4.9 0 4.1-4.3 8-8.2 11.1-.2.2-.5.3-.8.3Z"
+        className={pulse ? "svg-origin-center animate-heart-pop" : undefined}
+      />
     </svg>
   );
 }

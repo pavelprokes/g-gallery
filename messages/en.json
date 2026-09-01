@@ -75,18 +75,18 @@
       },
       {
         "q": "How do I download every photo at once?",
-        "a": "The \"Download all\" button packs the gallery into a ZIP. For big galleries this takes a moment and builds in the background — just check back shortly."
+        "a": "The “Download all” button packs the gallery into a ZIP. For big galleries this takes a moment and builds in the background — just check back shortly."
       }
     ],
     "guestTipsHeading": "Tips and tricks for shooting as a guest",
     "guestTipsIntro": "If the photographer or the couple enabled uploads on this gallery, anyone at the wedding can add their own photos, right alongside the photographer's.",
     "guestTipsImageAlt": "A table card with a QR code on the wedding table, among candles and place settings",
     "guestTips": [
-      "Nothing to install. Just the link or QR code from the photographer or couple, the \"Add photos\" button, and your phone's regular file picker or camera.",
+      "Nothing to install. Just the link or QR code from the photographer or couple, the “Add photos” button, and your phone's regular file picker or camera.",
       "Feel free to lock your phone mid-upload — it keeps going in the background and picks up once you're back.",
       "Add your name if the gallery asks — it lets the couple see whose photo it is later.",
       "Uploaded something by mistake? Delete it yourself right in the gallery — no need to message anyone.",
-      "iPhone photos work without any fuss — they're sent to the browser in a standard format automatically. The only exception: if Settings → Photos → Transfer to Mac or PC has \"Keep Originals\" turned on (most people don't have this), an upload can occasionally fail — switch it to \"Automatic\" and try again."
+      "iPhone photos work without any fuss — they're sent to the browser in a standard format automatically. The only exception: if Settings → Photos → Transfer to Mac or PC has “Keep Originals” turned on (most people don't have this), an upload can occasionally fail — switch it to “Automatic” and try again."
     ],
     "featuresHeading": "Everything the gallery can do",
     "featuresIntro": "Ordered from what you'll use most, down to the extras for specific moments of the wedding.",
@@ -108,9 +108,11 @@
   "errors": {
     "linkNotFoundTitle": "This link doesn't go anywhere",
     "linkNotFoundLead": "Chat apps often cut links in half when they're pasted — it happens all the time. Try opening it again straight from the original message, or scan the QR code if you've got it handy.",
-    "linkNotFoundHint": "Still no luck? Message the couple — they have the link.",
+    "linkNotFoundHint": "Still no luck? Message whoever sent you the link — they still have it.",
     "genericNotFoundTitle": "There's nothing here",
     "genericNotFoundLead": "This address doesn't lead anywhere.",
+    "adminNotFoundLead": "This address doesn't exist in the admin area.",
+    "adminNotFoundAction": "Back to the dashboard",
     "galleryErrorTitle": "Something went wrong",
     "galleryErrorLead": "The gallery couldn't load. Please try again.",
     "tryAgain": "Try again",
@@ -131,7 +133,7 @@
     "zipErrorAnnounce": "The download couldn't be prepared. Please try again.",
     "back": "Back",
     "showAllPhotos": "Show all photos",
-    "showFavoritesOnlyTitle": "Show only photos you've hearted",
+    "showFavoritesOnlyTitle": "Show only your favorites",
     "showFavoritesOnlySr": "Show favorites only",
     "slideshowButtonLabel": "Slideshow",
     "slideshowButtonTitle": "Photos on the big screen — change on their own, new ones appear live",
@@ -146,16 +148,16 @@
     "preparingShort": "Preparing…",
     "photosListAriaLabel": "Photos in the gallery",
     "loadingMorePhotos": "Loading more photos…",
-    "emptyGallery": "There are no photos in this gallery yet.",
-    "searchingFavorites": "Looking for your hearted photos in the rest of the gallery…",
-    "noFavoritesYet": "You haven't hearted any photos yet.",
+    "emptyGallery": "There are no photos in this gallery yet. Once the photographer adds them, they'll show up here — just reload the page.",
+    "searchingFavorites": "Looking for your favorites in the rest of the gallery…",
+    "noFavoritesYet": "You haven't added any favorites yet.",
     "lightboxAriaLabel": "Photo {index} of {total}",
     "previous": "Previous",
     "next": "Next",
     "close": "Close",
     "deleting": "Deleting…",
     "deleteMyPhoto": "Delete my photo",
-    "deleteConfirm": "Delete this photo from the album? This can't be undone.",
+    "deleteConfirm": "Delete this photo from the gallery? This can't be undone.",
     "selected": "Selected",
     "select": "Select",
     "preparingDownload": "Preparing download",
@@ -212,6 +214,27 @@
       "ariaLabel": "Slideshow",
       "empty": "There are no photos here yet.",
       "exit": "Exit"
+    },
+    "saveFailed": "Your last mark didn't save — check your connection and try again. If the link has expired, message whoever sent it to you.",
+    "downloadAllLabelSized": "Download all ({size})",
+    "downloadAllStaleTitle": "Downloads every photo except the very newest — the archive is being rebuilt.",
+    "archivePreparingLabel": "Preparing archive",
+    "archivePreparingTitle": "The full archive is still being prepared. Pick the photos you want and download those now, or check back shortly.",
+    "transfer": {
+      "startTitle": "Continue on another device",
+      "haveCode": "I have a code",
+      "codeTitle": "Enter this code on the other device",
+      "codeHint": "The code is valid for 15 minutes and works once. It moves your favorites, reactions and print selection.",
+      "enterTitle": "Code from the first device",
+      "enterHint": "Eight characters. Capitals and the dash don't matter.",
+      "submit": "Transfer",
+      "adopted": "Done",
+      "close": "Close",
+      "errorNothingYet": "You haven't marked anything here yet, so there's nothing to move. Favorite a photo and try again.",
+      "errorWrongCode": "That code doesn't match. Check it and try again.",
+      "errorExpired": "The code has expired. Generate a new one on the first device.",
+      "errorNoIdentity": "Your browser wouldn't let us store anything. Check whether site data is blocked for this page.",
+      "errorGeneric": "The transfer didn't work just now. Please try again shortly."
     }
   },
   "guestUpload": {
@@ -222,28 +245,28 @@
     "resumingProgress": "Finishing your upload — {done} of {total} · keeping the screen on. If this gets interrupted, it'll pick up again once you're back.",
     "discardRest": "Discard the rest",
     "doneSome": "Uploaded. Everyone at the wedding will see it.",
-    "doneNone": "Nothing was uploaded.",
-    "failedSuffix": "{count} didn't make it",
-    "skippedNote": "(We skipped {count} files — the rest are still uploading.)",
+    "doneNone": "Nothing was uploaded. Pick the photos again — smaller batches work best.",
+    "failedSuffix": "{count, plural, one {# photo didn't make it} other {# photos didn't make it}}",
+    "skippedNote": "(We skipped {count, plural, one {# file} other {# files}} — the rest are still uploading.)",
     "startFailed": "Couldn't start the upload. Please try again.",
     "resumeFailed": "Couldn't finish an upload left over from before.",
     "consentPrefix": "By uploading, you're confirming you're allowed to share these photos. Want one taken down?",
     "consentEmailLinkText": "Email us",
-    "consentNoEmailFallback": "Ask the couple — they can delete it right away",
+    "consentNoEmailFallback": "Ask the photographer or the couple — they can delete it right away",
     "nameAskTitle": "Who should get the credit?",
     "nameAskHint": "Add your first name and it'll show up on your photos. Leaving it blank is fine too.",
     "nameAskPlaceholder": "Name",
     "nameAskSave": "Save",
     "nameAskSkip": "Skip",
     "rejection": {
-      "unsupportedHeic": "We can't handle this format (HEIC) yet. In Settings → Camera → Formats, switch to \"Most Compatible\" and try again.",
+      "unsupportedHeic": "We can't handle this format (HEIC) yet. In Settings → Camera → Formats, switch to “Most Compatible” and try again.",
       "unsupportedVideo": "We don't accept videos yet, just photos.",
       "unsupportedGeneric": "We can't handle this file type. Try a different photo.",
       "fileTooLarge": "That photo is too large.",
       "quotaViewerFull": "You've already added a lot of photos — you can't add more for now. Thanks!",
-      "quotaAlbumFull": "The album is full for now. Please let the couple know.",
+      "quotaAlbumFull": "The gallery is full for now. Please let whoever sent you the link know.",
       "deniedPasswordRequired": "Please reload the page and enter the password.",
-      "deniedGeneric": "This album isn't accepting new photos anymore.",
+      "deniedGeneric": "This gallery isn't accepting new photos anymore.",
       "rateLimited": "You're sending a lot at once — give it a moment and try again.",
       "sizeMismatch": "The photo didn't fully transfer. We're trying again.",
       "genericFailure": "The upload didn't go through. Please try again once you have a better signal."
@@ -251,16 +274,21 @@
   },
   "presence": {
     "someone": "Someone is viewing right now",
-    "count": "{count, plural, one {# person} other {# people}} are viewing right now",
+    "count": "{count, plural, one {# person is viewing right now} other {# people are viewing right now}}",
     "named": "{names} {count, plural, one {is viewing} other {are viewing}}"
   },
   "sharePassword": {
+    "eyebrow": "Pavel Prokeš · wedding photographer",
     "title": "This gallery is password-protected",
     "hint": "The photographer sent you the password along with the link.",
+    "passwordLabel": "Gallery password",
     "placeholder": "Password",
     "verifying": "Checking…",
     "submit": "View gallery",
     "missingPassword": "Enter a password.",
-    "wrongPassword": "Wrong password. Please try again later."
+    "wrongPassword": "Wrong password. Check for capital letters and please try again later, or ask the photographer to resend it."
+  },
+  "promo": {
+    "cardAriaLabel": "{headline} — opens {cta} in a new window"
   }
 }

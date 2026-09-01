@@ -226,7 +226,7 @@ export function GuestUploader({
             <p className="mb-2 flex items-center gap-2 text-sm">
               <span
                 aria-hidden
-                className="inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
+                className="motion-loop inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
               />
               {t("preparing", { count: preparing })}
             </p>
@@ -256,7 +256,7 @@ export function GuestUploader({
               </p>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
                 <div
-                  className="h-full bg-neutral-900 transition-all dark:bg-neutral-100"
+                  className="motion-loop duration-move ease-standard h-full bg-neutral-900 transition-[width] dark:bg-neutral-100"
                   style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }}
                 />
               </div>
@@ -285,7 +285,7 @@ export function GuestUploader({
           */}
           <div className="flex gap-2">
             <label
-              className={`relative flex-1 rounded-lg bg-neutral-900 px-4 py-3 text-center text-base font-medium text-white dark:bg-neutral-100 dark:text-neutral-900 ${
+              className={`bg-brand-primary hover:bg-brand-primary-dark duration-flip relative flex-1 rounded-lg px-4 py-3 text-center text-base font-semibold text-white transition-colors ${
                 running ? "pointer-events-none opacity-50" : "cursor-pointer"
               }`}
             >
@@ -363,7 +363,7 @@ function NameAsk({ onSubmit }: { onSubmit: (name: string) => void }) {
         <div className="mt-4 flex gap-2">
           <button
             type="submit"
-            className="flex-1 rounded-lg bg-neutral-900 px-4 py-2 font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
+            className="bg-brand-primary hover:bg-brand-primary-dark duration-flip flex-1 rounded-lg px-4 py-2 font-semibold text-white transition-colors"
           >
             {t("nameAskSave")}
           </button>

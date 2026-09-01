@@ -9,6 +9,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -47,6 +48,15 @@ import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
+  buildGridEntries,
+  buildGridNavigation,
+  gridEntryKey,
+  photoInAdjacentRow,
+  type GridEntry,
+} from "@/lib/gallery-grid";
+import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
+import { PromoTile } from "@/components/promo-tile";
+import {
   clampPan,
   clampScale,
   distance,
@@ -59,6 +69,7 @@ import {
 import { srcFor } from "@/lib/image-src";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
+import { ViewerTransferPanel } from "@/components/viewer-transfer-panel";
 import { Slideshow } from "@/components/slideshow";
 import { GuestUploader } from "@/components/guest-uploader";
 import { OfflineIconButton } from "@/components/offline-toggle";
@@ -78,6 +89,8 @@ import {
   ProjectorIcon,
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
+import type { GalleryArchive } from "@/lib/shared-gallery";
+import { formatBytes } from "@/lib/offline";
 import {
   REACTION_EMOJI,
   REACTION_KINDS,
@@ -87,6 +100,18 @@ import {
   type ReactionKind,
 } from "@/lib/reactions-shared";
 import { MAX_PRINT_QUANTITY, clampPrintQuantity } from "@/lib/print-selections-shared";
+
+/**
+ * Undoes an optimistic write when the server refuses it.
+ *
+ * Every mark a viewer makes — heart, reaction, print quantity — is applied to
+ * the UI before the request is sent, because a wedding gallery is browsed by
+ * the hundred and a spinner per tap would be unusable. The cost of that is
+ * that a refusal has to be walked back, or the viewer keeps marking photos
+ * into a void: an expired link, a revoked one, or a link whose owner turned
+ * reactions off answers 403, and sixty red hearts then reach nobody.
+ */
+type Revert = () => void;
 
 /** Distance a touch must travel before it counts as a swipe, not a tap. */
 const SWIPE_THRESHOLD_PX = 50;
@@ -163,6 +188,13 @@ function aspectOf(photo: GalleryPhoto): number {
   return photo.width / photo.height;
 }
 
+/** A promo tile packs as a landscape frame; a photo packs as itself. */
+function entryAspect(entry: GridEntry<GalleryPhoto>): number {
+  return entry.kind === "promo" ? PROMO_ASPECT : aspectOf(entry.photo);
+}
+
+const photoIdOf = (photo: GalleryPhoto) => photo.id;
+
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
@@ -170,8 +202,19 @@ function aspectOf(photo: GalleryPhoto): number {
  * Traps Tab/Shift+Tab inside a modal container and restores focus to
  * whatever was focused before it opened. Shared by the lightbox and the name
  * prompt, which can each appear stacked over the grid.
+ *
+ * `initialFocus` names the control that should receive focus on open. Without
+ * it the first focusable element wins, which in the lightbox is whichever nav
+ * button happens to be enabled: on photo 1 "Předchozí" is disabled and focus
+ * fell through to "Další", while anywhere else it landed on "Předchozí" —
+ * so the same action put the keyboard in two different places depending on
+ * which photo was opened. A modal's initial focus has to be predictable.
  */
-function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, active: boolean) {
+function useFocusTrap<T extends HTMLElement>(
+  containerRef: RefObject<T | null>,
+  active: boolean,
+  initialFocusRef?: RefObject<HTMLElement | null>,
+) {
   useEffect(() => {
     if (!active) return;
     const container = containerRef.current;
@@ -185,9 +228,14 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
         container.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ),
-      ).filter((el) => el.offsetParent !== null);
+      ).filter(
+        // `inert` is how the lightbox hides its chrome; its subtree must not be
+        // a Tab stop or a focus target, and `offsetParent` alone does not
+        // exclude it (nor does it exclude an `opacity-0` element).
+        (el) => el.offsetParent !== null && !el.closest("[inert]"),
+      );
 
-    (getFocusable()[0] ?? container).focus();
+    (initialFocusRef?.current ?? getFocusable()[0] ?? container).focus();
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Tab") return;
@@ -210,7 +258,7 @@ function useFocusTrap<T extends HTMLElement>(containerRef: RefObject<T | null>, 
       container.removeEventListener("keydown", onKeyDown);
       restoreTarget?.focus();
     };
-  }, [active, containerRef]);
+  }, [active, containerRef, initialFocusRef]);
 }
 
 /** Movement under this is still a tap, not a drag — fingers are never still. */
@@ -675,7 +723,7 @@ function LightboxPhoto({
           aria-hidden
           className="pointer-events-none absolute right-4 bottom-4 flex size-8 items-center justify-center rounded-full bg-black/60"
         >
-          <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          <span className="motion-loop size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
         </span>
       )}
       {selected && (
@@ -748,6 +796,11 @@ interface GalleryViewProps {
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
   viewers: GalleryViewer[];
+  /** The owner's credit cards placed in this gallery (docs/PROMO-CARDS.md).
+   * Sent once with the page rather than per photo page: slots are resolved
+   * against the whole gallery, so a card at slot 5 is the 5th tile from the
+   * first paint and does not jump when the next page arrives. */
+  promos: GalleryPromo[];
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -759,12 +812,11 @@ interface GalleryViewProps {
    * which must never reveal that a wedding page exists. */
   backHref?: string;
   backLabel?: string;
-  /** Pre-built "download all" archive (docs/TODO.md §7), if one is ready — a
-   * plain CDN link, not a Worker request. Null covers every other state
-   * (never built, still building, or invalidated by a newer upload) equally;
-   * the UI doesn't distinguish them, since there is nothing the viewer can
-   * do about any of those besides wait. */
-  archiveZipUrl: string | null;
+  /** Pre-built "download all" archive (docs/TODO.md §7). Never null as an
+   * object: the control renders in every state, because "no button at all"
+   * was indistinguishable from a broken gallery to the one person who opened
+   * the link specifically to download their wedding. */
+  archive: GalleryArchive;
 }
 
 function GalleryViewInner({
@@ -777,11 +829,12 @@ function GalleryViewInner({
   initialCursor,
   imageGrant,
   viewers,
+  promos,
   allowDownload,
   allowReactions,
   allowUpload,
   allowPrintSelection,
-  archiveZipUrl,
+  archive,
   backHref,
   backLabel,
 }: GalleryViewProps) {
@@ -797,6 +850,33 @@ function GalleryViewInner({
     () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
+  /**
+   * A viewer's heart, reaction or print mark was applied optimistically and the
+   * server then refused it — so the UI has been put back and they need to know,
+   * or they will keep marking photos into a void. Set on any failure, cleared
+   * by the next write that succeeds.
+   *
+   * This is the one client-side error worth being loud about: the whole album
+   * selection hangs off these marks, and the failure mode it replaces was
+   * sixty red hearts that reached nobody.
+   */
+  const [saveFailed, setSaveFailed] = useState(false);
+  /**
+   * The undo for an optimistic write that the name prompt interrupted. Only one
+   * interaction can be waiting on the prompt at a time, so one slot is enough;
+   * a ref rather than state because nothing renders from it.
+   */
+  const pendingRevert = useRef<Revert | null>(null);
+  /**
+   * The photo whose favourite the server just confirmed, so its heart can pop.
+   *
+   * Deliberately driven by the confirmation rather than by the tap: the fill
+   * already flips optimistically, so this is the receipt, and its *absence* on
+   * a failed save is then meaningful too. Cleared on a timer because it is a
+   * one-shot animation, not a state.
+   */
+  const [savedPulseId, setSavedPulseId] = useState<string | null>(null);
+  const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
   const [projecting, setProjecting] = useState(false);
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
@@ -992,24 +1072,38 @@ function GalleryViewInner({
   }, [allowReactions, token]);
 
   const sendReaction = useCallback(
-    async (photoId: string, kind: ReactionKind, displayName?: string) => {
+    async (
+      photoId: string,
+      kind: ReactionKind,
+      displayName: string | undefined,
+      revert: Revert,
+    ) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
 
-      const response = await fetch(`/api/g/${encodeURIComponent(token)}/reaction`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anonKey, photoId, kind, displayName }),
-      });
-      if (!response.ok) return;
+      try {
+        const response = await fetch(`/api/g/${encodeURIComponent(token)}/reaction`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anonKey, photoId, kind, displayName }),
+        });
+        if (!response.ok) throw new Error(`reaction failed (${response.status})`);
 
-      // The server is authoritative about the tally: two viewers reacting at
-      // once would otherwise leave each of them with their own stale count.
-      const data = (await response.json()) as {
-        mine: ReactionKind | null;
-        counts: Partial<Record<ReactionKind, number>>;
-      };
-      setReactions((prev) => new Map(prev).set(photoId, { counts: data.counts, mine: data.mine }));
+        // The server is authoritative about the tally: two viewers reacting at
+        // once would otherwise leave each of them with their own stale count.
+        const data = (await response.json()) as {
+          mine: ReactionKind | null;
+          counts: Partial<Record<ReactionKind, number>>;
+        };
+        setReactions((prev) =>
+          new Map(prev).set(photoId, { counts: data.counts, mine: data.mine }),
+        );
+        setSaveFailed(false);
+      } catch (error) {
+        console.error(error);
+        revert();
+        setSaveFailed(true);
+      }
     },
     [token],
   );
@@ -1025,32 +1119,49 @@ function GalleryViewInner({
         return new Map(prev).set(photoId, { ...entry, mine: next });
       });
 
+      const revert = () =>
+        setReactions((prev) => {
+          const entry = prev.get(photoId) ?? { counts: {}, mine: null };
+          return new Map(prev).set(photoId, { ...entry, mine: current });
+        });
+
       // Same "join" moment as the heart — asked once, always skippable.
       if (next && !getViewerName() && !hasAnsweredNamePrompt()) {
+        pendingRevert.current = revert;
         setNamePromptFor(photoId);
         setPendingReaction(kind);
         return;
       }
 
-      void sendReaction(photoId, kind, getViewerName() ?? undefined);
+      void sendReaction(photoId, kind, getViewerName() ?? undefined, revert);
     },
     [reactions, sendReaction],
   );
 
   const sendFavorite = useCallback(
-    async (photoId: string, favorite: boolean, displayName?: string) => {
+    async (photoId: string, favorite: boolean, displayName: string | undefined, revert: Revert) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
 
-      const response = await fetch(`/api/g/${encodeURIComponent(token)}/favorite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anonKey, photoId, favorite, displayName }),
-      });
-      if (!response.ok) return;
+      try {
+        const response = await fetch(`/api/g/${encodeURIComponent(token)}/favorite`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anonKey, photoId, favorite, displayName }),
+        });
+        if (!response.ok) throw new Error(`favorite failed (${response.status})`);
 
-      const data = (await response.json()) as { count: number };
-      setCounts((prev) => new Map(prev).set(photoId, data.count));
+        const data = (await response.json()) as { count: number };
+        setCounts((prev) => new Map(prev).set(photoId, data.count));
+        setSaveFailed(false);
+        // Only on the way in: un-favouriting is a removal, and a celebration
+        // for it would read as the opposite of what just happened.
+        if (favorite) setSavedPulseId(photoId);
+      } catch (error) {
+        console.error(error);
+        revert();
+        setSaveFailed(true);
+      }
     },
     [token],
   );
@@ -1067,39 +1178,63 @@ function GalleryViewInner({
         return copy;
       });
 
+      const revert = () =>
+        setFavorites((prev) => {
+          const copy = new Set(prev);
+          if (next) copy.delete(photoId);
+          else copy.add(photoId);
+          return copy;
+        });
+
       // Google Photos asks who you are the moment you first interact — the
       // "join" moment. We do the same, and it stays optional.
       if (next && !getViewerName() && !hasAnsweredNamePrompt()) {
+        pendingRevert.current = revert;
         setNamePromptFor(photoId);
         return;
       }
 
-      void sendFavorite(photoId, next, getViewerName() ?? undefined);
+      void sendFavorite(photoId, next, getViewerName() ?? undefined, revert);
     },
     [favorites, sendFavorite],
   );
 
+  useEffect(() => {
+    if (!savedPulseId) return;
+    // Comfortably past the 320 ms burst, so the class is gone before the same
+    // photo could plausibly be favourited again and need to replay it.
+    const timer = window.setTimeout(() => setSavedPulseId(null), 600);
+    return () => clearTimeout(timer);
+  }, [savedPulseId]);
+
   const sendPrintQuantity = useCallback(
-    async (photoId: string, quantity: number, displayName?: string) => {
+    async (photoId: string, quantity: number, displayName: string | undefined, revert: Revert) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
 
-      const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anonKey, photoId, quantity, displayName }),
-      });
-      if (!response.ok) return;
+      try {
+        const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anonKey, photoId, quantity, displayName }),
+        });
+        if (!response.ok) throw new Error(`print selection failed (${response.status})`);
 
-      // The server is authoritative — a 0 sent while the row didn't exist
-      // resolves the same way a rejected quantity would.
-      const data = (await response.json()) as { quantity: number };
-      setPrintSelections((prev) => {
-        const copy = new Map(prev);
-        if (data.quantity > 0) copy.set(photoId, data.quantity);
-        else copy.delete(photoId);
-        return copy;
-      });
+        // The server is authoritative — a 0 sent while the row didn't exist
+        // resolves the same way a rejected quantity would.
+        const data = (await response.json()) as { quantity: number };
+        setPrintSelections((prev) => {
+          const copy = new Map(prev);
+          if (data.quantity > 0) copy.set(photoId, data.quantity);
+          else copy.delete(photoId);
+          return copy;
+        });
+        setSaveFailed(false);
+      } catch (error) {
+        console.error(error);
+        revert();
+        setSaveFailed(true);
+      }
     },
     [token],
   );
@@ -1118,16 +1253,25 @@ function GalleryViewInner({
         return copy;
       });
 
+      const revert = () =>
+        setPrintSelections((prev) => {
+          const copy = new Map(prev);
+          if (current > 0) copy.set(photoId, current);
+          else copy.delete(photoId);
+          return copy;
+        });
+
       // Same "join" moment as the heart — asked once, always skippable. Only
       // reachable on an increment: a decrement implies a copy was already
       // set, so the prompt was already shown or skipped.
       if (next > 0 && !getViewerName() && !hasAnsweredNamePrompt()) {
+        pendingRevert.current = revert;
         setNamePromptFor(photoId);
         setPendingPrint(next);
         return;
       }
 
-      void sendPrintQuantity(photoId, next, getViewerName() ?? undefined);
+      void sendPrintQuantity(photoId, next, getViewerName() ?? undefined, revert);
     },
     [printSelections, sendPrintQuantity],
   );
@@ -1175,16 +1319,30 @@ function GalleryViewInner({
     return () => observer.disconnect();
   }, [selectionActive]);
 
-  const rows = useMemo<JustifiedRow<GalleryPhoto>[]>(() => {
+  /**
+   * The tiles the grid lays out: every photo, plus the owner's promo cards at
+   * their slots (docs/PROMO-CARDS.md). Promos are *layout* participants only —
+   * `photos` itself is untouched, so the lightbox, selection, favourites,
+   * print marks and the ZIP manifest never see one.
+   *
+   * Favourites-only mode drops them: that view is the viewer's own shortlist,
+   * and a credit card in the middle of it is neither theirs nor a favourite.
+   */
+  const entries = useMemo<GridEntry<GalleryPhoto>[]>(
+    () => buildGridEntries(photos, favoritesOnly ? [] : promos),
+    [photos, promos, favoritesOnly],
+  );
+
+  const rows = useMemo<JustifiedRow<GridEntry<GalleryPhoto>>[]>(() => {
     if (containerWidth <= 0) return [];
     return justifyRows(
-      photos.map((photo) => ({ item: photo, aspect: aspectOf(photo) })),
+      entries.map((entry) => ({ item: entry, aspect: entryAspect(entry) })),
       containerWidth,
       targetRowHeight(containerWidth),
       GAP,
       itemsPerRow(containerWidth),
     );
-  }, [photos, containerWidth]);
+  }, [entries, containerWidth]);
 
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length + (hasNextPage ? 1 : 0),
@@ -1193,6 +1351,30 @@ function GalleryViewInner({
     scrollMargin,
     gap: GAP,
   });
+
+  /**
+   * Re-measures every row when the layout changes shape.
+   *
+   * `@tanstack/virtual-core` memoises its measurements on `count`,
+   * `paddingStart`, `scrollMargin`, `getItemKey`, `gap` and a cache version —
+   * **not** on `estimateSize`. `justifyRows` scales every row's height to fill
+   * the new width, so a resize that leaves the row *count* unchanged reuses
+   * stale heights and offsets: the `<li>` gets the old size and translateY
+   * while the tiles inside it get the fresh one, and rows overlap.
+   *
+   * Below 640 px this is not an edge case but the norm — the fixed 2-column
+   * grid makes `rows.length` independent of width, so every phone rotation,
+   * split-view resize and browser-chrome collapse hits it. `measure()` clears
+   * the size cache and bumps the version, which is the documented remedy.
+   *
+   * Layout effect, not a plain one: the paint that follows a resize must
+   * already have the corrected offsets, or the overlap is visible for a frame.
+   */
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+    // `rows` covers a row's height changing without the width doing so — a
+    // newly loaded page can repack the last row.
+  }, [containerWidth, rows, rowVirtualizer]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
 
@@ -1211,22 +1393,11 @@ function GalleryViewInner({
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  // `rowStarts[i]` is the flat photo index of row i's first tile — together
-  // with `rowIndexForPhoto` this is enough to convert a flat index to a
-  // (row, column) position and back, which ArrowUp/ArrowDown need below:
-  // justified rows vary in length, so a flat-index step by "the current
-  // row's length" over/undershoots into the wrong row.
-  const { rowIndexForPhoto, rowStarts } = useMemo(() => {
-    const rowIndexForPhoto = new Map<number, number>();
-    const rowStarts: number[] = [];
-    let seen = 0;
-    rows.forEach((row, rowIndex) => {
-      rowStarts.push(seen);
-      row.items.forEach((_, offset) => rowIndexForPhoto.set(seen + offset, rowIndex));
-      seen += row.items.length;
-    });
-    return { rowIndexForPhoto, rowStarts };
-  }, [rows]);
+  // Which row holds each photo, and which photos sit in each row left to
+  // right. Built from the justified rows rather than by arithmetic on the flat
+  // index, because rows vary in length and may also contain a promo tile that
+  // occupies a column without being a navigable photo (src/lib/gallery-grid.ts).
+  const nav = useMemo(() => buildGridNavigation(rows), [rows]);
 
   /**
    * The width each photo's tile was rendered at, so the lightbox can show that
@@ -1241,7 +1412,9 @@ function GalleryViewInner({
   const tileWidths = useMemo(() => {
     const widths = new Map<string, number>();
     for (const row of rows) {
-      for (const entry of row.items) widths.set(entry.item.id, entry.width);
+      for (const entry of row.items) {
+        if (entry.item.kind === "photo") widths.set(entry.item.photo.id, entry.width);
+      }
     }
     return widths;
   }, [rows]);
@@ -1257,11 +1430,11 @@ function GalleryViewInner({
         existing.focus();
         return;
       }
-      const rowIndex = rowIndexForPhoto.get(nextIndex);
+      const rowIndex = nav.rowIndexForPhoto.get(nextIndex);
       if (rowIndex !== undefined) rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
       setPendingFocusIndex(nextIndex);
     },
-    [photos.length, rowIndexForPhoto, rowVirtualizer],
+    [photos.length, nav, rowVirtualizer],
   );
 
   useEffect(() => {
@@ -1294,16 +1467,13 @@ function GalleryViewInner({
       // ArrowDown/ArrowUp: move to the same visual column in the adjacent
       // row rather than stepping the flat index by a row's length — rows
       // vary in length (justified layout), so a flat step over/undershoots
-      // into the wrong row from anywhere but the first column.
-      const rowIndex = rowIndexForPhoto.get(rovingIndex);
-      if (rowIndex === undefined) return;
-      const targetRow = rowIndex + (key === "ArrowDown" ? 1 : -1);
-      if (targetRow < 0 || targetRow >= rows.length) return;
-      const column = rovingIndex - rowStarts[rowIndex]!;
-      const targetColumn = Math.min(column, rows[targetRow]!.items.length - 1);
-      moveRoving(rowStarts[targetRow]! + targetColumn);
+      // into the wrong row from anywhere but the first column. A promo tile
+      // occupies a column without being a landing spot, and a row that is
+      // nothing but a promo is stepped over entirely.
+      const target = photoInAdjacentRow(nav, rovingIndex, key === "ArrowDown" ? 1 : -1);
+      if (target !== null) moveRoving(target);
     },
-    [photos.length, rovingIndex, rows, rowIndexForPhoto, rowStarts, moveRoving],
+    [photos.length, rovingIndex, nav, moveRoving],
   );
 
   const pick = useCallback(
@@ -1412,7 +1582,13 @@ function GalleryViewInner({
           if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
           return current;
         }
-        const next = requested < 0 ? photos.length - 1 : requested;
+        // Holding at photo 1 rather than wrapping to the end, for the mirror
+        // image of the reason above: wrapping backwards jumped to the last
+        // *loaded* photo, which in an 800-photo gallery is photo 60. It also
+        // meant a keyboard user opening photo 1 and pressing the focused
+        // "Předchozí" button landed at the far end of the gallery.
+        if (requested < 0) return current;
+        const next = requested;
         const photo = photos[next];
         if (photo && !reportedPhotos.current.has(photo.id)) {
           reportedPhotos.current.add(photo.id);
@@ -1454,7 +1630,9 @@ function GalleryViewInner({
   const activeSelected = active ? selection.ids.has(active.id) : false;
   const lightboxRef = useRef<HTMLDivElement>(null);
   const isLightboxOpen = lightboxIndex !== null;
-  useFocusTrap(lightboxRef, isLightboxOpen);
+  // Close is the one control that is always present and always enabled, so it
+  // is the only stable landing spot for focus when the lightbox opens.
+  useFocusTrap(lightboxRef, isLightboxOpen, lightboxCloseRef);
 
   /**
    * One history entry per open lightbox, not per photo browsed inside it, so
@@ -1492,11 +1670,19 @@ function GalleryViewInner({
    * over it is in the way of the only thing they asked for. Hidden means
    * non-interactive as well as invisible — chrome that is faded out but still
    * swallowing taps is worse than chrome that is simply there.
+   *
+   * `pointer-events-none` alone was not enough: it stops the mouse but leaves
+   * every control in the tab order and in the accessibility tree, and the
+   * focus trap's own visibility filter (`offsetParent !== null`) does not
+   * exclude an `opacity-0` element either — so Tab landed on invisible Close,
+   * Next, heart and download buttons. `inert` removes the subtree from both at
+   * once. The pointer-events class stays as the floor for anything that does
+   * not honour `inert`.
    */
-  const chromeClasses =
-    chromeHidden || zoomed
-      ? "pointer-events-none opacity-0 transition-opacity duration-200"
-      : "opacity-100 transition-opacity duration-200";
+  const chromeInert = chromeHidden || zoomed;
+  const chromeClasses = chromeInert
+    ? "pointer-events-none opacity-0 transition-opacity duration-200"
+    : "opacity-100 transition-opacity duration-200";
 
   /**
    * Takes back one of this viewer's own uploads. Irreversible, so it asks —
@@ -1646,6 +1832,29 @@ function GalleryViewInner({
         {zipState === "preparing" && t("zipPreparingAnnounce")}
         {zipState === "error" && t("zipErrorAnnounce")}
       </div>
+
+      {/* A mark that did not save is the one client-side failure worth
+          interrupting for: the whole album selection hangs off these, and the
+          state it replaces was sixty red hearts that reached nobody. Fixed to
+          the bottom so it is seen while scrolling a long gallery, above the
+          lightbox's own z-index so it survives being opened, and dismissible
+          because the viewer may simply want to carry on looking. */}
+      {saveFailed && (
+        <div
+          role="alert"
+          className="bg-brand-ink text-caption fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-white shadow-lg"
+        >
+          <span className="flex-1">{t("saveFailed")}</span>
+          <button
+            type="button"
+            onClick={() => setSaveFailed(false)}
+            aria-label={t("close")}
+            className="on-media -m-1 shrink-0 rounded-full p-1 text-white/70 hover:text-white"
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <header
         className={`${GUTTER} mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 sm:mb-5`}
       >
@@ -1653,7 +1862,7 @@ function GalleryViewInner({
           {backHref && (
             <a
               href={backHref}
-              className="mb-1 inline-block text-sm text-neutral-500 underline dark:text-neutral-400"
+              className="text-body mb-1 inline-block text-neutral-500 underline dark:text-neutral-400"
             >
               ← {backLabel ?? t("back")}
             </a>
@@ -1662,7 +1871,7 @@ function GalleryViewInner({
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">{subtitle}</p>
+            <p className="text-body mt-0.5 text-neutral-500 dark:text-neutral-400">{subtitle}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1695,30 +1904,47 @@ function GalleryViewInner({
               <ProjectorIcon />
             </IconButton>
           )}
-          {/* Only ever rendered when it can actually do something: a
-              single-photo gallery downloads directly, and a whole gallery needs
-              its pre-built archive (docs/TODO.md §7) to exist. A disabled
-              button explained only by a `title` is, on a phone, a dead control
-              with no explanation at all. */}
+          {/* The control now renders in every state rather than only when a
+              finished archive happens to exist. It used to disappear for the
+              whole window between the photographer sending the link and the
+              15-minute cron building the archive — and disappear again, for
+              everyone, each time a guest added a photo — which reads as a
+              broken gallery to the one person who came here to download their
+              wedding. The three states are: a ready archive (with its size,
+              because 8 GB is a different decision on a phone), the previous
+              archive while a rebuild is queued, and an honest "not yet, but
+              you can pick photos and take those now". */}
           {allowDownload &&
             selection.ids.size === 0 &&
-            (archiveZipUrl ? (
+            (allPhotos.length === 1 ? (
+              <IconButton
+                disabled={zipState === "preparing"}
+                onClick={() => void downloadZip([])}
+                label={t("downloadOneLabel")}
+                title={t("downloadOneTitle")}
+              >
+                <DownloadIcon />
+              </IconButton>
+            ) : archive.url ? (
               // A pre-built archive is a plain CDN link — no signed manifest,
               // no Worker request, just a download.
               <IconButtonLink
-                href={archiveZipUrl}
-                label={t("downloadAllLabel")}
-                title={t("downloadAllTitle")}
+                href={archive.url}
+                label={
+                  archive.sizeBytes
+                    ? t("downloadAllLabelSized", { size: formatBytes(archive.sizeBytes) })
+                    : t("downloadAllLabel")
+                }
+                title={archive.stale ? t("downloadAllStaleTitle") : t("downloadAllTitle")}
               >
                 <DownloadIcon />
               </IconButtonLink>
             ) : (
-              allPhotos.length === 1 && (
+              allPhotos.length > 0 && (
                 <IconButton
-                  disabled={zipState === "preparing"}
-                  onClick={() => void downloadZip([])}
-                  label={t("downloadOneLabel")}
-                  title={t("downloadOneTitle")}
+                  disabled
+                  label={t("archivePreparingLabel")}
+                  title={t("archivePreparingTitle")}
                 >
                   <DownloadIcon />
                 </IconButton>
@@ -1771,14 +1997,14 @@ function GalleryViewInner({
             type="button"
             disabled={zipState === "preparing"}
             onClick={() => void downloadZip(selectedInOrder(selection, photoIds))}
-            className="ml-auto flex min-h-11 items-center rounded-full bg-neutral-900 px-4 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="bg-brand-primary hover:bg-brand-primary-dark text-body duration-flip ml-auto flex min-h-11 items-center rounded-full px-4 font-semibold text-white transition-colors disabled:opacity-50"
           >
             {zipState === "preparing"
               ? t("preparingShort")
               : t("downloadSelected", { count: selection.ids.size })}
           </button>
           {zipState === "error" && (
-            <span className="w-full text-xs text-red-600">{t("zipErrorAnnounce")}</span>
+            <span className="text-caption text-admin-danger w-full">{t("zipErrorAnnounce")}</span>
           )}
         </div>
       )}
@@ -1802,7 +2028,7 @@ function GalleryViewInner({
               <li
                 key="loading"
                 aria-hidden
-                className="absolute top-0 left-0 flex w-full items-center justify-center text-sm text-neutral-400"
+                className="text-body absolute top-0 left-0 flex w-full items-center justify-center text-neutral-500 dark:text-neutral-400"
                 style={{
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
@@ -1813,12 +2039,9 @@ function GalleryViewInner({
             );
           }
 
-          let indexOffset = 0;
-          for (let i = 0; i < virtualRow.index; i += 1) indexOffset += rows[i]!.items.length;
-
           return (
             <li
-              key={row.items[0]?.item.id ?? virtualRow.index}
+              key={row.items[0] ? gridEntryKey(row.items[0].item, photoIdOf) : virtualRow.index}
               className="absolute top-0 left-0 flex w-full"
               style={{
                 height: virtualRow.size,
@@ -1826,9 +2049,34 @@ function GalleryViewInner({
                 transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
               }}
             >
-              {row.items.map((entry, offset) => {
-                const index = indexOffset + offset;
-                const photo = entry.item;
+              {row.items.map((entry) => {
+                // Taken before the narrowing below: inside the promo branch the
+                // entry's photo type is no longer referenced, so `P` would
+                // infer as `unknown` and the id accessor with it.
+                const key = gridEntryKey(entry.item, photoIdOf);
+
+                // The photographer's credit card (docs/PROMO-CARDS.md). It packs
+                // as a landscape frame and is otherwise inert: no photo index,
+                // so nothing downstream — lightbox, selection, favourites,
+                // print, ZIP — can reach it.
+                if (entry.item.kind === "promo") {
+                  return (
+                    <PromoTile
+                      key={key}
+                      promo={entry.item.promo}
+                      width={entry.width}
+                      height={entry.height}
+                      // Lets the tile beacon a PROMO_CLICK before the new tab
+                      // takes over — without it the card is placed blind.
+                      token={token}
+                    />
+                  );
+                }
+
+                // Carried on the entry rather than recomputed by summing the
+                // lengths of every preceding row — that was both O(rows²) per
+                // render and, once a row can hold a non-photo, wrong.
+                const { photo, photoIndex: index } = entry.item;
                 return (
                   <PhotoTile
                     key={photo.id}
@@ -1850,6 +2098,7 @@ function GalleryViewInner({
                     allowReactions={allowReactions}
                     allowPrintSelection={allowPrintSelection}
                     isFavorite={favorites.has(photo.id)}
+                    favoritePulse={savedPulseId === photo.id}
                     favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
                     reactionState={reactions.get(photo.id)}
                     printQuantity={printSelections.get(photo.id) ?? 0}
@@ -1872,7 +2121,7 @@ function GalleryViewInner({
       </ul>
 
       {photos.length === 0 && (
-        <p className={`${GUTTER} text-sm text-neutral-500 dark:text-neutral-400`}>
+        <p className={`${GUTTER} text-body text-neutral-500 dark:text-neutral-400`}>
           {!favoritesOnly
             ? t("emptyGallery")
             : hasNextPage
@@ -1909,7 +2158,14 @@ function GalleryViewInner({
               event.stopPropagation();
               move(-1);
             }}
-            className={`absolute left-0 ${chromeClasses}`}
+            inert={chromeInert}
+            // Now that going back at photo 1 holds in place rather than
+            // wrapping to the end, the button has to say so — it was the only
+            // one of the pair without a disabled state.
+            disabled={activeIndex === 0}
+            // Landscape on a notched phone puts the safe-area inset on the
+            // side, not the bottom; without this the circle sits under it.
+            className={`absolute left-0 ps-[env(safe-area-inset-left)] ${chromeClasses}`}
             aria-label={t("previous")}
           >
             <ChevronLeftIcon />
@@ -1919,22 +2175,25 @@ function GalleryViewInner({
               event.stopPropagation();
               move(1);
             }}
+            inert={chromeInert}
             disabled={activeIndex! >= photos.length - 1 && !hasNextPage}
-            className={`absolute right-0 ${chromeClasses}`}
+            className={`absolute right-0 pe-[env(safe-area-inset-right)] ${chromeClasses}`}
             aria-label={t("next")}
           >
             <ChevronRightIcon />
           </NavButton>
           <div
-            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 ${chromeClasses}`}
+            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))] ${chromeClasses}`}
+            inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md">
               <button
+                ref={lightboxCloseRef}
                 type="button"
                 onClick={closeLightbox}
                 aria-label={t("close")}
-                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+                className="on-media flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
               >
                 <CloseIcon className="h-5 w-5" />
               </button>
@@ -1981,8 +2240,16 @@ function GalleryViewInner({
             </span>
           </div>
 
+          {/* Heart + five reactions + printer + download is ~396 px of 44 px
+              targets; an iPhone SE is 375 and plenty of Androids are 360, so
+              this bar overflowed off both edges. It scrolls sideways within
+              the viewport rather than wrapping: a control bar that becomes two
+              rows moves every button the viewer had just learned the position
+              of. `bottom` clears the home indicator — the guest uploader was
+              the only surface in the app already doing this. */}
           <div
-            className={`absolute bottom-4 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md ${chromeClasses}`}
+            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/40 px-2 py-1.5 backdrop-blur-md [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
+            inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
             {allowReactions && (
@@ -1991,6 +2258,7 @@ function GalleryViewInner({
                   active={favorites.has(active.id)}
                   count={counts.get(active.id) ?? active.favoriteCount}
                   onClick={() => toggleFavorite(active.id)}
+                  pulse={savedPulseId === active.id}
                   size="lg"
                   bare
                 />
@@ -2032,6 +2300,11 @@ function GalleryViewInner({
             const photoId = namePromptFor;
             const kind = pendingReaction;
             const printQuantity = pendingPrint;
+            // The optimistic write happened before the prompt appeared, so its
+            // undo was parked rather than recreated here — only the handler
+            // that made the change knows what it replaced.
+            const revert = pendingRevert.current ?? (() => {});
+            pendingRevert.current = null;
             setNamePromptFor(null);
             setPendingReaction(null);
             setPendingPrint(null);
@@ -2039,15 +2312,15 @@ function GalleryViewInner({
             else dismissNamePrompt();
 
             // The prompt interrupts exactly one action; resume that one only.
-            if (kind) void sendReaction(photoId, kind, name || undefined);
+            if (kind) void sendReaction(photoId, kind, name || undefined, revert);
             else if (printQuantity !== null)
-              void sendPrintQuantity(photoId, printQuantity, name || undefined);
-            else void sendFavorite(photoId, true, name || undefined);
+              void sendPrintQuantity(photoId, printQuantity, name || undefined, revert);
+            else void sendFavorite(photoId, true, name || undefined, revert);
           }}
         />
       )}
 
-      <footer className="mx-4 mt-10 border-t pt-4 text-xs text-neutral-500 sm:mx-3 dark:text-neutral-400">
+      <footer className="text-caption mx-4 mt-10 border-t pt-4 text-neutral-500 sm:mx-3 dark:text-neutral-400">
         {!optedOut ? (
           <p>
             {t("privacyNotice")}{" "}
@@ -2058,6 +2331,18 @@ function GalleryViewInner({
         ) : (
           <p>{t("optedOutNotice")}</p>
         )}
+
+        {/* Moving a selection to another device (docs/PLAN.md §8a). In the
+            footer rather than the toolbar: it is something a viewer goes
+            looking for once, after noticing their hearts are missing on the
+            laptop — not a control that should sit over the photos. Hidden for
+            an opted-out viewer, who by definition has nothing stored to move. */}
+        {!optedOut && (allowReactions || allowPrintSelection) && (
+          <div className="mt-4">
+            <ViewerTransferPanel token={token} />
+          </div>
+        )}
+
         <SiteFooterIdentity className="mt-4" />
       </footer>
 
@@ -2102,6 +2387,8 @@ interface PhotoTileProps {
   allowReactions: boolean;
   allowPrintSelection: boolean;
   isFavorite: boolean;
+  /** The server just confirmed this photo's favourite — the heart pops once. */
+  favoritePulse: boolean;
   favoriteCount: number;
   reactionState: PhotoReactionState | undefined;
   printQuantity: number;
@@ -2134,6 +2421,7 @@ const PhotoTile = memo(function PhotoTile({
   allowReactions,
   allowPrintSelection,
   isFavorite,
+  favoritePulse,
   favoriteCount,
   reactionState,
   printQuantity,
@@ -2210,7 +2498,12 @@ const PhotoTile = memo(function PhotoTile({
         // Unselected keeps that placeholder as its background so the grid
         // still fills in with the picture's own palette instead of grey
         // holes while the photo is loading.
-        className={`relative block h-full w-full overflow-hidden ${selected ? "bg-brand-primary" : ""}`}
+        //
+        // `on-media` is the white focus ring: the default brown one is 1.9:1
+        // against a photograph. The clip that used to live here moved to the
+        // wrapper below, because the ring's dark outer halo is a box-shadow
+        // drawn outside the border box and `overflow-hidden` would eat it.
+        className={`on-media relative block h-full w-full ${selected ? "bg-brand-primary" : ""}`}
         style={selected ? undefined : { backgroundColor: placeholderStyle(photo.placeholder) }}
         aria-label={
           selectionActive
@@ -2218,22 +2511,24 @@ const PhotoTile = memo(function PhotoTile({
             : t("openPhoto", { fileName: photo.fileName })
         }
       >
-        <Image
-          // The button around this image is what a screen reader announces
-          // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
-          // straight after it, which tells nobody anything.
-          alt=""
-          src={src}
-          fill
-          sizes={`${Math.ceil(width)}px`}
-          priority={priority}
-          // A real justified layout — object-contain would letterbox a tile
-          // sized to the photo's own aspect ratio, so `fill` + the exact
-          // rendered box is enough; no crop, no letterbox.
-          className={`object-cover transition-transform duration-200 ${
-            selected ? "scale-90" : "hover:scale-105"
-          }`}
-        />
+        <span className="absolute inset-0 block overflow-hidden">
+          <Image
+            // The button around this image is what a screen reader announces
+            // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
+            // straight after it, which tells nobody anything.
+            alt=""
+            src={src}
+            fill
+            sizes={`${Math.ceil(width)}px`}
+            priority={priority}
+            // A real justified layout — object-contain would letterbox a tile
+            // sized to the photo's own aspect ratio, so `fill` + the exact
+            // rendered box is enough; no crop, no letterbox.
+            className={`duration-toggle object-cover transition-transform ${
+              selected ? "scale-90" : "hover:scale-105"
+            }`}
+          />
+        </span>
       </button>
       {allowDownload && (
         <SelectCheck
@@ -2257,6 +2552,7 @@ const PhotoTile = memo(function PhotoTile({
             active={isFavorite}
             count={favoriteCount}
             onClick={() => onToggleFavorite(photo.id)}
+            pulse={favoritePulse}
             className="absolute right-2 bottom-2"
           />
           <ReactionBadge state={reactionState} />
@@ -2281,6 +2577,7 @@ function HeartButton({
   active,
   count,
   onClick,
+  pulse = false,
   className = "",
   size = "sm",
   bare = false,
@@ -2288,6 +2585,8 @@ function HeartButton({
   active: boolean;
   count: number;
   onClick: () => void;
+  /** The server just confirmed this favourite — play the one-shot pop. */
+  pulse?: boolean;
   className?: string;
   /** "lg" is the lightbox's larger badge; "sm" (default) is the compact grid-tile badge — both keep a ≥44px touch target. */
   size?: "sm" | "lg";
@@ -2310,11 +2609,11 @@ function HeartButton({
       onClick={onClick}
       aria-pressed={active}
       aria-label={active ? t("removeFromFavorites") : t("addToFavorites")}
-      className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
+      className={`on-media duration-flip flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
         active && !bare ? "opacity-100" : restingClasses
       } ${className}`}
     >
-      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} />
+      <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} pulse={pulse} />
       {count > 0 && <span className="tabular-nums">{count}</span>}
     </button>
   );
@@ -2398,7 +2697,7 @@ function PrinterButton({
         type="button"
         onClick={onDecrement}
         aria-label={t("decreasePrintQuantity")}
-        className={`flex items-center justify-center rounded-full hover:bg-white/20 ${stepBtnSize}`}
+        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 ${stepBtnSize}`}
       >
         <MinusIcon className={stepIconSize} />
       </button>
@@ -2413,7 +2712,7 @@ function PrinterButton({
         onClick={onIncrement}
         disabled={quantity >= MAX_PRINT_QUANTITY}
         aria-label={t("increasePrintQuantity")}
-        className={`flex items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent ${stepBtnSize}`}
+        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent ${stepBtnSize}`}
       >
         <PlusIcon className={stepIconSize} />
       </button>
@@ -2461,7 +2760,7 @@ function SelectCheck({
         event.stopPropagation();
         onPick(event.shiftKey);
       }}
-      className={`absolute top-2 left-2 flex h-11 w-11 items-center justify-center rounded-full border-2 transition-opacity ${
+      className={`on-media duration-flip absolute top-2 left-2 flex h-11 w-11 items-center justify-center rounded-full border-2 transition-opacity ${
         selected
           ? "border-white opacity-100"
           : pinned
@@ -2469,7 +2768,10 @@ function SelectCheck({
             : "border-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
       }`}
     >
-      <CheckIcon className="h-4 w-4 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]" />
+      <CheckIcon
+        className="h-4 w-4 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
+        draw={selected}
+      />
     </button>
   );
 }
@@ -2579,7 +2881,7 @@ function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
         <h2 id="name-prompt-title" className="text-lg font-semibold">
           {t("namePromptTitle")}
         </h2>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
+        <p className="text-body text-neutral-500 dark:text-neutral-400">{t("namePromptHint")}</p>
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}

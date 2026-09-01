@@ -15,6 +15,10 @@ async function main() {
   // a test created (a guest upload, a new wedding) would otherwise be missed.
   await prisma.gallery.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
   await prisma.event.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
+  // Promo cards hang off the *user*, not off a gallery, so deleting the
+  // galleries only cascades their placements — the cards themselves would
+  // survive into the next run and accumulate.
+  await prisma.promoCard.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
   fs.unlinkSync(seedPath);
 
   await prisma.$disconnect();

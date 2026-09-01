@@ -57,12 +57,19 @@ test.describe("share gallery viewer", () => {
     await expect(dialog).toBeVisible();
     await expect(page.getByText(`1 / ${seed.photoCount}`)).toBeVisible();
 
-    // Focus starts inside the dialog (focus trap) — the first focusable
-    // element is "Předchozí".
-    await expect(page.getByRole("button", { name: "Předchozí" })).toBeFocused();
+    // Focus starts inside the dialog (focus trap), on Close — the one control
+    // that is present and enabled on every photo. It used to be whichever nav
+    // button came first in the DOM, which moved once "Předchozí" gained a
+    // disabled state on the first photo.
+    await expect(page.getByRole("button", { name: "Zavřít" })).toBeFocused();
+
+    // Going back from the first photo holds there rather than wrapping to the
+    // last *loaded* one, so the control says so.
+    await expect(page.getByRole("button", { name: "Předchozí" })).toBeDisabled();
 
     await page.getByRole("button", { name: "Další" }).click();
     await expect(page.getByText(`2 / ${seed.photoCount}`)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Předchozí" })).toBeEnabled();
 
     // Android/gesture back closes the lightbox, not the gallery — the whole
     // point of the history-entry-per-open design (docs/AUDIT.md §4.2).

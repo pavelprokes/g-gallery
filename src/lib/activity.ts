@@ -130,3 +130,32 @@ export async function photoCounts(galleryId: string): Promise<Map<string, Viewer
   }
   return counts;
 }
+
+/**
+ * Promo-tile clicks per gallery, for the card library in the admin.
+ *
+ * Gallery-level, not placement-level, and that is a real limitation rather
+ * than a shortcut: `ActivityEvent` can point at a gallery, a photo and a
+ * viewer, and a promo click is none of the last two — there is no column that
+ * can hold a `GalleryPromo.id`. A gallery holding a single card (the case the
+ * admin is built around, and the one `@@unique([galleryId, promoCardId])`
+ * keeps honest) therefore reads exactly; a gallery holding two cards reports
+ * one number covering both, which the admin labels as such instead of
+ * splitting it and being quietly wrong. Adding `ActivityEvent.galleryPromoId`
+ * (nullable, `onDelete: SetNull`) is the fix.
+ *
+ * Returns nothing for galleries with no clicks — the caller renders those as a
+ * real zero, because "placed and never clicked" is the finding the
+ * photographer is here for.
+ */
+export async function promoClickCounts(galleryIds: string[]): Promise<Map<string, number>> {
+  if (galleryIds.length === 0) return new Map();
+
+  const rows = await prisma.activityEvent.groupBy({
+    by: ["galleryId"],
+    where: { galleryId: { in: galleryIds }, type: "PROMO_CLICK" },
+    _count: { _all: true },
+  });
+
+  return new Map(rows.map((row) => [row.galleryId, row._count._all]));
+}

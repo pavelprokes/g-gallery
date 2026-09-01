@@ -67,7 +67,7 @@ export function NavButton({
   return (
     <button
       type="button"
-      className={`group flex h-20 w-20 shrink-0 items-center justify-center text-white disabled:opacity-40 ${className}`}
+      className={`on-media group flex h-20 w-20 shrink-0 items-center justify-center text-white disabled:opacity-40 ${className}`}
       {...props}
     >
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors group-hover:bg-black/55">

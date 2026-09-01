@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import type { PhotoStatus } from "@/generated/prisma/enums";
+import { pickCover } from "@/lib/event-access";
 import { getAdminSession } from "@/lib/auth-guard";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
@@ -28,9 +30,12 @@ export const dynamic = "force-dynamic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The newest confirmed photo, in the shape the thumbnail wants. */
-function coverOf(photos: AdminCover[]): AdminCover | null {
-  return photos[0] ?? null;
+/** What both cover queries below select — `status` is what {@link pickCover} judges by. */
+type CoverRow = AdminCover & { status: PhotoStatus };
+
+/** The photographer's pick, in the shape the thumbnail wants; newest as fallback. */
+function coverOf(chosen: CoverRow | null, newest: CoverRow[]): AdminCover | null {
+  return pickCover(chosen, newest[0]);
 }
 
 /** Whole days left before the purge cron permanently deletes this gallery. */
@@ -59,13 +64,22 @@ export default async function AdminPage() {
   const now = new Date();
   const days = lastDays(now);
 
-  // The newest confirmed photo of a gallery — its cover, same rule the wedding
-  // page uses (src/lib/event-access.ts).
-  const coverPhoto = {
+  const coverFields = {
+    objectKey: true,
+    thumbObjectKey: true,
+    placeholder: true,
+    status: true,
+  } as const;
+
+  // Two halves of the same rule the wedding page uses (src/lib/event-access.ts):
+  // the photographer's chosen cover, and the newest confirmed photo it falls
+  // back to. Both are fetched because a gallery is usually missing the first.
+  const chosenCover = { select: coverFields } satisfies Prisma.Gallery$coverPhotoArgs;
+  const newestPhoto = {
     where: { status: "CONFIRMED" },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 1,
-    select: { objectKey: true, thumbObjectKey: true, placeholder: true },
+    select: coverFields,
   } satisfies Prisma.Gallery$photosArgs;
 
   const [galleries, trashed, events, trashedEvents, sessions] = await Promise.all([
@@ -77,7 +91,8 @@ export default async function AdminPage() {
         title: true,
         status: true,
         eventDate: true,
-        photos: coverPhoto,
+        coverPhoto: chosenCover,
+        photos: newestPhoto,
         _count: {
           select: { photos: { where: { status: "CONFIRMED" } }, viewers: true },
         },
@@ -99,9 +114,12 @@ export default async function AdminPage() {
         slug: true,
         tokenCipher: true,
         // Both the cover and which galleries this wedding's chart sums over.
+        // Ordered like the cards on the wedding page, so "this wedding's cover"
+        // is the lead gallery's cover rather than whichever row came back first.
         galleries: {
           where: { trashedAt: null },
-          select: { id: true, photos: coverPhoto },
+          orderBy: [{ position: "asc" }, { title: "asc" }],
+          select: { id: true, coverPhoto: chosenCover, photos: newestPhoto },
         },
       },
     }),
@@ -158,7 +176,10 @@ export default async function AdminPage() {
           >
             {events.map((event) => {
               const token = decryptToken(event.tokenCipher);
-              const cover = coverOf(event.galleries.flatMap((gallery) => gallery.photos));
+              const cover = coverOf(
+                event.galleries.find((gallery) => gallery.coverPhoto)?.coverPhoto ?? null,
+                event.galleries.flatMap((gallery) => gallery.photos),
+              );
               const series = eventSeries.get(event.id) ?? emptySeries(days);
               return (
                 <li key={event.id} className="space-y-3 p-4">
@@ -210,7 +231,7 @@ export default async function AdminPage() {
           const series = gallerySeries.get(gallery.id) ?? emptySeries(days);
           return (
             <li key={gallery.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
-              <CoverThumb cover={coverOf(gallery.photos)} />
+              <CoverThumb cover={coverOf(gallery.coverPhoto, gallery.photos)} />
               <div className="min-w-0 flex-1 basis-48">
                 <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
                   {gallery.title}

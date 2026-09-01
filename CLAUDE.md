@@ -6,6 +6,9 @@ before changing architecture, storage, auth, or billing-relevant code.
 **`docs/GUEST-GALLERIES.md`** is the authority for guest uploads and wedding hubs (adopted
 2026-08-23, Phase 6) — read it before touching share-link resolution, the presign routes, or
 anything that assumes one share link means one gallery.
+**`docs/PROMO-CARDS.md`** is the authority for the photographer's credit tile in the grid (adopted
+2026-09-01) — read it before touching the grid's item stream, the justified layout's input, or
+anything that assumes every tile in the gallery is a photo.
 
 ## Commands
 
@@ -106,10 +109,13 @@ The team:
 - Local dev runs entirely on Docker (`compose.yaml`); container images are pinned, never `:latest`.
 - Standalone scripts importing `src/lib/*` need `tsx --conditions=react-server` (otherwise
   `server-only` resolves to its throwing client build).
-- **Deploying**: `pnpm build` runs `prisma generate`, **not** `prisma migrate deploy`. Vercel
-  deploys on push to `main`, so pending migrations must be applied against the production
-  `DIRECT_URL` _before_ merging — otherwise the new code queries columns that do not exist yet and
-  every page 500s. Command and ordering in `docs/VERCEL-ENV.md` §Migrations.
+- **Deploying**: `pnpm build` runs `prisma generate`, then `scripts/vercel-migrate.mjs`, then
+  `next build`. That middle step applies pending migrations **only on a Vercel production build** —
+  a preview deployment runs the same script and is turned away by a `VERCEL_ENV` check, because
+  otherwise every pull request would migrate production. A production build with no visible
+  `DIRECT_URL` **fails** rather than deploying code whose columns do not exist. Migrations must
+  still stay additive; dropping or narrowing a column is still two deploys. See
+  `docs/VERCEL-ENV.md` §Migrations.
 - Renames never change a URL: `ShareLink.slug` and `Gallery.eventKey` are frozen at creation
   (docs/TODO.md §6). Tokens resolve, slugs decorate — a stale slug looks wrong, a changed URL
   breaks something already printed or sent.

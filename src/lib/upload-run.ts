@@ -199,7 +199,13 @@ async function uploadOne(
   const placeholder = await averageColorOf(body);
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
-  const thumbnail = target.thumbTargets ? await makeThumbnail(body) : null;
+  //
+  // `credentials.kind` is already the owner/guest split this whole module turns
+  // on — the same branch the presign route uses to stamp `Photo.source` — so
+  // the thumbnail profile rides on it rather than on a second flag that could
+  // disagree with it. Owner uploads land in a desktop grid and get a bigger,
+  // slightly less compressed tile; guest uploads are unchanged.
+  const thumbnail = target.thumbTargets ? await makeThumbnail(body, credentials.kind) : null;
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {

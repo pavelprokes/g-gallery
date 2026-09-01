@@ -26,11 +26,11 @@ export default function NotFound() {
   if (pathname.startsWith("/admin")) {
     return (
       <DeadEnd
-        title="Tady nic není"
-        lead="Tahle adresa v administraci neexistuje."
+        title={t("genericNotFoundTitle")}
+        lead={t("adminNotFoundLead")}
         action={
           <Link href="/admin" className={buttonClasses()}>
-            Zpátky na přehled
+            {t("adminNotFoundAction")}
           </Link>
         }
       />

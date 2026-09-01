@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/vercel-migrate.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -27,7 +27,8 @@
     "backfill:placeholders": "tsx --conditions=react-server scripts/backfill-placeholders.ts",
     "backfill:taken-at": "tsx --conditions=react-server scripts/backfill-taken-at.ts",
     "postinstall": "prisma generate",
-    "prepare": "husky"
+    "prepare": "husky",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.13",

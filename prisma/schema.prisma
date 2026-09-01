@@ -39,6 +39,7 @@ model User {
   galleries         Gallery[]
   events            Event[]
   pushSubscriptions PushSubscription[]
+  promoCards        PromoCard[]
 
   @@map("user")
   @@schema("g_gallery")
@@ -193,7 +194,13 @@ model Gallery {
   description       String?
   eventDate         DateTime?
   status            GalleryStatus @default(DRAFT)
+  /// The photo the couple's family sees first. Chosen in the admin, because
+  /// "whatever was uploaded last" is the sparkler exit at ISO 12800 as often as
+  /// it is the portrait. SetNull, never Cascade: deleting the chosen photo must
+  /// leave the gallery alone and drop it back to the newest-first fallback,
+  /// which is also why the dangling-id case cannot happen at all.
   coverPhotoId      String?
+  coverPhoto        Photo?        @relation("GalleryCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
   /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
   storagePrefix     String        @unique
   publishedAt       DateTime?
@@ -241,11 +248,12 @@ model Gallery {
   eventLinkId   String?
   eventLink     ShareLink? @relation("EventCardLink", fields: [eventLinkId], references: [id], onDelete: SetNull)
 
-  photos         Photo[]
+  photos         Photo[]         @relation("GalleryPhotos")
   shareLinks     ShareLink[]     @relation("GalleryShareLinks")
   viewers        Viewer[]
   sessions       ViewSession[]
   activityEvents ActivityEvent[]
+  promos         GalleryPromo[]
 
   @@unique([eventId, eventKey])
   @@index([ownerId, status])
@@ -257,7 +265,7 @@ model Gallery {
 model Photo {
   id                 String      @id @default(cuid())
   galleryId          String
-  gallery            Gallery     @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery            Gallery     @relation("GalleryPhotos", fields: [galleryId], references: [id], onDelete: Cascade)
   /// Full R2 object key ("<storagePrefix>/<random-uuid>.jpg")
   objectKey          String      @unique
   /// Original filename, used for ZIP entries and downloads
@@ -299,6 +307,8 @@ model Photo {
   reactions       Reaction[]
   printSelections PrintSelection[]
   activityEvents  ActivityEvent[]
+  /// Galleries using this photo as their cover — at most one in practice.
+  coverOf         Gallery[]        @relation("GalleryCover")
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.
@@ -355,6 +365,88 @@ model ShareLink {
 }
 
 // ---------------------------------------------------------------------------
+// Promo cards — the photographer's own credit tile inside the grid
+// ---------------------------------------------------------------------------
+
+/// How a promo tile is painted. Three fixed looks rather than a colour picker:
+/// the tile sits between the photographer's own photos, and the one thing it
+/// must never do is clash with them.
+enum PromoTheme {
+  /// Brand ink on a warm near-white — reads as a caption card, not an ad.
+  LIGHT
+  /// Warm near-white on brand ink — the strongest of the three.
+  DARK
+  /// White on brand terracotta.
+  BRAND
+
+  @@schema("g_gallery")
+}
+
+/// Reusable "who photographed this" card the owner writes once and places into
+/// any gallery's grid (see `GalleryPromo` for the placement). Content lives
+/// here so fixing a typo or a moved URL fixes every gallery at once, rather
+/// than needing every delivered gallery re-edited.
+///
+/// Deliberately text-only: the tile shares a row with actual photographs, and
+/// a second image competing with them is exactly what makes a gallery look
+/// like a website with ads in it.
+model PromoCard {
+  id        String     @id @default(cuid())
+  ownerId   String
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Admin-only name, never shown to a viewer — how the owner tells two cards
+  /// apart in the picker ("Web 2026", "Instagram").
+  name      String
+  /// Small line above the headline ("Fotografie"), optional.
+  eyebrow   String?
+  headline  String
+  body      String?
+  /// Call-to-action label; falls back to the bare host name of `ctaUrl`.
+  ctaLabel  String?
+  /// Absolute http(s) URL. Validated on write — it is rendered as a link into
+  /// pages held by people who are not the owner.
+  ctaUrl    String
+  theme     PromoTheme @default(LIGHT)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  placements GalleryPromo[]
+
+  @@index([ownerId])
+  @@schema("g_gallery")
+}
+
+/// One card placed in one gallery. Separate from `PromoCard` because the slot
+/// is a property of the gallery, not of the card: the same "about me" card sits
+/// 5th in a 60-photo gallery and 5th in an 800-photo one, but either could be
+/// moved without touching the other.
+model GalleryPromo {
+  id          String    @id @default(cuid())
+  galleryId   String
+  gallery     Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  promoCardId String
+  promoCard   PromoCard @relation(fields: [promoCardId], references: [id], onDelete: Cascade)
+  /// 1-based position in the grid: `slot = 5` makes the card the 5th tile, so
+  /// what used to be the 5th photo becomes the 6th. Clamped to the end of the
+  /// stream when the gallery holds fewer photos than that (see
+  /// `src/lib/promo-card.ts`). 1-based on purpose — it is a position a person
+  /// types into the admin, and a 0-based one there is a bug generator.
+  slot        Int       @default(5)
+  /// Off keeps the placement (and its slot) while taking the tile out of the
+  /// grid — the same switch shape as `Gallery.listedOnEvent`.
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  /// One placement per card per gallery. Placing the same card twice is always
+  /// a mistake; two *different* cards in one gallery stays legal.
+  @@unique([galleryId, promoCardId])
+  @@index([galleryId, enabled])
+  @@index([promoCardId])
+  @@schema("g_gallery")
+}
+
+// ---------------------------------------------------------------------------
 // Activity & notifications (see docs/PLAN.md §8)
 // GDPR: no IPs stored; viewer identity is a first-party anonKey; everything
 // cascades away with the gallery; anonKey lifetime ≤ 13 months (cleanup job).
@@ -368,6 +460,10 @@ enum ActivityType {
   DOWNLOAD
   PRINT_SELECT
   VISITOR_IDENTIFIED
+  /// A viewer followed the photographer's credit tile out to their site
+  /// (docs/PROMO-CARDS.md). Without it the card is placed blind — there is no
+  /// way to tell a card that works from one nobody notices.
+  PROMO_CLICK
 
   @@schema("g_gallery")
 }
@@ -392,8 +488,39 @@ model Viewer {
   printSelections PrintSelection[]
   activityEvents  ActivityEvent[]
   uploads         Photo[]          @relation("GuestUploads")
+  transfer        ViewerTransfer?
 
   @@unique([galleryId, anonKey])
+  @@schema("g_gallery")
+}
+
+/// A one-shot code that moves a viewer's identity to another device
+/// (docs/PLAN.md §8a).
+///
+/// Favourites, reactions and print marks all hang off `Viewer`, which is keyed
+/// by a localStorage `anonKey` — so they are trapped in one browser. The bride
+/// goes through 700 photos on her phone across three evenings, then they sit
+/// down at the laptop together to finish, and the laptop shows nothing. Her
+/// mother, who wants six prints, is on a third device. Without this the album
+/// selection is a demo rather than a workflow.
+///
+/// Deliberately narrow: redeeming a code adopts one `Viewer` row inside one
+/// gallery the holder can already open. It carries no email, no account, and
+/// nothing that outlives the gallery.
+model ViewerTransfer {
+  id        String   @id @default(cuid())
+  /// One live code per viewer — asking again replaces the previous one, which
+  /// is also how a mistyped or shoulder-surfed code is cancelled.
+  viewerId  String   @unique
+  viewer    Viewer   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  /// SHA-256 of `{galleryId}:{code}`, never the code itself — the same rule
+  /// share tokens follow (CLAUDE.md invariant #5). Salting with the gallery id
+  /// means a precomputed table has to be built per gallery.
+  codeHash  String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
   @@schema("g_gallery")
 }
 
