@@ -2495,7 +2495,7 @@ const PhotoTile = memo(function PhotoTile({
 
   return (
     <div
-      className="group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:opacity-0 after:transition-opacity group-focus-within:after:opacity-100 group-hover:after:opacity-100 pointer-coarse:after:opacity-100"
+      className="group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:opacity-0 after:transition-opacity group-focus-within:after:opacity-100 group-hover:after:opacity-100"
       style={{ width, height }}
       onTouchStart={() => {
         if (!allowDownload) return;
@@ -2613,9 +2613,19 @@ const PhotoTile = memo(function PhotoTile({
  * disc behind it. The disc it used to have put a 44 px dark circle on top of
  * every photo in the gallery — the same objection `SelectCheck` below is
  * already written to avoid — and a wedding gallery is not improved by five
- * hundred of them sitting on people's faces. An unset heart therefore stays
- * dim on touch and fades in on hover with a mouse; a *set* one is always at
- * full strength, because that one is information rather than an affordance.
+ * hundred of them sitting on people's faces.
+ *
+ * An *unset* heart is an affordance, so with a mouse it fades in on hover and
+ * on touch it is not rendered at all: the grid on a phone shows state, never a
+ * menu of actions, which is how Google Photos and Apple Photos treat a
+ * thumbnail (nothing but state badges; favouriting happens in the detail view)
+ * and how the photographer galleries — Pixieset, Pic-Time, ShootProof — treat
+ * theirs. Substituting permanent visibility for the missing hover put two
+ * icons over every photo in the gallery. Touch reaches the same heart through
+ * the lightbox, where it is a full-size control on a bar of its own.
+ *
+ * A *set* heart, or one carrying somebody else's count, is information rather
+ * than an affordance, so that one stays at full strength everywhere.
  */
 function HeartButton({
   active,
@@ -2642,11 +2652,15 @@ function HeartButton({
     size === "lg"
       ? "min-h-11 min-w-11 px-2.5 py-1.5 text-sm"
       : "min-h-11 min-w-11 px-2 py-1 text-xs drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+  // Somebody else's heart on the photo is a count worth reading, so a tile
+  // with one stays visible even before this viewer has hearted it.
+  const pinned = !bare && (active || count > 0);
   const restingClasses = bare
     ? "hover:bg-white/15"
-    : // Fades in under a mouse; a touch screen has no hover to wait for, so
-      // there it sits quietly at 60% rather than disappearing entirely.
-      "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+    : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
+      // `opacity-0`, so a phone is not left with an invisible 44px tap target
+      // sitting in the corner of every photo.
+      "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:hidden";
   return (
     <button
       type="button"
@@ -2654,7 +2668,7 @@ function HeartButton({
       aria-pressed={active}
       aria-label={active ? t("removeFromFavorites") : t("addToFavorites")}
       className={`on-media duration-flip flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${sizeClasses} ${
-        active && !bare ? "opacity-100" : restingClasses
+        pinned ? "opacity-100" : restingClasses
       } ${className}`}
     >
       <HeartIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} active={active} pulse={pulse} />
@@ -2667,9 +2681,12 @@ function HeartButton({
  * The printer, top-right on a tile and in the lightbox.
  *
  * Unset, it is a single round tap target — same "almost nothing" treatment
- * as HeartButton above. The first tap sets one copy, which is where this
- * used to stop: a second tap on the same spot meant "one more copy," so
- * undoing a misclick meant clicking through the whole range again up to 99.
+ * as HeartButton above, including its touch rule: an idle printer is an
+ * affordance, so it fades in on hover with a mouse and is not rendered on a
+ * phone at all (the lightbox carries the full-size one). The first tap sets
+ * one copy, which is where this used to stop: a second tap on the same spot
+ * meant "one more copy," so undoing a misclick meant clicking through the
+ * whole range again up to 99.
  * Once a quantity is set it therefore expands into a stepper — minus, count,
  * plus — the same "Add" → quantity-stepper switch used by cart UIs (Uber
  * Eats, Instacart, most grocery-delivery apps): a single control that both
@@ -2701,9 +2718,10 @@ function PrinterButton({
       size === "lg" ? "h-11 w-11" : "h-11 w-11 drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
     const restingClasses = bare
       ? "hover:bg-white/15"
-      : // Fades in under a mouse; a touch screen has no hover to wait for, so
-        // there it sits quietly at 60% rather than disappearing entirely.
-        "opacity-75 pointer-fine:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100";
+      : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
+        // `opacity-0`, so a phone is not left with an invisible 44px tap
+        // target sitting in the corner of every photo.
+        "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:hidden";
     return (
       <button
         type="button"
