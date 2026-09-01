@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
-import { reconcileGhostUploads, sweepOrphanObjects } from "@/lib/reconcile";
+import { sendMail } from "@/lib/mailer";
+import {
+  reconcileGhostUploads,
+  renderSweepReport,
+  sweepIsNoteworthy,
+  sweepOrphanObjects,
+  type SweepResult,
+} from "@/lib/reconcile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,5 +29,26 @@ export async function GET(request: Request) {
   const sweepRequested = new URL(request.url).searchParams.get("sweep") === "1";
   const sweep = sweepRequested ? await sweepOrphanObjects() : null;
 
-  return NextResponse.json({ ok: true, ...ghosts, sweep });
+  // A destructive job whose only record is the response body of a cron nobody
+  // reads is a job that can delete the bucket unnoticed — which is how the
+  // 2026-09-01 thumbnail loss went a week without being spotted.
+  const reported = sweep && sweepIsNoteworthy(sweep) ? await reportSweep(sweep) : null;
+
+  return NextResponse.json({ ok: true, ...ghosts, sweep, reported });
+}
+
+async function reportSweep(sweep: SweepResult) {
+  const owners = await prisma.user.findMany({
+    where: { role: "admin" },
+    select: { email: true },
+  });
+
+  const { subject, text } = renderSweepReport(sweep);
+
+  return Promise.all(
+    owners.map(async (owner) => ({
+      email: owner.email,
+      ...(await sendMail({ to: owner.email, subject, text, html: `<pre>${text}</pre>` })),
+    })),
+  );
 }

@@ -26,6 +26,7 @@
     "auth:tables": "tsx --conditions=react-server scripts/dump-auth-tables.ts",
     "backfill:placeholders": "tsx --conditions=react-server scripts/backfill-placeholders.ts",
     "backfill:taken-at": "tsx --conditions=react-server scripts/backfill-taken-at.ts",
+    "clear:missing-thumbs": "tsx --conditions=react-server scripts/clear-missing-thumbs.ts",
     "postinstall": "prisma generate",
     "prepare": "husky",
     "migrate:deploy": "prisma migrate deploy"

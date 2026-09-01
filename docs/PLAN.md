@@ -122,6 +122,43 @@ Custom R2 domain and Image Transformations both require it
   URL — the browser must send it byte-identical.
 - R2 object metadata at upload: `Cache-Control: public, max-age=31536000, immutable`.
 
+### 5a. The orphan sweep decides by key shape, not by a list of columns (2026-09-01)
+
+On 2026-09-01 the weekly sweep deleted **every browser-made thumbnail and every pre-built
+`_archive.zip` in the bucket.** The originals were untouched, so nothing 500'd and nothing was
+unrecoverable — the galleries simply rendered tiles with no image in them, because on Cloudflare a
+thumbnail key is served straight from the bucket with no transform to fall back on.
+
+The bug was one line: the live-key set came from `Photo.objectKey` and nothing else. The cause
+worth fixing is not that line. It is that **the sweep's default was to delete, and its correctness
+depended on a list maintained by hand, in a file nobody opens when they add a new kind of object.**
+Three places write under `galleries/` — `api/uploads/presign` (the original), the same route again
+(two thumbnail targets), `lib/zip-build` (the archive) — and nothing connected any of them to
+`reconcile.ts`. Adding the two missing columns would have restored correctness while leaving that
+shape intact, so the fourth object kind would do it again.
+
+What replaced it:
+
+- **`classifyKey` reads an object key back into what wrote it** — original, thumbnail, archive, or
+  `unknown` — and resolves each to the thing that must still exist for it to be live: a photo's
+  **stem** (key without the extension) or a gallery's `storagePrefix`. A thumbnail is live because
+  _its original_ is live, so the sweep consults no thumbnail column at all. That is the coupling
+  removed rather than restated.
+- **`unknown` is never deleted**, only counted and reported. Forgetting now costs storage nobody
+  reclaims, instead of data nobody can get back. The key shape is checked in full
+  (`galleries/{prefix}/{name}`, a UUID-shaped name), so being unsure fails toward keeping bytes.
+- **A blast-radius guard** (`exceedsBlastRadius`): past both 100 objects and 10% of the listing,
+  the run is refused wholesale and nothing is deleted. Both bounds together — a small bucket
+  legitimately trips the ratio, a large one the count. This incident cleared ~100% of thumbnails
+  and would have been stopped here even with `classifyKey` also wrong.
+- **The result is emailed to the owners** when it is worth reading (a refusal, a failure, a
+  deletion, or an unknown key), and stays silent otherwise. The old run reported into the cron's
+  JSON response, which is why a week passed before anyone noticed.
+
+Recovery for rows still pointing at a thumbnail that is gone: `pnpm clear:missing-thumbs`
+(`--apply` to write). The grid also falls back to the transformed original on a 404, so a gallery
+repairs itself visually without the script.
+
 ## 6. Image delivery
 
 - URL shape: `https://cdn.<domain>/cdn-cgi/image/width=W,quality=82,format=auto,fit=scale-down/<key>`

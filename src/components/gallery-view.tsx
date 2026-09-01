@@ -2087,6 +2087,7 @@ function GalleryViewInner({
                     // device that could not make one, which fall back to the
                     // transformed original exactly as before.
                     src={srcFor(photo.thumbObjectKey ?? photo.objectKey, imageGrant)}
+                    fallbackSrc={srcFor(photo.objectKey, imageGrant)}
                     width={entry.width}
                     height={entry.height}
                     index={index}
@@ -2376,6 +2377,8 @@ function GalleryViewInner({
 interface PhotoTileProps {
   photo: GalleryPhoto;
   src: string;
+  /** The transformed original, used when `src` is a thumbnail that 404s. */
+  fallbackSrc: string;
   width: number;
   height: number;
   index: number;
@@ -2410,6 +2413,7 @@ interface PhotoTileProps {
 const PhotoTile = memo(function PhotoTile({
   photo,
   src,
+  fallbackSrc,
   width,
   height,
   index,
@@ -2434,6 +2438,11 @@ const PhotoTile = memo(function PhotoTile({
   buttonRef,
 }: PhotoTileProps) {
   const t = useTranslations("gallery");
+  // A thumbnail can be recorded on the row while its object is gone from the
+  // bucket. Without this the tile stays empty for good, even though the
+  // original is right there and every other surface can render it.
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+
   // Local to this tile, not shared — a touch gesture and the synthetic click
   // that follows it always target the same DOM node, so there is no reason
   // for this to live in the parent (and mutating a ref passed down as a prop
@@ -2517,7 +2526,8 @@ const PhotoTile = memo(function PhotoTile({
             // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
             // straight after it, which tells nobody anything.
             alt=""
-            src={src}
+            src={thumbnailFailed ? fallbackSrc : src}
+            onError={() => setThumbnailFailed(true)}
             fill
             sizes={`${Math.ceil(width)}px`}
             priority={priority}

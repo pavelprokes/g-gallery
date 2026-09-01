@@ -96,9 +96,10 @@ test.describe("guest uploads", () => {
     await page.getByRole("button", { name: "Přeskočit" }).click();
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED + 1);
 
-    // Newest first, so the photo just uploaded is the first tile.
+    // Capture order, oldest shot first (2026-08-25) — the photo just uploaded
+    // has the newest `takenAt`, so it is the LAST tile, not the first.
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
-    await grid.locator('button[aria-label^="Otevřít"]').first().click();
+    await grid.locator('button[aria-label^="Otevřít"]').last().click();
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Smazat mou fotku" }).click();
