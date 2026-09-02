@@ -35,6 +35,37 @@ export type KickoffResult =
   | { attempted: true; galleryId: string; ok: true }
   | { attempted: true; galleryId: string; ok: false; reason: string };
 
+/**
+ * Records that a gallery's set of confirmed photos changed — a confirmed
+ * upload, or a delete — and invalidates any pre-built archive.
+ *
+ * One function rather than the three near-identical copies this used to be
+ * (`uploads/confirm`, `g/[token]/mine`, `admin/actions`), because the two
+ * writes have to stay together: the timestamp is what defers a build until the
+ * gallery settles, and it must move for **every** change, while the status
+ * reset must not touch a NONE gallery (nobody has asked for a zip yet).
+ *
+ * `photosChangedAt` cannot be derived. Photo rows are hard-deleted, so a
+ * photographer culling a gallery leaves nothing behind to read a time off —
+ * and that is exactly when a rebuild is most wasteful, since the next delete
+ * invalidates it again.
+ */
+export async function markGalleryPhotosChanged(galleryId: string): Promise<void> {
+  await prisma.gallery.updateMany({
+    where: { id: galleryId },
+    data: { photosChangedAt: new Date() },
+  });
+
+  // A build already in flight is left running — `zip-callback` fences on
+  // `zipUploadId`, so one that finishes after this is ignored as stale rather
+  // than served as current. `zipAttempts` resets because the gallery's
+  // contents changed: past failures say nothing about this build.
+  await prisma.gallery.updateMany({
+    where: { id: galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
+    data: { zipStatus: "PENDING", zipAttempts: 0 },
+  });
+}
+
 /** ASCII-safe: Content-Disposition filenames travel badly with diacritics — same rule as `zip/route.ts`'s live-download archive name. */
 function archiveNameFor(title: string): string {
   const slug =
@@ -71,6 +102,7 @@ async function loadCandidates(): Promise<ZipBuildCandidate[]> {
       zipStatus: true,
       zipAttempts: true,
       updatedAt: true,
+      photosChangedAt: true,
       _count: {
         select: {
           photos: {
@@ -92,6 +124,7 @@ async function loadCandidates(): Promise<ZipBuildCandidate[]> {
     zipStatus: row.zipStatus as ZipStatusName,
     zipAttempts: row.zipAttempts,
     updatedAt: row.updatedAt,
+    photosChangedAt: row.photosChangedAt,
     newestPhotoAt: row.photos[0]?.createdAt ?? null,
     photosMissingChecksum: row._count.photos,
   }));

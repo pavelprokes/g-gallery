@@ -22,10 +22,12 @@
 export const ZIP_BUILD_CANDIDATE_LIMIT = 20;
 
 /**
- * How long a gallery must go without a new photo before its archive is worth
- * building. Every confirmed upload invalidates the archive
- * (`api/uploads/confirm`), so building during an active wedding means hundreds
- * of part messages for an archive that is stale before it finishes.
+ * How long a gallery must go without a change to its photos before its archive
+ * is worth building. Every confirmed upload **and every delete** invalidates
+ * the archive, so building before a gallery has settled means hundreds of part
+ * messages for an archive that is stale before it finishes — during a wedding
+ * while guests are still uploading, and equally while the photographer is
+ * culling a delivery down to the set they actually want to hand over.
  */
 export const QUIET_PERIOD_MS = 20 * 60 * 1000;
 
@@ -50,6 +52,12 @@ export interface ZipBuildCandidate {
   zipAttempts: number;
   /** Last write to the gallery row — the clock the retry backoff runs on. */
   updatedAt: Date;
+  /**
+   * When the photo set last changed, including a delete. Null on rows that
+   * predate the column, which is why {@link settledSince} falls back rather
+   * than trusting it alone.
+   */
+  photosChangedAt: Date | null;
   /** Newest confirmed photo, or null when the gallery has none. */
   newestPhotoAt: Date | null;
   /** Confirmed photos with no `crc32` or no `sizeBytes`. */
@@ -90,9 +98,26 @@ export function skipReasonFor(candidate: ZipBuildCandidate, now: Date): SkipReas
   // else, which is the whole point of returning a reason instead of a row.
   if (candidate.photosMissingChecksum > 0) return "missing_checksum";
 
-  if (now.getTime() - candidate.newestPhotoAt.getTime() < QUIET_PERIOD_MS) return "quiet_period";
+  if (now.getTime() - settledSince(candidate) < QUIET_PERIOD_MS) return "quiet_period";
 
   return null;
+}
+
+/**
+ * The most recent moment this gallery's contents are known to have changed.
+ *
+ * The newest photo's `createdAt` is not enough on its own: deleting photos
+ * changes the archive and can only move that timestamp *backwards*, so a
+ * gallery being culled would look more settled with every deletion — the exact
+ * opposite of the truth. `photosChangedAt` is the real clock; the newest photo
+ * is the fallback for rows written before that column existed, and the two are
+ * maxed rather than preferred so neither can drag the answer backwards.
+ */
+function settledSince(candidate: ZipBuildCandidate): number {
+  return Math.max(
+    candidate.photosChangedAt?.getTime() ?? 0,
+    candidate.newestPhotoAt?.getTime() ?? 0,
+  );
 }
 
 /**

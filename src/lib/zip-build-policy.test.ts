@@ -18,6 +18,7 @@ function candidate(over: Partial<ZipBuildCandidate> = {}): ZipBuildCandidate {
     zipStatus: "PENDING",
     zipAttempts: 0,
     updatedAt: ago(4 * HOUR),
+    photosChangedAt: ago(4 * HOUR),
     newestPhotoAt: ago(4 * HOUR),
     photosMissingChecksum: 0,
     ...over,
@@ -38,12 +39,58 @@ describe("skipReasonFor", () => {
     expect(skipReasonFor(candidate({ zipStatus: "BUILDING" }), NOW)).toBe("not_pending");
   });
 
-  it("waits out the quiet period while photos are still arriving", () => {
-    const busy = candidate({ newestPhotoAt: ago(QUIET_PERIOD_MS - 1000) });
-    expect(skipReasonFor(busy, NOW)).toBe("quiet_period");
+  describe("the quiet period", () => {
+    it("waits while photos are still arriving", () => {
+      const busy = candidate({
+        newestPhotoAt: ago(QUIET_PERIOD_MS - 1000),
+        photosChangedAt: ago(QUIET_PERIOD_MS - 1000),
+      });
+      expect(skipReasonFor(busy, NOW)).toBe("quiet_period");
+    });
 
-    const settled = candidate({ newestPhotoAt: ago(QUIET_PERIOD_MS + 1000) });
-    expect(skipReasonFor(settled, NOW)).toBeNull();
+    it("builds once the gallery has settled", () => {
+      const settled = candidate({
+        newestPhotoAt: ago(QUIET_PERIOD_MS + 1000),
+        photosChangedAt: ago(QUIET_PERIOD_MS + 1000),
+      });
+      expect(skipReasonFor(settled, NOW)).toBeNull();
+    });
+
+    it("waits while the photographer is still culling, not just uploading", () => {
+      // A delete is a change to the archive that can only move the newest
+      // photo's timestamp *backwards*. Reading the clock off the photos alone
+      // would make a gallery being culled look more and more settled with
+      // every deletion — so `photosChangedAt` has to be what decides.
+      const culling = candidate({
+        newestPhotoAt: ago(6 * HOUR),
+        photosChangedAt: ago(60_000),
+      });
+      expect(skipReasonFor(culling, NOW)).toBe("quiet_period");
+    });
+
+    it("counts a delete of the newest photo as a change, not as settling down", () => {
+      // Deleting the last photo added drags `newestPhotoAt` back hours. The
+      // two clocks are maxed, so neither can pull the answer backwards.
+      const deletedNewest = candidate({
+        newestPhotoAt: ago(30 * HOUR),
+        photosChangedAt: ago(QUIET_PERIOD_MS - 1000),
+      });
+      expect(skipReasonFor(deletedNewest, NOW)).toBe("quiet_period");
+    });
+
+    it("falls back to the newest photo for rows written before the column existed", () => {
+      const legacyBusy = candidate({
+        photosChangedAt: null,
+        newestPhotoAt: ago(QUIET_PERIOD_MS - 1000),
+      });
+      expect(skipReasonFor(legacyBusy, NOW)).toBe("quiet_period");
+
+      const legacySettled = candidate({
+        photosChangedAt: null,
+        newestPhotoAt: ago(QUIET_PERIOD_MS + 1000),
+      });
+      expect(skipReasonFor(legacySettled, NOW)).toBeNull();
+    });
   });
 
   it("skips a gallery whose photos have no checksum yet", () => {
@@ -132,7 +179,7 @@ describe("chooseZipBuild", () => {
   it("reports why it did nothing when nothing is eligible", () => {
     const choice = chooseZipBuild(
       [
-        candidate({ id: "busy", newestPhotoAt: ago(60_000) }),
+        candidate({ id: "busy", newestPhotoAt: ago(60_000), photosChangedAt: ago(60_000) }),
         candidate({ id: "dead", zipStatus: "FAILED", zipAttempts: MAX_BUILD_ATTEMPTS }),
       ],
       NOW,

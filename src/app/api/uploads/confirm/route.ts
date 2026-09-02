@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { headObject } from "@/lib/r2";
 import { thumbKeyFor } from "@/lib/thumbnail";
+import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -144,15 +145,9 @@ export async function POST(request: Request) {
   });
 
   // A new photo means any pre-built "download all" archive (docs/TODO.md §7)
-  // no longer matches the gallery's contents. NONE stays NONE (nobody has
-  // asked for a zip yet); anything else drops back to PENDING so the cron
-  // rebuilds it. A build already in flight is left running — the callback
-  // fences on zipUploadId, so a build that finishes after this update is
-  // simply ignored as stale rather than served as current.
-  await prisma.gallery.updateMany({
-    where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING", zipAttempts: 0 },
-  });
+  // no longer matches the gallery's contents, and restarts the clock the cron
+  // waits out before rebuilding.
+  await markGalleryPhotosChanged(photo.galleryId);
 
   return NextResponse.json({ ok: true });
 }

@@ -191,8 +191,12 @@ tested code. `FAILED` retries on an exponential backoff bounded by `Gallery.zipA
 `BUILDING` is recorded as `FAILED` so hung and reported failures share one retry rule; an
 unbuildable gallery is skipped rather than blocking the queue; and the cron response now reports
 _why_ nothing was built. A build is also deferred until a gallery has gone `QUIET_PERIOD_MS`
-without a new photo — rebuilding 315 parts every 15 minutes during a live wedding is waste, since
-the next upload invalidates it anyway.
+without a change to its photos — rebuilding 315 parts every 15 minutes during a live wedding is
+waste, since the next upload invalidates it anyway, and the same is true of a photographer part-way
+through culling a delivery. That clock is `Gallery.photosChangedAt`, not the newest photo's
+`createdAt`: photo rows are hard-deleted, so a delete leaves nothing behind to read a time off, and
+deleting the most recent photo would drag `createdAt` _backwards_ — making a gallery look more
+settled the more of it was being thrown away.
 
 **And the viewer hid a perfectly good archive.** `archiveFor` served a link only for
 `READY`/`PENDING`, on the theory that during `BUILDING` the key "names a multipart upload still
