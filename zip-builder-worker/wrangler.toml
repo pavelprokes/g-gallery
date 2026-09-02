@@ -2,11 +2,10 @@ name = "g-gallery-zip-builder"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
 
-# Deliberately NO [limits] override (docs/TODO.md §7) — every invocation here
-# (one part, or one finalize check) is designed to stay under the Workers
-# Free 10 ms CPU ceiling. Raising it would require Workers Paid, which is
-# exactly what this Worker exists to avoid; the paid live-streaming Worker
-# (../worker/) is a separate deployment for that reason.
+# Deliberately NO [limits] override (docs/TODO.md §7). CPU was never the
+# binding constraint here — **memory** is: 128 MB per isolate, on every plan,
+# shared by however many consumer invocations Cloudflare decides to run at
+# once. The consumer settings below are what keeps this Worker inside it.
 
 [vars]
 APP_CALLBACK_URL = "https://photos.svatebni-fotograf-cechy.cz/api/internal/zip-callback"
@@ -27,9 +26,29 @@ queue = "g-gallery-zip-parts"
 
 [[queues.consumers]]
 queue = "g-gallery-zip-parts"
-max_batch_size = 10
+# ONE part per invocation, and a hard cap on how many invocations run at once.
+#
+# This is the fix for the 2026-09-01 outage: a 377-photo gallery enqueues 315
+# part messages at once, and with `max_batch_size = 10` and auto-scaled
+# concurrency, Cloudflare ran many invocations in one 128 MB isolate, each
+# churning through ten parts that cost 12 MB live apiece (the old assembly
+# buffered every part twice). 718 of 1013 invocations came back
+# `exceededResources` — while using *less* CPU than the ones that succeeded,
+# which is what proves it was memory. Parts were retried, killed again, and
+# dropped after `max_retries`; only 111 of 315 ever landed, so the build could
+# never finish and the gallery sat on "Připravujeme archiv" for a day.
+#
+# Peak now: max_concurrency x (one 6 MiB part buffer + one stream chunk) =
+# 4 x 6.1 MB = ~25 MB against a 128 MB ceiling. Do not raise either number without redoing
+# that arithmetic — nothing else in this Worker enforces it.
+max_batch_size = 1
 max_batch_timeout = 5
+max_concurrency = 4
+# A part that fails four times is a real bug, not congestion. It goes to the
+# dead-letter queue instead of vanishing: the build it belongs to is doomed
+# either way, but a message sitting in a queue is something you can look at.
 max_retries = 3
+dead_letter_queue = "g-gallery-zip-parts-dlq"
 
 [triggers]
 # Checks for finished builds (finalize) and stale ones (abort). Workers Free

@@ -116,7 +116,9 @@ recomputed per request) — a later rename doesn't invalidate an already-sent li
 Notion/Figma make. Diacritics: NFD-normalized and stripped (`svatba-petra-a-jana`, not
 `svatba-petřa-a-jana`).
 
-## 7. Free ZIP download (skip Workers Paid) — **done 2026-08-23**
+## 7. Free ZIP download (skip Workers Paid) — **done 2026-08-23**, broke on large galleries,
+
+**fixed 2026-09-02** (see §7a)
 
 `docs/SETUP.md` §9 / `worker/` ship a **live, on-the-fly** streaming ZIP Worker, but it needs
 **Workers Paid ($5/mo)** — Free's 10 ms CPU-per-invocation limit can't cover streaming an 8 GB
@@ -154,12 +156,82 @@ Workers Paid too):
   build-start → Queue → Cron-finalize → callback path, downloaded the resulting object, and
   confirmed a byte-correct, `unzip -t`-clean archive with the right `Content-Disposition`.
 
+### 7a. The archive never built for a large gallery — **fixed 2026-09-02**
+
+A 377-photo production gallery (~2 GB, 315 parts) showed "Připravujeme archiv" for a day. Two
+independent bugs, and it took both:
+
+**The build could not finish.** `wrangler.toml` gave the Queue consumer `max_batch_size = 10` and
+no `max_concurrency`, so Cloudflare ran many invocations at once, each assembling up to ten 6 MiB
+parts — and `buildOnePart` buffered every part **twice** (`readAll` materialised each piece, then
+each piece was copied again into the part buffer) — measured 12 MB live for a 6 MiB part, so up to
+~120 MB of churn per invocation against the **128 MB isolate limit**, which applies on every plan
+and is shared by every concurrent invocation. Workers analytics for 2026-09-01 20:15–20:45:
+**718 of 1013 invocations `exceededResources`** — while burning _less_ CPU than the invocations that
+succeeded, which is what rules CPU out and names memory. Only 111 of 315 parts ever landed, in the
+tell-tale gappy pattern of batches dying part-way (1–14, 55–58, 65–67, 75–78, …). Note the design
+comments blamed the Workers **Free 10 ms CPU** ceiling for everything; the account runs the
+`standard` usage model and a 1.4 s-CPU invocation succeeded in the same window. Chasing CPU here
+would have found nothing.
+
+Fixed by `max_batch_size = 1` + `max_concurrency = 4`, and by `src/lib/zip-part-assembly.ts`, which
+streams each source range straight into one part-sized buffer: 6.1 MB per invocation measured,
+so ~25 MB in total at the configured concurrency. The arithmetic is now bounded rather than
+emergent, which is the actual fix — the old design had no number you could check.
+
+**And it could never recover.** `FAILED` was terminal: `kickoffPendingZipBuild` selected only
+`NONE`/`PENDING`, and `resetStaleZipBuilds` swept only `BUILDING`. Nothing but a fresh photo upload
+ever left `FAILED`. Separately, a gallery with a photo missing `crc32`/`sizeBytes` returned early
+without writing anything, so its `updatedAt` never moved and the `orderBy: updatedAt asc`
+`findFirst` picked _the same row_ every tick — one bad gallery starved every other one, which is
+exactly what the comment above it claimed the ordering prevented.
+
+Fixed by `src/lib/zip-build-policy.ts`: candidates are scanned as a list and chosen in pure,
+tested code. `FAILED` retries on an exponential backoff bounded by `Gallery.zipAttempts`; a stale
+`BUILDING` is recorded as `FAILED` so hung and reported failures share one retry rule; an
+unbuildable gallery is skipped rather than blocking the queue; and the cron response now reports
+_why_ nothing was built. A build is also deferred until a gallery has gone `QUIET_PERIOD_MS`
+without a new photo — rebuilding 315 parts every 15 minutes during a live wedding is waste, since
+the next upload invalidates it anyway.
+
+**And the viewer hid a perfectly good archive.** `archiveFor` served a link only for
+`READY`/`PENDING`, on the theory that during `BUILDING` the key "names a multipart upload still
+being assembled". It does not: an in-flight R2 multipart upload leaves the object already at the
+key untouched until `complete()` (verified against the production bucket on a scratch key,
+2026-09-02). So a gallery mid-rebuild — and _permanently_, one whose rebuild had failed — showed a
+dead "Připravujeme archiv" button over a complete, downloadable archive. The rule is now
+`zipBuiltAt`: once an archive has been built, the link never disappears again. Covered by
+`e2e/gallery-archive.spec.ts`.
+
+### 7b. The build's tracking manifest was public — **fixed 2026-09-02**
+
+Found while fixing §7a. The builder Worker parks a tracking manifest in the photos bucket for the
+duration of a build, and that manifest lists **every photo's R2 object key** for the gallery. It was
+named `_zip-builds/{galleryId}.json`, and the photos bucket is served publicly at
+`cdn.svatebni-fotograf-cechy.cz` — verified: a probe object written under `_zip-builds/` came back
+`200` over the CDN.
+
+`Gallery.id` is a cuid, not a secret, and the gallery page hands it to every viewer (the presence
+channel needs it — it is in the page HTML). So anyone who has ever opened a share link keeps the id
+and can poll that URL; during any rebuild it hands over every original's key, and originals are
+otherwise protected only by the gallery's 128-bit random `storagePrefix`. That survives link expiry
+and revocation, which invariant #5 requires to hold on every surface.
+
+Fixed by `src/lib/zip-build-scope.ts`: build bookkeeping is now named by
+`HMAC-SHA256(ZIP_BUILD_SIGNING_SECRET, galleryId)`, which the app and the Worker both derive and
+neither publishes. Contained entirely in the Worker — no manifest, message or schema change.
+Nothing migrates: the old-style keys only ever exist for the length of one build.
+
 **Open questions before building**
 
 - Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild
   on every publish action, or only on explicit admin request ("prepare download")?
-- Failure/retry: an interrupted multipart upload needs an explicit `abortMultipartUpload` (R2 lists
-  incomplete multipart uploads and does **not** auto-expire them), or storage leaks silently.
+  → answered 2026-09-02: any confirmed upload/delete, but debounced by a quiet period.
+- Failure/retry: an interrupted multipart upload needs an explicit `abortMultipartUpload`, or
+  storage leaks silently. (The claim here that R2 does **not** auto-expire them was wrong — R2
+  aborts incomplete multipart uploads after 7 days by default. It is still worth aborting
+  explicitly: 7 days of a half-built 2 GB archive is billed storage, and `abandonBuild` now retries
+  the abort and logs `ORPHANED MULTIPART UPLOAD` when it cannot.)
 - Does this **replace** `worker/`'s live ZIP entirely, or stay alongside it as a fallback for
   galleries too large/urgent to wait for a background build?
 - Cleanup: pruning old pre-built ZIPs when a gallery is re-built or archived.

@@ -83,6 +83,7 @@ export async function loadGalleryViewData(
       zipStatus: true,
       zipObjectKey: true,
       zipSizeBytes: true,
+      zipBuiltAt: true,
       // One filtered aggregate rides along with the row we are already
       // fetching, so the header's "56 fotek" costs no extra round trip.
       _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
@@ -182,7 +183,12 @@ export async function loadGalleryViewData(
         ctaUrl: placement.promoCard.ctaUrl,
         theme: placement.promoCard.theme,
       })),
-    archive: archiveFor(gallery.zipStatus, gallery.zipObjectKey, gallery.zipSizeBytes),
+    archive: archiveFor(
+      gallery.zipStatus,
+      gallery.zipObjectKey,
+      gallery.zipSizeBytes,
+      gallery.zipBuiltAt,
+    ),
   };
 }
 
@@ -191,37 +197,43 @@ export async function loadGalleryViewData(
  * time (docs/TODO.md §7). Built server-side since NEXT_PUBLIC_PHOTOS_BASE_URL
  * is the same public, build-time value the custom image loader already uses.
  *
- * ## Why PENDING still serves a link, and BUILDING does not
+ * ## Once an archive exists, the download button never disappears again
  *
- * Any photo added or removed flips a READY gallery back to PENDING
- * (`api/uploads/confirm`, `admin/actions`), but neither clears `zipObjectKey`
- * and nothing deletes the object — so while a rebuild is merely *queued*, the
- * previous archive is still complete and still there. Serving it, flagged as
- * `stale`, beats hiding the feature for up to 15 minutes per cron tick: the
- * viewer gets everything except the last few photos, which is what they came
- * for, instead of a gallery with no download button.
+ * The rule is `zipBuiltAt`, not `zipStatus`: a build that has completed at
+ * least once left a whole, downloadable object at `zipObjectKey`, and no later
+ * state change takes it away. Any photo added or removed flips the gallery
+ * back to PENDING, a rebuild moves it through BUILDING, a bad build lands it
+ * in FAILED — and through all of it that object is untouched. Serving it,
+ * flagged `stale`, is strictly better than hiding the one feature the link was
+ * sent for: the viewer gets everything except the last few photos.
  *
- * BUILDING is different and must not be served. `startNextZipBuild` overwrites
- * `zipObjectKey` with the *new* key at kickoff, so from that moment the column
- * names a multipart upload that is still being assembled; a link to it would
- * 404 or hand over a truncated ZIP. FAILED is excluded for the same reason —
- * the key it left behind is the failed build's.
+ * BUILDING used to be excluded on the theory that `zipObjectKey` names "a
+ * multipart upload still being assembled". It does name that upload — but an
+ * in-flight R2 multipart upload does not disturb the object already at the
+ * key; the previous archive is served, unchanged, until `complete()` swaps it
+ * (verified against the production bucket on a scratch key, 2026-09-02). The
+ * old rule cost every gallery its download button for the entire length of
+ * every rebuild, and cost a gallery whose build failed its button *forever*.
+ *
+ * A gallery that has never completed a build has nothing to serve, and the UI
+ * says so ("Připravujeme archiv") rather than linking at a key that 404s.
  */
 function archiveFor(
   zipStatus: string,
   zipObjectKey: string | null,
   zipSizeBytes: number | null,
+  zipBuiltAt: Date | null,
 ): GalleryArchive {
   const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
-  const servable = zipStatus === "READY" || zipStatus === "PENDING";
-  if (!servable || !zipObjectKey || !base) return { url: null, stale: false, sizeBytes: null };
+  if (!zipBuiltAt || !zipObjectKey || !base) return { url: null, stale: false, sizeBytes: null };
 
   const path = zipObjectKey.split("/").map(encodeURIComponent).join("/");
   return {
     url: `${base.replace(/\/$/, "")}/${path}`,
     stale: zipStatus !== "READY",
-    // Describes the object at `url` — during PENDING that is still the old
-    // archive, and so is this number. They stay consistent.
+    // Describes the object at `url` — while a rebuild is queued or running,
+    // that is still the previous archive, and so is this number. Both are
+    // written by the same callback, so they never disagree.
     sizeBytes: zipSizeBytes,
   };
 }

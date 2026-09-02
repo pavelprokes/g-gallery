@@ -151,7 +151,7 @@ export async function POST(request: Request) {
   // simply ignored as stale rather than served as current.
   await prisma.gallery.updateMany({
     where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING" },
+    data: { zipStatus: "PENDING", zipAttempts: 0 },
   });
 
   return NextResponse.json({ ok: true });

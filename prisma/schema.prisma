@@ -226,6 +226,12 @@ model Gallery {
   /// Part count the finalize step waits for via R2 listParts — set at kickoff,
   /// since it's computed from the entry list, not discovered afterwards
   zipPartsExpected Int?
+  /// Consecutive failed builds, reset to 0 on success. FAILED used to be a
+  /// terminal state — nothing but a fresh photo upload ever left it, so one bad
+  /// build meant "Připravujeme archiv" forever. The cron now retries FAILED on
+  /// an exponential backoff (src/lib/zip-build-policy.ts) and this is what
+  /// keeps that from becoming an infinite loop.
+  zipAttempts      Int       @default(0)
 
   /// Which wedding page lists this gallery, if any. Nullable by design:
   /// a standalone gallery with no wedding page around it stays legal.

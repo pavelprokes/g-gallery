@@ -53,8 +53,14 @@ export async function POST(request: Request) {
             zipObjectKey: objectKey,
             zipSizeBytes: sizeBytes,
             zipBuiltAt: new Date(),
+            // A success clears the slate: the next failure starts its backoff
+            // from the beginning rather than inheriting an old streak.
+            zipAttempts: 0,
           }
-        : { zipStatus: "FAILED" },
+        : // FAILED is no longer where a gallery goes to die — the cron retries
+          // it on a backoff, and this counter is what bounds that
+          // (src/lib/zip-build-policy.ts).
+          { zipStatus: "FAILED", zipAttempts: { increment: 1 } },
   });
 
   return NextResponse.json({ ok: true, applied: count > 0 });

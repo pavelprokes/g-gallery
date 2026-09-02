@@ -98,7 +98,7 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/g/[token]
   // the gallery's contents (docs/TODO.md §7).
   await prisma.gallery.updateMany({
     where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING" },
+    data: { zipStatus: "PENDING", zipAttempts: 0 },
   });
 
   return NextResponse.json({ ok: true });

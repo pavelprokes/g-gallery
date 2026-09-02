@@ -7,6 +7,13 @@ import {
   type BuildManifest,
 } from "@/lib/zip-build-manifest";
 import { uniqueNames } from "@/lib/zip-manifest";
+import {
+  chooseZipBuild,
+  ZIP_BUILD_CANDIDATE_LIMIT,
+  type SkipReason,
+  type ZipBuildCandidate,
+  type ZipStatusName,
+} from "@/lib/zip-build-policy";
 
 /**
  * Background "download all" ZIP build (docs/TODO.md §7).
@@ -20,7 +27,11 @@ import { uniqueNames } from "@/lib/zip-manifest";
  */
 
 export type KickoffResult =
-  | { attempted: false }
+  | { attempted: false; reason: "not_configured" }
+  /** Nothing was built, and why — one entry per gallery that was passed over.
+   * "Nothing to do" and "everything is stuck" used to be the same empty
+   * answer, which is how this went unnoticed for a day. */
+  | { attempted: false; reason: "nothing_eligible"; skipped: { id: string; reason: SkipReason }[] }
   | { attempted: true; galleryId: string; ok: true }
   | { attempted: true; galleryId: string; ok: false; reason: string };
 
@@ -37,22 +48,68 @@ function archiveNameFor(title: string): string {
   return `${slug}.zip`;
 }
 
-export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
-  const env = serverEnv();
-  if (!env.ZIP_BUILDER_WORKER_URL || !env.ZIP_BUILD_SIGNING_SECRET) {
-    return { attempted: false };
-  }
-
-  const gallery = await prisma.gallery.findFirst({
+/**
+ * A cheap scan of everything that might want building, with just enough per
+ * gallery for {@link chooseZipBuild} to decide. Deliberately *not* a
+ * `findFirst`: the query cannot express "skip this one and take the next", so
+ * a single unbuildable gallery at the front used to block the whole queue.
+ */
+async function loadCandidates(): Promise<ZipBuildCandidate[]> {
+  const rows = await prisma.gallery.findMany({
     where: {
       status: "PUBLISHED",
       trashedAt: null,
-      zipStatus: { in: ["NONE", "PENDING"] },
+      // FAILED is in here now. It is not a terminal state any more — the retry
+      // backoff and attempt cap live in zip-build-policy.ts.
+      zipStatus: { in: ["NONE", "PENDING", "FAILED"] },
       photos: { some: { status: "CONFIRMED" } },
     },
-    // Oldest-waiting first, so one gallery being repeatedly re-queued (e.g.
-    // missing checksums) never starves the others.
     orderBy: { updatedAt: "asc" },
+    take: ZIP_BUILD_CANDIDATE_LIMIT,
+    select: {
+      id: true,
+      zipStatus: true,
+      zipAttempts: true,
+      updatedAt: true,
+      _count: {
+        select: {
+          photos: {
+            where: { status: "CONFIRMED", OR: [{ crc32: null }, { sizeBytes: null }] },
+          },
+        },
+      },
+      photos: {
+        where: { status: "CONFIRMED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { createdAt: true },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    zipStatus: row.zipStatus as ZipStatusName,
+    zipAttempts: row.zipAttempts,
+    updatedAt: row.updatedAt,
+    newestPhotoAt: row.photos[0]?.createdAt ?? null,
+    photosMissingChecksum: row._count.photos,
+  }));
+}
+
+export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
+  const env = serverEnv();
+  if (!env.ZIP_BUILDER_WORKER_URL || !env.ZIP_BUILD_SIGNING_SECRET) {
+    return { attempted: false, reason: "not_configured" };
+  }
+
+  const choice = chooseZipBuild(await loadCandidates());
+  if (!choice.pick) {
+    return { attempted: false, reason: "nothing_eligible", skipped: choice.skipped };
+  }
+
+  const gallery = await prisma.gallery.findUnique({
+    where: { id: choice.pick.id },
     select: {
       id: true,
       title: true,
@@ -65,12 +122,14 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
       },
     },
   });
-  if (!gallery) return { attempted: false };
+  // Deleted between the scan and here — the next tick picks something else.
+  if (!gallery) return { attempted: false, reason: "nothing_eligible", skipped: choice.skipped };
 
   const missing = gallery.photos.findIndex((p) => !p.crc32 || !p.sizeBytes);
   if (missing >= 0) {
-    // Leave it PENDING — a later tick retries once reconcile/upload catches
-    // the photo up, rather than silently excluding it from the archive.
+    // The candidate scan already filters these out; reaching this means a photo
+    // was confirmed between the two queries. Leave it alone rather than
+    // shipping an archive quietly missing a photo.
     return { attempted: true, galleryId: gallery.id, ok: false, reason: "missing_checksum" };
   }
 
@@ -136,20 +195,32 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
 
 /**
  * A BUILDING gallery whose Worker-side build never reported back (crashed
- * Queue consumer, Worker redeploy mid-build, whatever) would otherwise block
- * that gallery forever — nothing else re-queues it once it leaves
- * NONE/PENDING. Anything still BUILDING after this long gets a fresh attempt
- * rather than a permanent stall; the old multipart upload is abandoned
- * (R2 has no cost for an incomplete one sitting unfinished, but the builder
- * Worker's own cron also aborts it explicitly once it notices).
+ * Queue consumer, Worker redeploy mid-build, a part that exhausted its
+ * retries) would otherwise sit there forever — nothing re-queues it once it
+ * leaves NONE/PENDING.
+ *
+ * It is recorded as FAILED rather than dropped straight back to PENDING, so
+ * that a hung build and a build the Worker actively reported as failed go
+ * through the *same* backoff and attempt cap (`zip-build-policy.ts`). Two
+ * different retry rules for two flavours of the same outcome is how one of
+ * them ends up never being retried at all.
+ *
+ * The abandoned R2 multipart upload is the builder Worker's to abort — and
+ * incomplete parts are billed as stored data, so a bucket lifecycle rule
+ * backstops it (docs/SETUP.md §10).
  */
 const STALE_BUILD_MINUTES = 60;
 
-export async function resetStaleZipBuilds(): Promise<number> {
+export async function failStaleZipBuilds(): Promise<number> {
   const cutoff = new Date(Date.now() - STALE_BUILD_MINUTES * 60_000);
   const { count } = await prisma.gallery.updateMany({
     where: { zipStatus: "BUILDING", updatedAt: { lt: cutoff } },
-    data: { zipStatus: "PENDING", zipUploadId: null, zipPartsExpected: null },
+    data: {
+      zipStatus: "FAILED",
+      zipAttempts: { increment: 1 },
+      zipUploadId: null,
+      zipPartsExpected: null,
+    },
   });
   return count;
 }

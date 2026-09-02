@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/env";
-import { kickoffPendingZipBuild, resetStaleZipBuilds } from "@/lib/zip-build";
+import { failStaleZipBuilds, kickoffPendingZipBuild } from "@/lib/zip-build";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -12,11 +12,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Stale sweep first: a gallery it resets to PENDING can be picked up by
-  // the kickoff call that follows in the same run, rather than waiting a
-  // full extra tick.
-  const staleReset = await resetStaleZipBuilds();
+  // Stale sweep first: a gallery it records as FAILED can be picked up by the
+  // kickoff call that follows in the same run once its backoff has elapsed,
+  // rather than waiting a full extra tick.
+  const staleFailed = await failStaleZipBuilds();
   const kickoff = await kickoffPendingZipBuild();
 
-  return NextResponse.json({ ok: true, staleReset, kickoff });
+  // `kickoff` carries the reason nothing was built, not just the fact of it.
+  // A silently empty response here is what let a whole day of "Připravujeme
+  // archiv" look, from the outside, exactly like a healthy idle queue.
+  return NextResponse.json({ ok: true, staleFailed, kickoff });
 }
