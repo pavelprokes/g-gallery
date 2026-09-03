@@ -105,10 +105,14 @@ test.describe("pre-built archive: the download control", () => {
     await expect(dialog).toContainText(/Wi-Fi/);
     await expect(dialog).toContainText(/navázat/);
 
-    // The way out that does not involve downloading 6 GB at all.
+    // The way out that does not involve downloading 6 GB at all — and the
+    // subject names the gallery, so the photographer knows which wedding is
+    // asking without working it out from the sender.
+    await expect(dialog).toContainText(/nemáte kam/);
+    await expect(dialog).toContainText(/flashce/);
     await expect(dialog.getByRole("link", { name: /Napište mi/ })).toHaveAttribute(
       "href",
-      /^mailto:/,
+      /^mailto:.*subject=Sta%C5%BEen%C3%AD%20galerie%3A%20/,
     );
 
     // Confirming is a plain link, so the browser's own download manager takes

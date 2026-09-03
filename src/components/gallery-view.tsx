@@ -2415,6 +2415,7 @@ function GalleryViewInner({
           href={archive.url}
           sizeBytes={archive.sizeBytes}
           photoCount={photoCount}
+          galleryTitle={title}
           onClose={() => setConfirmingDownload(false)}
         />
       )}
@@ -3073,11 +3074,15 @@ function DownloadAllPrompt({
   href,
   sizeBytes,
   photoCount,
+  galleryTitle,
   onClose,
 }: {
   href: string;
   sizeBytes: number | null;
   photoCount: number;
+  /** Goes into the mailto subject, so the photographer knows which wedding is
+   * asking without having to work it out from the sender. */
+  galleryTitle: string;
   onClose: () => void;
 }) {
   const t = useTranslations("gallery");
@@ -3125,7 +3130,7 @@ function DownloadAllPrompt({
             {t.rich("downloadPromptAlternative", {
               a: (chunks) => (
                 <a
-                  href={`mailto:${email}?subject=${encodeURIComponent(t("downloadPromptEmailSubject"))}`}
+                  href={`mailto:${email}?subject=${encodeURIComponent(t("downloadPromptEmailSubject", { title: galleryTitle }))}`}
                   className="underline"
                 >
                   {chunks}
