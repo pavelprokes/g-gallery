@@ -168,8 +168,16 @@ const GALLERY_PREFIX = "galleries/";
  */
 const ORPHAN_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** The archive `zip-build.ts` writes, one per gallery, beside its photos. */
-const ARCHIVE_SUFFIX = "/_archive.zip";
+/**
+ * The archive `zip-build.ts` writes beside a gallery's photos.
+ *
+ * `_archive-{buildId}.zip`, not a fixed `_archive.zip`: each build writes its
+ * own object so a superseded build finishing late cannot overwrite the archive
+ * the gallery is actually serving. The old fixed name is still matched, because
+ * galleries built before 2026-09-03 have one and it is still what their
+ * `zipObjectKey` points at.
+ */
+const ARCHIVE_NAME = /^_archive(-[0-9a-f]{32})?\.zip$/;
 
 /**
  * The name presign gives an original: `randomUUID()` plus an extension. Being
@@ -218,11 +226,15 @@ export function classifyKey(key: string): KeyClassification {
     return { kind: "unknown", owner: null };
   }
 
-  if (key.endsWith(ARCHIVE_SUFFIX)) {
-    return { kind: "archive", owner: key.slice(0, -ARCHIVE_SUFFIX.length) };
-  }
-
   const name = segments[2]!;
+
+  if (ARCHIVE_NAME.test(name)) {
+    // Owned by the gallery prefix, so every archive under a live gallery is
+    // spared. Retiring a superseded one is `zip-callback`'s job, at the moment
+    // it repoints `zipObjectKey` — this sweep deliberately never decides that,
+    // because getting it wrong deletes the download the couple came for.
+    return { kind: "archive", owner: key.slice(0, key.lastIndexOf("/")) };
+  }
 
   if (isThumbKey(key)) {
     // Stripped back to the stem the original shares — the original's own

@@ -7,6 +7,7 @@ import {
   type BuildManifest,
 } from "@/lib/zip-build-manifest";
 import { uniqueNames } from "@/lib/zip-manifest";
+import { deleteObject } from "@/lib/r2";
 import {
   chooseZipBuild,
   ZIP_BUILD_CANDIDATE_LIMIT,
@@ -54,19 +55,37 @@ export type KickoffResult =
  * invalidates it again.
  */
 export async function markGalleryPhotosChanged(galleryId: string): Promise<void> {
-  await prisma.gallery.updateMany({
-    where: { id: galleryId },
-    data: { photosChangedAt: new Date() },
-  });
+  // Clearing `zipBuildId` is the staleness fence, and it has to happen whatever
+  // state the gallery is in. The comment here used to claim `zip-callback`
+  // fenced on `zipUploadId` — but nothing ever cleared that either, so the
+  // fence did not exist: an admin who deleted a photo mid-build got the
+  // finished archive, still containing that photo, recorded as READY and served
+  // as current. For a gallery where "take that one down" is a promise to a
+  // guest, that is the worst way to be wrong.
+  const [superseded] = await prisma.$transaction([
+    prisma.gallery.findUnique({ where: { id: galleryId }, select: { zipBuildId: true } }),
+    prisma.gallery.updateMany({
+      where: { id: galleryId },
+      data: { photosChangedAt: new Date(), zipBuildId: null, zipUploadId: null },
+    }),
+    // NONE stays NONE (nobody has asked for a zip yet); anything else drops
+    // back to PENDING so the cron rebuilds it. `zipAttempts` resets because the
+    // gallery's contents changed: past failures say nothing about this build.
+    prisma.gallery.updateMany({
+      where: { id: galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
+      data: { zipStatus: "PENDING", zipAttempts: 0 },
+    }),
+  ]);
 
-  // A build already in flight is left running — `zip-callback` fences on
-  // `zipUploadId`, so one that finishes after this is ignored as stale rather
-  // than served as current. `zipAttempts` resets because the gallery's
-  // contents changed: past failures say nothing about this build.
-  await prisma.gallery.updateMany({
-    where: { id: galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING", zipAttempts: 0 },
-  });
+  // The fence alone is enough for correctness — the superseded build now
+  // finishes into nothing. This stops it wasting the twenty minutes first: the
+  // builder re-reads its tracking manifest for every part and treats a missing
+  // one as "this build was invalidated", so deleting it cancels the remaining
+  // parts. Best-effort by design; a failure here costs queue work, not
+  // correctness.
+  if (superseded?.zipBuildId) {
+    await deleteObject(`_zip-builds/${superseded.zipBuildId}.json`).catch(() => {});
+  }
 }
 
 /** ASCII-safe: Content-Disposition filenames travel badly with diacritics — same rule as `zip/route.ts`'s live-download archive name. */
@@ -183,9 +202,22 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
     crc32: photo.crc32!,
   }));
 
-  const objectKey = `${gallery.storagePrefix}/_archive.zip`;
+  // 128 bits, from Node's WebCrypto — this names every R2 key the build writes,
+  // in a bucket that is served publicly, and it is the fence the callback
+  // checks. It must be unguessable and it must never repeat.
+  const buildId = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+
+  // Its own key, not a fixed `_archive.zip`. A superseded build finishing late
+  // used to overwrite the good archive with stale bytes while the row still
+  // described the old one — the size and date said one thing, the object said
+  // another. Now nothing points at a build's object until its callback is
+  // accepted, and a rejected build deletes what it wrote.
+  const objectKey = `${gallery.storagePrefix}/_archive-${buildId}.zip`;
   const manifest: BuildManifest = {
     galleryId: gallery.id,
+    buildId,
     objectKey,
     archiveName: archiveNameFor(gallery.title),
     entries,
@@ -193,12 +225,22 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
   };
   const token = await signBuildManifest(manifest, env.ZIP_BUILD_SIGNING_SECRET);
 
-  // Marked BUILDING (with no uploadId yet) before the request goes out, so a
-  // crashed/timed-out kickoff still shows as "in progress" rather than
-  // silently retrying the same gallery every tick. `zip-callback` clears
-  // this back to PENDING on a build-start failure it hears about; a kickoff
-  // that never even got a response is caught by the stale-build sweep below.
-  await prisma.gallery.update({ where: { id: gallery.id }, data: { zipStatus: "BUILDING" } });
+  // BUILDING **and the build id**, before the request goes out. The ordering is
+  // load-bearing: everything the callback needs to recognise this build is
+  // written first, so a kickoff killed by the function timeout mid-handoff
+  // still ends in a build whose result can be accepted.
+  //
+  // It used to be the other way round — the fence (`zipUploadId`) was written
+  // *after* the fetch returned, and the handoff for a 1000-part gallery fans
+  // out eleven `sendBatch` calls. A kickoff that ran out of time there left the
+  // Worker building happily against a gallery that no longer had any way to
+  // recognise the result: the archive completed, the callback was rejected, the
+  // gallery stayed BUILDING, the stale sweep failed it, and the retry did the
+  // same thing again. Large galleries could never finish.
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: { zipStatus: "BUILDING", zipBuildId: buildId },
+  });
 
   let response: Response;
   try {
@@ -208,12 +250,18 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
       body: JSON.stringify({ token }),
     });
   } catch (error) {
-    await prisma.gallery.update({ where: { id: gallery.id }, data: { zipStatus: "PENDING" } });
+    await prisma.gallery.update({
+      where: { id: gallery.id },
+      data: { zipStatus: "PENDING", zipBuildId: null },
+    });
     return { attempted: true, galleryId: gallery.id, ok: false, reason: (error as Error).message };
   }
 
   if (!response.ok) {
-    await prisma.gallery.update({ where: { id: gallery.id }, data: { zipStatus: "PENDING" } });
+    await prisma.gallery.update({
+      where: { id: gallery.id },
+      data: { zipStatus: "PENDING", zipBuildId: null },
+    });
     return {
       attempted: true,
       galleryId: gallery.id,
@@ -260,6 +308,7 @@ export async function failStaleZipBuilds(): Promise<number> {
     data: {
       zipStatus: "FAILED",
       zipAttempts: { increment: 1 },
+      zipBuildId: null,
       zipUploadId: null,
       zipPartsExpected: null,
     },

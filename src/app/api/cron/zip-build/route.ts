@@ -3,7 +3,11 @@ import { serverEnv } from "@/lib/env";
 import { failStaleZipBuilds, kickoffPendingZipBuild } from "@/lib/zip-build";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+// The handoff fans out one Queue message per part — eleven `sendBatch` calls
+// for a 1045-part gallery — so 15 s was not comfortably enough. Correctness no
+// longer depends on finishing (see `zipBuildId` in zip-build.ts), but a kickoff
+// killed part-way still costs a whole cron tick.
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const env = serverEnv();

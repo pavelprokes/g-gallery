@@ -25,6 +25,19 @@ export interface BuildManifestEntry {
 
 export interface BuildManifest {
   galleryId: string;
+  /**
+   * Identifies this build, and nothing else. Random per build rather than
+   * derived from the gallery, because *two* builds of one gallery can overlap
+   * — an admin edit supersedes a running build and the next tick starts
+   * another. Deriving the name from `galleryId` made both builds share their
+   * tracking manifest and part markers in R2, so finalize could complete one
+   * multipart upload with etags belonging to the other.
+   *
+   * 128 bits of randomness also keeps the bookkeeping unguessable in a bucket
+   * that is served publicly, which is what the previous HMAC-of-galleryId was
+   * for; randomness covers both jobs at once.
+   */
+  buildId: string;
   /** R2 key the finished archive is written to. */
   objectKey: string;
   /** Filename offered to the browser — becomes the object's Content-Disposition, so the CDN link downloads correctly with no Worker involved. */
@@ -107,6 +120,11 @@ export async function verifyBuildManifest(
   }
 
   if (!Array.isArray(manifest.entries) || manifest.entries.length === 0) {
+    return { ok: false, reason: "malformed" };
+  }
+  // Every R2 key the builder writes is derived from this, so a missing or
+  // oddly-shaped one must never reach the Worker's key construction.
+  if (typeof manifest.buildId !== "string" || !/^[0-9a-f]{32}$/.test(manifest.buildId)) {
     return { ok: false, reason: "malformed" };
   }
   if (typeof manifest.exp !== "number" || manifest.exp * 1000 < now) {

@@ -6,7 +6,8 @@ const SECRET = "zip-build-signing-secret-at-least-32-chars!!";
 function manifest(over: Partial<BuildManifest> = {}): BuildManifest {
   return {
     galleryId: "g1",
-    objectKey: "galleries/a/_archive.zip",
+    buildId: "0123456789abcdef0123456789abcdef",
+    objectKey: "galleries/a/_archive-0123456789abcdef0123456789abcdef.zip",
     archiveName: "svatba.zip",
     entries: [{ key: "galleries/a/1.jpg", name: "1.jpg", size: 100, crc32: "deadbeef" }],
     exp: Math.floor(Date.now() / 1000) + 300,
@@ -19,7 +20,10 @@ describe("build manifest signing", () => {
     const token = await signBuildManifest(manifest(), SECRET);
     const result = await verifyBuildManifest(token, SECRET);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.manifest.objectKey).toBe("galleries/a/_archive.zip");
+    if (result.ok)
+      expect(result.manifest.objectKey).toBe(
+        "galleries/a/_archive-0123456789abcdef0123456789abcdef.zip",
+      );
   });
 
   it("rejects a manifest signed with a different secret", async () => {
@@ -41,6 +45,19 @@ describe("build manifest signing", () => {
       ok: false,
       reason: "bad_signature",
     });
+  });
+
+  it("rejects a manifest with no build id — every R2 key the builder writes is named from it", async () => {
+    // Not a signing concern but a shape one: an undefined buildId would build
+    // keys like `_zip-builds/undefined.json`, which two builds would share.
+    const { buildId: _dropped, ...rest } = manifest();
+    const token = await signBuildManifest(rest as BuildManifest, SECRET);
+    expect(await verifyBuildManifest(token, SECRET)).toEqual({ ok: false, reason: "malformed" });
+  });
+
+  it("rejects a build id that is not 128 bits of hex", async () => {
+    const token = await signBuildManifest(manifest({ buildId: "../../etc/passwd" }), SECRET);
+    expect(await verifyBuildManifest(token, SECRET)).toEqual({ ok: false, reason: "malformed" });
   });
 
   it("rejects an expired manifest", async () => {

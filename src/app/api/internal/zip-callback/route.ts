@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
 import { prisma } from "@/lib/db";
+import { deleteObject } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -14,8 +15,11 @@ export const maxDuration = 15;
  */
 const bodySchema = z.object({
   galleryId: z.string().min(1),
-  /** Fences against a superseded build (e.g. a photo was added mid-build)
-   * finishing late and being reported as current. */
+  /** The fence. A build whose id the gallery no longer names was superseded
+   * while it ran — an admin added or removed a photo — and must finish into
+   * nothing rather than be recorded as current. */
+  buildId: z.string().regex(/^[0-9a-f]{32}$/),
+  /** Informational: which R2 multipart upload produced this. */
   uploadId: z.string().min(1),
   status: z.enum(["ready", "failed"]),
   objectKey: z.string().min(1).optional(),
@@ -38,14 +42,21 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const { galleryId, uploadId, status, objectKey, sizeBytes } = parsed.data;
+  const { galleryId, buildId, status, objectKey, sizeBytes } = parsed.data;
 
-  // updateMany, not update: a gallery whose zipUploadId no longer matches
-  // this build (invalidated mid-flight, or a stale-build reset already fired)
-  // simply isn't touched — the callback is a no-op, not an error, since the
-  // Worker has no way to know that happened before it calls back.
+  // Which object the gallery is serving right now, so a successful build can
+  // retire it. Read before the write, because the write is what replaces it.
+  const before = await prisma.gallery.findUnique({
+    where: { id: galleryId },
+    select: { zipObjectKey: true },
+  });
+
+  // updateMany, not update: a gallery whose zipBuildId no longer matches this
+  // build was superseded while it ran, and simply isn't touched — the callback
+  // is a no-op, not an error, since the Worker has no way to know that happened
+  // before it called back.
   const { count } = await prisma.gallery.updateMany({
-    where: { id: galleryId, zipUploadId: uploadId },
+    where: { id: galleryId, zipBuildId: buildId },
     data:
       status === "ready"
         ? {
@@ -63,5 +74,17 @@ export async function POST(request: Request) {
           { zipStatus: "FAILED", zipAttempts: { increment: 1 } },
   });
 
+  // Each build writes its own object, so the one this replaced is now
+  // unreferenced. Deleted here rather than left to the weekly sweep, which
+  // spares anything under a live gallery prefix and would let every superseded
+  // archive accumulate at ~7 GB apiece. After the row is repointed, so a
+  // failure here leaks an object instead of breaking a download.
+  const retired = before?.zipObjectKey;
+  if (count > 0 && status === "ready" && retired && retired !== objectKey) {
+    await deleteObject(retired).catch(() => {});
+  }
+
+  // `applied: false` tells the Worker its build was superseded, which is its
+  // cue to delete the archive it just wrote — nothing will ever point at it.
   return NextResponse.json({ ok: true, applied: count > 0 });
 }
