@@ -82,7 +82,7 @@ const GuestUploader = dynamic(
 const OfflineIconButton = dynamic(() =>
   import("@/components/offline-toggle").then((module) => module.OfflineIconButton),
 );
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { IconButton, IconButtonLink, NavButton } from "@/components/ui/icon-button";
 import {
   CheckCircleIcon,
@@ -188,6 +188,17 @@ const GAP = 4;
  * as the phone once the container's own 4 px is added.
  */
 const GUTTER = "px-4 sm:px-3";
+
+/**
+ * Above this, "Stáhnout vše" asks before it starts.
+ *
+ * A delivered wedding is 6-8 GB. Starting that on a phone's data plan is a
+ * mistake nobody can take back once the bytes are moving, and the button alone
+ * — even with the size on it — reads as "one tap and you have your photos".
+ * Below the threshold the link stays a plain link: a 200 MB gallery does not
+ * need a conversation.
+ */
+const LARGE_ARCHIVE_BYTES = 1024 ** 3;
 
 /** Photos uploaded before dimensions were captured fall back to 3:2. */
 const FALLBACK_ASPECT = 1.5;
@@ -887,6 +898,7 @@ function GalleryViewInner({
   const [savedPulseId, setSavedPulseId] = useState<string | null>(null);
   const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
   const [projecting, setProjecting] = useState(false);
+  const [confirmingDownload, setConfirmingDownload] = useState(false);
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
   // server-rendered.
@@ -2021,7 +2033,10 @@ function GalleryViewInner({
               </IconButton>
             ) : archive.url ? (
               // A pre-built archive is a plain CDN link — no signed manifest,
-              // no Worker request, just a download.
+              // no Worker request, just a download. Above LARGE_ARCHIVE_BYTES it
+              // asks first: a delivered wedding is 6-8 GB, and starting that on
+              // a phone's data plan is a mistake nobody can take back once the
+              // bytes are moving.
               <IconButtonLink
                 href={archive.url}
                 label={
@@ -2030,6 +2045,14 @@ function GalleryViewInner({
                     : t("downloadAllLabel")
                 }
                 title={archive.stale ? t("downloadAllStaleTitle") : t("downloadAllTitle")}
+                onClick={
+                  archive.sizeBytes && archive.sizeBytes >= LARGE_ARCHIVE_BYTES
+                    ? (event) => {
+                        event.preventDefault();
+                        setConfirmingDownload(true);
+                      }
+                    : undefined
+                }
               >
                 <DownloadIcon />
               </IconButtonLink>
@@ -2385,6 +2408,15 @@ function GalleryViewInner({
             )}
           </div>
         </div>
+      )}
+
+      {confirmingDownload && archive.url && (
+        <DownloadAllPrompt
+          href={archive.url}
+          sizeBytes={archive.sizeBytes}
+          photoCount={photoCount}
+          onClose={() => setConfirmingDownload(false)}
+        />
       )}
 
       {namePromptFor && (
@@ -3020,6 +3052,100 @@ function ViewerChips({ viewers }: { viewers: GalleryViewer[] }) {
           {viewer.displayName.slice(0, 2).toUpperCase()}
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * What a several-gigabyte download actually involves, before it starts.
+ *
+ * Three things the button cannot say on its own: how long it may take and on
+ * what, that an interrupted download can be picked up again (the archive is one
+ * CDN object and the CDN answers Range requests, which is what makes that
+ * true), and that there is a person on the other end who will find another way
+ * if this one does not work.
+ *
+ * Deliberately *not* framed as "email me for full resolution" — the archive is
+ * already the untouched originals, and implying otherwise would talk the couple
+ * out of the thing that works.
+ */
+function DownloadAllPrompt({
+  href,
+  sizeBytes,
+  photoCount,
+  onClose,
+}: {
+  href: string;
+  sizeBytes: number | null;
+  photoCount: number;
+  onClose: () => void;
+}) {
+  const t = useTranslations("gallery");
+  const containerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(containerRef, true);
+  const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
+
+  return (
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="download-prompt-title"
+      tabIndex={-1}
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 outline-none"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm space-y-3 rounded-lg bg-white p-5 dark:bg-neutral-900"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="download-prompt-title" className="text-lg font-semibold">
+          {t("downloadPromptTitle")}
+        </h2>
+        <p className="text-body">
+          {t("downloadPromptSize", {
+            count: photoCount,
+            size: sizeBytes ? formatBytes(sizeBytes) : "",
+          })}
+        </p>
+        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+          {t("downloadPromptAdvice")}
+        </p>
+        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+          {t("downloadPromptResume")}
+        </p>
+        {email && (
+          <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+            {t.rich("downloadPromptAlternative", {
+              a: (chunks) => (
+                <a
+                  href={`mailto:${email}?subject=${encodeURIComponent(t("downloadPromptEmailSubject"))}`}
+                  className="underline"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("downloadPromptCancel")}
+          </Button>
+          {/* A plain link, so the browser's own download manager takes over —
+              which is also what makes resuming possible, and what keeps a
+              middle click or "open in new tab" working. */}
+          <a href={href} className={buttonClasses("primary")} onClick={onClose}>
+            {t("downloadPromptConfirm")}
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

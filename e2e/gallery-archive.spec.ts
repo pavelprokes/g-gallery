@@ -25,7 +25,7 @@ import path from "node:path";
 
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   archives: Record<
-    "none" | "ready" | "rebuilding" | "failed",
+    "none" | "ready" | "rebuilding" | "failed" | "large",
     { id: string; token: string; slug: string }
   >;
 };
@@ -80,6 +80,58 @@ test.describe("pre-built archive: the download control", () => {
     await expect(button).toHaveAttribute("title", /Vyber si zatím fotky|za chvíli/);
 
     await expect(page.getByRole("link", { name: /Stáhnout vše/ })).toHaveCount(0);
+  });
+
+  test("a small archive downloads on one click, with no interruption", async ({ page }) => {
+    // 12.3 MB is under the threshold: asking would be friction, not care.
+    await page.goto(`/g/${seed.archives.ready.token}/${seed.archives.ready.slug}`);
+    const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
+    await expect(link).toHaveAttribute("href", /\.zip$/);
+    await expect(page.getByRole("dialog", { name: /Stahujete celou galerii/ })).toHaveCount(0);
+  });
+
+  test("a multi-gigabyte archive says what it involves before it starts", async ({ page }) => {
+    // 6.1 GB. The button alone reads as "one tap and you have your photos",
+    // and on a phone's data plan that is a mistake nobody can undo once the
+    // bytes are moving.
+    await page.goto(`/g/${seed.archives.large.token}/${seed.archives.large.slug}`);
+
+    await page.getByRole("link", { name: /Stáhnout vše \(6\.1 GB\)/ }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Stahujete celou galerii" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("6.1 GB");
+    await expect(dialog).toContainText(/plném rozlišení/);
+    await expect(dialog).toContainText(/Wi-Fi/);
+    await expect(dialog).toContainText(/navázat/);
+
+    // The way out that does not involve downloading 6 GB at all.
+    await expect(dialog.getByRole("link", { name: /Napište mi/ })).toHaveAttribute(
+      "href",
+      /^mailto:/,
+    );
+
+    // Confirming is a plain link, so the browser's own download manager takes
+    // over — which is what makes an interrupted download resumable.
+    await expect(dialog.getByRole("link", { name: "Stáhnout" })).toHaveAttribute(
+      "href",
+      /_archive-[0-9a-f]{32}\.zip$/,
+    );
+  });
+
+  test("the download prompt can be dismissed without starting anything", async ({ page }) => {
+    await page.goto(`/g/${seed.archives.large.token}/${seed.archives.large.slug}`);
+    await page.getByRole("link", { name: /Stáhnout vše \(/ }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Stahujete celou galerii" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Zrušit" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole("link", { name: /Stáhnout vše \(/ }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
   test("a viewer can still take photos now while the archive is missing", async ({ page }) => {
