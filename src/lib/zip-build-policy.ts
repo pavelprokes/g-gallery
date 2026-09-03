@@ -74,6 +74,8 @@ export type SkipReason =
 
 export interface ZipBuildChoice {
   pick: ZipBuildCandidate | null;
+  /** Set when nothing was even considered, because a build is already running. */
+  blocked?: "build_in_flight";
   /** Every candidate that was passed over, and why — this is what the cron
    * reports, so "nothing happened" is never indistinguishable from "nothing
    * to do". */
@@ -124,11 +126,34 @@ function settledSince(candidate: ZipBuildCandidate): number {
  * Picks the gallery that has been waiting longest among those that can
  * actually be built. Ties break on id so the choice is deterministic, which
  * matters for tests and for reasoning about a stuck queue.
+ *
+ * ## One build at a time, enforced rather than described
+ *
+ * docs/TODO.md has always said this cron "kicks off one build at a time". It
+ * did not: it started one build *per tick*, and a tick is 15 minutes while a
+ * 7.6 GB gallery takes ~20. So a second gallery started while the first was
+ * still going, then a third.
+ *
+ * That buys nothing and costs plenty. The builder's Queue consumer has four
+ * slots **in total**, not four per build, so a second build does not add
+ * throughput — it halves each build's share while both race the *same*
+ * 60-minute abandon window on the Worker side. Measured 2026-09-03: 61
+ * parts/min across the whole queue, so two 1000-part galleries take ~38
+ * minutes together. Four of them would take ~80 and all four would be
+ * abandoned at once, retried, and pile up again.
+ *
+ * A gallery wedged in BUILDING therefore blocks the queue — the failure mode
+ * this file exists to prevent. It is bounded on purpose: `failStaleZipBuilds`
+ * runs first in the same cron request and clears anything stuck for an hour,
+ * so the block can outlive one gallery by at most that.
  */
 export function chooseZipBuild(
   candidates: readonly ZipBuildCandidate[],
   now: Date = new Date(),
+  buildsInFlight = 0,
 ): ZipBuildChoice {
+  if (buildsInFlight > 0) return { pick: null, blocked: "build_in_flight", skipped: [] };
+
   const skipped: { id: string; reason: SkipReason }[] = [];
   const eligible: ZipBuildCandidate[] = [];
 
