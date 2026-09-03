@@ -276,6 +276,20 @@ callback needs is durable before anything slow happens. The ordering is now load
 so. `maxDuration` also goes to 60 — correctness no longer depends on finishing, but a kickoff
 killed part-way still wastes a whole tick.
 
+### 7e. Serial did not have to mean slow — **fixed 2026-09-03**
+
+§7a made builds run one at a time, which is right: the builder's Queue consumer has four slots in
+total, so a second build adds no throughput and only makes both race the same abandon window. But
+the _only_ thing that started a build was a cron tick every 15 minutes, so a finished build left the
+builder idle for up to a quarter of an hour before the next gallery began. Three galleries waiting
+meant half an hour of doing nothing.
+
+`zip-callback` now chains the next build itself, in `after()` so the Worker is not held waiting on a
+handoff that fans out a thousand queue messages, and inside a try/catch so a failed chain cannot
+turn a successful callback into an error the Worker retries forever. The cron stays exactly as it
+was — the safety net rather than the only trigger — so if the chain never fires, nothing is lost but
+time.
+
 **Open questions before building**
 
 - Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild

@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
 import { prisma } from "@/lib/db";
 import { deleteObject } from "@/lib/r2";
+import { kickoffPendingZipBuild } from "@/lib/zip-build";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+// The chained handoff below fans out one queue message per part, so this needs
+// the same budget the cron route has.
+export const maxDuration = 60;
 
 /**
  * The background ZIP-builder Worker's only way to reach the app (docs/TODO.md
@@ -83,6 +86,24 @@ export async function POST(request: Request) {
   if (count > 0 && status === "ready" && retired && retired !== objectKey) {
     await deleteObject(retired).catch(() => {});
   }
+
+  // One build runs at a time (docs/TODO.md §7a), and until now the only thing
+  // that started one was a cron tick every 15 minutes. So a finished build left
+  // the builder idle for up to a quarter of an hour before the next gallery
+  // began — three galleries waiting meant half an hour of doing nothing at all.
+  // Serial was never meant to mean slow.
+  //
+  // `after` so the Worker is not held waiting on a handoff that fans out a
+  // thousand queue messages, and a try/catch because a failed chain must never
+  // turn a successful callback into an error the Worker retries forever. The
+  // cron stays as the safety net: if this never runs, nothing is lost but time.
+  after(async () => {
+    try {
+      await kickoffPendingZipBuild();
+    } catch (error) {
+      console.error("chained kickoff failed; the cron will pick it up", error);
+    }
+  });
 
   // `applied: false` tells the Worker its build was superseded, which is its
   // cue to delete the archive it just wrote — nothing will ever point at it.
