@@ -205,6 +205,33 @@ describe("chooseZipBuild", () => {
     expect(second.pick?.id).toBe("a");
   });
 
+  describe("one build at a time", () => {
+    // docs/TODO.md always claimed this; only the tick rate enforced it, and a
+    // 15-minute tick is shorter than a 7.6 GB build. The builder's queue has
+    // four slots for *all* builds, so a second one halves each build's share
+    // while both race the same 60-minute abandon window.
+    it("starts nothing while a build is already running", () => {
+      const choice = chooseZipBuild([candidate({ id: "waiting" })], NOW, 1);
+      expect(choice.pick).toBeNull();
+      expect(choice.blocked).toBe("build_in_flight");
+    });
+
+    it("does not enumerate skip reasons it never got round to checking", () => {
+      const choice = chooseZipBuild([candidate({ id: "a" }), candidate({ id: "b" })], NOW, 1);
+      expect(choice.skipped).toEqual([]);
+    });
+
+    it("starts one as soon as the queue is clear", () => {
+      const choice = chooseZipBuild([candidate({ id: "waiting" })], NOW, 0);
+      expect(choice.pick?.id).toBe("waiting");
+      expect(choice.blocked).toBeUndefined();
+    });
+
+    it("defaults to unblocked when the caller does not say", () => {
+      expect(chooseZipBuild([candidate({ id: "waiting" })], NOW).pick?.id).toBe("waiting");
+    });
+  });
+
   it("returns nothing, and no reasons, for an empty queue", () => {
     expect(chooseZipBuild([], NOW)).toEqual({ pick: null, skipped: [] });
   });

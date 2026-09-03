@@ -145,7 +145,8 @@ Workers Paid too):
   R2's requirement that every part but the last be the _same_ size (not just independently ≥5 MiB)
   is handled by cutting fixed windows out of the logical byte stream regardless of photo boundaries.
 - **Orchestration**: a Vercel cron (`/api/cron/zip-build`, `src/lib/zip-build.ts`) kicks off one
-  build at a time via a signed handoff (`src/lib/zip-build-manifest.ts`, same HMAC scheme as the
+  build at a time (enforced since 2026-09-03 — it used to mean "one per tick", and a tick is
+  shorter than a large build) via a signed handoff (`src/lib/zip-build-manifest.ts`, same HMAC scheme as the
   live Worker's manifest) to the builder's `/build-start`, which creates the R2 multipart upload and
   enqueues one Queue message per part. The builder's own Cron Trigger (every 2 min) finalizes
   completed uploads and aborts stale ones, then calls back to `/api/internal/zip-callback` — the

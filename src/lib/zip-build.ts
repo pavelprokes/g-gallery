@@ -28,6 +28,9 @@ import {
 
 export type KickoffResult =
   | { attempted: false; reason: "not_configured" }
+  /** A build is already running, and the builder's queue has one set of slots
+   * for all of them — a second build would only make both slower. */
+  | { attempted: false; reason: "build_in_flight" }
   /** Nothing was built, and why — one entry per gallery that was passed over.
    * "Nothing to do" and "everything is stuck" used to be the same empty
    * answer, which is how this went unnoticed for a day. */
@@ -136,7 +139,13 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
     return { attempted: false, reason: "not_configured" };
   }
 
-  const choice = chooseZipBuild(await loadCandidates());
+  const [candidates, buildsInFlight] = await Promise.all([
+    loadCandidates(),
+    prisma.gallery.count({ where: { zipStatus: "BUILDING" } }),
+  ]);
+
+  const choice = chooseZipBuild(candidates, new Date(), buildsInFlight);
+  if (choice.blocked) return { attempted: false, reason: "build_in_flight" };
   if (!choice.pick) {
     return { attempted: false, reason: "nothing_eligible", skipped: choice.skipped };
   }
