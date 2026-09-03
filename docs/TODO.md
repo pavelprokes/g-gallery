@@ -311,6 +311,27 @@ other's version.
 two independently deployed programs. New fields are optional and old ones keep working, or the next
 deploy of either one breaks the other.
 
+### 7h. `Accept-Language: *` returned 500 for the whole site — **fixed 2026-09-03**
+
+Not an archive bug at all; found while verifying one, because the verification script used Node's
+`fetch` instead of `curl`.
+
+`Negotiator` passes the wildcard `*` through — RFC 9110 allows it, and Node's own `fetch` sends
+`accept-language: *` by default — and `@formatjs/intl-localematcher` then throws
+`RangeError: Incorrect locale information provided`, because `*` is not a BCP-47 tag. The throw
+happened during render, so **every page** answered 500 to any client sending it: the gallery, the
+wedding pages, the home page, and the not-found page too.
+
+Everything sending that header saw a dead site: HTTP libraries, link previewers, uptime checks,
+crawlers. Every browser sends a real language list, which is why nobody noticed.
+
+`negotiateLocale` now drops the wildcard and anything `Intl.Locale` rejects, and treats a throw as
+"use Czech". A header this app does not understand is a reason to fall back, never a reason to
+serve nothing.
+
+**Worth remembering:** `curl` sends no `Accept-Language` and was green all morning. The bug was
+only ever one HTTP client away.
+
 **Open questions before building**
 
 - Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild
