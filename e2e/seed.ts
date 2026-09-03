@@ -175,7 +175,7 @@ async function main() {
     ready: await makeArchiveGallery(user.id, "E2E Archiv – hotový", {
       zipStatus: "READY",
       zipObjectKey: "galleries/e2e-archive/_archive.zip",
-      zipSizeBytes: 12_300_000,
+      zipSizeBytes: 12_300_000n,
       zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
     }),
     // A rebuild in flight over an archive that already exists. R2 leaves the
@@ -185,7 +185,16 @@ async function main() {
     rebuilding: await makeArchiveGallery(user.id, "E2E Archiv – přestavba", {
       zipStatus: "BUILDING",
       zipObjectKey: "galleries/e2e-archive/_archive.zip",
-      zipSizeBytes: 12_300_000,
+      zipSizeBytes: 12_300_000n,
+      zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
+    }),
+    // Over LARGE_ARCHIVE_BYTES, so "Stáhnout vše" asks before it starts. The
+    // size is a real delivered wedding's — and past the int4 ceiling that used
+    // to make a gallery this big impossible to record at all.
+    large: await makeArchiveGallery(user.id, "E2E Archiv – velká svatba", {
+      zipStatus: "READY",
+      zipObjectKey: "galleries/e2e-archive/_archive-00000000000000000000000000000001.zip",
+      zipSizeBytes: BigInt("6572945527"),
       zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
     }),
     // Same, after a build that failed. FAILED used to be terminal *and*
@@ -194,7 +203,7 @@ async function main() {
       zipStatus: "FAILED",
       zipAttempts: 2,
       zipObjectKey: "galleries/e2e-archive/_archive.zip",
-      zipSizeBytes: 12_300_000,
+      zipSizeBytes: 12_300_000n,
       zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
     }),
   };
@@ -241,7 +250,7 @@ async function makeArchiveGallery(
   zip: {
     zipStatus?: "NONE" | "PENDING" | "BUILDING" | "READY" | "FAILED";
     zipObjectKey?: string;
-    zipSizeBytes?: number;
+    zipSizeBytes?: bigint;
     zipBuiltAt?: Date;
     zipAttempts?: number;
   },
