@@ -290,6 +290,22 @@ turn a successful callback into an error the Worker retries forever. The cron st
 was — the safety net rather than the only trigger — so if the chain never fires, nothing is lost but
 time.
 
+### 7f. The app and the Worker must not have to ship together — **fixed 2026-09-03**
+
+§7c added `buildId` to the callback and made it **required**. The app deploys itself on every push
+to `main`; the builder Worker is deployed by hand (`docs/SETUP.md` §10). So the moment §7c went out,
+every callback from the Worker still running the previous code was rejected `400 invalid_body`:
+builds finished, nothing was ever recorded, and the Worker retried the same callback every two
+minutes forever. Worse than before the fix, and caused by the fix.
+
+`buildId` is optional now, and a callback without one is fenced on `uploadId` instead — which §7c
+made a real fence for the first time by clearing that column too. Neither side has to know the
+other's version.
+
+**The rule this leaves behind:** anything crossing the app↔Worker boundary is a wire format between
+two independently deployed programs. New fields are optional and old ones keep working, or the next
+deploy of either one breaks the other.
+
 **Open questions before building**
 
 - Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild
