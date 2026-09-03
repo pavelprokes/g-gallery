@@ -226,6 +226,18 @@ model Gallery {
   /// Part count the finalize step waits for via R2 listParts — set at kickoff,
   /// since it's computed from the entry list, not discovered afterwards
   zipPartsExpected Int?
+  /// When this gallery's set of CONFIRMED photos last changed — a confirmed
+  /// upload or a delete. The archive's "has it settled yet" clock: photo rows
+  /// are hard-deleted, so a delete leaves nothing behind to infer a time from,
+  /// and `updatedAt` does not move for a gallery still in NONE/PENDING. Null on
+  /// rows that predate the column; the policy falls back to the newest photo.
+  photosChangedAt  DateTime?
+  /// Consecutive failed builds, reset to 0 on success. FAILED used to be a
+  /// terminal state — nothing but a fresh photo upload ever left it, so one bad
+  /// build meant "Připravujeme archiv" forever. The cron now retries FAILED on
+  /// an exponential backoff (src/lib/zip-build-policy.ts) and this is what
+  /// keeps that from becoming an infinite loop.
+  zipAttempts      Int       @default(0)
 
   /// Which wedding page lists this gallery, if any. Nullable by design:
   /// a standalone gallery with no wedding page around it stays legal.

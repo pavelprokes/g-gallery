@@ -13,6 +13,7 @@ import {
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
 import { deleteObject } from "@/lib/r2";
 import { encryptToken } from "@/lib/token-cipher";
+import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3).
@@ -225,11 +226,9 @@ export async function deletePhoto(photoId: string) {
   await deleteObject(photo.objectKey);
 
   // Same staleness rule as a new upload: the pre-built archive no longer
-  // matches the gallery's contents (docs/TODO.md §7).
-  await prisma.gallery.updateMany({
-    where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING" },
-  });
+  // matches the gallery's contents, and a photographer part-way through a cull
+  // is exactly who the rebuild should wait for (docs/TODO.md §7).
+  await markGalleryPhotosChanged(photo.galleryId);
 
   revalidatePath(`/admin/g/${photo.galleryId}`);
 }

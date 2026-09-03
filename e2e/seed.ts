@@ -166,6 +166,39 @@ async function main() {
   const solo = await makeWedding(user.id, "Eliška a Honza", "Zámek Loučeň");
   const soloGallery = await makeEventGallery(user.id, solo.id, "Od hostů", "od-hostu", true, 2);
 
+  // --- pre-built "download all" archive, one gallery per state (docs/TODO.md
+  // §7). Their own galleries, so the photo counts the grid/lightbox specs
+  // assert on stay untouched.
+  const archives = {
+    // Never built: the only state that may hide the download link.
+    none: await makeArchiveGallery(user.id, "E2E Archiv – nikdy", {}),
+    ready: await makeArchiveGallery(user.id, "E2E Archiv – hotový", {
+      zipStatus: "READY",
+      zipObjectKey: "galleries/e2e-archive/_archive.zip",
+      zipSizeBytes: 12_300_000,
+      zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
+    }),
+    // A rebuild in flight over an archive that already exists. R2 leaves the
+    // finished object at the key untouched until the multipart upload
+    // completes, so this must still offer the previous archive — hiding it
+    // was the bug that made a whole gallery look broken.
+    rebuilding: await makeArchiveGallery(user.id, "E2E Archiv – přestavba", {
+      zipStatus: "BUILDING",
+      zipObjectKey: "galleries/e2e-archive/_archive.zip",
+      zipSizeBytes: 12_300_000,
+      zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
+    }),
+    // Same, after a build that failed. FAILED used to be terminal *and*
+    // hide the link, so this gallery had no download button ever again.
+    failed: await makeArchiveGallery(user.id, "E2E Archiv – selhala přestavba", {
+      zipStatus: "FAILED",
+      zipAttempts: 2,
+      zipObjectKey: "galleries/e2e-archive/_archive.zip",
+      zipSizeBytes: 12_300_000,
+      zipBuiltAt: new Date("2026-09-01T10:00:00Z"),
+    }),
+  };
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
@@ -187,6 +220,7 @@ async function main() {
       soloWeddingSlug: solo.slug,
       soloGalleryIds: [soloGallery],
       selfDelete,
+      archives,
     }),
   );
 
@@ -194,6 +228,66 @@ async function main() {
 }
 
 void main();
+
+/**
+ * A standalone published gallery whose only interesting property is the state
+ * of its pre-built archive, plus a share link that allows downloads. Two
+ * photos, because a one-photo gallery takes the "download the single file"
+ * branch instead of the archive branch.
+ */
+async function makeArchiveGallery(
+  ownerId: string,
+  title: string,
+  zip: {
+    zipStatus?: "NONE" | "PENDING" | "BUILDING" | "READY" | "FAILED";
+    zipObjectKey?: string;
+    zipSizeBytes?: number;
+    zipBuiltAt?: Date;
+    zipAttempts?: number;
+  },
+) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title,
+      eventDate: new Date("2026-08-12T00:00:00Z"),
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-archive-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      ...zip,
+    },
+  });
+
+  for (let i = 0; i < 2; i += 1) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/photo-${i}.jpg`,
+        fileName: `archive_${i}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#a37c5c",
+        status: "CONFIRMED",
+        sizeBytes: 1_000_000,
+        crc32: "deadbeef",
+        takenAt: new Date(Date.UTC(2026, 7, 22, 12, i)),
+      },
+    });
+  }
+
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, gallery.eventDate);
+  await prisma.shareLink.create({
+    data: {
+      galleryId: gallery.id,
+      tokenHash: hashShareToken(token),
+      allowDownload: true,
+      slug,
+    },
+  });
+  return { id: gallery.id, token, slug };
+}
 
 /** A wedding page plus its raw token, which exists only here and in .seed.json. */
 async function makeWedding(ownerId: string, title: string, venue: string) {

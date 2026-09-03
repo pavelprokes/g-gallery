@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { deleteObject } from "@/lib/r2";
+import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 /**
  * The photos this viewer added, and the one thing they may do to them: take
@@ -96,10 +97,7 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/g/[token]
 
   // Same staleness rule as an upload: the pre-built archive no longer matches
   // the gallery's contents (docs/TODO.md §7).
-  await prisma.gallery.updateMany({
-    where: { id: photo.galleryId, zipStatus: { in: ["READY", "BUILDING", "FAILED"] } },
-    data: { zipStatus: "PENDING" },
-  });
+  await markGalleryPhotosChanged(photo.galleryId);
 
   return NextResponse.json({ ok: true });
 }

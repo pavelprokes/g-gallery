@@ -5,13 +5,20 @@ import {
   type ChunkEntry,
 } from "../../src/lib/zip-chunk-layout";
 import { verifyBuildManifest, type BuildManifestEntry } from "../../src/lib/zip-build-manifest";
+import { assemblePart } from "../../src/lib/zip-part-assembly";
+import { buildScopeId } from "../../src/lib/zip-build-scope";
 
 /**
  * Background "download all" ZIP builder (docs/TODO.md §7) — deliberately a
- * separate deployment from `../worker/` (the live streaming ZIP), because
- * that one needs Workers Paid ([limits] cpu_ms above the Free default) and
- * this one is specifically designed not to. Mixing them into one script
- * would make this one need Paid too, defeating the point.
+ * separate deployment from `../worker/` (the live streaming ZIP), which raises
+ * its CPU limit with a [limits] override this one has no need of.
+ *
+ * The constraint that actually governs this Worker is **memory**: 128 MB per
+ * isolate, shared by every consumer invocation Cloudflare chooses to run
+ * concurrently. Everything here is written to hold one part's worth of bytes
+ * at a time and no more (see `assemblePart`), and `wrangler.toml` caps batch
+ * size and concurrency to match. Ignoring that is what took the archive down
+ * on 2026-09-01.
  *
  * Every part is computed **independently** — `zip-chunk-layout.ts`'s whole
  * reason to exist is that the archive's byte layout is knowable before any
@@ -40,6 +47,8 @@ interface PartMessage {
 
 interface TrackingManifest {
   galleryId: string;
+  /** Unguessable prefix this build's bookkeeping lives under (zip-build-scope.ts). */
+  scope: string;
   uploadId: string;
   objectKey: string;
   entries: BuildManifestEntry[];
@@ -51,26 +60,40 @@ interface TrackingManifest {
 
 const TRACKING_PREFIX = "_zip-builds/";
 const PART_SIZE = 6 * 1024 * 1024;
-/** A build that hasn't finished after this long is treated as dead, not slow — see resetStaleZipBuilds on the app side for the matching state-machine half of this. */
+/** A build that hasn't finished after this long is treated as dead, not slow — see failStaleZipBuilds on the app side for the matching state-machine half of this. */
 const STALE_MS = 60 * 60 * 1000;
 
-function trackingKey(galleryId: string): string {
-  return `${TRACKING_PREFIX}${galleryId}.json`;
+/**
+ * Every key below is scoped by `buildScopeId`, never by the raw gallery id —
+ * this bucket is public, the gallery id is not a secret, and the tracking
+ * manifest lists every photo's key. See `src/lib/zip-build-scope.ts`.
+ */
+function trackingKey(scope: string): string {
+  return `${TRACKING_PREFIX}${scope}.json`;
 }
 
-function partMarkerKey(galleryId: string, partNumber: number): string {
+function partMarkerKey(scope: string, partNumber: number): string {
   // Zero-padded so a lexicographic R2 list comes back in part order — not
   // load-bearing for correctness (every part is read regardless of order),
   // just makes debugging listings readable.
-  return `${TRACKING_PREFIX}${galleryId}/parts/${String(partNumber).padStart(6, "0")}`;
+  return `${partsPrefix(scope)}${String(partNumber).padStart(6, "0")}`;
 }
 
 /** Written the moment `completeMultipartUpload` succeeds — the one bit of
  * state that must survive a callback/cleanup failure, so a retry never calls
  * `complete()` a second time on an upload id R2 already considers finished. */
-function completedMarkerKey(galleryId: string): string {
-  return `${TRACKING_PREFIX}${galleryId}/completed`;
+function completedMarkerKey(scope: string): string {
+  return `${TRACKING_PREFIX}${scope}/completed`;
 }
+
+function partsPrefix(scope: string): string {
+  return `${TRACKING_PREFIX}${scope}/parts/`;
+}
+
+/** How many part markers to read at once during finalize. */
+const MARKER_READ_BATCH = 50;
+/** R2 accepts up to 1000 keys in one delete. */
+const DELETE_BATCH = 1000;
 
 function toChunkEntries(entries: readonly BuildManifestEntry[]): ChunkEntry[] {
   return entries.map((e) => ({
@@ -79,25 +102,6 @@ function toChunkEntries(entries: readonly BuildManifestEntry[]): ChunkEntry[] {
     size: e.size,
     crc32: Number.parseInt(e.crc32, 16) >>> 0,
   }));
-}
-
-async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const reader = stream.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.length;
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, at);
-    at += chunk.length;
-  }
-  return out;
 }
 
 export default {
@@ -160,8 +164,10 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
     },
   });
 
+  const scope = await buildScopeId(galleryId, env.ZIP_BUILD_SIGNING_SECRET);
   const tracking: TrackingManifest = {
     galleryId,
+    scope,
     uploadId: upload.uploadId,
     objectKey,
     entries,
@@ -170,7 +176,7 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
     expectedParts,
     startedAt: Date.now(),
   };
-  await env.PHOTOS.put(trackingKey(galleryId), JSON.stringify(tracking));
+  await env.PHOTOS.put(trackingKey(scope), JSON.stringify(tracking));
 
   // Queued in one batch, not chained — every part is independent, so there
   // is nothing to sequence. sendBatch caps at 100 messages; a gallery large
@@ -190,7 +196,8 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
 }
 
 async function buildOnePart(message: PartMessage, env: Env): Promise<void> {
-  const trackingObj = await env.PHOTOS.get(trackingKey(message.galleryId));
+  const scope = await buildScopeId(message.galleryId, env.ZIP_BUILD_SIGNING_SECRET);
+  const trackingObj = await env.PHOTOS.get(trackingKey(scope));
   if (!trackingObj) {
     // The build was invalidated (tracking object deleted by a sweep) after
     // this message was enqueued but before it was processed — nothing to do.
@@ -201,34 +208,43 @@ async function buildOnePart(message: PartMessage, env: Env): Promise<void> {
   const layout = buildZipLayout(toChunkEntries(tracking.entries));
   const plan = planPart(layout, message.partIndex, tracking.partSize);
 
-  const pieces = await Promise.all(
-    plan.pieces.map(async (piece) => {
-      if ("bytes" in piece) return piece.bytes;
-      const object = await env.PHOTOS.get(piece.key, {
-        range: { offset: piece.rangeStart, length: piece.rangeLength },
-      });
-      if (!object) throw new Error(`source object missing: ${piece.key}`);
-      return readAll(object.body);
-    }),
-  );
-
-  const content = new Uint8Array(plan.rangeLength);
-  let at = 0;
-  for (const piece of pieces) {
-    content.set(piece, at);
-    at += piece.length;
-  }
+  // One buffer, one source range in flight at a time (zip-part-assembly.ts).
+  // Buffering each piece first and concatenating afterwards is what put ~3x the
+  // part size on the heap and killed the isolate; see that module's header.
+  const content = await assemblePart(plan, async (ref) => {
+    const object = await env.PHOTOS.get(ref.key, {
+      range: { offset: ref.rangeStart, length: ref.rangeLength },
+    });
+    if (!object) throw new Error(`source object missing: ${ref.key}`);
+    return object.body;
+  });
 
   const upload = env.PHOTOS.resumeMultipartUpload(tracking.objectKey, tracking.uploadId);
   const uploaded = await upload.uploadPart(plan.partNumber, content);
-  await env.PHOTOS.put(partMarkerKey(message.galleryId, plan.partNumber), uploaded.etag);
+  await env.PHOTOS.put(partMarkerKey(scope, plan.partNumber), uploaded.etag);
+}
+
+/**
+ * Every key under `prefix`, following R2's cursor. `list` caps a page at 1000,
+ * and a gallery big enough to need more than 1000 parts would otherwise look
+ * to the sweep like a build that is permanently one part short — it would
+ * never finalize, and would be abandoned an hour later, forever.
+ */
+async function listAllKeys(env: Env, prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.PHOTOS.list({ prefix, cursor });
+    for (const object of page.objects) keys.push(object.key);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return keys;
 }
 
 async function sweepBuilds(env: Env): Promise<void> {
-  const listed = await env.PHOTOS.list({ prefix: TRACKING_PREFIX });
-  const trackingKeys = listed.objects
-    .map((o) => o.key)
-    .filter((key) => key.endsWith(".json") && !key.slice(TRACKING_PREFIX.length).includes("/"));
+  const trackingKeys = (await listAllKeys(env, TRACKING_PREFIX)).filter(
+    (key) => key.endsWith(".json") && !key.slice(TRACKING_PREFIX.length).includes("/"),
+  );
 
   // One gallery's failure (a bad callback, a transient R2 error) must not
   // stop the sweep from checking the rest.
@@ -246,21 +262,16 @@ async function checkOneBuild(key: string, env: Env): Promise<void> {
   // callback/cleanup left to retry — `complete()` must never be called
   // twice on the same upload id, so this branch is checked first and
   // unconditionally, before touching the multipart upload at all.
-  const completedMarker = await env.PHOTOS.get(completedMarkerKey(tracking.galleryId));
+  const completedMarker = await env.PHOTOS.get(completedMarkerKey(tracking.scope));
   if (completedMarker) {
     await reportReadyAndCleanup(tracking, Number(await completedMarker.text()), env);
     return;
   }
 
-  const partsPrefix = `${TRACKING_PREFIX}${tracking.galleryId}/parts/`;
-  const parts = await env.PHOTOS.list({ prefix: partsPrefix });
+  const partKeys = await listAllKeys(env, partsPrefix(tracking.scope));
 
-  if (parts.objects.length >= tracking.expectedParts) {
-    await finalizeBuild(
-      tracking,
-      parts.objects.map((o) => o.key),
-      env,
-    );
+  if (partKeys.length >= tracking.expectedParts) {
+    await finalizeBuild(tracking, partKeys, env);
     return;
   }
 
@@ -275,14 +286,22 @@ async function finalizeBuild(
   env: Env,
 ): Promise<void> {
   try {
-    const uploadedParts = await Promise.all(
-      partKeys.map(async (key) => {
-        const marker = await env.PHOTOS.get(key);
-        if (!marker) throw new Error(`part marker vanished: ${key}`);
-        const partNumber = Number(key.slice(key.lastIndexOf("/") + 1));
-        return { partNumber, etag: await marker.text() };
-      }),
-    );
+    // In bounded batches rather than one `Promise.all` over every key: a large
+    // gallery has hundreds of markers, and firing hundreds of concurrent R2
+    // reads is both a subrequest-burst and a pile of live response objects in
+    // the same 128 MB isolate this Worker is otherwise careful about.
+    const uploadedParts: { partNumber: number; etag: string }[] = [];
+    for (let i = 0; i < partKeys.length; i += MARKER_READ_BATCH) {
+      const batch = await Promise.all(
+        partKeys.slice(i, i + MARKER_READ_BATCH).map(async (key) => {
+          const marker = await env.PHOTOS.get(key);
+          if (!marker) throw new Error(`part marker vanished: ${key}`);
+          const partNumber = Number(key.slice(key.lastIndexOf("/") + 1));
+          return { partNumber, etag: await marker.text() };
+        }),
+      );
+      uploadedParts.push(...batch);
+    }
     uploadedParts.sort((a, b) => a.partNumber - b.partNumber);
 
     const upload = env.PHOTOS.resumeMultipartUpload(tracking.objectKey, tracking.uploadId);
@@ -297,7 +316,7 @@ async function finalizeBuild(
   // The archive is real and durable in R2 from this point on. Every step
   // after this must be retryable without ever touching the multipart
   // upload again — hence writing this marker before anything that can fail.
-  await env.PHOTOS.put(completedMarkerKey(tracking.galleryId), String(tracking.totalSize));
+  await env.PHOTOS.put(completedMarkerKey(tracking.scope), String(tracking.totalSize));
   await reportReadyAndCleanup(tracking, tracking.totalSize, env);
 }
 
@@ -323,11 +342,24 @@ async function reportReadyAndCleanup(
 }
 
 async function abandonBuild(tracking: TrackingManifest, env: Env, reason: string): Promise<void> {
-  try {
-    await env.PHOTOS.resumeMultipartUpload(tracking.objectKey, tracking.uploadId).abort();
-  } catch (error) {
-    // Already aborted, or never had any parts — not worth failing over.
-    console.error("abort failed (continuing)", tracking.galleryId, reason, error);
+  // An abort that does not stick leaves an incomplete multipart upload in R2
+  // holding every part already written (698 MB, in the 2026-09-01 case) and
+  // billed as stored data — and once the tracking object below is deleted,
+  // nothing in this Worker knows the upload exists any more. So: retry it, and
+  // if it still will not go, say so in a form that can be grepped for. The
+  // bucket's lifecycle rule (docs/SETUP.md §10) is the backstop that actually
+  // guarantees these get reaped.
+  let aborted = false;
+  for (let attempt = 0; attempt < 2 && !aborted; attempt += 1) {
+    try {
+      await env.PHOTOS.resumeMultipartUpload(tracking.objectKey, tracking.uploadId).abort();
+      aborted = true;
+    } catch (error) {
+      console.error("abort failed", tracking.galleryId, reason, attempt, error);
+    }
+  }
+  if (!aborted) {
+    console.error("ORPHANED MULTIPART UPLOAD", tracking.objectKey, tracking.uploadId);
   }
   try {
     await callback(env, {
@@ -342,11 +374,17 @@ async function abandonBuild(tracking: TrackingManifest, env: Env, reason: string
 }
 
 async function cleanupBuild(tracking: TrackingManifest, env: Env): Promise<void> {
-  const partsPrefix = `${TRACKING_PREFIX}${tracking.galleryId}/parts/`;
-  const parts = await env.PHOTOS.list({ prefix: partsPrefix });
-  await Promise.all(parts.objects.map((o) => env.PHOTOS.delete(o.key)));
-  await env.PHOTOS.delete(completedMarkerKey(tracking.galleryId));
-  await env.PHOTOS.delete(trackingKey(tracking.galleryId));
+  // R2's delete takes up to 1000 keys per call — one subrequest per marker
+  // would be hundreds of them for a large gallery, in an invocation that has
+  // other work to do. The tracking object goes last, and on its own: while it
+  // exists this whole path is retryable, and once it is gone the build is
+  // forgotten.
+  const keys = await listAllKeys(env, partsPrefix(tracking.scope));
+  keys.push(completedMarkerKey(tracking.scope));
+  for (let i = 0; i < keys.length; i += DELETE_BATCH) {
+    await env.PHOTOS.delete(keys.slice(i, i + DELETE_BATCH));
+  }
+  await env.PHOTOS.delete(trackingKey(tracking.scope));
 }
 
 async function callback(

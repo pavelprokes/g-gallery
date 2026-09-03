@@ -317,14 +317,22 @@ Local development: `cp worker/.dev.vars.example worker/.dev.vars`, paste the app
 ## 10. Free ZIP builder Worker (`zip-builder-worker/`, Workers Free)
 
 Background "download all" build (docs/TODO.md §7) — a **separate deployment** from `worker/`
-above, on purpose: that script's `[limits] cpu_ms` override needs Workers Paid, and mixing this one
-into the same script would force it onto Paid too. This one deliberately carries no `[limits]`
-override and stays on the Free 10 ms ceiling.
+above, on purpose: that script's `[limits] cpu_ms` override is one this Worker has no use for, and
+mixing the two would apply it here too.
+
+**The constraint that governs this Worker is memory, not CPU** — 128 MB per isolate, on every plan,
+shared by every consumer invocation Cloudflare decides to run concurrently. `max_batch_size = 1` and
+`max_concurrency = 4` in `wrangler.toml` are what keeps it inside that, together with
+`src/lib/zip-part-assembly.ts` holding one part-sized buffer and no more. Raising either number
+without redoing that arithmetic reproduces the 2026-09-01 outage (docs/TODO.md §7a), in which
+large-gallery builds died with `exceededResources` and no archive was ever produced.
 
 ```bash
 cd zip-builder-worker
 pnpm install --ignore-workspace
 npx wrangler queues create g-gallery-zip-parts
+# Where a part that has exhausted its retries goes, instead of vanishing.
+npx wrangler queues create g-gallery-zip-parts-dlq
 npx wrangler secret put ZIP_BUILD_SIGNING_SECRET   # must match the app's env byte for byte
 npx wrangler secret put ZIP_BUILD_CALLBACK_SECRET  # ditto
 npx wrangler deploy
@@ -340,13 +348,30 @@ ever changes.
 Then set in Vercel: `ZIP_BUILDER_WORKER_URL` (the deployed Worker's `*.workers.dev` URL, or a custom
 domain), `ZIP_BUILD_SIGNING_SECRET`, `ZIP_BUILD_CALLBACK_SECRET`. All three are optional at the env
 schema level — unset just means `/api/cron/zip-build` no-ops instead of failing, so galleries simply
-never get a pre-built archive (`archiveZipUrl` stays null, the UI shows "archiv se připravuje" and
-never resolves).
+never get a pre-built archive (the UI shows "Připravujeme archiv" and never resolves — the same
+symptom a broken build produces, which is why the cron reports a `not_configured` reason
+explicitly).
 
 Verify after deploying: publish a gallery with a few photos, wait for the next `/api/cron/zip-build`
 tick (every 15 min, `vercel.json`) to kick off a build, then the Worker's own Cron Trigger (every
 2 min) to finalize it — `Gallery.zipStatus` should reach `READY` within a few minutes, and
 `https://cdn.svatebni-fotograf-cechy.cz/<zipObjectKey>` should download the archive directly.
+
+**Verify on a gallery big enough to need many parts** (300+ photos, i.e. hundreds of 6 MiB parts),
+not only on a small one. The 2026-09-01 outage was invisible on small galleries: a handful of parts
+fits in one batch at low concurrency and completes fine, while a 315-part gallery failed every time.
+
+Two places tell you whether builds are healthy, and neither is the gallery page:
+
+```bash
+# What the cron actually decided, and why it did nothing if it did nothing.
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  https://photos.svatebni-fotograf-cechy.cz/api/cron/zip-build | jq
+
+# Worker invocation outcomes. `exceededResources` here means the isolate died —
+# check CPU against the successes before assuming it was CPU.
+npx wrangler tail g-gallery-zip-builder --status error
+```
 
 ---
 
