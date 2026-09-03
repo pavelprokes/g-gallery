@@ -221,7 +221,14 @@ model Gallery {
   zipObjectKey     String?
   zipSizeBytes     Int?
   zipBuiltAt       DateTime?
-  /// R2 multipart upload id while BUILDING — needed to list/finalize/abort it
+  /// Identity of the build currently allowed to report a result. Random per
+  /// build, cleared the moment anything changes the gallery's photos — that is
+  /// the whole staleness fence: `zip-callback` only applies to a build whose id
+  /// still matches, so a build that started before an admin edit finishes into
+  /// nothing instead of being recorded as current.
+  zipBuildId       String?
+  /// R2 multipart upload id while BUILDING — informational; the fence is
+  /// `zipBuildId`, since a superseded build keeps its own upload id happily.
   zipUploadId      String?
   /// Part count the finalize step waits for via R2 listParts — set at kickoff,
   /// since it's computed from the entry list, not discovered afterwards

@@ -6,7 +6,6 @@ import {
 } from "../../src/lib/zip-chunk-layout";
 import { verifyBuildManifest, type BuildManifestEntry } from "../../src/lib/zip-build-manifest";
 import { assemblePart } from "../../src/lib/zip-part-assembly";
-import { buildScopeId } from "../../src/lib/zip-build-scope";
 
 /**
  * Background "download all" ZIP builder (docs/TODO.md §7) — deliberately a
@@ -42,13 +41,15 @@ interface Env {
 
 interface PartMessage {
   galleryId: string;
+  /** Names this build's bookkeeping. Per build, never per gallery — two builds
+   * of one gallery overlap whenever an admin edit supersedes a running one. */
+  buildId: string;
   partIndex: number;
 }
 
 interface TrackingManifest {
   galleryId: string;
-  /** Unguessable prefix this build's bookkeeping lives under (zip-build-scope.ts). */
-  scope: string;
+  buildId: string;
   uploadId: string;
   objectKey: string;
   entries: BuildManifestEntry[];
@@ -64,30 +65,34 @@ const PART_SIZE = 6 * 1024 * 1024;
 const STALE_MS = 60 * 60 * 1000;
 
 /**
- * Every key below is scoped by `buildScopeId`, never by the raw gallery id —
- * this bucket is public, the gallery id is not a secret, and the tracking
- * manifest lists every photo's key. See `src/lib/zip-build-scope.ts`.
+ * Every key below is named by the build's own random id, never by the gallery.
+ * Two reasons, both learned the hard way: this bucket is served publicly and
+ * the tracking manifest lists every photo's key, so the name must be
+ * unguessable; and two builds of one gallery overlap whenever an admin edit
+ * supersedes a running build, so a per-gallery name made them share their
+ * manifest and part markers — finalize could then complete one multipart
+ * upload with etags belonging to the other.
  */
-function trackingKey(scope: string): string {
-  return `${TRACKING_PREFIX}${scope}.json`;
+function trackingKey(buildId: string): string {
+  return `${TRACKING_PREFIX}${buildId}.json`;
 }
 
-function partMarkerKey(scope: string, partNumber: number): string {
+function partMarkerKey(buildId: string, partNumber: number): string {
   // Zero-padded so a lexicographic R2 list comes back in part order — not
   // load-bearing for correctness (every part is read regardless of order),
   // just makes debugging listings readable.
-  return `${partsPrefix(scope)}${String(partNumber).padStart(6, "0")}`;
+  return `${partsPrefix(buildId)}${String(partNumber).padStart(6, "0")}`;
 }
 
 /** Written the moment `completeMultipartUpload` succeeds — the one bit of
  * state that must survive a callback/cleanup failure, so a retry never calls
  * `complete()` a second time on an upload id R2 already considers finished. */
-function completedMarkerKey(scope: string): string {
-  return `${TRACKING_PREFIX}${scope}/completed`;
+function completedMarkerKey(buildId: string): string {
+  return `${TRACKING_PREFIX}${buildId}/completed`;
 }
 
-function partsPrefix(scope: string): string {
-  return `${TRACKING_PREFIX}${scope}/parts/`;
+function partsPrefix(buildId: string): string {
+  return `${TRACKING_PREFIX}${buildId}/parts/`;
 }
 
 /** How many part markers to read at once during finalize. */
@@ -148,7 +153,7 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
     const status = verified.reason === "expired" ? 410 : 403;
     return new Response(verified.reason, { status });
   }
-  const { galleryId, objectKey, archiveName, entries } = verified.manifest;
+  const { galleryId, buildId, objectKey, archiveName, entries } = verified.manifest;
 
   const chunkEntries = toChunkEntries(entries);
   const layout = buildZipLayout(chunkEntries);
@@ -164,10 +169,9 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
     },
   });
 
-  const scope = await buildScopeId(galleryId, env.ZIP_BUILD_SIGNING_SECRET);
   const tracking: TrackingManifest = {
     galleryId,
-    scope,
+    buildId,
     uploadId: upload.uploadId,
     objectKey,
     entries,
@@ -176,15 +180,17 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
     expectedParts,
     startedAt: Date.now(),
   };
-  await env.PHOTOS.put(trackingKey(scope), JSON.stringify(tracking));
+  await env.PHOTOS.put(trackingKey(buildId), JSON.stringify(tracking));
 
   // Queued in one batch, not chained — every part is independent, so there
   // is nothing to sequence. sendBatch caps at 100 messages; a gallery large
   // enough to need more parts than that is far beyond this project's scale
   // (docs/PLAN.md: ~500 photos/gallery), so the simple path is enough.
   const messages: PartMessage[] = Array.from({ length: expectedParts }, (_, partIndex) => ({
-    body: { galleryId, partIndex },
-  })).map((m) => m.body);
+    galleryId,
+    buildId,
+    partIndex,
+  }));
   for (let i = 0; i < messages.length; i += 100) {
     await env.PARTS.sendBatch(messages.slice(i, i + 100).map((body) => ({ body })));
   }
@@ -196,11 +202,12 @@ async function handleBuildStart(request: Request, env: Env): Promise<Response> {
 }
 
 async function buildOnePart(message: PartMessage, env: Env): Promise<void> {
-  const scope = await buildScopeId(message.galleryId, env.ZIP_BUILD_SIGNING_SECRET);
-  const trackingObj = await env.PHOTOS.get(trackingKey(scope));
+  const trackingObj = await env.PHOTOS.get(trackingKey(message.buildId));
   if (!trackingObj) {
-    // The build was invalidated (tracking object deleted by a sweep) after
-    // this message was enqueued but before it was processed — nothing to do.
+    // This build was invalidated after the message was enqueued: either a
+    // sweep cleaned it up, or the app deleted the tracking object because an
+    // admin changed the gallery's photos and superseded it. Either way the
+    // result would be thrown away, so stop rather than spend the read.
     return;
   }
   const tracking = JSON.parse(await trackingObj.text()) as TrackingManifest;
@@ -221,7 +228,7 @@ async function buildOnePart(message: PartMessage, env: Env): Promise<void> {
 
   const upload = env.PHOTOS.resumeMultipartUpload(tracking.objectKey, tracking.uploadId);
   const uploaded = await upload.uploadPart(plan.partNumber, content);
-  await env.PHOTOS.put(partMarkerKey(scope, plan.partNumber), uploaded.etag);
+  await env.PHOTOS.put(partMarkerKey(message.buildId, plan.partNumber), uploaded.etag);
 }
 
 /**
@@ -262,13 +269,13 @@ async function checkOneBuild(key: string, env: Env): Promise<void> {
   // callback/cleanup left to retry — `complete()` must never be called
   // twice on the same upload id, so this branch is checked first and
   // unconditionally, before touching the multipart upload at all.
-  const completedMarker = await env.PHOTOS.get(completedMarkerKey(tracking.scope));
+  const completedMarker = await env.PHOTOS.get(completedMarkerKey(tracking.buildId));
   if (completedMarker) {
     await reportReadyAndCleanup(tracking, Number(await completedMarker.text()), env);
     return;
   }
 
-  const partKeys = await listAllKeys(env, partsPrefix(tracking.scope));
+  const partKeys = await listAllKeys(env, partsPrefix(tracking.buildId));
 
   if (partKeys.length >= tracking.expectedParts) {
     await finalizeBuild(tracking, partKeys, env);
@@ -316,7 +323,7 @@ async function finalizeBuild(
   // The archive is real and durable in R2 from this point on. Every step
   // after this must be retryable without ever touching the multipart
   // upload again — hence writing this marker before anything that can fail.
-  await env.PHOTOS.put(completedMarkerKey(tracking.scope), String(tracking.totalSize));
+  await env.PHOTOS.put(completedMarkerKey(tracking.buildId), String(tracking.totalSize));
   await reportReadyAndCleanup(tracking, tracking.totalSize, env);
 }
 
@@ -325,9 +332,11 @@ async function reportReadyAndCleanup(
   sizeBytes: number,
   env: Env,
 ): Promise<void> {
+  let applied: boolean;
   try {
-    await callback(env, {
+    applied = await callback(env, {
       galleryId: tracking.galleryId,
+      buildId: tracking.buildId,
       uploadId: tracking.uploadId,
       status: "ready",
       objectKey: tracking.objectKey,
@@ -337,6 +346,17 @@ async function reportReadyAndCleanup(
     // Next sweep tick retries just this — the completed marker keeps it
     // from ever re-entering finalizeBuild.
     return;
+  }
+
+  // Superseded: an admin changed the gallery's photos while this was building,
+  // so the app is no longer naming this build and nothing will ever point at
+  // the object. Each build writes its own key, so deleting it is safe — the
+  // archive the gallery is actually serving is a different object entirely.
+  if (!applied) {
+    console.log("build superseded, discarding its archive", tracking.buildId, tracking.objectKey);
+    await env.PHOTOS.delete(tracking.objectKey).catch((error) =>
+      console.error("could not delete superseded archive", tracking.objectKey, error),
+    );
   }
   await cleanupBuild(tracking, env);
 }
@@ -364,6 +384,7 @@ async function abandonBuild(tracking: TrackingManifest, env: Env, reason: string
   try {
     await callback(env, {
       galleryId: tracking.galleryId,
+      buildId: tracking.buildId,
       uploadId: tracking.uploadId,
       status: "failed",
     });
@@ -379,24 +400,26 @@ async function cleanupBuild(tracking: TrackingManifest, env: Env): Promise<void>
   // other work to do. The tracking object goes last, and on its own: while it
   // exists this whole path is retryable, and once it is gone the build is
   // forgotten.
-  const keys = await listAllKeys(env, partsPrefix(tracking.scope));
-  keys.push(completedMarkerKey(tracking.scope));
+  const keys = await listAllKeys(env, partsPrefix(tracking.buildId));
+  keys.push(completedMarkerKey(tracking.buildId));
   for (let i = 0; i < keys.length; i += DELETE_BATCH) {
     await env.PHOTOS.delete(keys.slice(i, i + DELETE_BATCH));
   }
-  await env.PHOTOS.delete(trackingKey(tracking.scope));
+  await env.PHOTOS.delete(trackingKey(tracking.buildId));
 }
 
+/** Returns whether the app accepted this build, or false if it was superseded. */
 async function callback(
   env: Env,
   payload: {
     galleryId: string;
+    buildId: string;
     uploadId: string;
     status: "ready" | "failed";
     objectKey?: string;
     sizeBytes?: number;
   },
-): Promise<void> {
+): Promise<boolean> {
   const response = await fetch(env.APP_CALLBACK_URL, {
     method: "POST",
     headers: {
@@ -406,4 +429,6 @@ async function callback(
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`callback rejected: ${response.status}`);
+  const body = (await response.json()) as { applied?: boolean };
+  return body.applied === true;
 }

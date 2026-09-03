@@ -227,6 +227,55 @@ Fixed by `src/lib/zip-build-scope.ts`: build bookkeeping is now named by
 neither publishes. Contained entirely in the Worker — no manifest, message or schema change.
 Nothing migrates: the old-style keys only ever exist for the length of one build.
 
+### 7c. The archive was wrong whenever an admin touched a gallery mid-build — **fixed 2026-09-03**
+
+Three faults, all in the same seam: what happens when the gallery changes while a build is running.
+
+**The staleness fence did not exist.** Every comment in the path claimed `zip-callback` fenced on
+`zipUploadId` — but nothing ever cleared that column, so a superseded build still matched its own
+callback and was recorded as `READY`. Delete a photo mid-build and the finished archive, _still
+containing that photo_, became the current download. On a product where "take that one down" is a
+promise to a guest, that is the worst available way to be wrong. `Gallery.zipBuildId` is now the
+fence, and `markGalleryPhotosChanged` clears it — which is what makes it a fence rather than a
+description of one.
+
+**Two builds of one gallery shared their bookkeeping.** Build bookkeeping was named by
+HMAC(secret, galleryId) — unguessable, which was the point (§7b), but _stable per gallery_. An
+admin edit supersedes a running build and the next tick starts another, so both wrote the same
+tracking manifest and the same part-marker prefix; finalize could then complete one multipart
+upload with etags belonging to the other. The name is now the build's own random 128-bit id, which
+is unguessable **and** unique, covering both jobs with one value. `zip-build-scope.ts` is gone.
+
+**A superseded build overwrote the good archive.** Every build wrote to the same
+`{prefix}/_archive.zip`, so a late finisher replaced the served archive with stale bytes while the
+row still described the old one — size and date saying one thing, object saying another. Each build
+now writes `_archive-{buildId}.zip`, nothing points at it until its callback is accepted, the
+retired object is deleted when a new one takes over, and a build told `applied: false` deletes what
+it wrote. The weekly sweep recognises both shapes and, as always, spares anything under a live
+gallery.
+
+The superseded build is also cancelled rather than left to burn twenty minutes of queue work: the
+app deletes its tracking object, and the builder already treats a missing one as "invalidated".
+
+### 7d. Large galleries could never finish, whatever else was fixed — **fixed 2026-09-03**
+
+Found on production the same morning, with every earlier fix already deployed: `5cceddcf…`'s
+archive object was **complete and downloadable in R2**, and the gallery page still said
+"Připravujeme archiv" with `archive: {url: null}`. The build worked; the app never learned it had.
+
+The fence (`zipUploadId`, then) was written **after** `/build-start` returned, and the cron route
+had `maxDuration = 15`. The handoff for a 1045-part gallery fans out eleven `sendBatch` calls on
+top of `createMultipartUpload` and the tracking write. A kickoff that ran out of budget there left
+the Worker building happily against a gallery that had no way left to recognise the result: the
+archive completed, the callback was rejected as superseded, the gallery stayed `BUILDING`, the
+stale sweep failed it, and the retry did exactly the same thing. **The bigger the gallery, the more
+certain the loop** — which is why the small ones came out fine all morning.
+
+§7c fixes it as a side effect, because `zipBuildId` is written _before_ the fetch: everything the
+callback needs is durable before anything slow happens. The ordering is now load-bearing and says
+so. `maxDuration` also goes to 60 — correctness no longer depends on finishing, but a kickoff
+killed part-way still wastes a whole tick.
+
 **Open questions before building**
 
 - Staleness: what invalidates a pre-built ZIP — any upload/delete after the initial build? Rebuild

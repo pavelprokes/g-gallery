@@ -82,6 +82,7 @@ describe("selectOrphans", () => {
         obj(`${PREFIX}/${UUID_A}.jpg`, 500),
         obj(`${PREFIX}/${UUID_A}.thumb.webp`, 500),
         obj(`${PREFIX}/_archive.zip`, 500),
+        obj(`${PREFIX}/_archive-0123456789abcdef0123456789abcdef.zip`, 500),
       ],
       live,
       cutoff,
@@ -97,6 +98,23 @@ describe("selectOrphans", () => {
   it("selects a thumbnail once its own photo is gone", () => {
     const { orphans } = selectOrphans([obj(`${PREFIX}/${UUID_B}.thumb.webp`, 48)], live, cutoff);
     expect(orphans.map((o) => o.key)).toEqual([`${PREFIX}/${UUID_B}.thumb.webp`]);
+  });
+
+  it("resolves a per-build archive to the same owner", () => {
+    // Since 2026-09-03 every build writes its own object, so a superseded build
+    // finishing late cannot overwrite the archive the gallery is serving. The
+    // sweep must recognise the new shape — an unrecognised key is `unknown`,
+    // which is safe, but a *recognised* one is what keeps the live archive
+    // spared and lets a dead gallery's archives be reclaimed.
+    const key = `${PREFIX}/_archive-0123456789abcdef0123456789abcdef.zip`;
+    expect(classifyKey(key)).toEqual({ kind: "archive", owner: PREFIX });
+  });
+
+  it("does not mistake a photo named like an archive for one", () => {
+    expect(classifyKey(`${PREFIX}/_archive-nothex.zip`).kind).toBe("unknown");
+    expect(classifyKey(`${PREFIX}/_archive-0123456789abcdef0123456789abcdef.jpg`).kind).toBe(
+      "unknown",
+    );
   });
 
   it("selects an archive once its gallery is gone", () => {
