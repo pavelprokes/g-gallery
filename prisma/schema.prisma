@@ -219,7 +219,13 @@ model Gallery {
   zipStatus        ZipStatus @default(NONE)
   /// R2 object key once READY — a direct link, no Worker involved at download time
   zipObjectKey     String?
-  zipSizeBytes     Int?
+  /// **BigInt, not Int.** A delivered wedding is routinely 6-8 GB and `Int` is
+  /// PostgreSQL int4, which stops at 2,147,483,647 — 2.147 GB. Every callback
+  /// reporting a larger archive failed with a 500, so an archive over that size
+  /// could never be recorded no matter how many times it was rebuilt. Small
+  /// galleries worked perfectly the whole time, which is what made it look like
+  /// a build problem rather than a column problem.
+  zipSizeBytes     BigInt?
   zipBuiltAt       DateTime?
   /// Identity of the build currently allowed to report a result. Random per
   /// build, cleared the moment anything changes the gallery's photos — that is

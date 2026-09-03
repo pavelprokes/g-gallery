@@ -41,6 +41,9 @@ const bodySchema = z.object({
   uploadId: z.string().min(1),
   status: z.enum(["ready", "failed"]),
   objectKey: z.string().min(1).optional(),
+  /** Bytes. Routinely in the billions — see `Gallery.zipSizeBytes`, which has
+   * to be a BigInt to hold it. `z.number()` is fine on the wire: 8 GB is far
+   * below `Number.MAX_SAFE_INTEGER`. */
   sizeBytes: z.number().int().positive().optional(),
 });
 
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
         ? {
             zipStatus: "READY",
             zipObjectKey: objectKey,
-            zipSizeBytes: sizeBytes,
+            zipSizeBytes: sizeBytes === undefined ? undefined : BigInt(sizeBytes),
             zipBuiltAt: new Date(),
             // A success clears the slate: the next failure starts its backoff
             // from the beginning rather than inheriting an old streak.
