@@ -18,11 +18,26 @@ export const maxDuration = 60;
  */
 const bodySchema = z.object({
   galleryId: z.string().min(1),
-  /** The fence. A build whose id the gallery no longer names was superseded
+  /**
+   * The fence. A build whose id the gallery no longer names was superseded
    * while it ran — an admin added or removed a photo — and must finish into
-   * nothing rather than be recorded as current. */
-  buildId: z.string().regex(/^[0-9a-f]{32}$/),
-  /** Informational: which R2 multipart upload produced this. */
+   * nothing rather than be recorded as current.
+   *
+   * **Optional, and it has to stay that way.** The app deploys itself on every
+   * push; the builder Worker is deployed by hand. Requiring this field made the
+   * two versions a matched pair, so the first deploy of the app rejected every
+   * callback from the Worker still running yesterday's code — builds finished,
+   * `400 invalid_body` came back, nothing was ever recorded, and the Worker
+   * retried the same callback every two minutes forever. Two things that ship
+   * separately must not have to ship together.
+   */
+  buildId: z
+    .string()
+    .regex(/^[0-9a-f]{32}$/)
+    .optional(),
+  /** Which R2 multipart upload produced this — and the fence for a Worker that
+   * predates `buildId`. Safe as one now: `markGalleryPhotosChanged` clears this
+   * column too, which is exactly what it never used to do. */
   uploadId: z.string().min(1),
   status: z.enum(["ready", "failed"]),
   objectKey: z.string().min(1).optional(),
@@ -45,7 +60,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const { galleryId, buildId, status, objectKey, sizeBytes } = parsed.data;
+  const { galleryId, buildId, uploadId, status, objectKey, sizeBytes } = parsed.data;
 
   // Which object the gallery is serving right now, so a successful build can
   // retire it. Read before the write, because the write is what replaces it.
@@ -54,12 +69,17 @@ export async function POST(request: Request) {
     select: { zipObjectKey: true },
   });
 
-  // updateMany, not update: a gallery whose zipBuildId no longer matches this
-  // build was superseded while it ran, and simply isn't touched — the callback
-  // is a no-op, not an error, since the Worker has no way to know that happened
+  // Whichever identity this Worker knows how to send. Both are cleared the
+  // moment a gallery's photos change, so either one is a real fence; `buildId`
+  // is the better of the two because it is also unique per build.
+  const fence = buildId ? { zipBuildId: buildId } : { zipUploadId: uploadId };
+
+  // updateMany, not update: a gallery whose build this no longer is was
+  // superseded while it ran, and simply isn't touched — the callback is a
+  // no-op, not an error, since the Worker has no way to know that happened
   // before it called back.
   const { count } = await prisma.gallery.updateMany({
-    where: { id: galleryId, zipBuildId: buildId },
+    where: { id: galleryId, ...fence },
     data:
       status === "ready"
         ? {
