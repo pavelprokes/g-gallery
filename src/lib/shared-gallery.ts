@@ -221,7 +221,7 @@ export async function loadGalleryViewData(
 function archiveFor(
   zipStatus: string,
   zipObjectKey: string | null,
-  zipSizeBytes: number | null,
+  zipSizeBytes: bigint | null,
   zipBuiltAt: Date | null,
 ): GalleryArchive {
   const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
@@ -234,7 +234,9 @@ function archiveFor(
     // Describes the object at `url` — while a rebuild is queued or running,
     // that is still the previous archive, and so is this number. Both are
     // written by the same callback, so they never disagree.
-    sizeBytes: zipSizeBytes,
+    // Narrowed to a number on the way out: a bigint cannot cross into a client
+    // component, and an 8 GB archive is nowhere near Number.MAX_SAFE_INTEGER.
+    sizeBytes: zipSizeBytes === null ? null : Number(zipSizeBytes),
   };
 }
 

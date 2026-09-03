@@ -276,6 +276,11 @@ callback needs is durable before anything slow happens. The ordering is now load
 so. `maxDuration` also goes to 60 — correctness no longer depends on finishing, but a kickoff
 killed part-way still wastes a whole tick.
 
+> **This diagnosis was wrong**, or at least not the operative cause — see §7g. The ordering and the
+> timeout were real weaknesses and the fixes are worth keeping, but the reason large galleries could
+> never finish was a column too narrow to hold their size. The symptom fitted both stories, and I
+> stopped at the first one that fitted.
+
 ### 7e. Serial did not have to mean slow — **fixed 2026-09-03**
 
 §7a made builds run one at a time, which is right: the builder's Queue consumer has four slots in
