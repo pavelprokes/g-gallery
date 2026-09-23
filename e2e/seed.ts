@@ -186,12 +186,16 @@ async function main() {
   // galleries of their own, one set per project, so "the photo I just added"
   // is simply the only tile. `second` is the next gallery the same guest opens:
   // a name given in `first` must credit their photos there too.
-  const naming: Record<string, { first: GuestLink; second: GuestLink; skip: GuestLink }> = {};
+  const naming: Record<
+    string,
+    { first: GuestLink; second: GuestLink; skip: GuestLink; optOut: GuestLink }
+  > = {};
   for (const project of ["chromium", "mobile-safari"]) {
     naming[project] = {
       first: await makeGuestGallery(user.id, `E2E Jméno 1 ${project}`),
       second: await makeGuestGallery(user.id, `E2E Jméno 2 ${project}`),
       skip: await makeGuestGallery(user.id, `E2E Bez jména ${project}`),
+      optOut: await makeGuestGallery(user.id, `E2E Nepočítat ${project}`),
     };
   }
 

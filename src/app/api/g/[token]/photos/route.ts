@@ -34,35 +34,47 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
     return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
 
-  const photos = await prisma.photo.findMany({
-    where: {
-      galleryId: access.shareLink.galleryId,
-      status: "CONFIRMED",
-      ...(cursor
-        ? {
-            OR: [
-              { takenAt: { gt: cursor.takenAt } },
-              { takenAt: cursor.takenAt, id: { gt: cursor.id } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ takenAt: "asc" }, { id: "asc" }],
-    take: PHOTOS_PAGE_SIZE + 1,
-    select: {
-      id: true,
-      objectKey: true,
-      thumbObjectKey: true,
-      fileName: true,
-      width: true,
-      height: true,
-      placeholder: true,
-      takenAt: true,
-      createdAt: true,
-      _count: { select: { favorites: true } },
-      ...UPLOADER_SELECT,
-    },
-  });
+  // The gallery's total rides along with the first page. The page's own
+  // server-rendered count is fixed at load, so after a guest adds or takes
+  // back a photo the header and the lightbox read "3 / 2" until a reload.
+  // Every refetch of the grid starts from this page, so the count is only as
+  // stale as the photos themselves.
+  const [photos, total] = await Promise.all([
+    prisma.photo.findMany({
+      where: {
+        galleryId: access.shareLink.galleryId,
+        status: "CONFIRMED",
+        ...(cursor
+          ? {
+              OR: [
+                { takenAt: { gt: cursor.takenAt } },
+                { takenAt: cursor.takenAt, id: { gt: cursor.id } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ takenAt: "asc" }, { id: "asc" }],
+      take: PHOTOS_PAGE_SIZE + 1,
+      select: {
+        id: true,
+        objectKey: true,
+        thumbObjectKey: true,
+        fileName: true,
+        width: true,
+        height: true,
+        placeholder: true,
+        takenAt: true,
+        createdAt: true,
+        _count: { select: { favorites: true } },
+        ...UPLOADER_SELECT,
+      },
+    }),
+    cursor
+      ? undefined
+      : prisma.photo.count({
+          where: { galleryId: access.shareLink.galleryId, status: "CONFIRMED" },
+        }),
+  ]);
 
   const hasMore = photos.length > PHOTOS_PAGE_SIZE;
   const page = hasMore ? photos.slice(0, PHOTOS_PAGE_SIZE) : photos;
@@ -80,6 +92,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
     })),
+    ...(total !== undefined ? { total } : {}),
     // `takenAt` is set on every confirm and backfilled for the back catalogue;
     // `createdAt` covers the impossible null without throwing away the page.
     nextCursor:

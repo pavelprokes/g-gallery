@@ -41,18 +41,73 @@ export function NameSheet({
   children: ReactNode;
   inputRef?: RefObject<HTMLInputElement | null>;
 }) {
-  const titleId = useId();
-  const hintId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
   const ownInputRef = useRef<HTMLInputElement>(null);
   const inputRef = externalInputRef ?? ownInputRef;
-  const keyboardInset = useKeyboardInset();
 
   // Focus goes straight to the field. The sheet always opens from a tap, and
   // React flushes a discrete event's effects inside that event, so this still
   // counts as a user gesture on iOS — which is what brings the keyboard up
   // without a second tap into the field.
-  useFocusTrap(containerRef, true, inputRef);
+  return (
+    <Sheet
+      title={title}
+      hint={hint}
+      onSubmit={onSubmit}
+      onDismiss={onDismiss}
+      initialFocusRef={inputRef}
+      field={(titleId) => (
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-labelledby={titleId}
+          maxLength={60}
+          placeholder={placeholder}
+          // 16 px: anything smaller and iOS Safari zooms the page in on focus.
+          className="focus:border-brand-primary focus:ring-brand-primary/20 dark:focus:border-brand-border dark:focus:ring-brand-border/20 duration-flip mt-4 min-h-12 w-full rounded-lg border bg-transparent px-3.5 text-base transition-colors outline-none focus:ring-3"
+          autoComplete="given-name"
+          autoCapitalize="words"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
+        />
+      )}
+    >
+      {children}
+    </Sheet>
+  );
+}
+
+/**
+ * The shell every guest-facing question shares: a dimmed backdrop, a sheet
+ * docked to the bottom on a phone and centred on anything wider, a title, one
+ * line of explanation, and the actions stacked under it.
+ */
+export function Sheet({
+  title,
+  hint,
+  onSubmit,
+  onDismiss,
+  initialFocusRef,
+  field,
+  children,
+}: {
+  title: string;
+  hint: string;
+  onSubmit: () => void;
+  onDismiss: () => void;
+  /** Where focus lands on open; the first focusable control otherwise. */
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Rendered between the hint and the actions, given the title's id. */
+  field?: (titleId: string) => ReactNode;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  const hintId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const keyboardInset = useKeyboardInset();
+
+  useFocusTrap(containerRef, true, initialFocusRef);
 
   return (
     <div
@@ -97,21 +152,7 @@ export function NameSheet({
         <p id={hintId} className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1">
           {hint}
         </p>
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          aria-labelledby={titleId}
-          maxLength={60}
-          placeholder={placeholder}
-          // 16 px: anything smaller and iOS Safari zooms the page in on focus.
-          className="focus:border-brand-primary focus:ring-brand-primary/20 dark:focus:border-brand-border dark:focus:ring-brand-border/20 duration-flip mt-4 min-h-12 w-full rounded-lg border bg-transparent px-3.5 text-base transition-colors outline-none focus:ring-3"
-          autoComplete="given-name"
-          autoCapitalize="words"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="go"
-        />
+        {field?.(titleId)}
         <div className="mt-4 flex flex-col gap-1">{children}</div>
       </form>
     </div>
