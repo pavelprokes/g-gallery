@@ -48,6 +48,8 @@ const bodySchema = z.union([
     shareToken: z.string().min(1).max(128),
     /** First-party localStorage UUID; absent when the viewer opted out. */
     anonKey: z.string().min(1).max(64).nullish(),
+    /** Volunteered in the name sheet before picking (docs/GUEST-GALLERIES.md §6). */
+    displayName: z.string().trim().min(1).max(60).nullish(),
     files: filesSchema,
   }),
 ]);
@@ -109,7 +111,11 @@ export async function POST(request: Request) {
       maxFileBytes: MAX_FILE_BYTES,
     };
   } else {
-    const access = await resolveGuestUpload(parsed.data.shareToken, parsed.data.anonKey ?? null);
+    const access = await resolveGuestUpload(
+      parsed.data.shareToken,
+      parsed.data.anonKey ?? null,
+      parsed.data.displayName ?? null,
+    );
     if (!access.ok) {
       return NextResponse.json(
         { error: "upload_denied", reason: access.reason },

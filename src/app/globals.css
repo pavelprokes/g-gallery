@@ -434,7 +434,34 @@ button:disabled,
   }
 }
 
+/*
+ * The name sheet (src/components/name-sheet.tsx) arriving: from the bottom edge on a
+ * phone, where it docks, and a short lift into the centre on a wider screen. One
+ * entrance, no exit — a sheet that animates out delays the file picker it opens.
+ */
+@keyframes sheet-rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @theme {
+  --animate-sheet-rise: sheet-rise var(--transition-duration-enter) var(--ease-out);
+  --animate-scrim-in: scrim-in var(--transition-duration-move) var(--ease-out);
   --animate-heart-pop: heart-pop var(--transition-duration-toggle) var(--ease-pop);
   --animate-heart-burst: heart-burst var(--transition-duration-enter) var(--ease-out) forwards;
   --animate-check-draw: check-draw 180ms var(--ease-out) forwards;

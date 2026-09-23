@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
+import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -59,6 +60,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       takenAt: true,
       createdAt: true,
       _count: { select: { favorites: true } },
+      ...UPLOADER_SELECT,
     },
   });
 
@@ -76,6 +78,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       height: photo.height,
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
+      uploaderName: uploaderNameOf(photo),
     })),
     // `takenAt` is set on every confirm and backfilled for the back catalogue;
     // `createdAt` covers the impossible null without throwing away the page.

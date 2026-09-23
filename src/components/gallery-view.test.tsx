@@ -97,6 +97,7 @@ describe("a long press on a tile", () => {
     height: 2000,
     placeholder: null,
     favoriteCount: 0,
+    uploaderName: null,
   };
 
   const renderTile = (onPick: (index: number, id: string, shift: boolean) => void) => {

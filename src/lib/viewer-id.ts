@@ -11,6 +11,34 @@ const STORAGE_KEY = "gg.viewer";
 const OPT_OUT_KEY = "gg.viewer.optout";
 const NAME_KEY = "gg.viewer.name";
 const NAME_ASKED_KEY = "gg.viewer.nameAsked";
+/**
+ * Separate from NAME_ASKED_KEY on purpose. Skipping "Komu za ně poděkovat?" on a
+ * heart says nothing about wanting to be credited for photos you add — and the
+ * shared flag is exactly why someone who had once skipped the heart prompt was
+ * never asked before uploading at all.
+ */
+const UPLOAD_NAME_ASKED_KEY = "gg.viewer.uploadNameAsked";
+
+// The name is read by more than one component at once (the upload bar says
+// "adding as …" while the heart prompt may set it), so they subscribe rather
+// than each keeping a copy that goes stale.
+const nameListeners = new Set<() => void>();
+
+function notifyName(): void {
+  for (const listener of nameListeners) listener();
+}
+
+export function subscribeViewerName(onChange: () => void): () => void {
+  nameListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    nameListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+/** Server render never knows a name; the client corrects on hydration. */
+export const getViewerNameServerSnapshot = () => null;
 
 /** The name the viewer volunteered, shown to others in the gallery. */
 export function getViewerName(): string | null {
@@ -28,6 +56,7 @@ export function setViewerName(name: string): void {
   } catch {
     /* storage unavailable */
   }
+  notifyName();
 }
 
 /** True once the viewer has answered or dismissed the name prompt. */
@@ -36,6 +65,23 @@ export function hasAnsweredNamePrompt(): boolean {
     return window.localStorage.getItem(NAME_ASKED_KEY) === "1";
   } catch {
     return true; // no storage -> never nag
+  }
+}
+
+/** True once the guest has named themselves or chosen to add photos without a name. */
+export function hasAnsweredUploadName(): boolean {
+  try {
+    return window.localStorage.getItem(UPLOAD_NAME_ASKED_KEY) === "1";
+  } catch {
+    return true; // no storage -> nowhere to remember the answer, so never ask
+  }
+}
+
+export function markUploadNameAnswered(): void {
+  try {
+    window.localStorage.setItem(UPLOAD_NAME_ASKED_KEY, "1");
+  } catch {
+    /* storage unavailable */
   }
 }
 
@@ -106,6 +152,7 @@ export function adoptViewerId(anonKey: string, displayName: string | null): bool
     if (displayName) {
       window.localStorage.setItem(NAME_KEY, displayName);
       window.localStorage.setItem(NAME_ASKED_KEY, "1");
+      notifyName();
     }
     return true;
   } catch {

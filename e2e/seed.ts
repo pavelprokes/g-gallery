@@ -182,6 +182,19 @@ async function main() {
     selfDelete[project] = { token: wedding.token, slug: wedding.slug };
   }
 
+  // The name asked before the picker (docs/GUEST-GALLERIES.md §6). Empty
+  // galleries of their own, one set per project, so "the photo I just added"
+  // is simply the only tile. `second` is the next gallery the same guest opens:
+  // a name given in `first` must credit their photos there too.
+  const naming: Record<string, { first: GuestLink; second: GuestLink; skip: GuestLink }> = {};
+  for (const project of ["chromium", "mobile-safari"]) {
+    naming[project] = {
+      first: await makeGuestGallery(user.id, `E2E Jméno 1 ${project}`),
+      second: await makeGuestGallery(user.id, `E2E Jméno 2 ${project}`),
+      skip: await makeGuestGallery(user.id, `E2E Bez jména ${project}`),
+    };
+  }
+
   const solo = await makeWedding(user.id, "Eliška a Honza", "Zámek Loučeň");
   const soloGallery = await makeEventGallery(user.id, solo.id, "Od hostů", "od-hostu", true, 2);
 
@@ -248,6 +261,7 @@ async function main() {
       soloWeddingSlug: solo.slug,
       soloGalleryIds: [soloGallery],
       selfDelete,
+      naming,
       archives,
     }),
   );
@@ -315,6 +329,36 @@ async function makeArchiveGallery(
     },
   });
   return { id: gallery.id, token, slug };
+}
+
+interface GuestLink {
+  token: string;
+  slug: string;
+}
+
+/** A standalone, empty gallery whose share link accepts guest uploads. */
+async function makeGuestGallery(ownerId: string, title: string): Promise<GuestLink> {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-name-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    },
+  });
+  const token = generateShareToken();
+  const slug = gallerySlug(title, null);
+  await prisma.shareLink.create({
+    data: {
+      galleryId: gallery.id,
+      tokenHash: hashShareToken(token),
+      allowReactions: true,
+      allowUpload: true,
+      slug,
+    },
+  });
+  return { token, slug };
 }
 
 /** A wedding page plus its raw token, which exists only here and in .seed.json. */

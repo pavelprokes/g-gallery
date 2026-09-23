@@ -68,6 +68,8 @@ import {
   zoomAround,
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
+import { useFocusTrap } from "@/lib/use-focus-trap";
+import { NameSheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { ViewerTransferPanel } from "@/components/viewer-transfer-panel";
@@ -85,6 +87,7 @@ const OfflineIconButton = dynamic(() =>
 import { Button, buttonClasses } from "@/components/ui/button";
 import { IconButton, IconButtonLink, NavButton } from "@/components/ui/icon-button";
 import {
+  CameraIcon,
   CheckCircleIcon,
   CheckIcon,
   ChevronLeftIcon,
@@ -141,6 +144,8 @@ export interface GalleryPhoto {
   height: number | null;
   placeholder: string | null;
   favoriteCount: number;
+  /** A guest photo's volunteered credit; null for the photographer's own. */
+  uploaderName: string | null;
 }
 
 export interface GalleryViewer {
@@ -218,69 +223,6 @@ const photoIdOf = (photo: GalleryPhoto) => photo.id;
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
-/**
- * Traps Tab/Shift+Tab inside a modal container and restores focus to
- * whatever was focused before it opened. Shared by the lightbox and the name
- * prompt, which can each appear stacked over the grid.
- *
- * `initialFocus` names the control that should receive focus on open. Without
- * it the first focusable element wins, which in the lightbox is whichever nav
- * button happens to be enabled: on photo 1 "Předchozí" is disabled and focus
- * fell through to "Další", while anywhere else it landed on "Předchozí" —
- * so the same action put the keyboard in two different places depending on
- * which photo was opened. A modal's initial focus has to be predictable.
- */
-function useFocusTrap<T extends HTMLElement>(
-  containerRef: RefObject<T | null>,
-  active: boolean,
-  initialFocusRef?: RefObject<HTMLElement | null>,
-) {
-  useEffect(() => {
-    if (!active) return;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const restoreTarget =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    const getFocusable = () =>
-      Array.from(
-        container.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter(
-        // `inert` is how the lightbox hides its chrome; its subtree must not be
-        // a Tab stop or a focus target, and `offsetParent` alone does not
-        // exclude it (nor does it exclude an `opacity-0` element).
-        (el) => el.offsetParent !== null && !el.closest("[inert]"),
-      );
-
-    (initialFocusRef?.current ?? getFocusable()[0] ?? container).focus();
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Tab") return;
-      const items = getFocusable();
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!first || !last) return;
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    container.addEventListener("keydown", onKeyDown);
-    return () => {
-      container.removeEventListener("keydown", onKeyDown);
-      restoreTarget?.focus();
-    };
-  }, [active, containerRef, initialFocusRef]);
-}
-
 /** Movement under this is still a tap, not a drag — fingers are never still. */
 const TAP_SLOP_PX = 8;
 
@@ -2349,11 +2291,31 @@ function GalleryViewInner({
                 "+" to hedge an incomplete count. Favoriting filters the list
                 to a subset `photoCount` doesn't describe, so that case keeps
                 the old loaded-so-far behaviour. */}
-            <span className="ml-auto rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/70 tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
+            <span className="ml-auto shrink-0 rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/70 tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
               {activeIndex! + 1} / {favoritesOnly ? photos.length : photoCount}
               {favoritesOnly && hasNextPage && "+"}
             </span>
           </div>
+
+          {/* Who added a guest photo — the promise the name sheet made ("it'll
+              appear with the photos you add"). Its own row just above the
+              controls rather than in the top bar: on a guest's own photo the
+              top bar already carries "Smazat mou fotku", and on a phone the
+              name was truncated to its first letter there. Icon and name, no
+              verb: Czech would have to guess přidal/přidala, and a name cannot
+              be declined into "od Petry" without knowing it. */}
+          {active.uploaderName && (
+            <div
+              className={`pointer-events-none absolute inset-x-0 bottom-[calc(max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))+4rem)] flex justify-center px-4 ${chromeClasses}`}
+              inert={chromeInert}
+            >
+              <span className="flex max-w-full min-w-0 items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/85 pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
+                <CameraIcon className="h-4 w-4 shrink-0" />
+                <span className="sr-only">{t("uploaderLabel")}: </span>
+                <span className="truncate">{active.uploaderName}</span>
+              </span>
+            </div>
+          )}
 
           {/* Heart + five reactions + printer + download is ~396 px of 44 px
               targets; an iPhone SE is 375 and plenty of Androids are 360, so
@@ -2497,6 +2459,7 @@ function GalleryViewInner({
             const anonKey = getViewerId();
             if (anonKey) setMine(new Set(await fetchMyPhotoIds(token, anonKey)));
           }}
+          onRenamed={() => queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] })}
         />
       )}
     </main>
@@ -3161,53 +3124,27 @@ function DownloadAllPrompt({
 
 function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
   const t = useTranslations("gallery");
-  const [value, setValue] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(containerRef, true);
+  const [value, setValue] = useState(() => getViewerName() ?? "");
 
+  // Escape and the backdrop skip rather than cancel: the heart, reaction or
+  // print mark this prompt interrupted has already been applied, and closing
+  // the prompt must not quietly undo it.
   return (
-    <div
-      ref={containerRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="name-prompt-title"
-      tabIndex={-1}
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 outline-none"
-      onKeyDown={(event) => {
-        // Owns its own Escape rather than letting it bubble to a lightbox
-        // that might be open underneath — see the note in the lightbox's
-        // keydown handler above.
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          onSubmit("");
-        }
-      }}
+    <NameSheet
+      title={t("namePromptTitle")}
+      hint={t("namePromptHint")}
+      placeholder={t("namePromptPlaceholder")}
+      value={value}
+      onChange={setValue}
+      onSubmit={() => onSubmit(value.trim())}
+      onDismiss={() => onSubmit("")}
     >
-      <form
-        className="w-full max-w-sm space-y-3 rounded-lg bg-white p-5 dark:bg-neutral-900"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit(value.trim());
-        }}
-      >
-        <h2 id="name-prompt-title" className="text-lg font-semibold">
-          {t("namePromptTitle")}
-        </h2>
-        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">{t("namePromptHint")}</p>
-        <input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          maxLength={60}
-          placeholder={t("namePromptPlaceholder")}
-          className="w-full rounded border px-3 py-2"
-        />
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => onSubmit("")}>
-            {t("namePromptSkip")}
-          </Button>
-          <Button type="submit">{t("namePromptSave")}</Button>
-        </div>
-      </form>
-    </div>
+      <button type="submit" className={SHEET_PRIMARY}>
+        {t("namePromptSave")}
+      </button>
+      <button type="button" className={SHEET_SECONDARY} onClick={() => onSubmit("")}>
+        {t("namePromptSkip")}
+      </button>
+    </NameSheet>
   );
 }

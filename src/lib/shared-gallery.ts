@@ -10,6 +10,7 @@ import {
 } from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
+import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 import {
   IMAGE_GRANT_TTL_SECONDS,
   signImageAccess,
@@ -44,6 +45,8 @@ export interface GalleryViewData {
     height: number | null;
     placeholder: string | null;
     favoriteCount: number;
+    /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
+    uploaderName: string | null;
   }[];
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
@@ -119,6 +122,7 @@ export async function loadGalleryViewData(
           takenAt: true,
           createdAt: true,
           _count: { select: { favorites: true } },
+          ...UPLOADER_SELECT,
         },
       },
       viewers: {
@@ -173,6 +177,7 @@ export async function loadGalleryViewData(
       height: photo.height,
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
+      uploaderName: uploaderNameOf(photo),
     })),
     initialCursor:
       hasMore && last
