@@ -222,6 +222,31 @@ test.describe("guest uploads", () => {
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(1);
     await grid.locator('button[aria-label^="Otevřít"]').first().click();
     await expect(page.getByRole("dialog").getByText("Honza")).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press("Escape");
+
+    // And taken back: the credit is public, so clearing it has to work.
+    await page.getByRole("button", { name: "Změnit" }).click();
+    await sheet.getByRole("textbox").fill("");
+    await sheet.getByRole("button", { name: "Odebrat jméno" }).click();
+    await expect(page.getByText("Přidáváš bez jména")).toBeVisible();
+    await grid.locator('button[aria-label^="Otevřít"]').first().click();
+    await expect(page.getByRole("dialog").getByText("Honza")).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  test("a stored name that breaks the rules never blocks the upload", async ({ request }) => {
+    // An optional credit written by an older build (or edited by hand) must
+    // be trimmed or dropped, not turned into a 400 for every photo.
+    for (const displayName of ["x".repeat(200), "   "]) {
+      const response = await request.post("/api/uploads/presign", {
+        data: {
+          shareToken: seed.uploadToken,
+          anonKey: "00000000-0000-4000-8000-000000000002",
+          displayName,
+          files: [{ fileName: "x.jpg", contentType: "image/jpeg", sizeBytes: 1000 }],
+        },
+      });
+      expect(response.status()).toBe(200);
+    }
   });
 
   test("a read-only link to the same gallery offers no way to upload", async ({ page }) => {

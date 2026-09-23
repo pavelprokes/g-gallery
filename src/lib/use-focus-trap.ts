@@ -60,7 +60,9 @@ export function useFocusTrap<T extends HTMLElement>(
     container.addEventListener("keydown", onKeyDown);
     return () => {
       container.removeEventListener("keydown", onKeyDown);
-      restoreTarget?.focus();
+      // The opener may have been replaced while the modal was open; focusing a
+      // detached node is a silent no-op, so leave it to the caller then.
+      if (restoreTarget?.isConnected) restoreTarget.focus();
     };
   }, [active, containerRef, initialFocusRef]);
 }

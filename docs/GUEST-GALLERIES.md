@@ -259,8 +259,18 @@ only the admin ever showed it.
   "Změnit", which re-credits the photos already there.
 - **Shown to everyone who can open the gallery**: the lightbox carries a camera icon and the name
   on guest photos (`uploaderName`, `src/lib/photo-attribution.ts`). Icon and name, no verb —
-  Czech would have to guess _přidal_ / _přidala_. The photographer's photos carry no credit. An
-  opt-out drops the name, both on write and on read.
+  Czech would have to guess _přidal_ / _přidala_. The photographer's photos carry no credit.
+- **One name per guest per gallery.** A name given on the heart prompt credits the guest's uploads
+  too — that prompt's hint says so since 2026-09-23 — and the photos refetch once it is saved.
+- **It can be taken back**: clearing the field under "Změnit" removes the name (`/identify`
+  accepts null) and every credit with it. This matters because the footer's "Nepočítat mě" does
+  _not_: it only forgets the `anonKey` in the browser and has never set `Viewer.optedOut` on the
+  server, so the `optedOut` checks in `ensureViewerId` and `uploaderNameOf` are defence for a
+  server-side opt-out that does not exist yet — and after opting out, the guest no longer holds
+  the key that would let them edit the name. Worth closing before this is marketed as a privacy
+  control.
+- A stored name that breaks the rules (too long, blank) is trimmed or dropped by presign, never
+  refused: an optional credit must not turn every upload into a 400.
 - The bar says who you are adding as ("Přidáváš jako Petra · Změnit", or "bez jména · Doplnit
   jméno"), so a wrong or skipped name is fixable without hunting for a setting.
 - **Measuring it** needs no new tracking: the share of guest `Viewer`s with at least one upload

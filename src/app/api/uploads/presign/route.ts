@@ -49,7 +49,14 @@ const bodySchema = z.union([
     /** First-party localStorage UUID; absent when the viewer opted out. */
     anonKey: z.string().min(1).max(64).nullish(),
     /** Volunteered in the name sheet before picking (docs/GUEST-GALLERIES.md §6). */
-    displayName: z.string().trim().min(1).max(60).nullish(),
+    // Normalised, never refused: this is an optional credit, and a stored
+    // name that fails a rule (written by an older build, say) must not turn
+    // every upload into a 400 the guest cannot understand.
+    displayName: z
+      .string()
+      .max(500)
+      .nullish()
+      .transform((value) => value?.trim().slice(0, 60) || null),
     files: filesSchema,
   }),
 ]);

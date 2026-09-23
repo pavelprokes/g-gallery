@@ -2399,10 +2399,19 @@ function GalleryViewInner({
             else dismissNamePrompt();
 
             // The prompt interrupts exactly one action; resume that one only.
-            if (kind) void sendReaction(photoId, kind, name || undefined, revert);
-            else if (printQuantity !== null)
-              void sendPrintQuantity(photoId, printQuantity, name || undefined, revert);
-            else void sendFavorite(photoId, true, name || undefined, revert);
+            const sent = kind
+              ? sendReaction(photoId, kind, name || undefined, revert)
+              : printQuantity !== null
+                ? sendPrintQuantity(photoId, printQuantity, name || undefined, revert)
+                : sendFavorite(photoId, true, name || undefined, revert);
+            // The same name credits this guest's own uploads, and it only
+            // reaches the server with the request above — refetch after it,
+            // not before, or the credits come back unchanged.
+            if (name && mine.size > 0) {
+              void sent.then(() =>
+                queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] }),
+              );
+            }
           }}
         />
       )}

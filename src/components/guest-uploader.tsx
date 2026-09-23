@@ -12,6 +12,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import {
+  clearViewerName,
   getOptOutServerSnapshot,
   getOptOutSnapshot,
   getViewerId,
@@ -82,6 +83,15 @@ export function GuestUploader({
   const [fatal, setFatal] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetMode | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  /**
+   * Where focus goes once the sheet closed on a pick. The bar button that
+   * opened it no longer exists at that point — answering swaps it for the
+   * file input — so the focus trap's own restore would drop to <body>.
+   */
+  const sourceInputs = useRef<Record<Source, HTMLInputElement | null>>({
+    library: null,
+    camera: null,
+  });
   const [barHeight, setBarHeight] = useState(0);
   const [draftName, setDraftName] = useState("");
   const name = useSyncExternalStore(
@@ -246,11 +256,15 @@ export function GuestUploader({
   const failed = items.filter((i) => i.state === "error").length;
   const finished = items.length > 0 && !running;
 
-  /** Saves a changed name and re-credits this guest's photos already here. */
+  /**
+   * Saves a changed name and re-credits this guest's photos already here. An
+   * empty name takes it back: the credit is public, so it has to be removable.
+   */
   const rename = useCallback(
     async (next: string) => {
       setSheet(null);
-      setViewerName(next);
+      if (next) setViewerName(next);
+      else clearViewerName();
       markUploadNameAnswered();
       setNameAnswered(true);
       const anonKey = getViewerId();
@@ -259,7 +273,7 @@ export function GuestUploader({
         const response = await fetch(`/api/g/${encodeURIComponent(token)}/identify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ anonKey, displayName: next }),
+          body: JSON.stringify({ anonKey, displayName: next || null }),
         });
         if (response.ok) void onRenamed();
       } catch {
@@ -274,9 +288,14 @@ export function GuestUploader({
    * The sheet's file inputs. The choice is recorded only once files were
    * actually picked: backing out of the picker leaves the sheet as it was.
    */
-  const pickFromSheet = (event: ChangeEvent<HTMLInputElement>, withName: boolean) => {
+  const pickFromSheet = (
+    event: ChangeEvent<HTMLInputElement>,
+    source: Source,
+    withName: boolean,
+  ) => {
     const list = Array.from(event.target.files ?? []);
     if (list.length === 0) return;
+    requestAnimationFrame(() => sourceInputs.current[source]?.focus({ preventScroll: true }));
     const trimmed = draftName.trim();
     if (withName && trimmed) setViewerName(trimmed);
     markUploadNameAnswered();
@@ -385,6 +404,9 @@ export function GuestUploader({
 
           <div className="flex gap-2">
             <SourceButton
+              inputRef={(input) => {
+                sourceInputs.current.library = input;
+              }}
               source="library"
               label={t("addPhotos")}
               primary
@@ -394,6 +416,9 @@ export function GuestUploader({
               onPick={pick}
             />
             <SourceButton
+              inputRef={(input) => {
+                sourceInputs.current.camera = input;
+              }}
               source="camera"
               label={t("takePhoto")}
               disabled={running}
@@ -436,16 +461,14 @@ export function GuestUploader({
           onChange={setDraftName}
           onSubmit={() => {
             const trimmed = draftName.trim();
-            if (trimmed) void rename(trimmed);
+            // Clearing a name nobody had is not a change worth a request.
+            if (trimmed || name) void rename(trimmed);
+            else setSheet(null);
           }}
           onDismiss={() => setSheet(null)}
         >
-          <button
-            type="submit"
-            disabled={!draftName.trim()}
-            className={`${SHEET_PRIMARY} disabled:cursor-not-allowed disabled:opacity-55`}
-          >
-            {t("renameSave")}
+          <button type="submit" className={SHEET_PRIMARY}>
+            {name && !draftName.trim() ? t("renameRemove") : t("renameSave")}
           </button>
           <button type="button" className={SHEET_SECONDARY} onClick={() => setSheet(null)}>
             {t("renameCancel")}
@@ -467,6 +490,7 @@ const ACCEPT = "image/jpeg,image/png,image/webp";
  * is a plain button that opens the sheet instead, whose own buttons are inputs.
  */
 function SourceButton({
+  inputRef,
   source,
   label,
   primary = false,
@@ -475,6 +499,7 @@ function SourceButton({
   onAsk,
   onPick,
 }: {
+  inputRef: (input: HTMLInputElement | null) => void;
   source: Source;
   label: string;
   primary?: boolean;
@@ -501,6 +526,7 @@ function SourceButton({
     <label className={className}>
       {label}
       <input
+        ref={inputRef}
         type="file"
         accept={ACCEPT}
         {...(source === "camera" ? { capture: "environment" as const } : { multiple: true })}
@@ -530,7 +556,7 @@ function PickSheet({
   source: Source;
   draftName: string;
   onDraftChange: (value: string) => void;
-  onPick: (event: ChangeEvent<HTMLInputElement>, withName: boolean) => void;
+  onPick: (event: ChangeEvent<HTMLInputElement>, source: Source, withName: boolean) => void;
   onDismiss: () => void;
 }) {
   const t = useTranslations("guestUpload");
@@ -559,7 +585,7 @@ function PickSheet({
           ref={primaryInputRef}
           {...inputProps}
           aria-label={primaryLabel}
-          onChange={(event) => onPick(event, true)}
+          onChange={(event) => onPick(event, source, true)}
         />
       </label>
       <label className={SHEET_SECONDARY}>
@@ -567,7 +593,7 @@ function PickSheet({
         <input
           {...inputProps}
           aria-label={t("nameSheetSkip")}
-          onChange={(event) => onPick(event, false)}
+          onChange={(event) => onPick(event, source, false)}
         />
       </label>
     </NameSheet>

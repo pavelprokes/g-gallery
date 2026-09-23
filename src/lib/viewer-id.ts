@@ -68,6 +68,16 @@ export function hasAnsweredNamePrompt(): boolean {
   }
 }
 
+/** Takes a name back. Still counts as answered — nobody is asked again. */
+export function clearViewerName(): void {
+  try {
+    window.localStorage.removeItem(NAME_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  notifyName();
+}
+
 /** True once the guest has named themselves or chosen to add photos without a name. */
 export function hasAnsweredUploadName(): boolean {
   try {
