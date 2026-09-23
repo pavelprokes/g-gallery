@@ -2,7 +2,7 @@ import { match } from "@formatjs/intl-localematcher";
 import { cookies, headers } from "next/headers";
 import Negotiator from "negotiator";
 import { getRequestConfig } from "next-intl/server";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/locales";
 
 /**
  * Which language to render in, from an `Accept-Language` header.
@@ -18,8 +18,8 @@ import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/loca
  *
  * So: drop anything that is not a well-formed tag before matching, and treat a
  * throw as "use the default" rather than as a broken page. A header this app
- * does not understand is a reason to fall back to Czech, never a reason to
- * serve nothing.
+ * does not understand is a reason to fall back to the default language, never
+ * a reason to serve nothing.
  */
 export function negotiateLocale(acceptLanguage: string | null): Locale {
   if (!acceptLanguage) return DEFAULT_LOCALE;
@@ -51,10 +51,6 @@ function isStructurallyValidTag(tag: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isLocale(value: string | undefined): value is Locale {
-  return LOCALES.includes(value as Locale);
 }
 
 export default getRequestConfig(async () => {

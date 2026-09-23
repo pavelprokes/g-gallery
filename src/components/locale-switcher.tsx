@@ -27,13 +27,18 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     });
   }
 
+  // `className` is layout only (margin, alignment) — the pill itself never
+  // changes between the footers it sits in.
   return (
     <div
       role="group"
-      aria-label={`${t("cs")} / ${t("en")}`}
+      // Every language by its own name — "Čeština / English / Français" —
+      // so a screen reader user who speaks only one of them still recognises
+      // theirs.
+      aria-label={LOCALES.map((code) => t(code)).join(" / ")}
       // The outer pill is un-padded — padding here would shrink each segment
       // below the button below its own 44px, since the two segments share
-      // this box's height. `gap-0.5` alone keeps CS/EN visually separated.
+      // this box's height. `gap-0.5` alone keeps the segments visually separated.
       className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border border-neutral-300 dark:border-neutral-700 ${className ?? ""}`}
     >
       {LOCALES.map((code) => (

@@ -2076,7 +2076,6 @@ function GalleryViewInner({
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
-          <LocaleSwitcher />
         </div>
       </header>
 
@@ -2447,6 +2446,11 @@ function GalleryViewInner({
       )}
 
       <footer className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mx-4 mt-10 border-t pt-4 sm:mx-3">
+        {/* In the footer, not the toolbar (Pavel, 2026-09-23): the language is
+            autodetected, so almost nobody needs the switch — and the toolbar
+            over the photos is the one place every guest looks. Whoever does
+            need it finds it where every site keeps it. */}
+        <LocaleSwitcher className="mb-4" />
         {!optedOut ? (
           <p>
             {t("privacyNotice")}{" "}

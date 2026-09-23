@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { OG_LOCALES } from "@/i18n/locales";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
@@ -41,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       url: "/",
       siteName: "g-gallery",
-      locale: locale === "en" ? "en_US" : "cs_CZ",
+      locale: OG_LOCALES[locale],
       type: "website",
     },
     twitter: {
@@ -93,10 +94,6 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-
-      <div className="mb-6 flex justify-end sm:mb-8">
-        <LocaleSwitcher />
-      </div>
 
       <header className="grid gap-8 sm:grid-cols-[1.2fr_1fr] sm:items-center">
         <div>
@@ -258,6 +255,7 @@ export default async function Home() {
       </section>
 
       <footer className="border-brand-border/60 border-t pt-8 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-500">
+        <LocaleSwitcher className="mb-6" />
         <p>
           {t("footerText")}{" "}
           <a

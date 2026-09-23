@@ -1,0 +1,308 @@
+{
+  "localeSwitcher": {
+    "cs": "Čeština",
+    "en": "English",
+    "fr": "Français"
+  },
+  "siteFooter": {
+    "role": "photographe de mariage",
+    "businessId": "N° d'identification (IČO) : 87877601",
+    "address": "Křižíkova 424/127, 186 00 Prague 8 – Karlín, République tchèque",
+    "email": "pavel@pavelprokes.cz",
+    "website": "svatebni-fotograf-cechy.cz",
+    "copyright": "© {year} Pavel Prokeš. Tous droits réservés.",
+    "builtBy": "Ce site a été conçu et programmé par Pavel Prokeš lui-même."
+  },
+  "manifest": {
+    "name": "Galerie photo de mariage",
+    "description": "Les photos du mariage en un seul lien – celles du photographe et celles des invités."
+  },
+  "marketing": {
+    "pageTitle": "Galerie photo de mariage avec QR code pour les invités",
+    "pageDescription": "Une seule galerie pour toutes les photos du mariage – le reportage terminé de votre photographe, ou une galerie partagée où les invités ajoutent leurs propres photos via un QR code. Sans appli, sans inscription.",
+    "kicker": "Galerie photo de mariage",
+    "heroTitle": "Toutes les photos du mariage en un seul lien – celles du photographe et celles des invités",
+    "heroLead": "Cette galerie vous a été envoyée par le photographe, ou transmise par les mariés – chacun peut partager le lien ou le QR code à son tour. Voici comment y accéder, ce que vous pouvez y faire, et que faire si quelque chose coince.",
+    "backToMainSite": "← Retour sur svatebni-fotograf-cechy.cz",
+    "heroImageAlt": "Une grille de photos de mariage dans la galerie, affichée sur un iPhone",
+    "twoWaysHeading": "Deux façons de recevoir une galerie",
+    "fromPhotographerTitle": "La galerie du photographe",
+    "fromPhotographerBody": "Après le reportage, votre photographe vous envoie un lien vers les photos finales en haute résolution. La galerie reste accessible longtemps après le mariage, se télécharge en un clic et ne demande aucun compte.",
+    "fromGuestsTitle": "En bonus du reportage : la galerie des invités",
+    "fromGuestsBody": "Comprise dans la formule photo du mariage. Sur place, les invités scannent le QR code posé sur la table et ajoutent leurs propres photos directement dans une galerie partagée – sans appli, sans inscription.",
+    "howItWorksHeading": "Comment ça marche",
+    "howItWorksSteps": [
+      {
+        "title": "1. Vous recevez un lien",
+        "body": "Du photographe ou des mariés – par e-mail, par SMS ou sur une petite carte avec un QR code. Parfois accompagné d'un mot de passe."
+      },
+      {
+        "title": "2. Vous l'ouvrez dans votre navigateur",
+        "body": "Rien à installer, aucun compte à créer – ça marche sur téléphone comme sur ordinateur."
+      },
+      {
+        "title": "3. Vous regardez, téléchargez, ajoutez",
+        "body": "Selon ce que le photographe a activé pour cette galerie – voir la liste complète des fonctions plus bas."
+      }
+    ],
+    "highlightsHeading": "Les deux fonctions les plus utiles",
+    "highlights": {
+      "download": {
+        "title": "Télécharger toutes les photos d'un coup",
+        "body": "Un bouton, un seul ZIP avec toutes les photos en haute résolution – pas besoin de les enregistrer une par une."
+      },
+      "projector": {
+        "title": "Diaporama en direct pendant le mariage",
+        "body": "Les photos des invités apparaissent à l'écran en temps réel, dès que quelqu'un les envoie – idéal pour une projection tout au long de la soirée."
+      }
+    },
+    "faqHeading": "Réponses rapides",
+    "faq": [
+      {
+        "q": "Où trouver le QR code ou le lien de la galerie ?",
+        "a": "Auprès du photographe ou directement des mariés – les deux peuvent partager le lien ou le QR code, transmis dans la discussion de famille ou imprimé sur une carte posée près du photobooth. Si vous ne l'avez pas, demandez simplement à l'un d'eux."
+      },
+      {
+        "q": "Je ne connais pas le mot de passe, que faire ?",
+        "a": "Seul le photographe le connaît – c'est lui qui l'a défini, et personne d'autre ne peut le réinitialiser ni le contourner. Écrivez-lui pour qu'il vous le renvoie. N'essayez pas de le deviner : après cinq tentatives ratées, le lien se bloque un moment pour tous ceux qui l'ont."
+      },
+      {
+        "q": "Le lien ne fonctionne pas, ou indique qu'il a expiré.",
+        "a": "Au bout d'un certain temps, une galerie cesse d'accepter les visites ou les envois de photos. Le photographe peut la rouvrir ou la prolonger à tout moment – il suffit de le contacter."
+      },
+      {
+        "q": "Ça marche aussi sans réseau ?",
+        "a": "Une fois la galerie ouverte et le mode hors ligne activé (l'icône de téléchargement dans la barre du haut), vous pouvez regarder les photos sans connexion – pratique dans un chalet en montagne."
+      },
+      {
+        "q": "Comment télécharger toutes les photos d'un coup ?",
+        "a": "Le bouton « Tout télécharger » regroupe la galerie dans un ZIP. Pour les grandes galeries, cela prend un moment et se prépare en arrière-plan – revenez un peu plus tard."
+      }
+    ],
+    "guestTipsHeading": "Trucs et astuces pour photographier en tant qu'invité",
+    "guestTipsIntro": "Si le photographe ou les mariés ont activé l'envoi de photos pour cette galerie, toute personne présente au mariage peut ajouter ses propres photos, juste à côté de celles du photographe.",
+    "guestTipsImageAlt": "Une petite carte avec un QR code sur la table du mariage, entre les bougies et les assiettes",
+    "guestTips": [
+      "Rien à installer. Le lien ou le QR code du photographe ou des mariés, le bouton « Ajouter des photos », puis le sélecteur de fichiers de votre téléphone ou directement l'appareil photo.",
+      "Vous pouvez verrouiller votre téléphone en plein envoi – il continue en arrière-plan et reprend dès que vous revenez.",
+      "Indiquez votre prénom si la galerie vous le demande – les mariés verront ainsi de qui vient chaque photo.",
+      "Une photo envoyée par erreur ? Supprimez-la vous-même directement dans la galerie – inutile d'écrire à qui que ce soit.",
+      "Les photos d'iPhone passent sans problème – elles sont envoyées au navigateur dans un format standard, automatiquement. Seule exception : si dans Réglages → Photos → Transfert vers Mac ou PC l'option « Conserver les originaux » est activée (ce n'est pas le cas de la plupart des gens), un envoi peut parfois échouer – passez sur « Automatique » et réessayez."
+    ],
+    "featuresHeading": "Tout ce que la galerie sait faire",
+    "featuresIntro": "Du plus utilisé au quotidien jusqu'aux extras pour certains moments du mariage.",
+    "features": [
+      "Un seul lien, rien à installer – s'ouvre dans n'importe quel navigateur, sur téléphone ou ordinateur.",
+      "Une grille de photos rapide et un affichage plein écran, fluide même sur un téléphone plus ancien.",
+      "Téléchargement de toute la galerie en un clic (ZIP).",
+      "Favoris et réactions – marquez les photos que vous préférez.",
+      "Mot de passe et durée limitée – le photographe décide qui accède à la galerie, et pour combien de temps.",
+      "Mode hors ligne – une fois téléchargées, les photos restent visibles sans réseau.",
+      "Notifications quand le photographe ajoute de nouvelles photos.",
+      "Photos des invités – les invités ajoutent leurs propres photos du mariage directement dans la galerie, sans appli ni compte.",
+      "Diaporama en direct – les nouvelles photos des invités apparaissent à l'écran en temps réel.",
+      "Plusieurs galeries sous un seul lien qui s'enrichit au fil du temps – une sélection, le reportage complet et la galerie des invités, toujours à la même adresse."
+    ],
+    "footerText": "Cette galerie est gérée par votre photographe.",
+    "footerLinkText": "Photographe de mariage en Tchéquie →"
+  },
+  "errors": {
+    "linkNotFoundTitle": "Ce lien ne mène nulle part",
+    "linkNotFoundLead": "Les applis de messagerie coupent souvent les liens en deux au moment de les copier – ça arrive tout le temps. Réessayez en l'ouvrant directement depuis le message d'origine, ou scannez le QR code si vous l'avez sous la main.",
+    "linkNotFoundHint": "Toujours rien ? Écrivez à la personne qui vous a envoyé le lien – elle l'a encore.",
+    "genericNotFoundTitle": "Il n'y a rien ici",
+    "genericNotFoundLead": "Cette adresse ne mène nulle part.",
+    "adminNotFoundLead": "Cette adresse n'existe pas dans l'administration.",
+    "adminNotFoundAction": "Retour au tableau de bord",
+    "galleryErrorTitle": "Quelque chose s'est mal passé",
+    "galleryErrorLead": "La galerie n'a pas pu se charger. Veuillez réessayer.",
+    "tryAgain": "Réessayer",
+    "contact": "Toujours rien ? <a>Écrivez-moi</a>, je regarde ça.",
+    "shareLinkDeadTitle": "Ce lien n'est plus valable",
+    "shareLinkDeadLead": "La galerie était bien ici, mais l'accès par ce lien a pris fin.",
+    "shareLinkDeadHint": "Les mariés ou le photographe peuvent vous en envoyer un nouveau.",
+    "eventPartGoneTitle": "Cette partie n'est plus là",
+    "eventPartGoneLead": "Le photographe l'a retirée de la page du mariage. Le reste y est toujours."
+  },
+  "gallery": {
+    "untitledPlaceholder": "Galerie",
+    "galleryOgDescription": "Les photos du mariage en un seul lien. Ouvrez, regardez, téléchargez.",
+    "photoCount": "{count, plural, one {# photo} other {# photos}}",
+    "emptyEvent": "Rien ici pour l'instant. Dès que le photographe ajoutera quelque chose, ça apparaîtra à cette adresse.",
+    "emptyCard": "Vide pour l'instant",
+    "guestCardHint": "Ajoutez aussi vos photos de téléphone",
+    "selectedCount": "{count, plural, one {# sélectionnée} other {# sélectionnées}}",
+    "zipPreparingAnnounce": "Préparation du téléchargement…",
+    "zipErrorAnnounce": "Le téléchargement n'a pas pu être préparé. Veuillez réessayer.",
+    "back": "Retour",
+    "showAllPhotos": "Afficher toutes les photos",
+    "showFavoritesOnlyTitle": "Afficher uniquement vos favoris",
+    "showFavoritesOnlySr": "Afficher les favoris uniquement",
+    "slideshowButtonLabel": "Diaporama",
+    "slideshowButtonTitle": "Les photos sur grand écran – elles défilent toutes seules, les nouvelles arrivent en direct",
+    "downloadAllLabel": "Tout télécharger",
+    "downloadAllTitle": "Tout télécharger (ZIP)",
+    "downloadOneLabel": "Télécharger",
+    "downloadOneTitle": "Télécharger la photo",
+    "downloadPromptTitle": "Vous êtes sur le point de télécharger toute la galerie",
+    "downloadPromptSize": "{count, plural, one {# photo} other {# photos}} en pleine résolution, {size}.",
+    "downloadPromptAdvice": "Sur une connexion lente, cela prend un moment. Le mieux : en Wi-Fi et sur un ordinateur avec assez d'espace – c'est beaucoup pour des données mobiles.",
+    "downloadPromptResume": "Si le téléchargement s'interrompt, la plupart des navigateurs savent le reprendre. Vous ne repartirez pas de zéro.",
+    "downloadPromptAlternative": "Impossible de télécharger, ou pas de place ? <a>Écrivez-moi</a> et je vous les fais parvenir autrement – par un service de transfert ou sur une clé USB.",
+    "downloadPromptConfirm": "Télécharger",
+    "downloadPromptCancel": "Annuler",
+    "downloadPromptEmailSubject": "Téléchargement de la galerie : {title}",
+    "clearSelection": "Annuler la sélection",
+    "deselectAll": "Tout désélectionner",
+    "selectAllLoaded": "Sélectionner tout ce qui est chargé",
+    "downloadSelected": "{count, plural, one {Télécharger # photo} other {Télécharger # photos (ZIP)}}",
+    "preparingShort": "Préparation…",
+    "photosListAriaLabel": "Photos de la galerie",
+    "loadingMorePhotos": "Chargement d'autres photos…",
+    "emptyGallery": "Il n'y a pas encore de photos dans cette galerie. Dès que le photographe les ajoutera, elles apparaîtront ici – il suffira de recharger la page.",
+    "searchingFavorites": "Recherche de vos favoris dans le reste de la galerie…",
+    "noFavoritesYet": "Vous n'avez pas encore de photo en favori.",
+    "lightboxAriaLabel": "Photo {index} sur {total}",
+    "previous": "Précédente",
+    "next": "Suivante",
+    "close": "Fermer",
+    "deleting": "Suppression…",
+    "deleteMyPhoto": "Supprimer ma photo",
+    "deleteConfirm": "Supprimer cette photo de la galerie ? Cette action est irréversible.",
+    "selected": "Sélectionnée",
+    "select": "Sélectionner",
+    "preparingDownload": "Préparation du téléchargement",
+    "downloadOriginal": "Télécharger l'original",
+    "privacyNotice": "Nous comptons les visites de façon anonyme, uniquement via ce navigateur – sans adresse IP.",
+    "optOut": "Ne pas me compter",
+    "optedOutNotice": "Vos visites ne sont pas comptées.",
+    "selectPhoto": "Sélectionner {fileName}",
+    "openPhoto": "Ouvrir {fileName}",
+    "addToFavorites": "Ajouter aux favoris",
+    "removeFromFavorites": "Retirer des favoris",
+    "markForPrint": "Marquer pour impression",
+    "markingModeLabel": "Marquer",
+    "markingModeOffTitle": "Afficher les icônes de marquage sur les photos",
+    "markingModeOnTitle": "Masquer les icônes de marquage",
+    "printQuantity": "À imprimer ({count}×)",
+    "decreasePrintQuantity": "Retirer un tirage",
+    "increasePrintQuantity": "Ajouter un tirage",
+    "viewerChipsAriaLabel": "Qui a regardé cette galerie",
+    "namePromptTitle": "À qui dire merci ?",
+    "namePromptHint": "Les autres verront ce prénom sur vos photos favorites. Vous pouvez aussi passer cette étape.",
+    "namePromptPlaceholder": "Ex. Camille",
+    "namePromptSkip": "Passer",
+    "namePromptSave": "Enregistrer",
+    "reactions": {
+      "LOVE": "Cœur",
+      "WOW": "Waouh",
+      "LAUGH": "Rire",
+      "SAD": "Émotion",
+      "CLAP": "Applaudissements"
+    },
+    "offline": {
+      "unsupported": "Ce navigateur ne prend pas en charge les galeries hors ligne.",
+      "notEnoughSpace": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}.",
+      "notEnoughSpaceWithFree": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}, il reste {free}.",
+      "tryAgain": "Réessayer",
+      "downloading": "Téléchargement sur l'appareil… {percent} %",
+      "downloadingWithBytes": "Téléchargement sur l'appareil… {percent} % · {bytes}",
+      "downloadingAriaLabel": "Téléchargement de la galerie pour un accès hors ligne",
+      "downloadStarted": "Téléchargement lancé, {percent} %.",
+      "availableOffline": "✓ La galerie est disponible hors ligne",
+      "availableOfflineWithBytes": "✓ La galerie est disponible hors ligne ({bytes})",
+      "availableOfflineNote": "Les photos enregistrées sont adaptées à cet écran, ce ne sont pas les originaux. Le navigateur peut les libérer de lui-même au bout d'un moment – sur iPhone, environ une semaine sans ouvrir la galerie ; il suffira alors de les retélécharger.",
+      "removeFromDevice": "Retirer de l'appareil",
+      "availableOfflineAnnounce": "Téléchargée – la galerie est disponible hors ligne.",
+      "downloadFailed": "Le téléchargement n'a pas pu se terminer.",
+      "downloadFailedAnnounce": "Le téléchargement a échoué.",
+      "saveOffline": "Enregistrez {count, plural, one {# photo} other {# photos}} sur cet appareil pour les regarder même sans réseau.",
+      "estimatedSize": "Prend environ {size}. Enregistre la taille adaptée à cet écran, pas les originaux.",
+      "onlyEngagedOption": "Seulement les photos que j'ai mises en favori, marquées pour impression ou auxquelles j'ai réagi ({count, plural, one {# photo} other {# photos}})",
+      "makeAvailable": "Rendre disponible hors ligne",
+      "iconLabel": "Hors ligne",
+      "iconTitle": "Enregistrer les photos sur cet appareil pour les regarder sans réseau",
+      "panelTitle": "Accès hors ligne"
+    },
+    "slideshow": {
+      "ariaLabel": "Diaporama",
+      "empty": "Il n'y a pas encore de photos ici.",
+      "exit": "Quitter"
+    },
+    "saveFailed": "Votre dernier marquage n'a pas été enregistré – vérifiez votre connexion et réessayez. Si le lien a expiré, écrivez à la personne qui vous l'a envoyé.",
+    "downloadAllLabelSized": "Tout télécharger ({size})",
+    "downloadAllStaleTitle": "Télécharge toutes les photos sauf les toutes dernières – l'archive est en cours de mise à jour.",
+    "archivePreparingLabel": "Préparation de l'archive",
+    "archivePreparingTitle": "L'archive complète est encore en préparation. Choisissez les photos qui vous intéressent et téléchargez-les tout de suite, ou revenez un peu plus tard.",
+    "transfer": {
+      "startTitle": "Continuer sur un autre appareil",
+      "haveCode": "J'ai un code",
+      "codeTitle": "Saisissez ce code sur l'autre appareil",
+      "codeHint": "Le code est valable 15 minutes et ne sert qu'une fois. Il transfère vos favoris, vos réactions et votre sélection pour impression.",
+      "enterTitle": "Code du premier appareil",
+      "enterHint": "Huit caractères. Majuscules et tiret n'ont pas d'importance.",
+      "submit": "Transférer",
+      "adopted": "Terminé",
+      "close": "Fermer",
+      "errorNothingYet": "Vous n'avez encore rien marqué ici, il n'y a donc rien à transférer. Mettez une photo en favori et réessayez.",
+      "errorWrongCode": "Ce code ne correspond pas. Vérifiez-le et réessayez.",
+      "errorExpired": "Le code a expiré. Générez-en un nouveau sur le premier appareil.",
+      "errorNoIdentity": "Votre navigateur n'a pas autorisé l'enregistrement des données. Vérifiez que le stockage n'est pas bloqué pour cette page.",
+      "errorGeneric": "Le transfert n'a pas fonctionné pour le moment. Veuillez réessayer dans un instant."
+    }
+  },
+  "guestUpload": {
+    "addPhotos": "Ajouter des photos",
+    "takePhoto": "Prendre une photo",
+    "preparing": "{count, plural, one {Préparation d'une photo…} other {Préparation de # photos…}}",
+    "uploadingProgress": "Envoi {done} sur {total} · l'écran reste allumé. En cas d'interruption, l'envoi reprendra quand vous reviendrez ici.",
+    "resumingProgress": "Fin de l'envoi – {done} sur {total} · l'écran reste allumé. En cas d'interruption, l'envoi reprendra quand vous reviendrez ici.",
+    "discardRest": "Abandonner le reste",
+    "doneSome": "Envoyé. Tout le monde au mariage pourra le voir.",
+    "doneNone": "Rien n'a été envoyé. Choisissez à nouveau les photos – par petits lots, ça passe mieux.",
+    "failedSuffix": "{count, plural, one {# photo n'est pas passée} other {# photos ne sont pas passées}}",
+    "skippedNote": "({count, plural, one {# fichier ignoré} other {# fichiers ignorés}}, les autres sont en cours d'envoi.)",
+    "startFailed": "L'envoi n'a pas pu démarrer. Veuillez réessayer.",
+    "resumeFailed": "Un envoi resté inachevé n'a pas pu être terminé.",
+    "consentPrefix": "En envoyant, vous confirmez avoir le droit de partager ces photos. Vous voulez en retirer une ?",
+    "consentEmailLinkText": "Écrivez-nous",
+    "consentNoEmailFallback": "Dites-le au photographe ou aux mariés, ils la supprimeront tout de suite",
+    "nameAskTitle": "À qui dire merci ?",
+    "nameAskHint": "Indiquez votre prénom – il apparaîtra sur vos photos. Le laisser vide, c'est très bien aussi.",
+    "nameAskPlaceholder": "Prénom",
+    "nameAskSave": "Enregistrer",
+    "nameAskSkip": "Passer",
+    "rejection": {
+      "unsupportedHeic": "Ce format (HEIC) n'est pas encore pris en charge. Dans Réglages → Appareil photo → Formats, choisissez « Le plus compatible » et réessayez.",
+      "unsupportedVideo": "Les vidéos ne sont pas encore acceptées, seulement les photos.",
+      "unsupportedGeneric": "Ce type de fichier n'est pas pris en charge. Essayez une autre photo.",
+      "fileTooLarge": "Cette photo est trop volumineuse.",
+      "quotaViewerFull": "Vous avez déjà ajouté beaucoup de photos – impossible d'en ajouter davantage pour l'instant. Merci !",
+      "quotaAlbumFull": "La galerie est pleine pour le moment. Prévenez la personne qui vous a envoyé le lien.",
+      "deniedPasswordRequired": "Veuillez recharger la page et saisir le mot de passe.",
+      "deniedGeneric": "Cette galerie n'accepte plus de nouvelles photos.",
+      "rateLimited": "Vous en envoyez beaucoup d'un coup – patientez un instant et réessayez.",
+      "sizeMismatch": "La photo n'a pas été transférée en entier. Nouvel essai en cours.",
+      "genericFailure": "L'envoi n'a pas abouti. Réessayez dès que vous aurez un meilleur réseau."
+    }
+  },
+  "presence": {
+    "someone": "Quelqu'un regarde en ce moment",
+    "count": "{count, plural, one {# personne regarde en ce moment} other {# personnes regardent en ce moment}}",
+    "named": "{names} {count, plural, one {regarde} other {regardent}}"
+  },
+  "sharePassword": {
+    "eyebrow": "Pavel Prokeš · photographe de mariage",
+    "title": "Cette galerie est protégée par un mot de passe",
+    "hint": "Le photographe vous a envoyé le mot de passe avec le lien.",
+    "passwordLabel": "Mot de passe de la galerie",
+    "placeholder": "Mot de passe",
+    "verifying": "Vérification…",
+    "submit": "Voir la galerie",
+    "missingPassword": "Saisissez un mot de passe.",
+    "wrongPassword": "Mot de passe incorrect. Vérifiez les majuscules et réessayez un peu plus tard, ou demandez au photographe de vous le renvoyer."
+  },
+  "promo": {
+    "cardAriaLabel": "{headline} – ouvre {cta} dans une nouvelle fenêtre"
+  }
+}
