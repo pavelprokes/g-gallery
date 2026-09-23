@@ -294,7 +294,9 @@ grid impressions are not views). No third parties; all identity/logic server-sid
 [sheet 16](https://www.cnil.fr/en/sheet-ndeg16-use-analytics-your-websites-and-applications)):
 viewer-id is **functional/strictly-necessary** (powers the viewer's own favorites/reactions +
 "viewed" dedup), first-party, single-site, never cross-referenced, no IP stored, lifetime ≤ 13
-months and deleted with the gallery, privacy notice + "nepočítat mě" opt-out in the gallery footer.
+months and deleted with the gallery, privacy notice + "nepočítat mě" opt-out in the gallery footer
+(which since 2026-09-23 also marks the viewer `optedOut` server-side and drops their name —
+docs/GUEST-GALLERIES.md §6).
 Names shown only when voluntarily entered.
 
 **Vercel Web Analytics** (aggregate traffic only — cannot do per-viewer/per-photo work):

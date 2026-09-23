@@ -129,14 +129,23 @@ export const getOptOutSnapshot = hasOptedOut;
 /** Server render always assumes opted-in; the client corrects on hydration. */
 export const getOptOutServerSnapshot = () => false;
 
+/**
+ * Forgets this browser's identity. Callers opt out on the server first
+ * (`/api/g/[token]/opt-out`) — once the key is gone here, nothing can address
+ * the rows it wrote any more.
+ */
 export function optOut(): void {
   try {
     window.localStorage.setItem(OPT_OUT_KEY, "1");
     window.localStorage.removeItem(STORAGE_KEY);
+    // The name goes with it: an opted-out browser must not keep offering
+    // "Přidáváš jako Petra" for a credit the server has just removed.
+    window.localStorage.removeItem(NAME_KEY);
   } catch {
     /* storage unavailable — nothing to clear */
   }
   for (const listener of listeners) listener();
+  notifyName();
 }
 
 /**
@@ -167,6 +176,20 @@ export function adoptViewerId(anonKey: string, displayName: string | null): bool
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * The key this browser already has, without minting one. The server-side
+ * opt-out needs the key a guest's rows were written under — creating a fresh
+ * one just to opt it out would mark nothing.
+ */
+export function peekViewerId(): string | null {
+  if (hasOptedOut()) return null;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
   }
 }
 

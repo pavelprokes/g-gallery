@@ -21,10 +21,13 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   /** One wedding per browser project — see e2e/seed.ts for why. */
   selfDelete: Record<string, { token: string; slug: string }>;
   /** Empty upload galleries per browser project, for the name sheet. */
-  naming: Record<string, Record<"first" | "second" | "skip", { token: string; slug: string }>>;
+  naming: Record<
+    string,
+    Record<"first" | "second" | "skip" | "optOut", { token: string; slug: string }>
+  >;
 };
 
-function namingUrl(projectName: string, which: "first" | "second" | "skip"): string {
+function namingUrl(projectName: string, which: "first" | "second" | "skip" | "optOut"): string {
   const link = seed.naming[projectName]?.[which];
   if (!link) throw new Error(`no naming gallery seeded for project ${projectName}`);
   return `/g/${link.token}/${link.slug}`;
@@ -106,11 +109,16 @@ test.describe("guest uploads", () => {
 
     await uploadAsNewGuest(page, "omylem.jpg", null);
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED + 1);
+    // The total follows what just landed. It is fixed at page load otherwise,
+    // and the lightbox used to read "3 / 2".
+    await expect(page.getByText("3 fotky")).toBeVisible();
 
     // Capture order, oldest shot first (2026-08-25) — the photo just uploaded
     // has the newest `takenAt`, so it is the LAST tile, not the first.
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await grid.locator('button[aria-label^="Otevřít"]').last().click();
+
+    await expect(page.getByRole("dialog").getByText("3 / 3")).toBeVisible();
 
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Smazat mou fotku" }).click();
@@ -118,6 +126,7 @@ test.describe("guest uploads", () => {
     // Back to the seeded photos: the guest's own upload is gone, the two that
     // were never theirs are untouched.
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(SEEDED);
+    await expect(page.getByText("2 fotky")).toBeVisible();
   });
 
   test("a photo someone else uploaded offers no delete button", async ({ page }, testInfo) => {
@@ -231,6 +240,49 @@ test.describe("guest uploads", () => {
     await expect(page.getByText("Přidáváš bez jména")).toBeVisible();
     await grid.locator('button[aria-label^="Otevřít"]').first().click();
     await expect(page.getByRole("dialog").getByText("Honza")).toHaveCount(0, { timeout: 15_000 });
+  });
+
+  test("'Nepočítat mě' takes the name off the guest's photos, for everyone", async ({
+    page,
+    browser,
+  }, testInfo) => {
+    const url = namingUrl(testInfo.project.name, "optOut");
+    await page.goto(url);
+    await uploadAsNewGuest(page, "moje.jpg", "Petra");
+    const grid = page.getByRole("list", { name: "Fotky v galerii" });
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(1);
+
+    // It cannot be undone, so it asks first — and says what it takes away.
+    await page.getByRole("button", { name: "Nepočítat mě" }).click();
+    const confirm = page.getByRole("dialog", { name: "Nepočítat tvoje návštěvy?" });
+    await expect(confirm).toContainText("nepůjde smazat");
+    // Cancel holds the focus, so a stray Enter does not confirm it.
+    await expect(confirm.getByRole("button", { name: "Zrušit" })).toBeFocused();
+    await confirm.getByRole("button", { name: "Nepočítat mě" }).click();
+    await expect(page.getByText("Tvoje návštěvy se nepočítají.")).toBeVisible();
+    await expect(page.getByText("Přidáváš jako")).toHaveCount(0);
+
+    // Someone else opening the gallery no longer sees the name.
+    const other = await browser.newContext({ locale: "cs-CZ" });
+    const otherPage = await other.newPage();
+    await otherPage.goto(url);
+    await otherPage
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]')
+      .first()
+      .click();
+    await expect(otherPage.getByRole("dialog")).toBeVisible();
+    await expect(otherPage.getByRole("dialog").getByText("Petra")).toHaveCount(0);
+    await other.close();
+
+    // And the opted-out guest can still add photos — just unattributed.
+    await page.getByLabel("Přidat fotky").setInputFiles(JPEG("dalsi.jpg"));
+    await expect(page.getByText("Nahráno. Uvidí to všichni na svatbě.")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(2);
+    await grid.locator('button[aria-label^="Otevřít"]').first().click();
+    await expect(page.getByRole("dialog").getByText("Petra")).toHaveCount(0);
   });
 
   test("a stored name that breaks the rules never blocks the upload", async ({ request }) => {

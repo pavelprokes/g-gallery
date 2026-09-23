@@ -31,6 +31,7 @@ import {
   getViewerName,
   hasAnsweredNamePrompt,
   optOut,
+  peekViewerId,
   setViewerName,
   subscribeOptOut,
 } from "@/lib/viewer-id";
@@ -69,7 +70,7 @@ import {
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
 import { useFocusTrap } from "@/lib/use-focus-trap";
-import { NameSheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
+import { NameSheet, Sheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { ViewerTransferPanel } from "@/components/viewer-transfer-panel";
@@ -704,6 +705,8 @@ function LightboxPhoto({
 interface PhotosPage {
   items: GalleryPhoto[];
   nextCursor: string | null;
+  /** The gallery's confirmed total — first page only. */
+  total?: number;
 }
 
 async function fetchPhotosPage(
@@ -715,6 +718,21 @@ async function fetchPhotosPage(
   const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`failed to fetch photos page (${response.status})`);
   return (await response.json()) as PhotosPage;
+}
+
+/**
+ * A 403 `OPTED_OUT` means this browser's key was opted out on the server —
+ * from another device that took the identity over by transfer code, since
+ * this one would have forgotten the key itself. Adopting it here keeps the
+ * footer honest instead of every heart silently snapping back.
+ */
+async function adoptServerOptOut(response: Response): Promise<void> {
+  if (response.status !== 403) return;
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as { error?: string } | null;
+  if (body?.error === "OPTED_OUT") optOut();
 }
 
 /** Ids of the photos this viewer uploaded. Empty on any failure: the delete
@@ -910,6 +928,11 @@ function GalleryViewInner({
   const [chromeHidden, setChromeHidden] = useState(false);
   const [zoomed, setZoomed] = useState(false);
 
+  /** "Nepočítat mě" asked to confirm, because it has consequences here. */
+  const [confirmingOptOut, setConfirmingOptOut] = useState(false);
+  const [optOutFailed, setOptOutFailed] = useState(false);
+  const [optingOut, setOptingOut] = useState(false);
+
   const optedOut = useSyncExternalStore(
     subscribeOptOut,
     getOptOutSnapshot,
@@ -926,10 +949,19 @@ function GalleryViewInner({
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialData: {
-      pages: [{ items: initialPhotos, nextCursor: initialCursor }],
+      pages: [
+        { items: initialPhotos, nextCursor: initialCursor, total: photoCount },
+      ] as PhotosPage[],
       pageParams: [null],
     },
   });
+
+  /**
+   * The gallery's real total, kept current. The `photoCount` prop is fixed at
+   * page load; the first page of every refetch carries a fresh one, so a guest
+   * who adds or deletes a photo sees the header and the lightbox counter follow.
+   */
+  const liveCount = data.pages[0]?.total ?? photoCount;
 
   /** Every photo fetched so far. The grid and the lightbox both work off
    * `photos` below, which is this list narrowed by the favourites filter;
@@ -1091,7 +1123,10 @@ function GalleryViewInner({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ anonKey, photoId, kind, displayName }),
         });
-        if (!response.ok) throw new Error(`reaction failed (${response.status})`);
+        if (!response.ok) {
+          await adoptServerOptOut(response);
+          throw new Error(`reaction failed (${response.status})`);
+        }
 
         // The server is authoritative about the tally: two viewers reacting at
         // once would otherwise leave each of them with their own stale count.
@@ -1153,7 +1188,10 @@ function GalleryViewInner({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ anonKey, photoId, favorite, displayName }),
         });
-        if (!response.ok) throw new Error(`favorite failed (${response.status})`);
+        if (!response.ok) {
+          await adoptServerOptOut(response);
+          throw new Error(`favorite failed (${response.status})`);
+        }
 
         const data = (await response.json()) as { count: number };
         setCounts((prev) => new Map(prev).set(photoId, data.count));
@@ -1222,7 +1260,10 @@ function GalleryViewInner({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ anonKey, photoId, quantity, displayName }),
         });
-        if (!response.ok) throw new Error(`print selection failed (${response.status})`);
+        if (!response.ok) {
+          await adoptServerOptOut(response);
+          throw new Error(`print selection failed (${response.status})`);
+        }
 
         // The server is authoritative — a 0 sent while the row didn't exist
         // resolves the same way a rejected quantity would.
@@ -1663,10 +1704,52 @@ function GalleryViewInner({
 
   const closeLightbox = useCallback(() => window.history.back(), []);
 
+  /**
+   * "Nepočítat mě" (docs/GUEST-GALLERIES.md §6). The server is told first:
+   * once the key is forgotten in this browser, nothing can reach the rows it
+   * wrote — a name on uploaded photos would stay there for good. If that
+   * request fails the key is kept and the guest is told, rather than being
+   * shown "not counted" while their name is still on the server.
+   */
+  const performOptOut = useCallback(async () => {
+    setOptingOut(true);
+    setOptOutFailed(false);
+    const anonKey = peekViewerId();
+    try {
+      if (anonKey) {
+        const response = await fetch(`/api/g/${encodeURIComponent(token)}/opt-out`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anonKey }),
+        });
+        if (!response.ok) throw new Error(`opt-out failed (${response.status})`);
+      }
+      optOut();
+      setConfirmingOptOut(false);
+      setMine(new Set());
+      // Their credits just disappeared from the server.
+      void queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+    } catch (error) {
+      console.error("[g-gallery/opt-out]", error);
+      setOptOutFailed(true);
+    } finally {
+      setOptingOut(false);
+    }
+  }, [queryClient, token]);
+
+  /**
+   * Always asks first. It cannot be undone from here, and what it takes away
+   * is not visible from this gallery alone: the key is forgotten for every
+   * gallery, so photos this guest added somewhere else stop being deletable
+   * too — `mine` only knows about this one.
+   */
+  const requestOptOut = useCallback(() => setConfirmingOptOut(true), []);
+  const optOutCancelRef = useRef<HTMLButtonElement>(null);
+
   const toggleChrome = useCallback(() => setChromeHidden((hidden) => !hidden), []);
 
   /** "15. 8. 2026 · 56 fotek", with either half omitted if it isn't known. */
-  const subtitle = [eventDate, photoCount > 0 ? t("photoCount", { count: photoCount }) : null]
+  const subtitle = [eventDate, liveCount > 0 ? t("photoCount", { count: liveCount }) : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -2285,14 +2368,14 @@ function GalleryViewInner({
               )}
             </div>
 
-            {/* `photoCount` is the gallery's real, server-side total — unlike
+            {/* `liveCount` is the gallery's real, server-side total — unlike
                 `photos.length`, it doesn't depend on how many pages of the
                 infinite scroll have loaded yet, so the counter never needs a
                 "+" to hedge an incomplete count. Favoriting filters the list
-                to a subset `photoCount` doesn't describe, so that case keeps
+                to a subset `liveCount` doesn't describe, so that case keeps
                 the old loaded-so-far behaviour. */}
             <span className="ml-auto shrink-0 rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/70 tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
-              {activeIndex! + 1} / {favoritesOnly ? photos.length : photoCount}
+              {activeIndex! + 1} / {favoritesOnly ? photos.length : liveCount}
               {favoritesOnly && hasNextPage && "+"}
             </span>
           </div>
@@ -2381,6 +2464,45 @@ function GalleryViewInner({
         />
       )}
 
+      {confirmingOptOut && (
+        <Sheet
+          title={t("optOutConfirmTitle")}
+          hint={t("optOutConfirmHint")}
+          onSubmit={() => void performOptOut()}
+          // Cancel, not the irreversible button: Enter or Space straight after
+          // the sheet opens must not confirm what the guest has not read.
+          initialFocusRef={optOutCancelRef}
+          onDismiss={() => {
+            setConfirmingOptOut(false);
+            setOptOutFailed(false);
+          }}
+        >
+          {optOutFailed && (
+            <p role="alert" className="text-body text-admin-danger mb-2 dark:text-red-400">
+              {t("optOutFailed")}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={optingOut}
+            className={`${SHEET_PRIMARY} disabled:cursor-not-allowed disabled:opacity-55`}
+          >
+            {t("optOut")}
+          </button>
+          <button
+            ref={optOutCancelRef}
+            type="button"
+            className={SHEET_SECONDARY}
+            onClick={() => {
+              setConfirmingOptOut(false);
+              setOptOutFailed(false);
+            }}
+          >
+            {t("optOutCancel")}
+          </button>
+        </Sheet>
+      )}
+
       {namePromptFor && (
         <NamePrompt
           onSubmit={(name) => {
@@ -2425,9 +2547,19 @@ function GalleryViewInner({
         {!optedOut ? (
           <p>
             {t("privacyNotice")}{" "}
-            <button type="button" className="underline" onClick={optOut}>
+            <button
+              type="button"
+              className="underline disabled:opacity-50"
+              disabled={optingOut}
+              onClick={requestOptOut}
+            >
               {t("optOut")}
             </button>
+            {optOutFailed && !confirmingOptOut && (
+              <span role="alert" className="text-admin-danger ms-2 dark:text-red-400">
+                {t("optOutFailed")}
+              </span>
+            )}
           </p>
         ) : (
           <p>{t("optedOutNotice")}</p>

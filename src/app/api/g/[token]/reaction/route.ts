@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
+import { clearOptedOutName } from "@/lib/viewer-opt-out";
 import { galleryReactions, toggleReaction } from "@/lib/reactions";
 import { isReactionKind, REACTION_KINDS } from "@/lib/reactions-shared";
 
@@ -77,7 +78,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/r
     select: { id: true, optedOut: true, displayName: true },
   });
 
-  if (viewer.optedOut) return NextResponse.json({ error: "OPTED_OUT" }, { status: 403 });
+  if (viewer.optedOut) {
+    if (displayName) await clearOptedOutName(access.shareLink.galleryId, anonKey);
+    return NextResponse.json({ error: "OPTED_OUT" }, { status: 403 });
+  }
 
   const result = await toggleReaction(photo.id, viewer.id, kind);
 

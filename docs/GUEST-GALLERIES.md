@@ -263,12 +263,20 @@ only the admin ever showed it.
 - **One name per guest per gallery.** A name given on the heart prompt credits the guest's uploads
   too — that prompt's hint says so since 2026-09-23 — and the photos refetch once it is saved.
 - **It can be taken back**: clearing the field under "Změnit" removes the name (`/identify`
-  accepts null) and every credit with it. This matters because the footer's "Nepočítat mě" does
-  _not_: it only forgets the `anonKey` in the browser and has never set `Viewer.optedOut` on the
-  server, so the `optedOut` checks in `ensureViewerId` and `uploaderNameOf` are defence for a
-  server-side opt-out that does not exist yet — and after opting out, the guest no longer holds
-  the key that would let them edit the name. Worth closing before this is marketed as a privacy
-  control.
+  accepts null) and every credit with it.
+- **"Nepočítat mě" is real on the server since 2026-09-23** (`POST /api/g/[token]/opt-out`).
+  Before, it only forgot the `anonKey` in the browser: the name stayed on the guest's photos and
+  they no longer held the key to change it. Now the browser asks the server first — every `Viewer`
+  row with that key, in every gallery, gets `optedOut` and loses its name — and only then forgets
+  the key; if the request fails the key is kept and the guest is told. It always asks to confirm (Cancel
+  has the focus): their photos stay, without the name, and can no longer be deleted from this
+  browser — in any gallery, which this one alone cannot see. The route only acts for a key that
+  already has a row in the gallery whose link was presented, so a live link is never a handle on
+  galleries its holder cannot open; the heart, reaction and print routes roll back a name they
+  wrote onto an opted-out row, and a second device sharing the key by transfer code adopts the
+  opt-out on its next refused heart. Hearts and print marks stay too — the
+  couple's print order is built from them. It is the one place rows are addressed across
+  galleries, and it only ever removes data.
 - A stored name that breaks the rules (too long, blank) is trimmed or dropped by presign, never
   refused: an optional credit must not turn every upload into a 400.
 - The bar says who you are adding as ("Přidáváš jako Petra · Změnit", or "bez jména · Doplnit
