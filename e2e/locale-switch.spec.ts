@@ -3,14 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * The CS/EN locale switcher (src/i18n/request.ts, src/components/locale-switcher.tsx):
+ * The CS/EN/FR locale switcher (src/i18n/request.ts, src/components/locale-switcher.tsx):
  * autodetected from Accept-Language on first visit, then pinned by a cookie
  * so every later request — including the very next one — renders
  * consistently without renegotiating or flashing the wrong language.
  *
  * `playwright.config.ts` pins the default browser context to `cs-CZ` so
  * every other spec keeps asserting on Czech text; this file is the one place
- * that deliberately overrides it to exercise English.
+ * that deliberately overrides it to exercise English and French.
  */
 
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
@@ -45,6 +45,23 @@ test.describe("locale switching", () => {
     await context.close();
   });
 
+  test("a browser set to French is autodetected, region subtag included", async ({ browser }) => {
+    // fr-CA, not fr-FR: the catalog is keyed by bare language, and a Québécois
+    // guest must land on it just the same.
+    const context = await browser.newContext({ locale: "fr-CA" });
+    const page = await context.newPage();
+
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+    await expect(page.getByRole("list", { name: "Photos de la galerie" })).toBeVisible();
+    await expect
+      .poll(async () => (await context.cookies()).find((c) => c.name === LOCALE_COOKIE)?.value)
+      .toBe("fr");
+
+    await context.close();
+  });
+
   test("switching locale updates the cookie, localStorage, visible text and <html lang>, without changing the URL", async ({
     page,
   }) => {
@@ -56,7 +73,7 @@ test.describe("locale switching", () => {
 
     const urlBefore = page.url();
     await page
-      .getByRole("group", { name: "Čeština / English" })
+      .getByRole("group", { name: "Čeština / English / Français" })
       .getByRole("button", { name: "EN" })
       .click();
 

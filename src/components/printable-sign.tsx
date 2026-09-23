@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Locale } from "@/i18n/locales";
+import { LOCALES, type Locale } from "@/i18n/locales";
 
 type Variant = "table" | "corner";
 
@@ -31,6 +31,14 @@ const UI_STRINGS: Record<
     printerTip:
       "Tip: colors can shift on inkjet printers. Before printing several copies, try one on your own paper first.",
     qrAlt: "QR code for the {target} gallery",
+  },
+  fr: {
+    print: "Imprimer",
+    sharedGallery: "galerie partagée",
+    leadsTo: "Mène vers :",
+    printerTip:
+      "Astuce : les couleurs peuvent varier sur une imprimante à jet d'encre. Avant d'imprimer plusieurs exemplaires, faites d'abord un essai sur votre papier.",
+    qrAlt: "QR code de la galerie {target}",
   },
 };
 
@@ -84,6 +92,23 @@ const COPY: Record<
       headline: "We might miss the best moments of the night. Add yours to our gallery.",
       cta: "Upload photos →",
       caption: "No app, no sign-up — anyone with a phone can add photos.",
+    },
+  },
+  // "vous" throughout, like the French catalog: a printed card addresses a
+  // room of strangers of every age, where "tu" would read as presumptuous.
+  fr: {
+    table: {
+      label: "Carte de table (courte)",
+      headline: "Ce soir, vous êtes aussi photographe — rejoignez la galerie.",
+      cta: "Envoyez vos photos →",
+      caption: null,
+    },
+    corner: {
+      label: "Photobooth (longue)",
+      headline:
+        "Les plus beaux moments de la soirée, on risque de les manquer. Ajoutez les vôtres à notre galerie.",
+      cta: "Envoyez vos photos →",
+      caption: "Sans appli, sans inscription — tout le monde peut participer avec un téléphone.",
     },
   },
 };
@@ -164,7 +189,7 @@ export function PrintableSign({
         {/* The sign's own language — independent of the photographer's admin
             locale, since what matters is what the guests will read. */}
         <div role="group" aria-label="Sign language / Jazyk cedulky" className="flex gap-1">
-          {(["cs", "en"] as const).map((code) => (
+          {LOCALES.map((code) => (
             <button
               key={code}
               type="button"

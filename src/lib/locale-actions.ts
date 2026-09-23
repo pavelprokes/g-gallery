@@ -1,10 +1,11 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/locales";
+import { isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/locales";
 
 export async function setLocale(locale: Locale) {
-  if (!LOCALES.includes(locale)) return;
+  // A Server Action is a public POST endpoint — the argument is untrusted.
+  if (!isLocale(locale)) return;
   const store = await cookies();
   store.set(LOCALE_COOKIE, locale, {
     path: "/",

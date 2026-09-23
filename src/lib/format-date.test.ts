@@ -9,6 +9,16 @@ describe("formatDate", () => {
   it("renders the first of the month correctly in UTC CI", () => {
     expect(formatDate(new Date("2026-07-31T22:00:00Z"), "cs")).toBe("1. 8. 2026");
   });
+
+  it("uses each language's own date order", () => {
+    const date = new Date("2026-08-14T22:00:00Z");
+    expect(formatDate(date, "en")).toBe("8/15/2026");
+    expect(formatDate(date, "fr")).toBe("15/08/2026");
+  });
+
+  it("falls back to the default language for a locale the app does not speak", () => {
+    expect(formatDate(new Date("2026-08-14T22:00:00Z"), "de")).toBe("15. 8. 2026");
+  });
 });
 
 describe("formatDigestDay", () => {

@@ -2,7 +2,7 @@ import { match } from "@formatjs/intl-localematcher";
 import { cookies, headers } from "next/headers";
 import Negotiator from "negotiator";
 import { getRequestConfig } from "next-intl/server";
-import { DEFAULT_LOCALE, LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/locales";
+import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALES, type Locale } from "@/i18n/locales";
 
 /**
  * Which language to render in, from an `Accept-Language` header.
@@ -51,10 +51,6 @@ function isStructurallyValidTag(tag: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isLocale(value: string | undefined): value is Locale {
-  return LOCALES.includes(value as Locale);
 }
 
 export default getRequestConfig(async () => {
