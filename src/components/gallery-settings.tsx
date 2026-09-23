@@ -5,6 +5,8 @@ import { updateGallery } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
+import { TranslationFields } from "@/components/admin/translation-fields";
+import type { ContentTranslations } from "@/lib/content-translations";
 
 /**
  * Renaming a gallery, or fixing its date or description. Behind a button, like
@@ -19,11 +21,13 @@ export function GallerySettings({
   title,
   eventDate,
   description,
+  translations,
 }: {
   galleryId: string;
   title: string;
   eventDate: string | null;
   description: string | null;
+  translations: ContentTranslations<"title">;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -61,6 +65,11 @@ export function GallerySettings({
           defaultValue={description ?? ""}
         />
       </div>
+      <TranslationFields
+        className="w-full"
+        values={translations}
+        fields={[{ name: "title", label: "Název", maxLength: 200, original: title }]}
+      />
       <Button type="submit" size="lg">
         Uložit
       </Button>

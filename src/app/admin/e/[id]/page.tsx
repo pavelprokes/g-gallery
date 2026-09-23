@@ -1,3 +1,4 @@
+import { EVENT_TRANSLATED_FIELDS, parseTranslations } from "@/lib/content-translations";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -54,6 +55,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
       title: true,
       eventDate: true,
       venue: true,
+      translations: true,
       slug: true,
       tokenCipher: true,
       trashedAt: true,
@@ -123,6 +125,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               title={event.title}
               eventDate={event.eventDate?.toISOString().slice(0, 10) ?? null}
               venue={event.venue}
+              translations={parseTranslations(event.translations, EVENT_TRANSLATED_FIELDS)}
             />
             <form action={trashEvent.bind(null, event.id)}>
               <Button type="submit" variant="destructive">

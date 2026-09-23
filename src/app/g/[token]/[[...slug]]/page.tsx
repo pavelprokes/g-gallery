@@ -34,7 +34,7 @@ export async function generateMetadata(
     return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
   }
 
-  return galleryShareMetadata(access.shareLink.galleryId, t);
+  return galleryShareMetadata(access.shareLink.galleryId, t, await getLocale());
 }
 
 export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {

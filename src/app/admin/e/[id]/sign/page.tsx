@@ -1,3 +1,8 @@
+import {
+  EVENT_TRANSLATED_FIELDS,
+  localizeFieldForAll,
+  parseTranslations,
+} from "@/lib/content-translations";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -29,6 +34,7 @@ export default async function EventSignPage(props: PageProps<"/admin/e/[id]/sign
     select: {
       id: true,
       title: true,
+      translations: true,
       slug: true,
       tokenCipher: true,
       galleries: {
@@ -83,7 +89,11 @@ export default async function EventSignPage(props: PageProps<"/admin/e/[id]/sign
       <PrintableSign
         url={url}
         qrSvg={qrSvg}
-        targetLabel={event.title}
+        targetLabels={localizeFieldForAll(
+          event.title,
+          parseTranslations(event.translations, EVENT_TRANSLATED_FIELDS),
+          "title",
+        )}
         readinessNote={
           uploadReady
             ? { ok: true, text: `nahrávání zapnuto (${uploadReady.title})` }

@@ -39,6 +39,29 @@ test.describe("wedding page", () => {
     await expect(page.getByRole("link", { name: /Kompletní set/ })).toHaveCount(0);
   });
 
+  test("a French guest reads what the photographer translated, and English where they did not", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ locale: "fr-FR" });
+    const page = await context.newPage();
+    await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}`);
+
+    // Names untranslated on purpose — the original stands.
+    await expect(page.getByRole("heading", { name: "Pavel a Patricie" })).toBeVisible();
+    await expect(page.getByText("Domaine de Benice")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Photos des invités/ })).toBeVisible();
+    // Only an English translation exists for this one: English beats Czech.
+    await expect(page.getByRole("link", { name: /First picks/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /První výběr/ })).toHaveCount(0);
+
+    // The gallery it opens carries the same title in its heading and tab.
+    await page.getByRole("link", { name: /First picks/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "First picks" })).toBeVisible();
+    await expect(page).toHaveTitle("First picks");
+
+    await context.close();
+  });
+
   test("a card opens the gallery and offers the way back", async ({ page }) => {
     await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}`);
     await page.getByRole("link", { name: /První výběr/ }).click();

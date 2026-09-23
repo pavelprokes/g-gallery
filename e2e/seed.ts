@@ -152,6 +152,25 @@ async function main() {
     2,
   );
 
+  // Guest-facing translations typed in the admin (docs/I18N.md §Content). One
+  // gallery translated into both languages, one into English only — so the
+  // French page exercises its own language *and* the fall back to English —
+  // and the couple's names left alone, as they usually are.
+  await prisma.event.update({
+    where: { id: wedding.id },
+    data: { translations: { en: { venue: "Benice Farm" }, fr: { venue: "Domaine de Benice" } } },
+  });
+  await prisma.gallery.update({
+    where: { id: guests },
+    data: {
+      translations: { en: { title: "From the guests" }, fr: { title: "Photos des invités" } },
+    },
+  });
+  await prisma.gallery.update({
+    where: { id: listed },
+    data: { translations: { en: { title: "First picks" } } },
+  });
+
   // One per browser project. Deleting asserts on exact counts, and both
   // projects run in parallel — sharing a gallery would make the count a race
   // rather than a fact. Seeded with photos nobody's anonKey owns, which is what

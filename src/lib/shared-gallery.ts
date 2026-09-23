@@ -1,6 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import type { Locale } from "@/i18n/locales";
+import {
+  GALLERY_TRANSLATED_FIELDS,
+  localizeField,
+  localizeOptionalField,
+  parseTranslations,
+  PROMO_TRANSLATED_FIELDS,
+} from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
 import {
@@ -77,6 +84,8 @@ export async function loadGalleryViewData(
     select: {
       id: true,
       title: true,
+      // docs/I18N.md §Content — the title in the guest's language.
+      translations: true,
       eventDate: true,
       storagePrefix: true,
       // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
@@ -136,6 +145,7 @@ export async function loadGalleryViewData(
               ctaLabel: true,
               ctaUrl: true,
               theme: true,
+              translations: true,
             },
           },
         },
@@ -148,8 +158,10 @@ export async function loadGalleryViewData(
   const page = hasMore ? gallery.photos.slice(0, PHOTOS_PAGE_SIZE) : gallery.photos;
   const last = page.at(-1);
 
+  const titleTranslations = parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS);
+
   return {
-    title: gallery.title,
+    title: localizeField(gallery.title, titleTranslations, "title", locale),
     eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
     photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
@@ -173,16 +185,20 @@ export async function loadGalleryViewData(
     // are not the owner. Dropping the tile is the safe failure.
     promos: gallery.promos
       .filter((placement) => isSafePromoUrl(placement.promoCard.ctaUrl))
-      .map((placement) => ({
-        id: placement.id,
-        slot: placement.slot,
-        eyebrow: placement.promoCard.eyebrow,
-        headline: placement.promoCard.headline,
-        body: placement.promoCard.body,
-        ctaLabel: placement.promoCard.ctaLabel,
-        ctaUrl: placement.promoCard.ctaUrl,
-        theme: placement.promoCard.theme,
-      })),
+      .map((placement) => {
+        const card = placement.promoCard;
+        const tr = parseTranslations(card.translations, PROMO_TRANSLATED_FIELDS);
+        return {
+          id: placement.id,
+          slot: placement.slot,
+          eyebrow: localizeOptionalField(card.eyebrow, tr, "eyebrow", locale),
+          headline: localizeField(card.headline, tr, "headline", locale),
+          body: localizeOptionalField(card.body, tr, "body", locale),
+          ctaLabel: localizeOptionalField(card.ctaLabel, tr, "ctaLabel", locale),
+          ctaUrl: card.ctaUrl,
+          theme: card.theme,
+        };
+      }),
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,

@@ -5,6 +5,8 @@ import { createPromoCard, deletePromoCard, updatePromoCard } from "@/app/admin/p
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Hint, Input, Label, Select, Textarea } from "@/components/ui/input";
+import { TranslationFields } from "@/components/admin/translation-fields";
+import type { ContentTranslations } from "@/lib/content-translations";
 import { PROMO_THEMES, type PromoTheme } from "@/lib/promo-card";
 
 export interface PromoCardValues {
@@ -16,6 +18,7 @@ export interface PromoCardValues {
   ctaLabel: string | null;
   ctaUrl: string;
   theme: PromoTheme;
+  translations: ContentTranslations<"eyebrow" | "headline" | "body" | "ctaLabel">;
 }
 
 const THEME_LABELS: Record<PromoTheme, string> = {
@@ -141,6 +144,22 @@ export function PromoCardForm({ card, onDone }: { card?: PromoCardValues; onDone
             />
           </div>
         </div>
+
+        <TranslationFields
+          values={card?.translations}
+          fields={[
+            { name: "eyebrow", label: "Nadřádek", maxLength: 40, original: values.eyebrow },
+            { name: "headline", label: "Nadpis", maxLength: 120, original: values.headline },
+            {
+              name: "body",
+              label: "Text",
+              maxLength: 400,
+              multiline: true,
+              original: values.body,
+            },
+            { name: "ctaLabel", label: "Text odkazu", maxLength: 60, original: values.ctaLabel },
+          ]}
+        />
 
         <div>
           <Label htmlFor={`${fieldId}-theme`}>Barva</Label>

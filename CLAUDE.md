@@ -10,7 +10,8 @@ anything that assumes one share link means one gallery.
 2026-09-01) — read it before touching the grid's item stream, the justified layout's input, or
 anything that assumes every tile in the gallery is a photo.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr, adopted 2026-09-23) —
-read it before touching `src/i18n/*`, the message catalogs, or the locale switcher.
+read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
+shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
 
 ## Commands
 

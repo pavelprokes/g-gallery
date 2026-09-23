@@ -1,3 +1,8 @@
+import {
+  GALLERY_TRANSLATED_FIELDS,
+  localizeFieldForAll,
+  parseTranslations,
+} from "@/lib/content-translations";
 import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -30,7 +35,12 @@ export default async function GallerySignPage(props: PageProps<"/admin/g/[id]/si
     where: { id, ownerId: session.user.id },
     // `event` is only for the breadcrumb — an event-owned gallery routes through
     // its wedding rather than jumping straight back to the overview.
-    select: { id: true, title: true, event: { select: { id: true, title: true } } },
+    select: {
+      id: true,
+      title: true,
+      translations: true,
+      event: { select: { id: true, title: true } },
+    },
   });
   if (!gallery) notFound();
 
@@ -104,7 +114,11 @@ export default async function GallerySignPage(props: PageProps<"/admin/g/[id]/si
     <PrintableSign
       url={url}
       qrSvg={qrSvg}
-      targetLabel={gallery.title}
+      targetLabels={localizeFieldForAll(
+        gallery.title,
+        parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS),
+        "title",
+      )}
       readinessNote={{ ok: true, text: "nahrávání zapnuto" }}
     />,
   );

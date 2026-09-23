@@ -2,6 +2,14 @@ import "server-only";
 import type { PhotoStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { hashShareToken } from "@/lib/share-token";
+import type { Locale } from "@/i18n/locales";
+import {
+  EVENT_TRANSLATED_FIELDS,
+  GALLERY_TRANSLATED_FIELDS,
+  localizeField,
+  localizeOptionalField,
+  parseTranslations,
+} from "@/lib/content-translations";
 import { visibleEventCards, type EventGalleryRow } from "@/lib/event-cards";
 
 /**
@@ -48,7 +56,16 @@ export interface ResolvedEvent {
   cards: EventCard[];
 }
 
-export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | null> {
+/**
+ * `locale` is the guest's language: the wedding's title and venue and every
+ * card's title come back already translated (docs/I18N.md §Content). Card order
+ * is still decided on the Czech original, so the page reads in the same order
+ * in every language.
+ */
+export async function resolveEvent(
+  eventToken: string,
+  locale: Locale,
+): Promise<ResolvedEvent | null> {
   if (!eventToken || eventToken.length > 128) return null;
 
   const event = await prisma.event.findUnique({
@@ -60,11 +77,13 @@ export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | 
       title: true,
       eventDate: true,
       venue: true,
+      translations: true,
       slug: true,
       galleries: {
         select: {
           id: true,
           title: true,
+          translations: true,
           eventKey: true,
           position: true,
           listedOnEvent: true,
@@ -89,6 +108,19 @@ export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | 
   });
   if (!event) return null;
 
+  const cardTitles = new Map(
+    event.galleries.map((gallery) => [
+      gallery.id,
+      localizeField(
+        gallery.title,
+        parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS),
+        "title",
+        locale,
+      ),
+    ]),
+  );
+  const eventTranslations = parseTranslations(event.translations, EVENT_TRANSLATED_FIELDS);
+
   const rows: EventCard[] = event.galleries.map((gallery) => {
     const cover = pickCover(gallery.coverPhoto, gallery.photos[0]);
     return {
@@ -110,10 +142,14 @@ export async function resolveEvent(eventToken: string): Promise<ResolvedEvent | 
 
   return {
     id: event.id,
-    title: event.title,
+    title: localizeField(event.title, eventTranslations, "title", locale),
     eventDate: event.eventDate,
-    venue: event.venue,
+    venue: localizeOptionalField(event.venue, eventTranslations, "venue", locale),
     slug: event.slug,
-    cards: visibleEventCards(rows, new Date()),
+    // Sorted on the original titles first, translated after.
+    cards: visibleEventCards(rows, new Date()).map((card) => ({
+      ...card,
+      title: cardTitles.get(card.id) ?? card.title,
+    })),
   };
 }

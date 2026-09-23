@@ -38,7 +38,8 @@ export async function generateMetadata(
   props: PageProps<"/s/[token]/[[...slug]]">,
 ): Promise<Metadata> {
   const { token, slug } = await props.params;
-  const event = await resolveEvent(token);
+  const locale = await getLocale();
+  const event = await resolveEvent(token, locale);
   const t = await getTranslations("gallery");
 
   if (!event) {
@@ -54,7 +55,7 @@ export async function generateMetadata(
     const galleryToken = compositeToken(token, card.eventKey);
     const access = await resolveShareLink(galleryToken);
     if (access.ok) {
-      return galleryShareMetadata(access.shareLink.galleryId, t);
+      return galleryShareMetadata(access.shareLink.galleryId, t, locale);
     }
   }
 
@@ -65,7 +66,8 @@ export async function generateMetadata(
 export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug]]">) {
   const { token, slug } = await props.params;
 
-  const event = await resolveEvent(token);
+  const locale = await getLocale();
+  const event = await resolveEvent(token, locale);
   if (!event) notFound();
 
   const segments = slug ?? [];
@@ -107,7 +109,6 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
     );
   }
 
-  const locale = await getLocale();
   const data = await loadGalleryViewData(access.shareLink, locale);
   if (!data) notFound();
 

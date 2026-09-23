@@ -133,7 +133,7 @@ const COPY: Record<
 export function PrintableSign({
   url,
   qrSvg,
-  targetLabel,
+  targetLabels,
   readinessNote,
 }: {
   /** The full absolute URL encoded in the QR — also shown as plain text under it. */
@@ -141,7 +141,7 @@ export function PrintableSign({
   /** Server-rendered QR SVG markup (src/lib/qr.ts). */
   qrSvg: string;
   /** What this sign points at — printed as a small kicker line, and used in the preview-only readiness note. */
-  targetLabel: string;
+  targetLabels: Record<Locale, string>;
   /** Round-1 groom-persona ask: confirm what's live before trusting a print run. Preview only. */
   readinessNote?: { ok: boolean; text: string };
 }) {
@@ -149,6 +149,9 @@ export function PrintableSign({
   const [locale, setLocale] = useState<Locale>("cs");
   const copy = COPY[locale][variant];
   const ui = UI_STRINGS[locale];
+  // The wedding's or gallery's own name, translated in the admin
+  // (docs/I18N.md §Content) — in the sign's language, not the admin's.
+  const targetLabel = targetLabels[locale];
 
   return (
     <div>
