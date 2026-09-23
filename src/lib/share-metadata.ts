@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
 import type { PhotoStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
+import type { Locale } from "@/i18n/locales";
+import {
+  GALLERY_TRANSLATED_FIELDS,
+  localizeField,
+  parseTranslations,
+} from "@/lib/content-translations";
 import { pickCover } from "@/lib/event-access";
 
 const galleryCoverSelect = {
   title: true,
+  translations: true,
   coverPhoto: { select: { objectKey: true, status: true } },
   photos: {
     where: { status: "CONFIRMED" as PhotoStatus },
@@ -23,13 +30,22 @@ function ogImageUrl(objectKey: string): string | undefined {
 export async function galleryShareMetadata(
   galleryId: string,
   t: (key: string) => string,
+  locale: Locale,
 ): Promise<Metadata> {
   const gallery = await prisma.gallery.findUnique({
     where: { id: galleryId },
     select: galleryCoverSelect,
   });
 
-  const title = gallery?.title ?? t("untitledPlaceholder");
+  // The tab and the link preview carry the title in the reader's language too.
+  const title = gallery
+    ? localizeField(
+        gallery.title,
+        parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS),
+        "title",
+        locale,
+      )
+    : t("untitledPlaceholder");
   const description = t("galleryOgDescription");
   const cover = pickCover(gallery?.coverPhoto, gallery?.photos[0]);
   const imageUrl = cover ? ogImageUrl(cover.objectKey) : undefined;

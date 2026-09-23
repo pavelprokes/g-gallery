@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { promoClickCounts } from "@/lib/activity";
+import { parseTranslations, PROMO_TRANSLATED_FIELDS } from "@/lib/content-translations";
 import { getAdminSession } from "@/lib/auth-guard";
 import { PageHeader } from "@/components/ui/page-header";
 import { PromoCardList, type PromoCardRow } from "@/components/admin/promo-card-list";
@@ -23,6 +24,7 @@ export default async function PromoCardsPage() {
       ctaLabel: true,
       ctaUrl: true,
       theme: true,
+      translations: true,
       placements: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -49,6 +51,7 @@ export default async function PromoCardsPage() {
 
   const rows: PromoCardRow[] = cards.map((card) => ({
     ...card,
+    translations: parseTranslations(card.translations, PROMO_TRANSLATED_FIELDS),
     placements: card.placements.map((placement) => ({
       galleryId: placement.gallery.id,
       galleryTitle: placement.gallery.title,

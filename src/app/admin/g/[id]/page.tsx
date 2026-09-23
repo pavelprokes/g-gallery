@@ -1,3 +1,4 @@
+import { GALLERY_TRANSLATED_FIELDS, parseTranslations } from "@/lib/content-translations";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -39,6 +40,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       title: true,
       eventDate: true,
       description: true,
+      translations: true,
       status: true,
       trashedAt: true,
       eventId: true,
@@ -139,6 +141,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               title={gallery.title}
               eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
               description={gallery.description}
+              translations={parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS)}
             />
             {gallery.status === "DRAFT" && (
               <form action={publish}>

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
+import type { Prisma } from "@/generated/prisma/client";
+import { readTranslationsFromForm } from "@/lib/content-translations";
 import { MAX_PROMO_SLOT, MIN_PROMO_SLOT, PROMO_THEMES, isSafePromoUrl } from "@/lib/promo-card";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
@@ -33,8 +35,12 @@ const promoCardSchema = z.object({
   theme: z.enum(PROMO_THEMES),
 });
 
+/** Same limits as the Czech fields they translate. Not exported — a "use server" file may only export async functions. */
+const PROMO_TRANSLATION_LIMITS = { eyebrow: 40, headline: 120, body: 400, ctaLabel: 60 };
+
 function readPromoCard(formData: FormData) {
-  return promoCardSchema.safeParse({
+  const translations = readTranslationsFromForm(formData, PROMO_TRANSLATION_LIMITS);
+  const parsed = promoCardSchema.safeParse({
     name: formData.get("name"),
     eyebrow: formData.get("eyebrow"),
     headline: formData.get("headline"),
@@ -43,6 +49,11 @@ function readPromoCard(formData: FormData) {
     ctaUrl: formData.get("ctaUrl"),
     theme: formData.get("theme"),
   });
+  if (!parsed.success || !translations.success) return { success: false as const };
+  return {
+    success: true as const,
+    data: { ...parsed.data, translations: translations.data as Prisma.InputJsonObject },
+  };
 }
 
 export async function createPromoCard(formData: FormData) {

@@ -10,6 +10,8 @@ import {
   hashPassword,
   hashShareToken,
 } from "@/lib/share-token";
+import type { Prisma } from "@/generated/prisma/client";
+import { readTranslationsFromForm } from "@/lib/content-translations";
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
 import { deleteObject } from "@/lib/r2";
 import { encryptToken } from "@/lib/token-cipher";
@@ -576,7 +578,11 @@ export async function updateEvent(eventId: string, formData: FormData) {
     eventDate: formData.get("eventDate") || undefined,
     venue: formData.get("venue") || undefined,
   });
-  if (!parsed.success) throw new Error("INVALID_INPUT");
+  // Guest-facing translations of the same two fields (docs/I18N.md §Content).
+  // Replaced wholesale: the form always carries every translation input, so an
+  // emptied one means "no translation any more", not "leave it as it was".
+  const translations = readTranslationsFromForm(formData, { title: 200, venue: 200 });
+  if (!parsed.success || !translations.success) throw new Error("INVALID_INPUT");
 
   await prisma.event.updateMany({
     where: { id: eventId, ownerId: session.user.id },
@@ -584,6 +590,7 @@ export async function updateEvent(eventId: string, formData: FormData) {
       title: parsed.data.title,
       eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       venue: parsed.data.venue ?? null,
+      translations: translations.data as Prisma.InputJsonObject,
     },
   });
 
@@ -683,7 +690,10 @@ export async function updateGallery(galleryId: string, formData: FormData) {
     eventDate: formData.get("eventDate") || undefined,
     description: formData.get("description") || undefined,
   });
-  if (!parsed.success) throw new Error("INVALID_INPUT");
+  // Same wholesale rule as updateEvent. Only the title: `description` is never
+  // shown to a guest.
+  const translations = readTranslationsFromForm(formData, { title: 200 });
+  if (!parsed.success || !translations.success) throw new Error("INVALID_INPUT");
 
   const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, ownerId: session.user.id },
@@ -697,6 +707,7 @@ export async function updateGallery(galleryId: string, formData: FormData) {
       title: parsed.data.title,
       eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
       description: parsed.data.description ?? null,
+      translations: translations.data as Prisma.InputJsonObject,
     },
   });
 

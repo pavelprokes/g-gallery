@@ -5,6 +5,8 @@ import { updateEvent } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
+import { TranslationFields } from "@/components/admin/translation-fields";
+import type { ContentTranslations } from "@/lib/content-translations";
 
 /**
  * Renaming a wedding, or fixing its date or venue. Behind a button because it
@@ -18,11 +20,13 @@ export function EventSettings({
   title,
   eventDate,
   venue,
+  translations,
 }: {
   eventId: string;
   title: string;
   eventDate: string | null;
   venue: string | null;
+  translations: ContentTranslations<"title" | "venue">;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -55,6 +59,15 @@ export function EventSettings({
         <Label htmlFor="event-venue">Místo</Label>
         <Input id="event-venue" name="venue" maxLength={200} defaultValue={venue ?? ""} />
       </div>
+      <TranslationFields
+        className="w-full"
+        values={translations}
+        note="Jména páru obvykle překládat netřeba, spíš místo."
+        fields={[
+          { name: "title", label: "Pár", maxLength: 200, original: title },
+          { name: "venue", label: "Místo", maxLength: 200, original: venue },
+        ]}
+      />
       <Button type="submit" size="lg">
         Uložit
       </Button>

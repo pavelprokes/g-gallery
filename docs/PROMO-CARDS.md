@@ -51,6 +51,11 @@ Two tables, because content and placement have different lifetimes:
   slot belongs to the gallery, not to the card: the same card sits 5th in a 60-photo gallery and
   5th in an 800-photo one, and either can move without touching the other.
 
+The card's guest-facing copy (`eyebrow`, `headline`, `body`, `ctaLabel`) can be translated in
+the card form; the translations live in `PromoCard.translations` and follow the fallback rules in
+`docs/I18N.md` §Content. `name` is admin-only and is never translated. The live preview in the
+form shows the Czech original.
+
 `@@unique([galleryId, promoCardId])` — placing the same card twice in one gallery is always a
 mistake. Two _different_ cards in one gallery stays legal, and the rendering path is already
 N-aware, though the admin is built around the common case of one.

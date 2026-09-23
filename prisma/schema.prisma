@@ -156,29 +156,33 @@ enum ZipStatus {
 /// owner of access — each gallery keeps its own ShareLink, and `listedOnEvent`
 /// only decides whether a card for it shows up here.
 model Event {
-  id          String    @id @default(cuid())
-  ownerId     String
-  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  title       String
-  eventDate   DateTime?
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title        String
+  eventDate    DateTime?
   /// Free-text place shown under the title ("Statek Benice"); cosmetic.
-  venue       String?
+  venue        String?
+  /// Guest-facing translations of `title` and `venue` (docs/I18N.md §Content):
+  /// `{ "en": { "title": "…", "venue": "…" }, "fr": { … } }`. The columns
+  /// above are the Czech original; a missing entry falls back to it.
+  translations Json      @default("{}")
   /// SHA-256 of the 128-bit event token — the only thing access resolves by.
   /// A *different secret* from any gallery's token, which is what keeps a
   /// forwarded gallery link from exposing the wedding page.
-  tokenHash   String    @unique
+  tokenHash    String    @unique
   /// The same token, AES-256-GCM encrypted so the admin can show and copy the
   /// address at any time (src/lib/token-cipher.ts). Never resolves anything;
   /// null when TOKEN_ENCRYPTION_KEY is unset or the row predates it.
-  tokenCipher String?
+  tokenCipher  String?
   /// Readable URL hint frozen at creation, never parsed for resolution.
-  slug        String
+  slug         String
   /// Set when the whole wedding is moved to trash from the admin UI
-  trashedAt   DateTime?
+  trashedAt    DateTime?
   /// Deadline for permanent deletion (trashedAt + 30 days)
-  purgeAt     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  purgeAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   galleries Gallery[]
 
@@ -194,6 +198,9 @@ model Gallery {
   description       String?
   eventDate         DateTime?
   status            GalleryStatus @default(DRAFT)
+  /// Guest-facing translations of `title` (docs/I18N.md §Content):
+  /// `{ "en": { "title": "…" }, "fr": { … } }`. `title` is the Czech original.
+  translations      Json          @default("{}")
   /// The photo the couple's family sees first. Chosen in the admin, because
   /// "whatever was uploaded last" is the sparkler exit at ISO 12800 as often as
   /// it is the portrait. SetNull, never Cascade: deleting the chosen photo must
@@ -416,24 +423,27 @@ enum PromoTheme {
 /// a second image competing with them is exactly what makes a gallery look
 /// like a website with ads in it.
 model PromoCard {
-  id        String     @id @default(cuid())
-  ownerId   String
-  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  ownerId      String
+  owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   /// Admin-only name, never shown to a viewer — how the owner tells two cards
   /// apart in the picker ("Web 2026", "Instagram").
-  name      String
+  name         String
   /// Small line above the headline ("Fotografie"), optional.
-  eyebrow   String?
-  headline  String
-  body      String?
+  eyebrow      String?
+  headline     String
+  body         String?
   /// Call-to-action label; falls back to the bare host name of `ctaUrl`.
-  ctaLabel  String?
+  ctaLabel     String?
   /// Absolute http(s) URL. Validated on write — it is rendered as a link into
   /// pages held by people who are not the owner.
-  ctaUrl    String
-  theme     PromoTheme @default(LIGHT)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  ctaUrl       String
+  theme        PromoTheme @default(LIGHT)
+  /// Guest-facing translations of `eyebrow`, `headline`, `body`, `ctaLabel`
+  /// (docs/I18N.md §Content). The columns above are the Czech original.
+  translations Json       @default("{}")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   placements GalleryPromo[]
 
