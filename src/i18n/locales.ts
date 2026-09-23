@@ -10,7 +10,13 @@
 // See docs/I18N.md.
 export const LOCALES = ["cs", "en", "fr"] as const;
 export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = "cs";
+/**
+ * English, not Czech (Pavel, 2026-09-23): the default only ever applies to a
+ * browser that states no usable preference, or one whose languages the app
+ * does not speak at all — and a guest like that is far more likely to read
+ * English than Czech. A Czech browser says so and gets Czech regardless.
+ */
+export const DEFAULT_LOCALE: Locale = "en";
 export const LOCALE_COOKIE = "NEXT_LOCALE";
 
 /**

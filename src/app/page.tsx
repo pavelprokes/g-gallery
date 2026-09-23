@@ -95,10 +95,6 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
 
-      <div className="mb-6 flex justify-end sm:mb-8">
-        <LocaleSwitcher />
-      </div>
-
       <header className="grid gap-8 sm:grid-cols-[1.2fr_1fr] sm:items-center">
         <div>
           <p className="text-brand-primary text-sm font-medium tracking-wide uppercase">
@@ -259,6 +255,7 @@ export default async function Home() {
       </section>
 
       <footer className="border-brand-border/60 border-t pt-8 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-500">
+        <LocaleSwitcher className="mb-6" />
         <p>
           {t("footerText")}{" "}
           <a

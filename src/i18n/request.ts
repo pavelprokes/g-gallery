@@ -18,8 +18,8 @@ import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, LOCALES, type Locale } from "@
  *
  * So: drop anything that is not a well-formed tag before matching, and treat a
  * throw as "use the default" rather than as a broken page. A header this app
- * does not understand is a reason to fall back to Czech, never a reason to
- * serve nothing.
+ * does not understand is a reason to fall back to the default language, never
+ * a reason to serve nothing.
  */
 export function negotiateLocale(acceptLanguage: string | null): Locale {
   if (!acceptLanguage) return DEFAULT_LOCALE;

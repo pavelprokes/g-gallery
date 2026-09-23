@@ -4,7 +4,7 @@ export const TIME_ZONE = "Europe/Prague";
 
 /**
  * `locale` is the app's bare language code ("cs" | "en" | "fr"); anything the
- * app does not speak falls back to the default rather than to the runtime's
+ * app does not speak falls back to the default language rather than to the runtime's
  * own locale, so a stray value can never make one guest's dates render
  * differently from the rest of the page.
  */

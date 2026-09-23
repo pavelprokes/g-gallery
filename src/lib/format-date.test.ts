@@ -17,7 +17,7 @@ describe("formatDate", () => {
   });
 
   it("falls back to the default language for a locale the app does not speak", () => {
-    expect(formatDate(new Date("2026-08-14T22:00:00Z"), "de")).toBe("15. 8. 2026");
+    expect(formatDate(new Date("2026-08-14T22:00:00Z"), "de")).toBe("8/15/2026");
   });
 });
 

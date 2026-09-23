@@ -27,6 +27,8 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     });
   }
 
+  // `className` is layout only (margin, alignment) — the pill itself never
+  // changes between the footers it sits in.
   return (
     <div
       role="group"

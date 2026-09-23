@@ -67,9 +67,6 @@ export async function EventHub({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
-      <div className="mb-4 flex justify-end">
-        <LocaleSwitcher />
-      </div>
       <header>
         <h1 className="text-page sm:text-display font-semibold text-balance">{event.title}</h1>
         <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1">
@@ -187,6 +184,7 @@ export async function EventHub({
       )}
 
       <footer className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mt-10 border-t pt-4">
+        <LocaleSwitcher className="mb-4" />
         <SiteFooterIdentity />
       </footer>
     </main>
