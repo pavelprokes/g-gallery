@@ -25,7 +25,13 @@ const MAX_RETRIES = 3;
 
 export type UploadCredentials =
   | { kind: "owner"; galleryId: string }
-  | { kind: "guest"; shareToken: string; anonKey: string | null };
+  | {
+      kind: "guest";
+      shareToken: string;
+      anonKey: string | null;
+      /** Sent with presign only — see `resolveGuestUpload`. */
+      displayName?: string | null;
+    };
 
 export type UploadItemState = "pending" | "uploading" | "done" | "error";
 
@@ -150,6 +156,9 @@ async function presign(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...credentialFields(credentials),
+      ...(credentials.kind === "guest" && credentials.displayName
+        ? { displayName: credentials.displayName }
+        : {}),
       files: files.map((f, i) => ({
         fileName: f.name,
         contentType: f.type || "image/jpeg",

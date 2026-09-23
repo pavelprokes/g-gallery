@@ -51,6 +51,14 @@ export function denialStatus(reason: GuestUploadDenial): number {
 export async function resolveGuestUpload(
   token: string,
   anonKey: string | null,
+  /**
+   * The name the guest volunteered, sent by presign only. It rides along with
+   * every upload rather than being set once, because the name lives in the
+   * browser while the `Viewer` row is per gallery: someone who named
+   * themselves in one gallery and then uploads to another must not land there
+   * anonymous.
+   */
+  displayName?: string | null,
 ): Promise<GuestUploadAccess> {
   const access = await resolveShareLink(token);
   if (!access.ok) return { ok: false, reason: access.reason };
@@ -71,7 +79,9 @@ export async function resolveGuestUpload(
       shareLinkId: access.shareLink.id,
       galleryId: gallery.id,
       storagePrefix: gallery.storagePrefix,
-      viewerId: anonKey ? await ensureViewerId(gallery.id, access.shareLink.id, anonKey) : null,
+      viewerId: anonKey
+        ? await ensureViewerId(gallery.id, access.shareLink.id, anonKey, displayName ?? null)
+        : null,
     },
   };
 }
@@ -88,12 +98,23 @@ async function ensureViewerId(
   galleryId: string,
   shareLinkId: string,
   anonKey: string,
+  displayName: string | null,
 ): Promise<string | null> {
   const viewer = await prisma.viewer.upsert({
     where: { galleryId_anonKey: { galleryId, anonKey } },
-    create: { galleryId, shareLinkId, anonKey },
-    update: { lastSeenAt: new Date() },
+    create: { galleryId, shareLinkId, anonKey, displayName },
+    update: { lastSeenAt: new Date(), ...(displayName ? { displayName } : {}) },
     select: { id: true, optedOut: true },
   });
-  return viewer.optedOut ? null : viewer.id;
+  if (!viewer.optedOut) return viewer.id;
+
+  // Same rule as /api/g/[token]/identify: volunteering a name does not
+  // silently reverse an opt-out, so the write is rolled back.
+  if (displayName) {
+    await prisma.viewer.update({
+      where: { galleryId_anonKey: { galleryId, anonKey } },
+      data: { displayName: null },
+    });
+  }
+  return null;
 }

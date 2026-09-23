@@ -15,7 +15,13 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   anonKey: z.string().min(1).max(64),
-  displayName: z.string().trim().min(1).max(60),
+  // Null or blank removes the name. Now that it credits a guest's uploads to
+  // everyone who opens the gallery, taking it back has to be possible.
+  displayName: z
+    .string()
+    .max(500)
+    .nullable()
+    .transform((value) => value?.trim().slice(0, 60) || null),
 });
 
 export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/identify">) {

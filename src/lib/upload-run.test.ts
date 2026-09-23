@@ -176,3 +176,45 @@ describe("runUploads — thumbnail profile", () => {
     expect(makeThumbnail.mock.calls[0]![1]).toBe("guest");
   });
 });
+
+describe("runUploads — guest name", () => {
+  it("sends the volunteered name with presign only, never with confirm", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void init;
+      const url = String(input);
+      if (url.includes("/api/uploads/presign")) {
+        return new Response(
+          JSON.stringify({
+            uploads: [
+              { photoId: "p1", objectKey: "k", url: "https://r2.example/put", headers: {} },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/api/uploads/confirm")) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      return new Response(null, { status: 200, headers: { etag: '"abc"' } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runUploads({
+      files: [new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" })],
+      credentials: { kind: "guest", shareToken: "tok", anonKey: "abc", displayName: "Petra" },
+      resumeIds: [undefined],
+      onItem: () => undefined,
+      onFatal: () => undefined,
+      onSkipped: () => undefined,
+    });
+
+    const bodyOf = (path: string) =>
+      JSON.parse(
+        String(fetchMock.mock.calls.find((call) => String(call[0]).includes(path))![1]?.body),
+      );
+    expect(bodyOf("/api/uploads/presign").displayName).toBe("Petra");
+    expect(bodyOf("/api/uploads/confirm")).not.toHaveProperty("displayName");
+
+    vi.unstubAllGlobals();
+  });
+});

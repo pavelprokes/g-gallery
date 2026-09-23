@@ -236,6 +236,47 @@ applies.
   feature free: see §7.
 - Capture straight from the camera via `<input capture>` next to the normal file picker.
 
+### Name before the picker (adopted 2026-09-23, Pavel)
+
+This reverses the original "asked once _after_ the first upload lands" rule. Asked afterwards, the
+question met a guest who had already put the phone away, and the couple got an album of nobody's
+photos. It also never kept its own promise: the copy said the name "appears with your photos", but
+only the admin ever showed it.
+
+- **Asked once per browser, before the first pick, and optional.** Tapping "Přidat fotky" or
+  "Vyfotit" opens a sheet (`src/components/name-sheet.tsx`): "Jak se jmenuješ?", one field, then
+  "Vybrat fotky" and a quieter "Pokračovat bez jména". **Both buttons are file inputs** — iOS opens
+  a picker only from a direct tap on an input that is not `display:none`, and it means naming
+  yourself or declining costs no tap beyond the one that opens the picker. Required was
+  considered and rejected: the metric this feature lives by (§1) is the share of guests who
+  upload at all.
+- **Its own flag** (`gg.viewer.uploadNameAsked`, `src/lib/viewer-id.ts`), separate from the heart
+  prompt's: skipping the name on a heart said nothing about uploads, and the shared flag is why a
+  guest who once skipped it was never asked here at all.
+- **The name travels with every presign** (`displayName`, `resolveGuestUpload`), not once through
+  `/identify`. The name lives in the browser but `Viewer` is per gallery, so a guest who named
+  themselves in one gallery used to land in the next one anonymous. `/identify` stays for
+  "Změnit", which re-credits the photos already there.
+- **Shown to everyone who can open the gallery**: the lightbox carries a camera icon and the name
+  on guest photos (`uploaderName`, `src/lib/photo-attribution.ts`). Icon and name, no verb —
+  Czech would have to guess _přidal_ / _přidala_. The photographer's photos carry no credit.
+- **One name per guest per gallery.** A name given on the heart prompt credits the guest's uploads
+  too — that prompt's hint says so since 2026-09-23 — and the photos refetch once it is saved.
+- **It can be taken back**: clearing the field under "Změnit" removes the name (`/identify`
+  accepts null) and every credit with it. This matters because the footer's "Nepočítat mě" does
+  _not_: it only forgets the `anonKey` in the browser and has never set `Viewer.optedOut` on the
+  server, so the `optedOut` checks in `ensureViewerId` and `uploaderNameOf` are defence for a
+  server-side opt-out that does not exist yet — and after opting out, the guest no longer holds
+  the key that would let them edit the name. Worth closing before this is marketed as a privacy
+  control.
+- A stored name that breaks the rules (too long, blank) is trimmed or dropped by presign, never
+  refused: an optional credit must not turn every upload into a 400.
+- The bar says who you are adding as ("Přidáváš jako Petra · Změnit", or "bez jména · Doplnit
+  jméno"), so a wrong or skipped name is fixable without hunting for a setting.
+- **Measuring it** needs no new tracking: the share of guest `Viewer`s with at least one upload
+  that carry a `displayName`, and whether the share of guests uploading at all moved after
+  2026-09-23.
+
 ## 7. Taking a photo back (moderation deferred)
 
 **Pavel, 2026-08-23: no moderation for now — a guest just needs to be able to delete their own
@@ -394,7 +435,8 @@ own 30-day trash window on top, swept by the same daily cron.
 - **Per-photo delete** (`deletePhoto`) — new, and not only for guest photos: there was no way to
   remove a single photo before, which §13.7 requires before guests can add any.
 - **Attribution**: `POST /api/g/[token]/identify` sets the volunteered name, asked once _after_ the
-  first upload lands. A viewer who opted out gets no attribution and no name.
+  first upload lands. A viewer who opted out gets no attribution and no name. _Superseded
+  2026-09-23: the name is now asked before the picker — see §6, "Name before the picker"._
 - **E2E** (`e2e/guest-upload.spec.ts`, 4 cases × 2 browsers): a real file goes picker → presign →
   PUT to MinIO → confirm → grid; a read-only link to the _same gallery_ offers no button and is
   refused server-side with `UPLOAD_NOT_ALLOWED`; HEIC comes back 415 with `reason: "heic"`.

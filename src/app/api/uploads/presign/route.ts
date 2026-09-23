@@ -48,6 +48,15 @@ const bodySchema = z.union([
     shareToken: z.string().min(1).max(128),
     /** First-party localStorage UUID; absent when the viewer opted out. */
     anonKey: z.string().min(1).max(64).nullish(),
+    /** Volunteered in the name sheet before picking (docs/GUEST-GALLERIES.md §6). */
+    // Normalised, never refused: this is an optional credit, and a stored
+    // name that fails a rule (written by an older build, say) must not turn
+    // every upload into a 400 the guest cannot understand.
+    displayName: z
+      .string()
+      .max(500)
+      .nullish()
+      .transform((value) => value?.trim().slice(0, 60) || null),
     files: filesSchema,
   }),
 ]);
@@ -109,7 +118,11 @@ export async function POST(request: Request) {
       maxFileBytes: MAX_FILE_BYTES,
     };
   } else {
-    const access = await resolveGuestUpload(parsed.data.shareToken, parsed.data.anonKey ?? null);
+    const access = await resolveGuestUpload(
+      parsed.data.shareToken,
+      parsed.data.anonKey ?? null,
+      parsed.data.displayName ?? null,
+    );
     if (!access.ok) {
       return NextResponse.json(
         { error: "upload_denied", reason: access.reason },
