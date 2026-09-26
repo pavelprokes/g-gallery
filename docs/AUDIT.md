@@ -149,7 +149,7 @@ no-op leading column of the only index on `Photo`
 all the real ordering work. Either wire both (an EXIF-date backfill for `takenAt`, a drag-reorder
 action for `sortOrder`) or drop them and the dead index column.
 
-### 3.6 No Web Worker for the upload pipeline — **[code]**
+### 3.6 No Web Worker for the upload pipeline — **[code]** — _fixed 2026-09-25, see §8 P3.5_
 
 `docs/PLAN.md:99` specifies "Client-side per file, in a Web Worker: CRC32 … + EXIF GPS strip".
 `src/components/uploader.tsx:69-77` runs `stripGpsFromFile`, `crc32HexOfBlob`, `readDimensions`
@@ -473,7 +473,17 @@ asked for the other four alongside it rather than waiting for their individual t
    detail page with a confirm step, a "Koš" section on the admin list with a restore action and a
    countdown to purge, and a daily cron (`/api/cron/purge-trash`) that calls the existing
    `deleteGalleryWithObjects()` once `purgeAt` passes — 30-day recovery window.
-5. Move the upload pipeline's CRC32/EXIF/decode work into a Web Worker (§3.6) — still open.
+5. ✅ Move the upload pipeline's CRC32/EXIF/decode work into a Web Worker (§3.6) — **done
+   2026-09-25**, reopened because guests now upload through the same pipeline from mid-range
+   phones, where the page froze per photo. `src/lib/upload-prepare.ts` (GPS strip, capture time,
+   CRC32, dimensions, placeholder colour — DOM-free) runs in `upload-prepare.worker.ts`, one worker
+   per session, created on the first file. The thumbnail stays where it was: pica already has its
+   own workers. Every failure — no `Worker`, a script that will not load, a worker that goes quiet
+   for 60 s — falls back to the main thread for the rest of the session and says so in the console
+   (`[g-gallery/upload]`); an upload never depends on it. Turbopack (Next 16.3) bundles it from
+   `new Worker(new URL(…, import.meta.url))` but emits a classic worker whatever `type` says
+   (vercel/next.js#98841) — verified working in both `next build` and `next dev`, and the E2E upload
+   test asserts the worker ran and no fallback fired.
 
 **New, added mid-session, not in the original audit:** a readable URL slug
 (`/g/{token}/{slug}`, e.g. `/g/xY82f.../svatba-anna-a-petr-2026-08-12`) built from the gallery

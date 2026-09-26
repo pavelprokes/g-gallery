@@ -62,6 +62,27 @@ test.describe("wedding page", () => {
     await context.close();
   });
 
+  test("the photographer's galleries are tiles, the guests' is the row beneath them", async ({
+    page,
+  }) => {
+    await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}`);
+
+    const main = page.getByRole("link", { name: /První výběr/ });
+    const guests = page.getByRole("link", { name: /Od hostů/ });
+    await expect(main).toBeVisible();
+    await expect(guests).toBeVisible();
+
+    // What tells them apart is the designated link accepting uploads — only
+    // the guest row says so, and it comes after the photographer's work.
+    await expect(guests).toContainText("Přidej i svoje fotky z mobilu");
+    await expect(main).not.toContainText("Přidej i svoje fotky z mobilu");
+    const [mainBox, guestBox] = await Promise.all([main.boundingBox(), guests.boundingBox()]);
+    expect(mainBox!.y + mainBox!.height).toBeLessThanOrEqual(guestBox!.y);
+    // A tile, not a row: the one main gallery spans the width and stands far
+    // taller than the guest row's 80 px thumbnail.
+    expect(mainBox!.height).toBeGreaterThan(guestBox!.height * 2);
+  });
+
   test("a card opens the gallery and offers the way back", async ({ page }) => {
     await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}`);
     await page.getByRole("link", { name: /První výběr/ }).click();

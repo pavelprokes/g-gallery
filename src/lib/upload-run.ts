@@ -1,11 +1,8 @@
 "use client";
 
-import { crc32HexOfBlob } from "@/lib/crc32";
 import { classifyContentType } from "@/lib/upload-content-types";
 import { makeThumbnail } from "@/lib/thumbnail";
-import { stripGpsFromFile } from "@/lib/exif-gps";
-import { readTakenAtFromFile } from "@/lib/exif-taken-at";
-import { averageColorOf } from "@/lib/placeholder";
+import { prepareUploadOffMainThread } from "@/lib/upload-prepare-client";
 
 /**
  * The browser half of the upload pipeline, shared by the photographer's
@@ -172,40 +169,15 @@ async function presign(
   return data.uploads;
 }
 
-/** Dimensions drive the justified gallery layout; failure is non-fatal. */
-async function readDimensions(blob: Blob): Promise<{ width: number; height: number } | null> {
-  if (typeof createImageBitmap !== "function") return null;
-  try {
-    const bitmap = await createImageBitmap(blob);
-    const size = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return size;
-  } catch {
-    return null;
-  }
-}
-
 async function uploadOne(
   file: File,
   target: PresignedUpload,
   credentials: UploadCredentials,
 ): Promise<void> {
-  // GPS is stripped before the bytes ever leave the browser, and the CRC32 is
-  // computed on the exact bytes that get stored so the ZIP writer can trust it.
-  const body = await stripGpsFromFile(file);
-  // Capture time drives the gallery timeline (oldest shot first). EXIF where
-  // the file has it; the file's own mtime otherwise — for a camera-roll pick
-  // that is the capture time too, and it beats "when the upload ran" for
-  // everything else. The server falls back to confirm time if both are junk.
-  const takenAt =
-    (await readTakenAtFromFile(file)) ??
-    (Number.isFinite(file.lastModified) && file.lastModified > 0
-      ? new Date(file.lastModified)
-      : null);
-  const crc32 = await crc32HexOfBlob(body);
-  const dimensions = await readDimensions(body);
-  // Cosmetic, so a failure here never blocks the upload.
-  const placeholder = await averageColorOf(body);
+  // GPS strip, capture time, CRC32, dimensions and placeholder colour — off
+  // the main thread where a worker can run (src/lib/upload-prepare-client.ts).
+  const { body, crc32, takenAt, width, height, placeholder } =
+    await prepareUploadOffMainThread(file);
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
   //
@@ -253,8 +225,8 @@ async function uploadOne(
           etag: put.headers.get("etag") ?? "unknown",
           crc32,
           sizeBytes: body.size,
-          width: dimensions?.width,
-          height: dimensions?.height,
+          width: width ?? undefined,
+          height: height ?? undefined,
           placeholder,
           thumb: thumbStored,
           takenAt: takenAt?.toISOString(),
