@@ -180,9 +180,24 @@ test.describe("guest uploads", () => {
   test("asks for a name before the picker, and credits the photo with it everywhere", async ({
     page,
   }, testInfo) => {
+    // The photo is prepared in the upload worker, not on the main thread
+    // (docs/AUDIT.md §3.6): a fallback would say so in the console.
+    const fallbacks: string[] = [];
+    page.on("console", (message) => {
+      if (message.text().includes("[g-gallery/upload]")) fallbacks.push(message.text());
+    });
+    // Only the bundled upload worker: pica's thumbnail workers start from
+    // blob: URLs and would make this pass whether ours ran or not.
+    let workers = 0;
+    page.on("worker", (worker) => {
+      if (worker.url().includes("/_next/static/")) workers += 1;
+    });
+
     await page.goto(namingUrl(testInfo.project.name, "first"));
     await uploadAsNewGuest(page, "prvni.jpg", "Petra");
     await expect(page.getByText("Přidáváš jako Petra")).toBeVisible();
+    expect(workers).toBeGreaterThan(0);
+    expect(fallbacks).toEqual([]);
 
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBe(1);

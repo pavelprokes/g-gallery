@@ -33,12 +33,33 @@ const schema = z.object({
 
 export type ServerEnv = z.infer<typeof schema>;
 
+/**
+ * `KEY=` in a .env file is how people leave something unset — the shipped
+ * `.env.docker.example` does exactly that for TOKEN_ENCRYPTION_KEY — but it
+ * arrives as an empty string, which fails every `min(1)` and `url()` above.
+ * For an optional key that took the whole schema down with it: every guest
+ * upload on a fresh local stack returned 500 on presign. Empty means unset.
+ */
+export function withoutEmptyValues(env: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(env).filter(([key, value]) => value !== "" || KEEP_WHEN_EMPTY.has(key)),
+  );
+}
+
+/**
+ * Keys with a schema default. Dropping an empty one would quietly substitute
+ * the default — `S3_REGION=` becoming "auto" signs every MinIO request wrong,
+ * which surfaces as a signature mismatch far from its cause. Left in, it fails
+ * validation by name, as it always did.
+ */
+const KEEP_WHEN_EMPTY = new Set(["S3_REGION"]);
+
 let cached: ServerEnv | undefined;
 
 export function serverEnv(): ServerEnv {
   if (cached) return cached;
 
-  const parsed = schema.safeParse(process.env);
+  const parsed = schema.safeParse(withoutEmptyValues(process.env));
   if (!parsed.success) {
     const missing = parsed.error.issues.map((i) => i.path.join(".")).join(", ");
     throw new Error(`Invalid or missing environment variables: ${missing}`);

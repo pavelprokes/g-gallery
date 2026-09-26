@@ -141,7 +141,9 @@ async function main() {
   // Two listed, so the page renders as a rozcestník — with a single listed
   // gallery it renders that gallery in place instead, which the solo wedding
   // below covers.
-  const guests = await makeEventGallery(user.id, wedding.id, "Od hostů", "od-hostu", true, 4);
+  // Accepts uploads, so the wedding page renders it as the compact guest row
+  // under the photographer's tiles (docs/GUEST-GALLERIES.md §2).
+  const guests = await makeEventGallery(user.id, wedding.id, "Od hostů", "od-hostu", true, 4, true);
   const listed = await makeEventGallery(user.id, wedding.id, "První výběr", "prvni-vyber", true, 3);
   const hidden = await makeEventGallery(
     user.id,
