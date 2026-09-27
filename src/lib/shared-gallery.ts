@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { Locale } from "@/i18n/locales";
 import {
+  EVENT_TRANSLATED_FIELDS,
   GALLERY_TRANSLATED_FIELDS,
   localizeField,
   localizeOptionalField,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
 import { formatDate } from "@/lib/format-date";
+import { inheritsEventVenue } from "@/lib/gallery-venue";
 
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
@@ -33,6 +35,8 @@ import { formatDate } from "@/lib/format-date";
 export interface GalleryViewData {
   title: string;
   eventDate: string | null;
+  /** The wedding's venue, when the gallery borrows it (src/lib/gallery-venue.ts). */
+  venue: string | null;
   /** Every confirmed photo, not just the first page — the header states how
    * big the gallery is before any of it has scrolled into view. */
   photoCount: number;
@@ -90,6 +94,7 @@ export async function loadGalleryViewData(
       // docs/I18N.md §Content — the title in the guest's language.
       translations: true,
       eventDate: true,
+      event: { select: { eventDate: true, venue: true, translations: true, trashedAt: true } },
       storagePrefix: true,
       // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
       zipStatus: true,
@@ -167,6 +172,15 @@ export async function loadGalleryViewData(
   return {
     title: localizeField(gallery.title, titleTranslations, "title", locale),
     eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
+    venue:
+      gallery.event && inheritsEventVenue(gallery.eventDate, gallery.event)
+        ? localizeOptionalField(
+            gallery.event.venue,
+            parseTranslations(gallery.event.translations, EVENT_TRANSLATED_FIELDS),
+            "venue",
+            locale,
+          )
+        : null,
     photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
       id: photo.id,

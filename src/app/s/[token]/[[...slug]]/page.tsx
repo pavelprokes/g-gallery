@@ -123,6 +123,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       galleryId={access.shareLink.galleryId}
       title={data.title}
       eventDate={data.eventDate}
+      venue={data.venue}
       photoCount={data.photoCount}
       archive={data.archive}
       initialPhotos={data.initialPhotos}

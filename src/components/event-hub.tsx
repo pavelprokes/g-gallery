@@ -10,6 +10,7 @@ import { splitEventCards } from "@/lib/event-cards";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
+import { PhotographerCredit } from "@/components/photographer-credit";
 
 /**
  * The wedding page's rozcestník (docs/GUEST-GALLERIES.md §2).
@@ -74,6 +75,7 @@ export async function EventHub({
             .filter(Boolean)
             .join(" · ")}
         </p>
+        <PhotographerCredit className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1" />
       </header>
 
       {event.cards.length === 0 ? (
