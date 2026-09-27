@@ -48,6 +48,23 @@ test.describe("share gallery viewer", () => {
     expect(box!.height).toBeGreaterThan(0);
   });
 
+  test("previews in a chat with a resized cover, not the original", async ({ page }) => {
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+
+    // A 12 MB original is what WhatsApp silently refused to show. The first
+    // photo in grid order stands in for a cover nobody has chosen.
+    const image = page.locator('meta[property="og:image"]');
+    await expect(image).toHaveAttribute("content", /1200.*630.*\/photo-0\.jpg/);
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "E2E Test Gallery",
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image",
+    );
+  });
+
   test("lightbox opens, navigates, and closes via history back", async ({ page }) => {
     await page.goto(`/g/${seed.token}/${seed.slug}`);
     const grid = page.getByRole("list", { name: "Fotky v galerii" });

@@ -5,7 +5,12 @@ import { resolveEvent } from "@/lib/event-access";
 import { resolveShareLink } from "@/lib/share-access";
 import { compositeToken } from "@/lib/event-token";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
-import { eventShareMetadata, galleryShareMetadata } from "@/lib/share-metadata";
+import { splitEventCards } from "@/lib/event-cards";
+import {
+  eventShareMetadata,
+  galleryShareMetadata,
+  unavailableShareMetadata,
+} from "@/lib/share-metadata";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { EventPartGone } from "@/components/share-link-dead";
@@ -42,9 +47,7 @@ export async function generateMetadata(
   const event = await resolveEvent(token, locale);
   const t = await getTranslations("gallery");
 
-  if (!event) {
-    return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
-  }
+  if (!event) return unavailableShareMetadata(t, locale);
 
   const segments = slug ?? [];
   const requestedKey = segments[1];
@@ -59,8 +62,10 @@ export async function generateMetadata(
     }
   }
 
-  const hubCover = event.cards.find((c) => c.cover)?.cover?.objectKey;
-  return eventShareMetadata(event.title, hubCover, t);
+  // The hub previews with the photographer's gallery — the one its visitors
+  // open first — and falls back to the guests' only when there is no other.
+  const previewCard = splitEventCards(event.cards).main[0] ?? event.cards[0];
+  return eventShareMetadata(event.title, previewCard?.id ?? null, t, locale);
 }
 
 export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug]]">) {

@@ -6,7 +6,7 @@ import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { ShareLinkDead } from "@/components/share-link-dead";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
-import { galleryShareMetadata } from "@/lib/share-metadata";
+import { galleryShareMetadata, unavailableShareMetadata } from "@/lib/share-metadata";
 
 // Dynamic by definition: token validity, expiry, revocation, and the password
 // unlock cookie are checked server-side on every request (docs/PLAN.md §4).
@@ -28,13 +28,13 @@ export async function generateMetadata(
   const { token } = await props.params;
   const t = await getTranslations("gallery");
 
+  const locale = await getLocale();
+
   const access = await resolveShareLink(token);
 
-  if (!access.ok) {
-    return { title: t("untitledPlaceholder"), robots: { index: false, follow: false } };
-  }
+  if (!access.ok) return unavailableShareMetadata(t, locale);
 
-  return galleryShareMetadata(access.shareLink.galleryId, t, await getLocale());
+  return galleryShareMetadata(access.shareLink.galleryId, t, locale);
 }
 
 export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {
