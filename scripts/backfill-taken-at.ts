@@ -11,11 +11,23 @@
  *
  * Safe to re-run: reads are immutable objects, writes are idempotent, and a
  * photo whose EXIF cannot be read simply keeps its upload-time baseline.
+ *
+ * Re-run 2026-09-28 when the parser stopped honouring OffsetTimeOriginal
+ * (src/lib/exif-taken-at.ts): only photos from bodies that write a zone
+ * change. Run it in the zone the uploads happen in — the parser reads
+ * wall-clock time in the local zone, exactly as the uploading browser does:
+ *
+ *   TZ=Europe/Prague pnpm backfill:taken-at
+ *
+ * Chapters (docs/CHAPTERS.md) start at a photo's timeline position, so any
+ * chapter whose starting photo moved is moved with it afterwards — and any
+ * chapter from before link anchors existed gets its anchor.
  */
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "../src/lib/exif-taken-at";
+import { chapterSlug } from "../src/lib/gallery-chapters";
 
 const CONCURRENCY = 6;
 
@@ -34,7 +46,9 @@ async function main() {
     where: { status: "CONFIRMED", mimeType: "image/jpeg" },
     select: { id: true, objectKey: true, fileName: true, takenAt: true, createdAt: true },
   });
-  console.log(`confirmed JPEG photos: ${photos.length}`);
+  console.log(
+    `confirmed JPEG photos: ${photos.length} (reading wall-clock time in ${Intl.DateTimeFormat().resolvedOptions().timeZone})`,
+  );
 
   let refined = 0;
   let unchanged = 0;
@@ -75,6 +89,53 @@ async function main() {
   console.log(
     `refined ${refined}, already correct ${unchanged}, no EXIF ${noExif}, fetch failures ${failed}`,
   );
+
+  // A chapter's start is its first photo's (takenAt, id). Follow the photo;
+  // a chapter whose photo is gone keeps its position, as it always does.
+  const chapters = await prisma.galleryChapter.findMany({
+    select: { id: true, startTakenAt: true, startPhotoId: true },
+  });
+  const starts = new Map(
+    (
+      await prisma.photo.findMany({
+        where: { id: { in: chapters.map((chapter) => chapter.startPhotoId) } },
+        select: { id: true, takenAt: true, createdAt: true },
+      })
+    ).map((photo) => [photo.id, photo.takenAt ?? photo.createdAt]),
+  );
+  let chaptersMoved = 0;
+  for (const chapter of chapters) {
+    const takenAt = starts.get(chapter.startPhotoId);
+    if (!takenAt || takenAt.getTime() === chapter.startTakenAt.getTime()) continue;
+    await prisma.galleryChapter.update({
+      where: { id: chapter.id },
+      data: { startTakenAt: takenAt },
+    });
+    chaptersMoved += 1;
+  }
+  console.log(`chapters moved with their first photo: ${chaptersMoved} of ${chapters.length}`);
+
+  // Chapters created before link anchors existed link by their id
+  // (`#cm1x9k…`). Give each its readable anchor, the same one a new chapter
+  // with that title gets. Only null slugs are touched — a slug, once set, is
+  // frozen, because links to it may already be out.
+  const unslugged = await prisma.galleryChapter.findMany({
+    where: { slug: null },
+    orderBy: [{ startTakenAt: "asc" }, { startPhotoId: "asc" }],
+    select: { id: true, galleryId: true, title: true },
+  });
+  for (const chapter of unslugged) {
+    const taken = await prisma.galleryChapter.findMany({
+      where: { galleryId: chapter.galleryId, slug: { not: null } },
+      select: { slug: true },
+    });
+    const slug = chapterSlug(
+      chapter.title,
+      taken.flatMap((row) => (row.slug ? [row.slug] : [])),
+    );
+    await prisma.galleryChapter.update({ where: { id: chapter.id }, data: { slug } });
+  }
+  console.log(`chapters given a link anchor: ${unslugged.length}`);
   await prisma.$disconnect();
   if (failed > 0) process.exitCode = 1;
 }

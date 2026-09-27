@@ -10,6 +10,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -237,11 +238,19 @@ function chapterRowHeight(containerWidth: number): number {
   return containerWidth < 640 ? 88 : 120;
 }
 
-/** Swaps the URL's hash in place — no history entry, no `hashchange`. */
+/**
+ * Swaps the URL's hash in place — no history entry, no `hashchange`.
+ *
+ * `null` state, as Next documents for the native History API: Next's patched
+ * `replaceState` then carries its own router state over and syncs the router
+ * to the new URL. Passing `history.state` through (it already holds Next's
+ * marker) skips that sync, and the next router commit — a `router.refresh()`
+ * from the locale switcher — would put the old hash back.
+ */
 function replaceHash(hash: string) {
   if (window.location.hash === hash) return;
   const { pathname, search } = window.location;
-  window.history.replaceState(window.history.state, "", `${pathname}${search}${hash}`);
+  window.history.replaceState(null, "", `${pathname}${search}${hash}`);
 }
 
 /** Height of the sticky chapter bar — also the virtualizer's scroll padding,
@@ -1676,6 +1685,12 @@ function GalleryViewInner({
     // Wait for the first layout: before it there are no rows to find a
     // header in, and fetching pages to look for one would be wasted.
     if (!jumpingTo || rows.length === 0) return;
+    // Favourites switched on mid-jump: there are no headers to land on now.
+    // Drop the jump quietly — the link in the URL is still a good one.
+    if (!showChapters) {
+      const frame = requestAnimationFrame(() => setJumpingTo(null));
+      return () => cancelAnimationFrame(frame);
+    }
     const target = chapterRows.find((c) => c.id === jumpingTo);
     if (target) {
       // Instant, never smooth: a smooth scroll would mount — and download —
@@ -1698,6 +1713,7 @@ function GalleryViewInner({
   }, [
     jumpingTo,
     rows.length,
+    showChapters,
     chapterRows,
     hasNextPage,
     isFetchingNextPage,
@@ -1706,7 +1722,7 @@ function GalleryViewInner({
   ]);
 
   /**
-   * The chapter in the URL (docs/CHAPTERS.md §Links): `…/g/{token}/{slug}#obrad`
+   * The chapter in the URL (docs/CHAPTERS.md §Links): `…/g/{token}/{slug}#ceremony`
    * opens the gallery on that chapter, and so does editing the hash by hand.
    * A hash that names no chapter — deleted, emptied, mistyped — opens the
    * start of the gallery and is taken out of the URL, so it is not passed on.
@@ -1717,40 +1733,37 @@ function GalleryViewInner({
    * changed. A `router.refresh()` (the locale switcher) hands over a new
    * array, and by then the hash is the one this page wrote while the viewer
    * scrolled; re-reading it would snap them back to their chapter's header.
-   * Hence the refs for the latest values instead of effect dependencies.
+   * Hence `useEffectEvent`: the handler sees the latest props without being
+   * an effect dependency.
    */
-  const chaptersRef = useRef(chapters);
-  const favoritesOnlyRef = useRef(favoritesOnly);
-  useEffect(() => {
-    chaptersRef.current = chapters;
-    favoritesOnlyRef.current = favoritesOnly;
-  }, [chapters, favoritesOnly]);
+  const fromHash = useEffectEvent(() => {
+    // The viewer's own shortlist has no chapters to land on: the link is
+    // ignored there (not wiped), and the reader's own chapter replaces it
+    // once the filter is off and they scroll.
+    if (favoritesOnly) return;
+    let anchor: string;
+    try {
+      anchor = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      anchor = "\u0000"; // a malformed hash (`#100%`) names no chapter either
+    }
+    if (!anchor) return;
+    const chapter = chapters.find((c) => c.anchor === anchor);
+    if (chapter) {
+      setJumpingTo(chapter.id);
+    } else {
+      replaceHash("");
+      window.scrollTo({ top: 0 });
+    }
+  });
 
   useEffect(() => {
-    const fromHash = () => {
-      // The viewer's own shortlist has no chapters to land on; the link
-      // stays as it is for when the filter is off again.
-      if (favoritesOnlyRef.current) return;
-      let anchor: string;
-      try {
-        anchor = decodeURIComponent(window.location.hash.slice(1));
-      } catch {
-        anchor = "\u0000"; // a malformed hash (`#100%`) names no chapter either
-      }
-      if (!anchor) return;
-      const chapter = chaptersRef.current.find((c) => c.anchor === anchor);
-      if (chapter) {
-        setJumpingTo(chapter.id);
-      } else {
-        replaceHash("");
-        window.scrollTo({ top: 0 });
-      }
-    };
-    const frame = requestAnimationFrame(fromHash);
-    window.addEventListener("hashchange", fromHash);
+    const onHashChange = () => fromHash();
+    const frame = requestAnimationFrame(onHashChange);
+    window.addEventListener("hashchange", onHashChange);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("hashchange", fromHash);
+      window.removeEventListener("hashchange", onHashChange);
     };
   }, []);
 

@@ -19,7 +19,7 @@ import {
   type SignedImageGrant,
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
-import type { GalleryChapter } from "@/lib/gallery-chapters";
+import { chapterAnchor, type GalleryChapter } from "@/lib/gallery-chapters";
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
 
@@ -250,7 +250,7 @@ export async function loadGalleryViewData(
           locale,
         ),
         start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
-        anchor: chapter.slug ?? chapter.id,
+        anchor: chapterAnchor(chapter),
       })),
     ),
     archive: archiveFor(
