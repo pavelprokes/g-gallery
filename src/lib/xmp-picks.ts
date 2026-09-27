@@ -7,11 +7,7 @@
 // in the upload worker, and the three values sit in fixed, well-known places
 // (`xmp:Rating`, `xmp:Label`, `dc:subject`) in every writer that matters.
 
-/** The APP1 identifier that marks a segment as XMP rather than EXIF. */
-const XMP_SIGNATURE = "http://ns.adobe.com/xap/1.0/\0";
-
-/** Scanned from the start of the file; Lightroom writes XMP right after EXIF. */
-export const XMP_SCAN_BYTES = 512 * 1024;
+import { findApp1Segment, XMP_SIGNATURE } from "@/lib/exif-gps";
 
 /**
  * Keywords that mark a photo for the highlights, compared without case or
@@ -21,8 +17,12 @@ export const XMP_SCAN_BYTES = 512 * 1024;
 const HIGHLIGHT_KEYWORDS = new Set(["highlight", "highlights", "gold", "vyber"]);
 
 export interface XmpPicks {
-  /** Lightroom stars, -1 (rejected) to 5; null when the file has none. */
-  rating: number | null;
+  /**
+   * Lightroom stars, -1 (rejected) to 5. A packet without `xmp:Rating` is 0★:
+   * Lightroom writes no rating for an unrated photo. `null` is kept for "no
+   * XMP at all" — the caller never gets a packet then (docs/HIGHLIGHTS.md).
+   */
+  rating: number;
   /** Colour label as written ("Red", "Zelená" in a Czech Lightroom); null when none. */
   label: string | null;
   /** Carries one of the highlight keywords. */
@@ -67,7 +67,7 @@ export function parseXmpPicks(packet: string): XmpPicks {
   );
 
   return {
-    rating: Number.isInteger(rating) ? Math.max(-1, Math.min(5, rating)) : null,
+    rating: Number.isInteger(rating) ? Math.max(-1, Math.min(5, rating)) : 0,
     label: label ? label.slice(0, 32) : null,
     tagged: keywords.some((keyword) => HIGHLIGHT_KEYWORDS.has(keyword)),
   };
@@ -75,51 +75,11 @@ export function parseXmpPicks(packet: string): XmpPicks {
 
 /**
  * The photographer's marks from a JPEG, or null when it carries no XMP.
- * Accepts a prefix of the file — anything that covers the XMP segment works.
+ * Accepts a prefix of the file — anything that covers the XMP segment works;
+ * the upload passes the same head it reads the capture time from.
  */
 export function readXmpPicksFromJpeg(bytes: Uint8Array): XmpPicks | null {
-  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
-
-  let offset = 2;
-  while (offset + 4 <= bytes.length) {
-    if (bytes[offset] !== 0xff) return null;
-    const marker = bytes[offset + 1]!;
-    // Start of scan: the image data follows, and no metadata comes after it.
-    if (marker === 0xda || marker === 0xd9) return null;
-    const length = (bytes[offset + 2]! << 8) | bytes[offset + 3]!;
-    if (length < 2) return null;
-
-    const start = offset + 4;
-    const end = offset + 2 + length;
-    if (marker === 0xe1 && end <= bytes.length) {
-      const segment = bytes.subarray(start, end);
-      if (startsWith(segment, XMP_SIGNATURE)) {
-        const packet = new TextDecoder().decode(segment.subarray(XMP_SIGNATURE.length));
-        return parseXmpPicks(packet);
-      }
-    }
-    offset = end;
-  }
-  return null;
-}
-
-function startsWith(bytes: Uint8Array, text: string): boolean {
-  if (bytes.length < text.length) return false;
-  for (let i = 0; i < text.length; i++) if (bytes[i] !== text.charCodeAt(i)) return false;
-  return true;
-}
-
-/**
- * Browser-side wrapper: reads only the head of the file. Null when the file
- * is not a JPEG, has no XMP, or cannot be read — marks are a hint, never a
- * reason for an upload to fail.
- */
-export async function readXmpPicksFromFile(file: File): Promise<XmpPicks | null> {
-  if (!file.type.includes("jpeg")) return null;
-  try {
-    const head = new Uint8Array(await file.slice(0, XMP_SCAN_BYTES).arrayBuffer());
-    return readXmpPicksFromJpeg(head);
-  } catch {
-    return null;
-  }
+  const segment = findApp1Segment(bytes, XMP_SIGNATURE);
+  if (!segment) return null;
+  return parseXmpPicks(new TextDecoder().decode(bytes.subarray(segment.start, segment.end)));
 }

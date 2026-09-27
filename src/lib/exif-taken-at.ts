@@ -150,18 +150,3 @@ export function readTakenAtFromJpeg(bytes: Uint8Array): Date | null {
   const ifd0Date = readAsciiTag(reader, header.ifd0Offset, IFD0_DATE_TIME_TAG);
   return ifd0Date ? parseExifDate(ifd0Date, null) : null;
 }
-
-/**
- * Browser-side wrapper: reads only the head of the file (EXIF lives there),
- * so a 40 MB original costs a 512 KiB slice, not a full read. Null when the
- * file is not a JPEG or carries no usable timestamp.
- */
-export async function readTakenAtFromFile(file: File): Promise<Date | null> {
-  if (!file.type.includes("jpeg")) return null;
-  try {
-    const head = new Uint8Array(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer());
-    return readTakenAtFromJpeg(head);
-  } catch {
-    return null;
-  }
-}

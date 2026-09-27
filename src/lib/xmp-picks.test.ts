@@ -54,11 +54,11 @@ describe("parseXmpPicks", () => {
   it("keeps a rejected photo's -1 and clamps nonsense", () => {
     expect(parseXmpPicks(`xmp:Rating="-1"`).rating).toBe(-1);
     expect(parseXmpPicks(`xmp:Rating="9"`).rating).toBe(5);
-    expect(parseXmpPicks(`xmp:Rating="x"`).rating).toBeNull();
+    expect(parseXmpPicks(`xmp:Rating="x"`).rating).toBe(0);
   });
 
-  it("is empty for a packet without marks", () => {
-    expect(parseXmpPicks("<x:xmpmeta/>")).toEqual({ rating: null, label: null, tagged: false });
+  it("reads a packet without a rating as 0★ — Lightroom writes none for an unrated photo", () => {
+    expect(parseXmpPicks("<x:xmpmeta/>")).toEqual({ rating: 0, label: null, tagged: false });
   });
 });
 

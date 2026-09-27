@@ -8,11 +8,18 @@ import type { GalleryChapter } from "@/lib/gallery-chapters";
 /**
  * A row that scrolls sideways: whether each side has more to show, and a way
  * to page it — for a mouse without a horizontal wheel, which has no other.
- * A vertical wheel over the row scrolls it sideways too, until it reaches an
- * end and the page takes over. Shared by the chapter bar and the highlights
- * (docs/HIGHLIGHTS.md). `content` re-measures when what the row holds changes.
+ * Shared by the chapter bar and the highlights (docs/HIGHLIGHTS.md).
+ * `content` re-measures when what the row holds changes.
+ *
+ * `wheelSideways`: a vertical wheel over the row scrolls it sideways until it
+ * reaches an end. Right for the chapter bar — a thin strip the pointer only
+ * crosses on purpose. Wrong for anything tall enough that the pointer rests on
+ * it while the viewer scrolls the page: it would swallow the page's scroll.
  */
-export function useSideScroll<T extends HTMLElement>(content: unknown) {
+export function useSideScroll<T extends HTMLElement>(
+  content: unknown,
+  { wheelSideways }: { wheelSideways: boolean },
+) {
   const scrollerRef = useRef<T>(null);
   const [more, setMore] = useState({ before: false, after: false });
 
@@ -43,7 +50,7 @@ export function useSideScroll<T extends HTMLElement>(content: unknown) {
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
-    scroller.addEventListener("wheel", onWheel, { passive: false });
+    if (wheelSideways) scroller.addEventListener("wheel", onWheel, { passive: false });
     // The chips too, not just the row: they change width without the row
     // doing so — most often when the brand font replaces the fallback.
     const observer = new ResizeObserver(update);
@@ -55,7 +62,7 @@ export function useSideScroll<T extends HTMLElement>(content: unknown) {
       scroller.removeEventListener("wheel", onWheel);
       observer.disconnect();
     };
-  }, [content]);
+  }, [content, wheelSideways]);
 
   const page = (direction: 1 | -1) => {
     const scroller = scrollerRef.current;
@@ -97,7 +104,9 @@ export function ChapterBar({
   height: number;
 }) {
   const t = useTranslations("gallery");
-  const { scrollerRef, more, page } = useSideScroll<HTMLDivElement>(chapters);
+  const { scrollerRef, more, page } = useSideScroll<HTMLDivElement>(chapters, {
+    wheelSideways: true,
+  });
 
   // Keep the current chip visible as the grid scrolls past chapters. Only the
   // bar's own horizontal scroll moves — never the page.

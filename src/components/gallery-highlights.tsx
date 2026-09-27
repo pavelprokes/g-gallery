@@ -38,7 +38,11 @@ export function GalleryHighlights({
 }) {
   const t = useTranslations("gallery");
   const headingId = useId();
-  const { scrollerRef, more, page } = useSideScroll<HTMLUListElement>(highlights);
+  const { scrollerRef, more, page } = useSideScroll<HTMLUListElement>(highlights, {
+    // A 160–224 px strip at the top of the page: the pointer rests on it while
+    // the viewer wheels down, and the page must scroll, not the strip.
+    wheelSideways: false,
+  });
 
   return (
     <section aria-labelledby={headingId} className="mb-4">
@@ -54,7 +58,7 @@ export function GalleryHighlights({
         {more.before && <ScrollArrow side="before" onClick={() => page(-1)} />}
         <ul
           ref={scrollerRef}
-          className="flex min-w-0 flex-1 snap-x snap-mandatory scroll-px-4 [scrollbar-width:none] gap-1 overflow-x-auto px-4 sm:scroll-px-3 sm:px-3 [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 flex-1 snap-x snap-proximity scroll-px-4 [scrollbar-width:none] gap-1 overflow-x-auto px-4 sm:scroll-px-3 sm:px-3 [&::-webkit-scrollbar]:hidden"
           style={{ maskImage: edgeMask(more), WebkitMaskImage: edgeMask(more) }}
         >
           {highlights.map((photo, i) => (

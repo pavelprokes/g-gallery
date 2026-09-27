@@ -1581,6 +1581,12 @@ function GalleryViewInner({
     };
     const observer = new ResizeObserver(sync);
     observer.observe(el);
+    // The parent too: anything above the list that changes height — text
+    // re-wrapping when the brand font loads or the locale switches, a notice
+    // mounting — resizes the parent without resizing the list, and moves
+    // `offsetTop`. The highlights' heading and hint are the tallest of these
+    // (docs/HIGHLIGHTS.md).
+    if (el.parentElement) observer.observe(el.parentElement);
     // The observer's own first callback covers the initial size, but not a
     // later offsetTop shift caused by sibling content changing height
     // without the list itself resizing (selection toggling the toolbar).
@@ -1880,7 +1886,17 @@ function GalleryViewInner({
   const [jumpingToPhoto, setJumpingToPhoto] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!jumpingToPhoto || rows.length === 0) return;
+    if (!jumpingToPhoto) return;
+    // The favourites filter hid the strip mid-jump: the viewer has moved on,
+    // and the photo may not even be in the filtered grid. Checked before the
+    // empty-grid wait below — an empty shortlist must not park the jump until
+    // the filter is turned off again.
+    if (favoritesOnly) {
+      flashOnFocus.current = false;
+      const frame = requestAnimationFrame(() => setJumpingToPhoto(null));
+      return () => cancelAnimationFrame(frame);
+    }
+    if (rows.length === 0) return;
     const index = photos.findIndex((photo) => photo.id === jumpingToPhoto);
     const rowIndex = index >= 0 ? nav.rowIndexForPhoto.get(index) : undefined;
     if (rowIndex === undefined && hasNextPage) {
@@ -1905,6 +1921,7 @@ function GalleryViewInner({
     return () => cancelAnimationFrame(frame);
   }, [
     jumpingToPhoto,
+    favoritesOnly,
     rows.length,
     photos,
     nav,

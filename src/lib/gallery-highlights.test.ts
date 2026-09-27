@@ -128,4 +128,47 @@ describe("pickHighlights", () => {
     expect(picks).toHaveLength(12);
     expect(picks.every((p) => p.pinned)).toBe(true);
   });
+
+  it("gives a densely shot ceremony its seats — two shooters never make one endless burst", () => {
+    const photos: HighlightCandidate[] = [];
+    for (let m = 0; m < 60; m += 2) photos.push(photo(m)); // getting ready, sparse
+    // 30-minute ceremony, a frame every 3 s from two interleaved cameras.
+    for (let t = 0; t < 30 * 60; t += 3) photos.push(photo(120, t));
+    for (let m = 240; m < 300; m += 2) photos.push(photo(m)); // party, sparse
+    const ceremony = pickHighlights(photos)
+      .map((p) => minutesOf(p.id))
+      .filter((m) => m >= 120 && m < 150);
+    // 600 of the day's 660 photos: the ceremony takes most of the seats.
+    expect(ceremony.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("compares a rating only with other ratings, not with photos that carry none", () => {
+    // Older uploads without marks, newer ones exported at a blanket 4★.
+    const photos = wedding().map((p, i) => ({ ...p, rating: i % 2 ? 4 : null }));
+    const withoutMarks = pickHighlights(photos.map((p) => ({ ...p, rating: null })));
+    expect(pickHighlights(photos)).toEqual(withoutMarks);
+  });
+
+  it("does not put the frame beside a pinned or excluded one into the pick", () => {
+    const photos = wedding().filter((p) => minutesOf(p.id) >= 60);
+    for (let m = 0; m < 60; m += 3) photos.push(photo(m));
+    // A 25-second, 1-fps sequence, all 5★ — two burst windows, the pin in the first.
+    const sequence = Array.from({ length: 25 }, (_, t) => photo(30, t + 1, { rating: 5 }));
+    const pinned = { ...sequence[14]!, pin: true };
+    const ids = pickHighlights([...photos, ...sequence.map((p, i) => (i === 14 ? pinned : p))]).map(
+      (p) => p.id,
+    );
+    expect(ids).toContain(pinned.id);
+    // The second window is the same moment a few seconds on: nothing from it.
+    const rest = sequence.filter((_, i) => i !== 14).map((p) => p.id);
+    expect(ids.filter((id) => rest.includes(id))).toEqual([]);
+  });
+
+  it("scores 5★ above the unrated when only the best shots are starred", () => {
+    // Lightroom writes no rating for 0★; the upload stores those as 0.
+    const photos = wedding().map((p) => ({ ...p, rating: 0 }));
+    const star = photos.find((p) => minutesOf(p.id) === 131)!;
+    star.rating = 5;
+    expect(pickHighlights(photos).map((p) => p.id)).toContain(star.id);
+  });
 });

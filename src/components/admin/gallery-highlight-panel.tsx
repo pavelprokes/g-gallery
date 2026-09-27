@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Hint } from "@/components/ui/input";
 import { FORMS, pluralize } from "@/lib/czech-plural";
-import { MIN_PHOTOS_FOR_AUTO } from "@/lib/gallery-highlights";
+import { MAX_PINNED, MIN_PHOTOS_FOR_AUTO } from "@/lib/gallery-highlights";
 
 export interface AdminHighlight {
   id: string;
@@ -30,11 +30,16 @@ export function GalleryHighlightPanel({
   enabled,
   highlights,
   excludedCount,
+  pinnedCount,
+  ownCount,
 }: {
   galleryId: string;
   enabled: boolean;
   highlights: AdminHighlight[];
   excludedCount: number;
+  pinnedCount: number;
+  /** The photographer's own photos — the pool the automatic fill draws from. */
+  ownCount: number;
 }) {
   return (
     <Card as="section">
@@ -50,10 +55,19 @@ export function GalleryHighlightPanel({
       <p className="text-admin-muted mb-3 text-sm dark:text-neutral-400">
         {!enabled
           ? "Vypnuto — hosté výběr nevidí."
-          : highlights.length === 0
-            ? `Galerie má méně než ${MIN_PHOTOS_FOR_AUTO} tvých fotek, takže se výběr nesestaví sám. Připni fotky ručně tlačítkem u fotky.`
-            : `Hosté vidí nahoře v galerii ${pluralize(highlights.length, FORMS.photoAccusative)}. Klepnutím na fotku se přenesou na její místo v galerii.`}
+          : highlights.length > 0
+            ? `Hosté vidí nahoře v galerii ${pluralize(highlights.length, FORMS.photoAccusative)}. Klepnutím na fotku se přenesou na její místo v galerii.`
+            : ownCount < MIN_PHOTOS_FOR_AUTO
+              ? `Galerie má méně než ${MIN_PHOTOS_FOR_AUTO} tvých fotek, takže se výběr nesestaví sám. Připni fotky ručně tlačítkem u fotky.`
+              : "Výběr je prázdný — návrh nemá z čeho vybírat, protože jsou vyřazené všechny kandidátky. Vrať vyřazené, nebo připni fotky ručně."}
       </p>
+
+      {pinnedCount > MAX_PINNED && (
+        <p className="text-admin-danger mb-3 text-sm">
+          Připnuto {pinnedCount} fotek — hosté uvidí jen prvních {MAX_PINNED} podle času pořízení.
+          Pozdější připnuté se neukážou, dokud některé neodepneš.
+        </p>
+      )}
 
       {highlights.length > 0 && (
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
@@ -101,8 +115,10 @@ export function GalleryHighlightPanel({
         Návrh rozloží výběr rovnoměrně přes celý den — podle kapitol, a bez nich podle pauz ve
         focení — a přednost dá fotkám, které jsi v Lightroomu odlišil od ostatních: 5★ mezi
         čtyřhvězdičkovými, jiný barevný štítek, než má většina, nebo klíčové slovo „highlight“ či
-        „výběr“. Exportuj s metadaty (Zahrnout: Všechna metadata). Fotky nahrané dřív tyhle značky
-        nemají, u nich připínej ručně. Připnutá fotka je ve výběru vždy, vyřazená nikdy.
+        „výběr“. Exportuj s metadaty (Zahrnout: Všechna metadata). GPS souřadnice galerie při
+        nahrání odstraní sama; textové údaje o místě (město, adresa), pokud je v Lightroomu
+        vyplňuješ, ale v originálech zůstanou. Fotky nahrané dřív tyhle značky nemají, u nich
+        připínej ručně. Připnutá fotka je ve výběru vždy, vyřazená nikdy.
       </Hint>
     </Card>
   );
