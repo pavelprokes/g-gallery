@@ -237,6 +237,13 @@ function chapterRowHeight(containerWidth: number): number {
   return containerWidth < 640 ? 88 : 120;
 }
 
+/** Swaps the URL's hash in place — no history entry, no `hashchange`. */
+function replaceHash(hash: string) {
+  if (window.location.hash === hash) return;
+  const { pathname, search } = window.location;
+  window.history.replaceState(window.history.state, "", `${pathname}${search}${hash}`);
+}
+
 /** Height of the sticky chapter bar — also the virtualizer's scroll padding,
  * so a jump lands a header just under the bar instead of behind it. */
 const CHAPTER_BAR_HEIGHT = 56;
@@ -1666,7 +1673,9 @@ function GalleryViewInner({
   const focusChapterRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!jumpingTo) return;
+    // Wait for the first layout: before it there are no rows to find a
+    // header in, and fetching pages to look for one would be wasted.
+    if (!jumpingTo || rows.length === 0) return;
     const target = chapterRows.find((c) => c.id === jumpingTo);
     if (target) {
       // Instant, never smooth: a smooth scroll would mount — and download —
@@ -1678,10 +1687,51 @@ function GalleryViewInner({
       return;
     }
     // Done — or the chapter emptied since the page loaded and there is nothing
-    // left to fetch. Cleared on the next frame, once the scroll has landed.
+    // left to fetch, in which case the gallery's start is the honest answer.
+    if (!target) {
+      replaceHash("");
+      window.scrollTo({ top: 0 });
+    }
+    // Cleared on the next frame, once the scroll has landed.
     const frame = requestAnimationFrame(() => setJumpingTo(null));
     return () => cancelAnimationFrame(frame);
-  }, [jumpingTo, chapterRows, hasNextPage, isFetchingNextPage, fetchNextPage, rowVirtualizer]);
+  }, [
+    jumpingTo,
+    rows.length,
+    chapterRows,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    rowVirtualizer,
+  ]);
+
+  /**
+   * The chapter in the URL (docs/CHAPTERS.md §Links): `…/g/{token}/{slug}#obrad`
+   * opens the gallery on that chapter, and so does editing the hash by hand.
+   * A hash that names no chapter — deleted, emptied, mistyped — opens the
+   * start of the gallery and is taken out of the URL, so it is not passed on.
+   * Read on the next frame — setting state from an effect body re-renders
+   * synchronously for nothing.
+   */
+  useEffect(() => {
+    const fromHash = () => {
+      const anchor = decodeURIComponent(window.location.hash.slice(1));
+      if (!anchor) return;
+      const chapter = chapters.find((c) => c.anchor === anchor);
+      if (chapter) {
+        setJumpingTo(chapter.id);
+      } else {
+        replaceHash("");
+        window.scrollTo({ top: 0 });
+      }
+    };
+    const frame = requestAnimationFrame(fromHash);
+    window.addEventListener("hashchange", fromHash);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", fromHash);
+    };
+  }, [chapters]);
 
   useEffect(() => {
     const lastVisible = virtualRows.at(-1);
@@ -1963,6 +2013,20 @@ function GalleryViewInner({
   }, []);
 
   const closeLightbox = useCallback(() => window.history.back(), []);
+
+  /**
+   * Keeps the URL on the chapter being read, so the address bar is always a
+   * link to "here" (docs/CHAPTERS.md §Links). Replaced, never pushed: scrolling
+   * must not fill the back button with chapters. Left alone at the very top —
+   * a gallery just opened keeps the URL it was opened with, which is also what
+   * lets an incoming `#obrad` survive until the jump reads it — and while the
+   * lightbox is open, since its history entry is the current one then.
+   */
+  useEffect(() => {
+    if (!showChapters || isLightboxOpen || jumpingTo || window.scrollY === 0) return;
+    const anchor = chapters.find((c) => c.id === currentChapterId)?.anchor;
+    replaceHash(anchor ? `#${anchor}` : "");
+  }, [showChapters, isLightboxOpen, jumpingTo, currentChapterId, chapters]);
 
   /**
    * "Nepočítat mě" (docs/GUEST-GALLERIES.md §6). The server is told first:

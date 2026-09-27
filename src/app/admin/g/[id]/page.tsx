@@ -93,6 +93,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           translations: true,
           startTakenAt: true,
           startPhotoId: true,
+          slug: true,
         },
       },
       shareLinks: {
@@ -153,6 +154,14 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   }));
   const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  // A chapter's link is the gallery's own share link plus its anchor — the
+  // newest one still live, so what gets copied is what a guest can open.
+  const liveLink = gallery.shareLinks.find(
+    (link) => !link.revokedAt && (!link.expiresAt || link.expiresAt > new Date()),
+  );
+  const liveToken = liveLink ? decryptToken(liveLink.tokenCipher) : null;
+  const chapterShareUrl = liveLink && liveToken ? `/g/${liveToken}/${liveLink.slug ?? ""}` : null;
+
   // Chapters are placed exactly as a guest's grid places them
   // (src/lib/gallery-grid.ts), over the photos in timeline order.
   type AdminPhoto = (typeof gallery.photos)[number];
@@ -169,6 +178,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       id: chapter.id,
       title: chapter.title,
       start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+      anchor: chapter.id,
       count: 0,
     })),
     timelineOf,
@@ -190,6 +200,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       const first = chapterPhotos[0];
       return {
         id: chapter.id,
+        anchor: chapter.slug ?? chapter.id,
         title: chapter.title,
         translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
         count: chapterPhotos.length,
@@ -376,6 +387,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <GalleryChapterPanel
         chapters={adminChapters}
+        shareUrl={chapterShareUrl}
         timelineHref="?timeline=1"
         timelineActive={timelineView}
       />

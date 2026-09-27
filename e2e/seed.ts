@@ -480,19 +480,26 @@ async function makeChaptersGallery(ownerId: string) {
   }
 
   const starts = [
-    { title: "Přípravy", at: 0 },
-    { title: "Obřad", at: 40 },
-    { title: "První tanec", at: 125 },
+    { title: "Přípravy", slug: "getting-ready", at: 0 },
+    { title: "Obřad", slug: "ceremony", at: 40 },
+    { title: "První tanec", slug: "first-dance", at: 125 },
   ];
-  for (const { title, at } of starts) {
+  for (const { title, slug, at } of starts) {
     await prisma.galleryChapter.create({
-      data: { galleryId: gallery.id, title, startTakenAt: takenAt(at), startPhotoId: ids[at]! },
+      data: {
+        galleryId: gallery.id,
+        title,
+        slug,
+        startTakenAt: takenAt(at),
+        startPhotoId: ids[at]!,
+      },
     });
   }
   await prisma.galleryChapter.create({
     data: {
       galleryId: gallery.id,
       title: "Prázdná",
+      slug: "prazdna",
       startTakenAt: takenAt(photoCount + 5),
       startPhotoId: "zzz",
     },
@@ -504,5 +511,11 @@ async function makeChaptersGallery(ownerId: string) {
     data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
   });
 
-  return { token, slug, titles: starts.map((s) => s.title), lastChapterAt: 125 };
+  return {
+    token,
+    slug,
+    titles: starts.map((s) => s.title),
+    anchors: starts.map((s) => s.slug),
+    lastChapterAt: 125,
+  };
 }

@@ -161,6 +161,7 @@ describe("groupByChapter", () => {
     id,
     title: id,
     start: { takenAt, id: photoId },
+    anchor: id,
     count: 0,
   });
   const shape = (segments: ReturnType<typeof groupByChapter<TimedPhoto>>) =>

@@ -10,7 +10,7 @@ import {
   TRANSLATED_LOCALES,
   type ContentTranslations,
 } from "@/lib/content-translations";
-import { MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/gallery-chapters";
+import { chapterSlug, MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/gallery-chapters";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3), and every write
@@ -67,6 +67,16 @@ export async function startChapter(galleryId: string, photoId: string, formData:
   // where this photo sits on the guests' timeline.
   const startTakenAt = photo.takenAt ?? photo.createdAt;
   const translations = withPresetTranslations(title.data, {}) as Prisma.InputJsonObject;
+  // Only used when this creates the chapter — an existing one keeps its
+  // frozen slug through the rename below.
+  const taken = await prisma.galleryChapter.findMany({
+    where: { galleryId: ids.data.galleryId, slug: { not: null } },
+    select: { slug: true },
+  });
+  const slug = chapterSlug(
+    title.data,
+    taken.flatMap((row) => (row.slug ? [row.slug] : [])),
+  );
 
   await prisma.galleryChapter.upsert({
     where: {
@@ -82,6 +92,7 @@ export async function startChapter(galleryId: string, photoId: string, formData:
       translations,
       startTakenAt,
       startPhotoId: photo.id,
+      slug,
     },
     update: { title: title.data, translations },
   });
