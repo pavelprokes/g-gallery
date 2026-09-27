@@ -198,6 +198,35 @@ export async function loadGalleryViewData(
 
   const titleTranslations = parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS);
 
+  // Independent of each other, so none of them waits on another's round trip.
+  const [imageGrant, chapters, highlights] = await Promise.all([
+    mintImageGrant(gallery.storagePrefix),
+    chaptersWithCounts(
+      gallery.id,
+      gallery._count.photos,
+      gallery.chapters.map((chapter) => ({
+        id: chapter.id,
+        title: localizeField(
+          chapter.title,
+          parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+          "title",
+          locale,
+        ),
+        start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+        anchor: chapterAnchor(chapter),
+      })),
+    ),
+    gallery.highlightsEnabled
+      ? loadHighlights(
+          gallery.id,
+          gallery.chapters.map((chapter) => ({
+            takenAt: chapter.startTakenAt.toISOString(),
+            id: chapter.startPhotoId,
+          })),
+        )
+      : Promise.resolve([]),
+  ]);
+
   return {
     title: localizeField(gallery.title, titleTranslations, "title", locale),
     eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
@@ -227,7 +256,7 @@ export async function loadGalleryViewData(
       hasMore && last
         ? encodeCursor({ takenAt: last.takenAt ?? last.createdAt, id: last.id })
         : null,
-    imageGrant: await mintImageGrant(gallery.storagePrefix),
+    imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
     // Filtered here as well as on write: a row can predate a validation rule,
     // and this value is rendered as an `href` into pages held by people who
@@ -248,30 +277,8 @@ export async function loadGalleryViewData(
           theme: card.theme,
         };
       }),
-    chapters: await chaptersWithCounts(
-      gallery.id,
-      gallery._count.photos,
-      gallery.chapters.map((chapter) => ({
-        id: chapter.id,
-        title: localizeField(
-          chapter.title,
-          parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
-          "title",
-          locale,
-        ),
-        start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
-        anchor: chapterAnchor(chapter),
-      })),
-    ),
-    highlights: gallery.highlightsEnabled
-      ? await loadHighlights(
-          gallery.id,
-          gallery.chapters.map((chapter) => ({
-            takenAt: chapter.startTakenAt.toISOString(),
-            id: chapter.startPhotoId,
-          })),
-        )
-      : [],
+    chapters,
+    highlights,
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,

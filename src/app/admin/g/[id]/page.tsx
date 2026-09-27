@@ -463,6 +463,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         enabled={gallery.highlightsEnabled}
         highlights={adminHighlights}
         excludedCount={gallery.photos.filter((photo) => photo.highlightPin === false).length}
+        pinnedCount={gallery.photos.filter((photo) => photo.highlightPin === true).length}
+        ownCount={gallery.photos.filter((photo) => photo.source === "OWNER").length}
       />
 
       <section>

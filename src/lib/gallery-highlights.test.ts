@@ -128,4 +128,24 @@ describe("pickHighlights", () => {
     expect(picks).toHaveLength(12);
     expect(picks.every((p) => p.pinned)).toBe(true);
   });
+
+  it("gives a densely shot ceremony its seats — two shooters never make one endless burst", () => {
+    const photos: HighlightCandidate[] = [];
+    for (let m = 0; m < 60; m += 2) photos.push(photo(m)); // getting ready, sparse
+    // 30-minute ceremony, a frame every 3 s from two interleaved cameras.
+    for (let t = 0; t < 30 * 60; t += 3) photos.push(photo(120, t));
+    for (let m = 240; m < 300; m += 2) photos.push(photo(m)); // party, sparse
+    const ceremony = pickHighlights(photos)
+      .map((p) => minutesOf(p.id))
+      .filter((m) => m >= 120 && m < 150);
+    // 600 of the day's 660 photos: the ceremony takes most of the seats.
+    expect(ceremony.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("compares a rating only with other ratings, not with photos that carry none", () => {
+    // Older uploads without marks, newer ones exported at a blanket 4★.
+    const photos = wedding().map((p, i) => ({ ...p, rating: i % 2 ? 4 : null }));
+    const withoutMarks = pickHighlights(photos.map((p) => ({ ...p, rating: null })));
+    expect(pickHighlights(photos)).toEqual(withoutMarks);
+  });
 });

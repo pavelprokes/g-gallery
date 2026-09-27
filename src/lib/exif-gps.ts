@@ -21,7 +21,16 @@ export interface ExifSegment {
   tiffEnd: number;
 }
 
-export function findExifSegment(bytes: Uint8Array): ExifSegment | null {
+/**
+ * The payload of the first APP1 segment whose payload starts with `signature`
+ * — "Exif\0\0" for EXIF, Adobe's namespace URI for XMP. Offsets are into
+ * `bytes`, with the signature already skipped. Null when there is none before
+ * the image data, or when the file is not a JPEG.
+ */
+export function findApp1Segment(
+  bytes: Uint8Array,
+  signature: string,
+): { start: number; end: number } | null {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null; // not a JPEG
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -44,21 +53,30 @@ export function findExifSegment(bytes: Uint8Array): ExifSegment | null {
     const payloadEnd = offset + 2 + length;
     if (length < 2 || payloadEnd > bytes.length) return null;
 
-    if (marker === 0xe1 && payloadEnd - payloadStart >= 8) {
-      const isExif =
-        bytes[payloadStart] === 0x45 && // E
-        bytes[payloadStart + 1] === 0x78 && // x
-        bytes[payloadStart + 2] === 0x69 && // i
-        bytes[payloadStart + 3] === 0x66 && // f
-        bytes[payloadStart + 4] === 0x00 &&
-        bytes[payloadStart + 5] === 0x00;
-      if (isExif) return { tiffStart: payloadStart + 6, tiffEnd: payloadEnd };
+    if (marker === 0xe1 && payloadEnd - payloadStart >= signature.length) {
+      let matches = true;
+      for (let i = 0; i < signature.length && matches; i++) {
+        matches = bytes[payloadStart + i] === signature.charCodeAt(i);
+      }
+      if (matches) return { start: payloadStart + signature.length, end: payloadEnd };
     }
 
     offset = payloadEnd;
   }
 
   return null;
+}
+
+const EXIF_SIGNATURE = "Exif\0\0";
+
+/** The APP1 identifier that marks a segment as XMP rather than EXIF. */
+export const XMP_SIGNATURE = "http://ns.adobe.com/xap/1.0/\0";
+
+export function findExifSegment(bytes: Uint8Array): ExifSegment | null {
+  const segment = findApp1Segment(bytes, EXIF_SIGNATURE);
+  // A TIFF header needs 8 bytes.
+  if (!segment || segment.end - segment.start < 2) return null;
+  return { tiffStart: segment.start, tiffEnd: segment.end };
 }
 
 export interface TiffHeader {
@@ -112,8 +130,9 @@ function zeroGpsData(
   bytes.fill(0, ifdStart, ifdEnd);
 }
 
-/** True if the JPEG carries a GPS IFD pointer in IFD0. */
+/** True if the JPEG carries a GPS IFD pointer in IFD0, or a location in its XMP. */
 export function hasGpsData(input: Uint8Array): boolean {
+  if (xmpGpsValueRanges(input).length > 0) return true;
   const segment = findExifSegment(input);
   if (!segment) return false;
 
@@ -136,12 +155,48 @@ export function hasGpsData(input: Uint8Array): boolean {
 
 /**
  * Remove GPS location data from a JPEG, preserving every other EXIF tag
- * (orientation, copyright, camera, timestamps).
+ * (orientation, copyright, camera, timestamps) and the rest of the XMP packet
+ * (the photographer's rating and keywords, docs/HIGHLIGHTS.md).
  *
  * Returns the input unchanged when there is nothing to strip, so callers can
  * cheaply skip re-hashing.
  */
 export function stripGpsFromJpeg(input: Uint8Array): Uint8Array {
+  const exifStripped = stripExifGps(input);
+  const ranges = xmpGpsValueRanges(exifStripped);
+  if (ranges.length === 0) return exifStripped;
+  // Copy-on-write, like the EXIF step: the input is never modified in place.
+  const output = exifStripped === input ? new Uint8Array(input) : exifStripped;
+  for (const [from, to] of ranges) output.fill(0x20, from, to);
+  return output;
+}
+
+/**
+ * Where the values of the XMP packet's `exif:GPS…` properties sit — Lightroom
+ * copies the location into XMP as well as EXIF, so stripping EXIF alone would
+ * still ship it. Blanking the values with spaces keeps every byte where it
+ * was: no segment length changes and the packet stays well-formed XML, while
+ * the coordinates are gone.
+ */
+function xmpGpsValueRanges(bytes: Uint8Array): [number, number][] {
+  const segment = findApp1Segment(bytes, XMP_SIGNATURE);
+  if (!segment) return [];
+  // latin1: one character per byte, so string indices are byte offsets.
+  const packet = new TextDecoder("latin1").decode(bytes.subarray(segment.start, segment.end));
+  const ranges: [number, number][] = [];
+  // `d`: the match reports where each group sits, so the value's bytes are
+  // located exactly rather than searched for again.
+  const property =
+    /exif:GPS\w+\s*=\s*(?:"([^"]*)"|'([^']*)')|<exif:GPS(\w+)>([^<]*)<\/exif:GPS\3>/dg;
+  for (const match of packet.matchAll(property)) {
+    const group = [1, 2, 4].find((g) => match[g] !== undefined)!;
+    const [from, to] = match.indices![group]!;
+    if (match[group]!.trim() !== "") ranges.push([segment.start + from, segment.start + to]);
+  }
+  return ranges;
+}
+
+function stripExifGps(input: Uint8Array): Uint8Array {
   const segment = findExifSegment(input);
   if (!segment) return input;
 

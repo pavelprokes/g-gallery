@@ -24,9 +24,11 @@ page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly wha
    highlight. Guests' uploads are never filled in automatically, only pinned.
    - **Parts of the day**: chapters (docs/CHAPTERS.md) when there are any, else pauses in shooting
      longer than 20 minutes. Seats are shared out in proportion to each part's size (largest
-     remainder); a part under 3 % of the day gets none. Pins already in a part use its share first.
-   - **Moments**: shots less than 4 s apart are one burst and yield one photo at most. A burst the
-     photographer already pinned or excluded a frame of yields nothing.
+     remainder), sized in photos rather than moments; a part under 3 % of the day gets none. Pins already in a part use its share first.
+   - **Moments**: shots less than 4 s apart are one burst and yield one photo at most — but a burst
+     never spans more than 15 s, or two shooters interleaving through a half-hour ceremony would
+     make the whole ceremony one "burst". A burst the photographer already pinned or excluded a
+     frame of yields nothing.
    - **Within a part**: the part is cut into equal stretches, and each stretch gives its
      best-scored moment — the one nearest its middle among equals. With no marks at all this is an
      even walk through the day.
@@ -43,6 +45,10 @@ score is relative to the gallery:
 | colour label on ≤ 25 % of the photos | +4                                         |
 | stars above the gallery's usual      | +3 per star (below the usual: −3 per star) |
 
+"Usual" is the most common rating among photos **that carry one**. A photo with no rating (uploaded
+before marks were read, or exported without them) scores nothing for stars — it is neither above
+nor below anything.
+
 Keywords are compared without case or diacritics and deliberately exclude common words (`best`,
 `top`) that would catch someone's ordinary tagging.
 
@@ -55,14 +61,26 @@ upload worker has no `DOMParser`, and the values sit in fixed places. Verified a
 written by Lightroom (attribute form) and exiftool (element form).
 
 The export must include metadata (Lightroom: _Include: All Metadata_). Photos uploaded before
-2026-09-28 have no marks; there is no backfill — for those, pin by hand.
+2026-09-28 have no marks; there is no backfill — for those, pin by hand. The head of the file is
+read once for both the capture time and the marks, through the same APP1 walker the GPS strip uses
+(`findApp1Segment` in `src/lib/exif-gps.ts`).
+
+**Location in XMP.** Lightroom copies GPS into the XMP packet as well as EXIF, and "All Metadata" is
+exactly the export that keeps it. The upload's GPS strip therefore also blanks the values of every
+`exif:GPS…` property in the XMP packet (with spaces, byte for byte, so no segment length changes
+and the XML stays well-formed) — invariant #2 would otherwise hold for EXIF only.
 
 ## Guest side
 
 `GalleryHighlights` (`src/components/gallery-highlights.tsx`), between the header and the chapter
 bar. Hidden in favourites-only mode, like chapters and promos. Horizontal strip with the chapter
-bar's side-scroll behaviour (`useSideScroll` in `src/components/chapter-nav.tsx`: fade, arrows,
-vertical wheel scrolls sideways).
+bar's side-scroll behaviour (`useSideScroll` in `src/components/chapter-nav.tsx`: fade, arrows) —
+but **not** its vertical-wheel-scrolls-sideways: the strip is 160–224 px tall at the top of the
+page, the pointer rests on it while the viewer wheels down, and it would swallow the page's scroll.
+Snap is `proximity`, not `mandatory`, for the same reason.
+
+The list's scroll margin is re-read when anything above it resizes, not only the list itself: the
+strip's heading and hint re-wrap when the brand font loads or the locale changes.
 
 **A highlight is never a photo in the grid's stream.** It is not in the `photos` array, so the
 lightbox, arrow keys, selection, favourites, print marks and the ZIP never see it (same rule as
@@ -72,7 +90,8 @@ promos and chapter headers). Tapping it does not open a lightbox; it **jumps**:
   grid, then one **instant** `scrollToIndex` (a smooth scroll would download every row it passes);
 - the tile then takes focus (it becomes the roving tab stop) and flashes a brand-coloured outline
   for two seconds, so the eye finds it among its neighbours;
-- a photo deleted since the page loaded is simply not found; nothing happens.
+- a photo deleted since the page loaded is simply not found; nothing happens;
+- turning the favourites filter on mid-jump cancels it.
 
 The strip's own images do load photos from across the day — that is its job. The chapters spec
 that asserts "nothing from the middle is requested" runs on a gallery with highlights switched off.
@@ -84,7 +103,8 @@ that asserts "nothing from the middle is requested" runs on a gallery with highl
 (`Gallery.highlightsEnabled`, **on by default** — the automatic pick is a sensible start that the
 photographer adjusts, not something to opt into per gallery). Every grid tile below has one button
 for the photo's state: pin, drop from the pick, unpin, or hand back to the pick. The pick is shown
-even while switched off, so it can be reviewed first.
+even while switched off, so it can be reviewed first. An empty pick says why (too few photos, or
+everything excluded), and more than 24 pins say which ones guests will not see.
 
 ## Not built (yet)
 

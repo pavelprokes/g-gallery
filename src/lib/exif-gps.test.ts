@@ -133,3 +133,52 @@ describe("exif-gps", () => {
     expect(bytes).toEqual(snapshot);
   });
 });
+
+describe("GPS in the XMP packet", () => {
+  // Lightroom copies the location into XMP too — both attribute and element
+  // forms occur in the wild.
+  const PACKET =
+    `<rdf:Description xmlns:exif="http://ns.adobe.com/exif/1.0/" xmp:Rating="5"` +
+    ` exif:GPSLatitude="50,5.1234N" exif:GPSLongitude='14,25.5E'>` +
+    `<exif:GPSAltitude>235/1</exif:GPSAltitude>` +
+    `<dc:subject><rdf:Bag><rdf:li>highlight</rdf:li></rdf:Bag></dc:subject></rdf:Description>`;
+
+  function jpegWithXmp(packet: string): Uint8Array {
+    const payload = new TextEncoder().encode(`http://ns.adobe.com/xap/1.0/\0${packet}`);
+    const length = payload.length + 2;
+    return new Uint8Array([
+      0xff,
+      0xd8,
+      0xff,
+      0xe1,
+      length >> 8,
+      length & 0xff,
+      ...payload,
+      0xff,
+      0xd9,
+    ]);
+  }
+
+  it("blanks the location and keeps everything else byte for byte in place", () => {
+    const bytes = jpegWithXmp(PACKET);
+    expect(hasGpsData(bytes)).toBe(true);
+
+    const out = stripGpsFromJpeg(bytes);
+    expect(out.length).toBe(bytes.length);
+    expect(hasGpsData(out)).toBe(false);
+
+    const text = new TextDecoder().decode(out);
+    expect(text).not.toMatch(/50,5\.1234N|14,25\.5E|235\/1/);
+    // The marks the highlights read survive (docs/HIGHLIGHTS.md).
+    expect(text).toContain(`xmp:Rating="5"`);
+    expect(text).toContain("<rdf:li>highlight</rdf:li>");
+    expect(text).toContain(`exif:GPSLatitude="          "`);
+    // The input is left alone.
+    expect(new TextDecoder().decode(bytes)).toContain("50,5.1234N");
+  });
+
+  it("leaves a packet without a location untouched", () => {
+    const bytes = jpegWithXmp(`<x xmp:Rating="4"/>`);
+    expect(stripGpsFromJpeg(bytes)).toBe(bytes);
+  });
+});

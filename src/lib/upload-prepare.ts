@@ -1,7 +1,7 @@
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
-import { readTakenAtFromFile } from "@/lib/exif-taken-at";
-import { readXmpPicksFromFile, type XmpPicks } from "@/lib/xmp-picks";
+import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "@/lib/exif-taken-at";
+import { readXmpPicksFromJpeg, type XmpPicks } from "@/lib/xmp-picks";
 import { averageColorOf } from "@/lib/placeholder";
 
 /**
@@ -36,8 +36,11 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
   // the file has it; the file's own mtime otherwise — for a camera-roll pick
   // that is the capture time too, and it beats "when the upload ran" for
   // everything else. The server falls back to confirm time if both are junk.
+  // EXIF and Lightroom's XMP both sit in the head of the file, so it is read
+  // once for the capture time and the photographer's marks.
+  const head = await readHead(file);
   const takenAt =
-    (await readTakenAtFromFile(file)) ??
+    (head && orNull(() => readTakenAtFromJpeg(head))) ??
     (Number.isFinite(file.lastModified) && file.lastModified > 0
       ? new Date(file.lastModified)
       : null);
@@ -45,9 +48,9 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
   const dimensions = await readDimensions(body);
   // Cosmetic, so a failure here never blocks the upload.
   const placeholder = await averageColorOf(body);
-  // Read from the original: the GPS strip rewrites only EXIF, but there is no
-  // reason to depend on that.
-  const picks = await readXmpPicksFromFile(file);
+  // Marks for the highlights (docs/HIGHLIGHTS.md) — a hint, never a reason
+  // for an upload to fail.
+  const picks = head ? orNull(() => readXmpPicksFromJpeg(head)) : null;
   return {
     body,
     crc32,
@@ -57,6 +60,25 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
     placeholder,
     picks,
   };
+}
+
+/** Metadata is a hint: a file that trips a parser still uploads. */
+function orNull<T>(read: () => T | null): T | null {
+  try {
+    return read();
+  } catch {
+    return null;
+  }
+}
+
+/** The head of a JPEG, where its metadata lives; null for anything else. */
+async function readHead(file: File): Promise<Uint8Array | null> {
+  if (!file.type.includes("jpeg")) return null;
+  try {
+    return new Uint8Array(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 /** Dimensions drive the justified gallery layout; failure is non-fatal. */

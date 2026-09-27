@@ -36,6 +36,13 @@ const PART_GAP_MS = 20 * 60_000;
 /** Shots this close together are one moment — a burst yields one photo at most. */
 const BURST_GAP_MS = 4_000;
 
+/**
+ * …but a moment never lasts longer than this. Without a cap, two shooters
+ * interleaving through a half-hour ceremony keep every gap under four seconds
+ * and the whole ceremony collapses into one "burst".
+ */
+const BURST_MAX_SPAN_MS = 15_000;
+
 /** A colour label on more than this share of photos is a habit, not a pick. */
 const HABITUAL_LABEL_SHARE = 0.25;
 
@@ -87,16 +94,29 @@ export function pickHighlights(
     return pinned.map((c) => ({ id: c.id, pinned: true }));
   }
 
-  const moments = momentsOf(own, scorer(own));
-  const parts = cutIntoParts([...moments, ...pinned].sort(compareTimeline), chapterStarts);
-  const seats = seatsPerPart(parts, count, budget);
-
-  const auto = parts.flatMap((part, i) =>
-    pickFrom(
-      part.filter((c): c is Moment => c.pin === null),
-      seats[i]!,
+  // Parts are cut over the photos themselves, so a part's share of the seats
+  // follows how much of the day it is, not how many bursts it happened to hold.
+  const pinnedIds = new Set(pinned.map((c) => c.id));
+  const parts = cutIntoParts(
+    timeline.filter((c) => c.own || pinnedIds.has(c.id)),
+    chapterStarts,
+  );
+  const score = scorer(own);
+  const moments = parts.map((part) =>
+    momentsOf(
+      part.filter((c) => c.own),
+      score,
     ),
   );
+  const seats = seatsPerPart(
+    parts.map((part) => part.length),
+    parts.map((part) => part.filter((c) => pinnedIds.has(c.id)).length),
+    moments.map((m) => m.length),
+    count,
+    budget,
+  );
+
+  const auto = moments.flatMap((m, i) => pickFrom(m, seats[i]!));
 
   return [
     ...pinned.map((c) => ({ ...c, pinned: true })),
@@ -115,16 +135,20 @@ function scorer(own: readonly HighlightCandidate[]): (c: HighlightCandidate) => 
   const ratingCounts = new Map<number, number>();
   const labelCounts = new Map<string, number>();
   for (const c of own) {
-    const rating = c.rating ?? 0;
-    ratingCounts.set(rating, (ratingCounts.get(rating) ?? 0) + 1);
+    if (c.rating !== null) ratingCounts.set(c.rating, (ratingCounts.get(c.rating) ?? 0) + 1);
     if (c.label) labelCounts.set(c.label, (labelCounts.get(c.label) ?? 0) + 1);
   }
-  const usualRating = [...ratingCounts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
+  // Only photos that carry a rating define the usual one, and only they are
+  // compared against it: a photo uploaded before marks were read, or exported
+  // without them, is neither above nor below anything.
+  const usualRating = [...ratingCounts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
   const rareLabel = (label: string | null) =>
     !!label && (labelCounts.get(label) ?? 0) / own.length <= HABITUAL_LABEL_SHARE;
 
   return (c) =>
-    (c.tagged ? 10 : 0) + (rareLabel(c.label) ? 4 : 0) + ((c.rating ?? 0) - usualRating) * 3;
+    (c.tagged ? 10 : 0) +
+    (rareLabel(c.label) ? 4 : 0) +
+    (c.rating !== null && usualRating !== undefined ? (c.rating - usualRating) * 3 : 0);
 }
 
 /**
@@ -149,7 +173,11 @@ function momentsOf(
   };
   for (const c of own) {
     const previous = burst.at(-1);
-    if (previous && msBetween(previous, c) > BURST_GAP_MS) flush();
+    if (
+      previous &&
+      (msBetween(previous, c) > BURST_GAP_MS || msBetween(burst[0]!, c) > BURST_MAX_SPAN_MS)
+    )
+      flush();
     burst.push(c);
   }
   flush();
@@ -187,16 +215,18 @@ function cutIntoParts<T extends TimelinePosition>(
 
 /**
  * Automatic seats per part. The day's `count` seats are shared out in
- * proportion to each part's size (largest remainder), so the ceremony gets
- * more than the stray frames before it; pins already sitting in a part use up
- * its share first. What is left over is then trimmed or topped up to exactly
- * `budget`, never beyond the moments a part actually has.
+ * proportion to each part's size in photos (largest remainder), so the
+ * ceremony gets more than the stray frames before it; pins already sitting in
+ * a part use up its share first. What is left over is then trimmed or topped
+ * up to exactly `budget`, never beyond the moments a part actually has.
  */
-function seatsPerPart(parts: readonly HighlightCandidate[][], count: number, budget: number) {
-  const sizes = parts.map((part) => part.length);
-  const available = parts.map((part) => part.filter((c) => c.pin === null).length);
-  const pinnedIn = parts.map((part, i) => part.length - available[i]!);
-
+function seatsPerPart(
+  sizes: readonly number[],
+  pinnedIn: readonly number[],
+  available: readonly number[],
+  count: number,
+  budget: number,
+): number[] {
   const target = shareOut(sizes, count);
   const seats = target.map((t, i) => Math.min(available[i]!, Math.max(0, t - pinnedIn[i]!)));
 

@@ -1581,6 +1581,13 @@ function GalleryViewInner({
     };
     const observer = new ResizeObserver(sync);
     observer.observe(el);
+    // Everything above the list too: its text re-wraps without the list
+    // resizing — the brand font replacing the fallback, a locale switch — and
+    // every such shift moves `offsetTop`. The highlights' heading and hint are
+    // the tallest of these (docs/HIGHLIGHTS.md).
+    for (let above = el.previousElementSibling; above; above = above.previousElementSibling) {
+      observer.observe(above);
+    }
     // The observer's own first callback covers the initial size, but not a
     // later offsetTop shift caused by sibling content changing height
     // without the list itself resizing (selection toggling the toolbar).
@@ -1881,6 +1888,13 @@ function GalleryViewInner({
 
   useEffect(() => {
     if (!jumpingToPhoto || rows.length === 0) return;
+    // The favourites filter hid the strip mid-jump: the viewer has moved on,
+    // and the photo may not even be in the filtered grid.
+    if (favoritesOnly) {
+      flashOnFocus.current = false;
+      const frame = requestAnimationFrame(() => setJumpingToPhoto(null));
+      return () => cancelAnimationFrame(frame);
+    }
     const index = photos.findIndex((photo) => photo.id === jumpingToPhoto);
     const rowIndex = index >= 0 ? nav.rowIndexForPhoto.get(index) : undefined;
     if (rowIndex === undefined && hasNextPage) {
@@ -1905,6 +1919,7 @@ function GalleryViewInner({
     return () => cancelAnimationFrame(frame);
   }, [
     jumpingToPhoto,
+    favoritesOnly,
     rows.length,
     photos,
     nav,
