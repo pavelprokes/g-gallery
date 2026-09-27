@@ -1,5 +1,4 @@
 import { GALLERY_TRANSLATED_FIELDS, parseTranslations } from "@/lib/content-translations";
-import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -7,6 +6,8 @@ import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { printTotals } from "@/lib/print-selections";
 import { printList } from "@/lib/print-export";
+import { placeholderStyle } from "@/lib/placeholder";
+import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { PrintDownloadButton } from "@/components/admin/print-download-button";
 import { Uploader } from "@/components/uploader";
 import { DeletePhotoButton } from "@/components/delete-photo-button";
@@ -119,6 +120,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   );
   const visiblePhotos = printOnly ? printMarkedPhotos : gallery.photos;
   const printItems = printMarkedPhotos.map((photo) => ({
+    id: photo.id,
     fileName: photo.fileName,
     quantity: printQuantities.get(photo.id) ?? 0,
   }));
@@ -273,14 +275,16 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
                     isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
                   }`}
-                  style={photo.placeholder ? { backgroundColor: photo.placeholder } : undefined}
+                  style={
+                    photo.placeholder
+                      ? { backgroundColor: placeholderStyle(photo.placeholder) }
+                      : undefined
+                  }
                 >
-                  <Image
-                    src={photo.thumbObjectKey ?? photo.objectKey}
+                  <AdminPhotoImage
+                    objectKey={photo.objectKey}
+                    thumbObjectKey={photo.thumbObjectKey}
                     alt={photo.fileName}
-                    fill
-                    sizes="(max-width: 640px) 50vw, 200px"
-                    className="object-cover"
                   />
                   {isCover && (
                     <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">

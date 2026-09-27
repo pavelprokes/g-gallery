@@ -20,25 +20,36 @@ afterEach(() => {
 });
 
 describe("installImageRetry", () => {
-  it("retries with a retry param on src and every srcset candidate, backing off", () => {
+  it("retries Cloudflare URLs, commas and all, on src and every srcset candidate", () => {
     vi.useFakeTimers();
-    const img = failingImage(
-      "https://cdn.test/cdn-cgi/image/width=384/a.jpg",
-      "https://cdn.test/cdn-cgi/image/width=384/a.jpg 384w, https://cdn.test/cdn-cgi/image/width=640/a.jpg 640w",
-    );
+    const cf = (w: number) =>
+      `https://cdn.test/cdn-cgi/image/width=${w},quality=82,format=auto,fit=scale-down/g/a.jpg`;
+    const img = failingImage(cf(384), `${cf(384)} 384w, ${cf(640)} 640w`);
 
     fail(img);
     vi.advanceTimersByTime(999);
     expect(img.getAttribute("src")).not.toContain("retry");
     vi.advanceTimersByTime(1);
-    expect(img.getAttribute("src")).toBe("https://cdn.test/cdn-cgi/image/width=384/a.jpg?retry=1");
-    expect(img.getAttribute("srcset")).toBe(
-      "https://cdn.test/cdn-cgi/image/width=384/a.jpg?retry=1 384w, https://cdn.test/cdn-cgi/image/width=640/a.jpg?retry=1 640w",
-    );
+    expect(img.getAttribute("src")).toBe(`${cf(384)}?retry=1`);
+    expect(img.getAttribute("srcset")).toBe(`${cf(384)}?retry=1 384w, ${cf(640)}?retry=1 640w`);
 
     fail(img);
     vi.advanceTimersByTime(2000);
-    expect(img.getAttribute("src")).toContain("retry=2");
+    expect(img.getAttribute("src")).toBe(`${cf(384)}?retry=2`);
+  });
+
+  it("gives every new picture in a reused element a full set of retries", () => {
+    vi.useFakeTimers();
+    const img = failingImage("https://cdn.test/a.jpg");
+    for (let i = 0; i < 3; i++) {
+      fail(img);
+      vi.runAllTimers();
+    }
+    // The lightbox moves on to the next photo with the same <img>.
+    img.setAttribute("src", "https://cdn.test/b.jpg");
+    fail(img);
+    vi.runAllTimers();
+    expect(img.getAttribute("src")).toBe("https://cdn.test/b.jpg?retry=1");
   });
 
   it("gives up after three retries", () => {

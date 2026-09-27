@@ -1,26 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { printFileName, printList } from "./print-export";
+import { printEntries, printList } from "./print-export";
 
-describe("printList", () => {
-  it("lists one line per photo, sorted by file name", () => {
+describe("printEntries", () => {
+  it("keeps a single copy's name and prefixes the count otherwise, sorted by name", () => {
     expect(
-      printList([
-        { fileName: "b.jpg", quantity: 5 },
-        { fileName: "a.jpg", quantity: 1 },
+      printEntries([
+        { id: "p2", fileName: "b.jpg", quantity: 5 },
+        { id: "p1", fileName: "a.jpg", quantity: 1 },
+        { id: "p3", fileName: "c.jpg", quantity: 0 },
       ]),
-    ).toBe("a.jpg — 1 ks\nb.jpg — 5 ks");
+    ).toEqual([
+      { id: "p1", name: "a.jpg", quantity: 1 },
+      { id: "p2", name: "5x_b.jpg", quantity: 5 },
+    ]);
+  });
+
+  it("tells apart photos that share a file name", () => {
+    expect(
+      printEntries([
+        { id: "p2", fileName: "IMG_0001.jpg", quantity: 1 },
+        { id: "p1", fileName: "IMG_0001.jpg", quantity: 2 },
+      ]).map((entry) => entry.name),
+    ).toEqual(["2x_IMG_0001_p1.jpg", "IMG_0001_p2.jpg"]);
+  });
+
+  it("reduces a guest-chosen name to a basename and never drops a photo", () => {
+    expect(
+      printEntries([
+        { id: "p1", fileName: "../../x\r\n.jpg", quantity: 1 },
+        { id: "p2", fileName: "dir/..", quantity: 1 },
+      ]).map((entry) => entry.name),
+    ).toEqual(["foto_p2.jpg", "x.jpg"]);
   });
 });
 
-describe("printFileName", () => {
-  it("keeps a single copy's name and prefixes the count otherwise", () => {
-    expect(printFileName({ fileName: "a.jpg", quantity: 1 })).toBe("a.jpg");
-    expect(printFileName({ fileName: "a.jpg", quantity: 5 })).toBe("5x_a.jpg");
-  });
-
-  it("reduces a guest-chosen name to a basename without control characters", () => {
-    expect(printFileName({ fileName: "../../x\r\n.jpg", quantity: 1 })).toBe("x.jpg");
-    expect(printFileName({ fileName: "dir/..", quantity: 1 })).toBeNull();
-    expect(printFileName({ fileName: "a.jpg", quantity: 0 })).toBeNull();
+describe("printList", () => {
+  it("uses the same names as the downloaded files", () => {
+    expect(printList([{ id: "p1", fileName: "b.jpg", quantity: 5 }])).toBe("5x_b.jpg — 5 ks");
   });
 });

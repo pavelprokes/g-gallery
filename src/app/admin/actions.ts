@@ -15,7 +15,7 @@ import { readTranslationsFromForm } from "@/lib/content-translations";
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
 import { deleteObject, presignDownload } from "@/lib/r2";
 import { printTotals } from "@/lib/print-selections";
-import { printFileName } from "@/lib/print-export";
+import { printEntries } from "@/lib/print-export";
 import { encryptToken } from "@/lib/token-cipher";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
@@ -785,17 +785,22 @@ export async function printDownloadLinks(galleryId: string) {
   const quantities = await printTotals(gallery.id);
   const photos = await prisma.photo.findMany({
     where: { id: { in: [...quantities.keys()] }, galleryId: gallery.id, status: "CONFIRMED" },
-    orderBy: { fileName: "asc" },
     select: { id: true, objectKey: true, fileName: true },
   });
+  const objectKeys = new Map(photos.map((photo) => [photo.id, photo.objectKey]));
 
-  const links: { name: string; url: string }[] = [];
-  for (const photo of photos) {
-    const name = printFileName({
+  // Same names, same order as the list the admin copies (printList).
+  const entries = printEntries(
+    photos.map((photo) => ({
+      id: photo.id,
       fileName: photo.fileName,
       quantity: quantities.get(photo.id) ?? 0,
-    });
-    if (name) links.push({ name, url: await presignDownload(photo.objectKey, name) });
-  }
-  return links;
+    })),
+  );
+  return Promise.all(
+    entries.map(async (entry) => ({
+      name: entry.name,
+      url: await presignDownload(objectKeys.get(entry.id)!, entry.name),
+    })),
+  );
 }

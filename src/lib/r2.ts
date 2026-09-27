@@ -60,6 +60,14 @@ export async function presignPut(key: string, contentType: string): Promise<stri
   return signed.url;
 }
 
+/** RFC 5987 value: encodeURIComponent leaves ' ( ) * as they are, which attr-char does not allow. */
+function rfc5987(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
 /**
  * Presign a GET that the browser saves as `fileName` instead of displaying —
  * the photographer's print download, straight from R2 (never through Vercel).
@@ -71,7 +79,7 @@ export async function presignDownload(key: string, fileName: string): Promise<st
   const ascii = fileName.replace(/[^\x20-\x7e]|["\\]/g, "_");
   url.searchParams.set(
     "response-content-disposition",
-    `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    `attachment; filename="${ascii}"; filename*=UTF-8''${rfc5987(fileName)}`,
   );
   const signed = await r2Client().sign(new Request(url, { method: "GET" }), {
     aws: { signQuery: true },
