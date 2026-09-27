@@ -54,13 +54,24 @@ export function ChapterBar({
       const canMove = event.deltaY > 0 ? scroller.scrollLeft < max - 1 : scroller.scrollLeft > 1;
       if (!canMove) return; // at the end: let the page scroll
       event.preventDefault();
-      scroller.scrollLeft += event.deltaY;
+      // A wheel can report lines (Firefox) or pages instead of pixels.
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? scroller.clientWidth
+            : 1;
+      scroller.scrollLeft += event.deltaY * unit;
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
     scroller.addEventListener("wheel", onWheel, { passive: false });
+    // The chips too, not just the row: they change width without the row
+    // doing so — most often when the brand font replaces the fallback.
     const observer = new ResizeObserver(update);
     observer.observe(scroller);
+    for (const chip of scroller.children) observer.observe(chip);
+    void document.fonts?.ready.then(update);
     return () => {
       scroller.removeEventListener("scroll", update);
       scroller.removeEventListener("wheel", onWheel);
@@ -97,7 +108,7 @@ export function ChapterBar({
       {more.before && <ScrollArrow side="before" onClick={() => page(-1)} />}
       <div
         ref={scrollerRef}
-        className="relative flex h-full min-w-0 flex-1 snap-x scroll-px-4 [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 sm:scroll-px-3 sm:px-3 [&::-webkit-scrollbar]:hidden"
+        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 sm:px-3 [&::-webkit-scrollbar]:hidden"
         style={{ maskImage: edgeMask(more), WebkitMaskImage: edgeMask(more) }}
       >
         {chapters.map((chapter) => {
@@ -114,11 +125,25 @@ export function ChapterBar({
               aria-busy={busy || undefined}
               onClick={(event) => {
                 // Let a modified click (new tab, copy) do what the browser does.
-                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey ||
+                  event.button !== 0
+                )
+                  return;
                 event.preventDefault();
                 onJump(chapter.id);
               }}
-              className={`text-body flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-full border px-4 whitespace-nowrap transition-colors ${
+              // It was a button, and a chip still reads as one: Space jumps
+              // too, instead of scrolling the page.
+              onKeyDown={(event) => {
+                if (event.key !== " ") return;
+                event.preventDefault();
+                onJump(chapter.id);
+              }}
+              className={`text-body flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 whitespace-nowrap transition-colors ${
                 current
                   ? "border-brand-ink bg-brand-ink dark:border-brand-tint dark:bg-brand-tint dark:text-brand-ink text-white"
                   : "border-brand-border hover:bg-brand-tint dark:hover:bg-brand-ink/40 dark:border-neutral-700"

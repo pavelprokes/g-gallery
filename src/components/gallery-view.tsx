@@ -1712,12 +1712,33 @@ function GalleryViewInner({
    * start of the gallery and is taken out of the URL, so it is not passed on.
    * Read on the next frame — setting state from an effect body re-renders
    * synchronously for nothing.
+   *
+   * Read once on arrival and on `hashchange` only — never because `chapters`
+   * changed. A `router.refresh()` (the locale switcher) hands over a new
+   * array, and by then the hash is the one this page wrote while the viewer
+   * scrolled; re-reading it would snap them back to their chapter's header.
+   * Hence the refs for the latest values instead of effect dependencies.
    */
+  const chaptersRef = useRef(chapters);
+  const favoritesOnlyRef = useRef(favoritesOnly);
+  useEffect(() => {
+    chaptersRef.current = chapters;
+    favoritesOnlyRef.current = favoritesOnly;
+  }, [chapters, favoritesOnly]);
+
   useEffect(() => {
     const fromHash = () => {
-      const anchor = decodeURIComponent(window.location.hash.slice(1));
+      // The viewer's own shortlist has no chapters to land on; the link
+      // stays as it is for when the filter is off again.
+      if (favoritesOnlyRef.current) return;
+      let anchor: string;
+      try {
+        anchor = decodeURIComponent(window.location.hash.slice(1));
+      } catch {
+        anchor = "\u0000"; // a malformed hash (`#100%`) names no chapter either
+      }
       if (!anchor) return;
-      const chapter = chapters.find((c) => c.anchor === anchor);
+      const chapter = chaptersRef.current.find((c) => c.anchor === anchor);
       if (chapter) {
         setJumpingTo(chapter.id);
       } else {
@@ -1731,7 +1752,7 @@ function GalleryViewInner({
       cancelAnimationFrame(frame);
       window.removeEventListener("hashchange", fromHash);
     };
-  }, [chapters]);
+  }, []);
 
   useEffect(() => {
     const lastVisible = virtualRows.at(-1);

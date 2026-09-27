@@ -154,13 +154,22 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   }));
   const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // A chapter's link is the gallery's own share link plus its anchor — the
-  // newest one still live, so what gets copied is what a guest can open.
-  const liveLink = gallery.shareLinks.find(
-    (link) => !link.revokedAt && (!link.expiresAt || link.expiresAt > new Date()),
-  );
-  const liveToken = liveLink ? decryptToken(liveLink.tokenCipher) : null;
-  const chapterShareUrl = liveLink && liveToken ? `/g/${liveToken}/${liveLink.slug ?? ""}` : null;
+  // Each link's copyable URL, decrypted once for both the share-link panel
+  // and the chapters' "copy link" buttons.
+  const shareLinks = gallery.shareLinks.map((link) => {
+    const token = decryptToken(link.tokenCipher);
+    return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+  });
+  // A chapter's link is a share link plus its anchor: the newest one a guest
+  // can actually open — live, copyable, and on a published gallery (a draft
+  // resolves to not-found for everyone).
+  const now = new Date();
+  const chapterShareUrl =
+    gallery.status === "PUBLISHED"
+      ? (shareLinks.find(
+          (link) => link.url && !link.revokedAt && (!link.expiresAt || link.expiresAt > now),
+        )?.url ?? null)
+      : null;
 
   // Chapters are placed exactly as a guest's grid places them
   // (src/lib/gallery-grid.ts), over the photos in timeline order.
@@ -363,10 +372,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <ShareLinkPanel
         galleryId={gallery.id}
-        shareLinks={gallery.shareLinks.map((link) => {
-          const token = decryptToken(link.tokenCipher);
-          return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
-        })}
+        shareLinks={shareLinks}
         published={gallery.status === "PUBLISHED"}
         hostedByEvent={gallery.eventId !== null}
       />

@@ -67,35 +67,41 @@ export async function startChapter(galleryId: string, photoId: string, formData:
   // where this photo sits on the guests' timeline.
   const startTakenAt = photo.takenAt ?? photo.createdAt;
   const translations = withPresetTranslations(title.data, {}) as Prisma.InputJsonObject;
-  // Only used when this creates the chapter — an existing one keeps its
-  // frozen slug through the rename below.
-  const taken = await prisma.galleryChapter.findMany({
-    where: { galleryId: ids.data.galleryId, slug: { not: null } },
-    select: { slug: true },
-  });
-  const slug = chapterSlug(
-    title.data,
-    taken.flatMap((row) => (row.slug ? [row.slug] : [])),
-  );
+  const at = { galleryId: ids.data.galleryId, startTakenAt, startPhotoId: photo.id };
 
-  await prisma.galleryChapter.upsert({
-    where: {
-      galleryId_startTakenAt_startPhotoId: {
-        galleryId: ids.data.galleryId,
-        startTakenAt,
-        startPhotoId: photo.id,
-      },
-    },
-    create: {
-      galleryId: ids.data.galleryId,
-      title: title.data,
-      translations,
-      startTakenAt,
-      startPhotoId: photo.id,
-      slug,
-    },
-    update: { title: title.data, translations },
+  // A chapter already starting here is renamed; its slug stays frozen.
+  const renamed = await prisma.galleryChapter.updateMany({
+    where: at,
+    data: { title: title.data, translations },
   });
+
+  // Otherwise a new one, with the next free anchor. Two creates racing for the
+  // same title both see it free and one loses on the unique index — it simply
+  // looks again and takes `-2`. Racing for the same *photo* is a double
+  // submit: the retry finds the winner's row and renames it instead.
+  for (let attempt = 0; renamed.count === 0 && attempt < 3; attempt += 1) {
+    const taken = await prisma.galleryChapter.findMany({
+      where: { galleryId: ids.data.galleryId, slug: { not: null } },
+      select: { slug: true },
+    });
+    const slug = chapterSlug(
+      title.data,
+      taken.flatMap((row) => (row.slug ? [row.slug] : [])),
+    );
+    try {
+      await prisma.galleryChapter.create({
+        data: { ...at, title: title.data, translations, slug },
+      });
+      break;
+    } catch (error) {
+      if ((error as { code?: string }).code !== "P2002" || attempt === 2) throw error;
+      const raced = await prisma.galleryChapter.updateMany({
+        where: at,
+        data: { title: title.data, translations },
+      });
+      if (raced.count > 0) break;
+    }
+  }
 
   revalidatePath(`/admin/g/${ids.data.galleryId}`);
 }

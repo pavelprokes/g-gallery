@@ -97,6 +97,7 @@ test.describe("gallery chapters", () => {
   for (const [what, hash] of [
     ["an unknown chapter", "#neexistuje"],
     ["a chapter left with no photos", "#prazdna"],
+    ["a malformed anchor", "#100%"],
   ] as const) {
     test(`a link to ${what} opens the start of the gallery`, async ({ page }) => {
       await page.goto(`/g/${token}/${slug}${hash}`);

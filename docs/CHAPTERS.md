@@ -113,9 +113,11 @@ can end up underneath a button (an overlaid arrow was tried first and hid the ch
 fade is a CSS mask, which is visual only and takes no clicks. An arrow pages the row by 80 % of its
 width; a vertical mouse wheel over the bar scrolls it sideways until it reaches an end, then lets
 the page scroll. The arrows are `aria-hidden` and out of the tab order: keyboard and screen-reader
-users Tab through the chips, and a focused chip scrolls itself into view. `scroll-padding` matches
-the row's padding — without it `snap-start` pulls the first chip flush to the edge and the row
-opens already scrolled, with a "back" arrow showing.
+users Tab through the chips, and a focused chip scrolls itself into view. No scroll snapping: it
+fought the wheel (a notch shorter than half a chip snapped straight back) and pulled the first chip
+flush to the edge, so the row opened already scrolled. The overflow state is re-measured when the
+chips themselves change width, not only the row — the brand font arriving after first paint is
+what makes a row start to overflow.
 
 ## Links
 
@@ -128,9 +130,15 @@ never reaches the server, so this adds nothing to what the token already exposes
   any guest reads: a preset takes its English name (`ceremony`, `first-dance`), a custom title —
   which has no English yet when it is created — is transliterated to plain ASCII
   (`rozbijeni-talire`). A duplicate gets `-2`. Rows from before the column existed link by id.
+  Deleting a chapter frees its anchor, on purpose: a re-created "Obřad" takes `ceremony` back, and
+  the ceremony links already sent open the ceremony again.
 - **Opening a link** with a known anchor jumps to that chapter exactly as a chip does. An anchor that
   names no chapter — deleted, emptied, mistyped — opens the **start of the gallery** and the hash is
-  taken out of the URL, so a dead link is not passed on. Editing the hash by hand works the same.
+  taken out of the URL, so a dead link is not passed on — a malformed one (`#100%`) included.
+  Editing the hash by hand works the same. The hash is read on arrival and on `hashchange` only,
+  never because the chapter list re-rendered: after a `router.refresh()` (the locale switcher) the
+  hash is the one this page wrote while the viewer scrolled, and re-reading it would snap them back
+  to their chapter's header. In favourites-only mode a link is left untouched for later.
 - **The URL follows the reader.** As the chapter under the bar changes, the hash is _replaced_
   (never pushed — scrolling must not fill the back button with chapters). It is left alone at the
   very top of the page, so a gallery just opened keeps the URL it was opened with (which is also
