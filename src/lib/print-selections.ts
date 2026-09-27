@@ -52,3 +52,32 @@ export async function printTotals(galleryId: string): Promise<Map<string, number
   });
   return new Map(grouped.map((row) => [row.photoId, row._sum.quantity ?? 0]));
 }
+
+/**
+ * Who marked what, one row per viewer — the admin's answer to "the bride says
+ * fifty, the total says twenty-eight": a hub link is marked by several
+ * guests, and one person on two devices is two viewers.
+ */
+export async function printTotalsByViewer(
+  galleryId: string,
+): Promise<{ viewerId: string; displayName: string | null; photos: number; pieces: number }[]> {
+  const grouped = await prisma.printSelection.groupBy({
+    by: ["viewerId"],
+    where: { photo: { galleryId, status: "CONFIRMED" } },
+    _count: { _all: true },
+    _sum: { quantity: true },
+  });
+  const viewers = await prisma.viewer.findMany({
+    where: { id: { in: grouped.map((row) => row.viewerId) } },
+    select: { id: true, displayName: true },
+  });
+  const names = new Map(viewers.map((viewer) => [viewer.id, viewer.displayName]));
+  return grouped
+    .map((row) => ({
+      viewerId: row.viewerId,
+      displayName: names.get(row.viewerId) ?? null,
+      photos: row._count._all,
+      pieces: row._sum.quantity ?? 0,
+    }))
+    .sort((a, b) => b.pieces - a.pieces);
+}
