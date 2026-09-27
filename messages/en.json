@@ -18,11 +18,12 @@
     "description": "Wedding photos in one link — from the photographer and from guests."
   },
   "marketing": {
-    "pageTitle": "Wedding photo gallery with a QR code for guests",
+    "pageTitle": "Wedding gallery help",
     "pageDescription": "One gallery for all your wedding photos — the finished set from your photographer, or a shared gallery guests add their own photos to via QR code. No app, no account.",
     "kicker": "Wedding photo gallery",
     "heroTitle": "All your wedding photos, one link — from the photographer and from your guests",
     "heroLead": "This gallery was sent to you by your photographer, or forwarded by the couple — either side can share the link or QR code onward. Here's how to get into it, what you can do once you're in, and what to do if you get stuck.",
+    "forYourWedding": "Planning your own wedding? See how the guest gallery works →",
     "backToMainSite": "← Back to svatebni-fotograf-cechy.cz",
     "heroImageAlt": "A grid of wedding photos in the gallery, shown on an iPhone",
     "twoWaysHeading": "Two ways you might get a gallery",

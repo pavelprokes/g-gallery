@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
+import type { Locale } from "@/i18n/locales";
 import { previewMetadata } from "@/lib/og-image";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
@@ -46,6 +47,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
+/**
+ * The main site's sales page for the guest gallery — this page stays the guests' help
+ * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so fr gets en.
+ */
+function guestGalleryPageUrl(locale: Locale): string {
+  const url = new URL(
+    locale === "cs" ? "/galerie-pro-hosty" : "/en/galerie-pro-hosty",
+    MAIN_SITE_URL,
+  );
+  url.search = "utm_source=galerie&utm_medium=napoveda";
+  return url.href;
+}
+
 const HIGHLIGHT_ICONS = {
   download: DownloadIcon,
   projector: ProjectorIcon,
@@ -62,6 +76,7 @@ interface StepEntry {
 }
 
 export default async function Home() {
+  const locale = await getLocale();
   const t = await getTranslations("marketing");
   const faq = t.raw("faq") as FaqEntry[];
   const guestTips = t.raw("guestTips") as string[];
@@ -96,8 +111,14 @@ export default async function Home() {
           </h1>
           <p className="mt-4 max-w-prose text-neutral-600 dark:text-neutral-400">{t("heroLead")}</p>
           <a
+            href={guestGalleryPageUrl(locale)}
+            className="text-brand-primary hover:text-brand-primary-dark mt-6 block w-fit text-sm font-medium underline underline-offset-4"
+          >
+            {t("forYourWedding")}
+          </a>
+          <a
             href={MAIN_SITE_URL}
-            className="text-brand-primary hover:text-brand-primary-dark mt-6 inline-block text-sm font-medium underline underline-offset-4"
+            className="text-brand-primary hover:text-brand-primary-dark mt-3 inline-block text-sm font-medium underline underline-offset-4"
           >
             {t("backToMainSite")}
           </a>
