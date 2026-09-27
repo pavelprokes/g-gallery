@@ -130,6 +130,8 @@
     "galleryOgDescription": "Les photos du mariage en un seul lien. Ouvrez, regardez, téléchargez.",
     "photographerCredit": "Photographe : <link>Pavel Prokeš</link>",
     "photoCount": "{count, plural, one {# photo} other {# photos}}",
+    "chaptersNavLabel": "Chapitres",
+    "chapterEyebrow": "Chapitre {number}",
     "emptyEvent": "Rien ici pour l'instant. Dès que le photographe ajoutera quelque chose, ça apparaîtra à cette adresse.",
     "emptyCard": "Vide pour l'instant",
     "guestCardHint": "Ajoutez aussi vos photos de téléphone",

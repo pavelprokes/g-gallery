@@ -53,11 +53,14 @@ import {
   buildGridEntries,
   buildGridNavigation,
   gridEntryKey,
+  groupByChapter,
   photoInAdjacentRow,
   type GridEntry,
 } from "@/lib/gallery-grid";
 import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
+import type { GalleryChapter } from "@/lib/gallery-chapters";
 import { PromoTile } from "@/components/promo-tile";
+import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
 import {
   clampPan,
   clampScale,
@@ -149,6 +152,9 @@ export interface GalleryPhoto {
   favoriteCount: number;
   /** A guest photo's volunteered credit; null for the photographer's own. */
   uploaderName: string | null;
+  /** Capture time, ISO — the timeline position chapters start at
+   * (docs/CHAPTERS.md). */
+  takenAt: string;
 }
 
 export interface GalleryViewer {
@@ -216,12 +222,24 @@ function aspectOf(photo: GalleryPhoto): number {
   return photo.width / photo.height;
 }
 
-/** A promo tile packs as a landscape frame; a photo packs as itself. */
+/** A promo tile packs as a landscape frame; a photo packs as itself. Chapter
+ * headers never reach the justified layout — they are rows of their own. */
 function entryAspect(entry: GridEntry<GalleryPhoto>): number {
-  return entry.kind === "promo" ? PROMO_ASPECT : aspectOf(entry.photo);
+  return entry.kind === "photo" ? aspectOf(entry.photo) : PROMO_ASPECT;
 }
 
 const photoIdOf = (photo: GalleryPhoto) => photo.id;
+const timelineOf = (photo: GalleryPhoto) => ({ takenAt: photo.takenAt, id: photo.id });
+
+/** A chapter header's row height (docs/CHAPTERS.md): room above the title so a
+ * new chapter reads as a break in the day, not as a caption on the row above. */
+function chapterRowHeight(containerWidth: number): number {
+  return containerWidth < 640 ? 88 : 120;
+}
+
+/** Height of the sticky chapter bar — also the virtualizer's scroll padding,
+ * so a jump lands a header just under the bar instead of behind it. */
+const CHAPTER_BAR_HEIGHT = 56;
 
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
@@ -814,6 +832,8 @@ interface GalleryViewProps {
    * against the whole gallery, so a card at slot 5 is the 5th tile from the
    * first paint and does not jump when the next page arrives. */
   promos: GalleryPromo[];
+  /** Named stretches of the timeline, empty ones dropped (docs/CHAPTERS.md). */
+  chapters: GalleryChapter[];
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -844,6 +864,7 @@ function GalleryViewInner({
   imageGrant,
   viewers,
   promos,
+  chapters,
   allowDownload,
   allowReactions,
   allowUpload,
@@ -1077,6 +1098,14 @@ function GalleryViewInner({
     () => (favoritesOnly ? allPhotos.filter((photo) => favorites.has(photo.id)) : allPhotos),
     [allPhotos, favoritesOnly, favorites],
   );
+
+  /**
+   * Chapters (docs/CHAPTERS.md) cut the stream into runs, each justified on
+   * its own under a full-width header row, so a chapter always starts on a
+   * fresh row. Favourites-only mode is the viewer's own shortlist and has no
+   * chapters, for the same reason it has no promo.
+   */
+  const showChapters = !favoritesOnly && chapters.length > 0;
 
   useEffect(() => {
     if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
@@ -1515,7 +1544,9 @@ function GalleryViewInner({
     // without the list itself resizing (selection toggling the toolbar).
     sync();
     return () => observer.disconnect();
-  }, [selectionActive]);
+    // `showChapters`: the chapter bar above the list comes and goes with the
+    // favourites filter, moving the list's top without resizing it.
+  }, [selectionActive, showChapters]);
 
   /**
    * The tiles the grid lays out: every photo, plus the owner's promo cards at
@@ -1533,20 +1564,50 @@ function GalleryViewInner({
 
   const rows = useMemo<JustifiedRow<GridEntry<GalleryPhoto>>[]>(() => {
     if (containerWidth <= 0) return [];
-    return justifyRows(
-      entries.map((entry) => ({ item: entry, aspect: entryAspect(entry) })),
-      containerWidth,
-      targetRowHeight(containerWidth),
-      GAP,
-      itemsPerRow(containerWidth),
-    );
-  }, [entries, containerWidth]);
+    const segments = showChapters
+      ? groupByChapter(entries, chapters, timelineOf)
+      : [{ chapter: null, entries }];
+    return segments.flatMap((segment) => {
+      const justified = justifyRows(
+        segment.entries.map((entry) => ({ item: entry, aspect: entryAspect(entry) })),
+        containerWidth,
+        targetRowHeight(containerWidth),
+        GAP,
+        itemsPerRow(containerWidth),
+      );
+      if (!segment.chapter) return justified;
+      const height = chapterRowHeight(containerWidth);
+      const header: JustifiedRow<GridEntry<GalleryPhoto>> = {
+        items: [
+          { item: { kind: "chapter", chapter: segment.chapter }, width: containerWidth, height },
+        ],
+        height,
+        partial: false,
+      };
+      return [header, ...justified];
+    });
+  }, [entries, containerWidth, showChapters, chapters]);
+
+  /** Row index of each chapter header now in the grid, in timeline order. */
+  const chapterRows = useMemo(
+    () =>
+      rows.flatMap((row, rowIndex) => {
+        const first = row.items[0]?.item;
+        return first?.kind === "chapter" ? [{ id: first.chapter.id, rowIndex }] : [];
+      }),
+    [rows],
+  );
+
+  /** The first row of photos gets the eager, high-priority load — row 0 when
+   * the gallery opens on a chapter header is that header. */
+  const firstPhotoRow = chapterRows[0]?.rowIndex === 0 ? 1 : 0;
 
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length + (hasNextPage ? 1 : 0),
     estimateSize: (index) => rows[index]?.height ?? targetRowHeight(containerWidth),
     overscan: 4,
     scrollMargin,
+    scrollPaddingStart: showChapters ? CHAPTER_BAR_HEIGHT : 0,
     gap: GAP,
   });
 
@@ -1575,6 +1636,52 @@ function GalleryViewInner({
   }, [containerWidth, rows, rowVirtualizer]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  /**
+   * The chapter being read: the last header at or above the row under the
+   * bar. Recomputed on every scroll render, which the virtualizer already
+   * causes — a handful of chapters, no observer of its own.
+   */
+  const rowUnderBar = rowVirtualizer.getVirtualItemForOffset(
+    (rowVirtualizer.scrollOffset ?? 0) + CHAPTER_BAR_HEIGHT + 1,
+  )?.index;
+  const currentChapterId =
+    rowUnderBar === undefined
+      ? null
+      : (chapterRows.findLast((c) => c.rowIndex <= rowUnderBar)?.id ?? null);
+
+  /**
+   * Jumping to a chapter (docs/CHAPTERS.md). The grid is virtualized, so only
+   * the rows around the target ever mount — nothing between here and there
+   * is downloaded. What the jump does need is the photo *metadata* up to the
+   * chapter's start, since row positions depend on every photo above; pages
+   * are pulled until the header exists, the same way the favourites filter
+   * pulls the whole gallery.
+   *
+   * ponytail: sequential 60-photo pages — a 500-photo wedding is ~8 small JSON
+   * requests to reach its last chapter. A `take` parameter on the photos
+   * route is the upgrade if a 2000-photo gallery ever makes that feel slow.
+   */
+  const [jumpingTo, setJumpingTo] = useState<string | null>(null);
+  const focusChapterRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!jumpingTo) return;
+    const target = chapterRows.find((c) => c.id === jumpingTo);
+    if (target) {
+      // Instant, never smooth: a smooth scroll would mount — and download —
+      // every row it passes on the way.
+      rowVirtualizer.scrollToIndex(target.rowIndex, { align: "start" });
+      focusChapterRef.current = jumpingTo;
+    } else if (hasNextPage) {
+      if (!isFetchingNextPage) void fetchNextPage();
+      return;
+    }
+    // Done — or the chapter emptied since the page loaded and there is nothing
+    // left to fetch. Cleared on the next frame, once the scroll has landed.
+    const frame = requestAnimationFrame(() => setJumpingTo(null));
+    return () => cancelAnimationFrame(frame);
+  }, [jumpingTo, chapterRows, hasNextPage, isFetchingNextPage, fetchNextPage, rowVirtualizer]);
 
   useEffect(() => {
     const lastVisible = virtualRows.at(-1);
@@ -2258,6 +2365,16 @@ function GalleryViewInner({
         </div>
       </header>
 
+      {showChapters && !selectionActive && (
+        <ChapterBar
+          height={CHAPTER_BAR_HEIGHT}
+          chapters={chapters}
+          currentId={currentChapterId}
+          jumpingTo={jumpingTo}
+          onJump={setJumpingTo}
+        />
+      )}
+
       {/* The viewer's own running print order (Pavel, 2026-09-27: a bride
           counted 50 marks where the admin showed 28, and nothing on her screen
           could have told her which was right). Sticky so it stays in view
@@ -2270,7 +2387,12 @@ function GalleryViewInner({
           // `items-start`: in a zero-height flex row the default stretch
           // sized the pill to 0 as well, so its background covered only the
           // padding and the text spilled out over the photos.
-          <div className="pointer-events-none sticky top-2 z-30 flex h-0 items-start justify-center px-3">
+          // Under the chapter bar when there is one, rather than over its chips.
+          <div
+            className={`pointer-events-none sticky z-30 flex h-0 items-start justify-center px-3 ${
+              showChapters ? "top-16" : "top-2"
+            }`}
+          >
             {/* The lightbox chrome's glass (its top bar and counter): it sits
                 over photos the same way. Blur only under a fine pointer, as
                 there — a blurred layer over a scrolling grid is the one thing
@@ -2375,9 +2497,23 @@ function GalleryViewInner({
             );
           }
 
+          const first = row.items[0]?.item;
+          if (first?.kind === "chapter") {
+            return (
+              <ChapterHeaderRow
+                key={gridEntryKey(first, photoIdOf)}
+                chapter={first.chapter}
+                ordinal={chapters.indexOf(first.chapter) + 1}
+                height={virtualRow.size}
+                offset={virtualRow.start - rowVirtualizer.options.scrollMargin}
+                focusRef={focusChapterRef}
+              />
+            );
+          }
+
           return (
             <li
-              key={row.items[0] ? gridEntryKey(row.items[0].item, photoIdOf) : virtualRow.index}
+              key={first ? gridEntryKey(first, photoIdOf) : virtualRow.index}
               className="absolute top-0 left-0 flex w-full"
               style={{
                 height: virtualRow.size,
@@ -2395,6 +2531,7 @@ function GalleryViewInner({
                 // as a landscape frame and is otherwise inert: no photo index,
                 // so nothing downstream — lightbox, selection, favourites,
                 // print, ZIP — can reach it.
+                if (entry.item.kind === "chapter") return null;
                 if (entry.item.kind === "promo") {
                   return (
                     <PromoTile
@@ -2427,7 +2564,7 @@ function GalleryViewInner({
                     width={entry.width}
                     height={entry.height}
                     index={index}
-                    priority={virtualRow.index === 0}
+                    priority={virtualRow.index === firstPhotoRow}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}

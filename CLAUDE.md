@@ -9,6 +9,9 @@ anything that assumes one share link means one gallery.
 **`docs/PROMO-CARDS.md`** is the authority for the photographer's credit tile in the grid (adopted
 2026-09-01) — read it before touching the grid's item stream, the justified layout's input, or
 anything that assumes every tile in the gallery is a photo.
+**`docs/CHAPTERS.md`** is the authority for gallery chapters ("Obřad", "Hostina" — adopted
+2026-09-27) — read it before touching the grid's row building, `groupByChapter`, or the jump to a
+chapter (it must stay an instant scroll, or it downloads every photo it passes).
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).

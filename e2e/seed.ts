@@ -246,6 +246,8 @@ async function main() {
     }),
   };
 
+  const chapters = await makeChaptersGallery(user.id);
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
@@ -269,6 +271,7 @@ async function main() {
       selfDelete,
       naming,
       archives,
+      chapters,
     }),
   );
 
@@ -435,4 +438,71 @@ async function makeEventGallery(
   await prisma.gallery.update({ where: { id: gallery.id }, data: { eventLinkId: link.id } });
 
   return gallery.id;
+}
+
+/**
+ * A gallery long enough that its last chapter sits past the first two photo
+ * pages (60 each), so jumping to it has to fetch metadata it does not have yet
+ * (docs/CHAPTERS.md). One chapter starts after the last photo — empty, and
+ * never shown.
+ */
+async function makeChaptersGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Kapitoly",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-chapters-${Date.now()}`,
+    },
+  });
+
+  const photoCount = 130;
+  const takenAt = (i: number) => new Date(Date.UTC(2026, 7, 22, 10, i));
+  const ids: string[] = [];
+  for (let i = 0; i < photoCount; i += 1) {
+    const photo = await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/chapter-photo-${i}.jpg`,
+        fileName: `chapter_${i}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#a37c5c",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: takenAt(i),
+      },
+      select: { id: true },
+    });
+    ids.push(photo.id);
+  }
+
+  const starts = [
+    { title: "Přípravy", at: 0 },
+    { title: "Obřad", at: 40 },
+    { title: "První tanec", at: 125 },
+  ];
+  for (const { title, at } of starts) {
+    await prisma.galleryChapter.create({
+      data: { galleryId: gallery.id, title, startTakenAt: takenAt(at), startPhotoId: ids[at]! },
+    });
+  }
+  await prisma.galleryChapter.create({
+    data: {
+      galleryId: gallery.id,
+      title: "Prázdná",
+      startTakenAt: takenAt(photoCount + 5),
+      startPhotoId: "zzz",
+    },
+  });
+
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+
+  return { token, slug, titles: starts.map((s) => s.title), lastChapterAt: 125 };
 }

@@ -18,6 +18,11 @@
  */
 
 import { type GalleryPromo, promoInsertIndex } from "@/lib/promo-card";
+import {
+  compareTimeline,
+  type GalleryChapter,
+  type TimelinePosition,
+} from "@/lib/gallery-chapters";
 
 export type GridEntry<P> =
   | {
@@ -28,7 +33,10 @@ export type GridEntry<P> =
        * above it. */
       photoIndex: number;
     }
-  | { kind: "promo"; promo: GalleryPromo };
+  | { kind: "promo"; promo: GalleryPromo }
+  /** A chapter's header row (docs/CHAPTERS.md). Never inside a segment's
+   * `entries` — the grid lays it out as a full-width row of its own. */
+  | { kind: "chapter"; chapter: GalleryChapter };
 
 /**
  * Interleaves promo placements into the photo stream at their slots.
@@ -77,7 +85,61 @@ export function buildGridEntries<P>(
  * placement id can never collide with a photo id.
  */
 export function gridEntryKey<P>(entry: GridEntry<P>, photoId: (photo: P) => string): string {
-  return entry.kind === "promo" ? `promo:${entry.promo.id}` : `photo:${photoId(entry.photo)}`;
+  if (entry.kind === "promo") return `promo:${entry.promo.id}`;
+  if (entry.kind === "chapter") return `chapter:${entry.chapter.id}`;
+  return `photo:${photoId(entry.photo)}`;
+}
+
+export interface GridSegment<P> {
+  /** Null for the photos before the first chapter starts. */
+  chapter: GalleryChapter | null;
+  entries: GridEntry<P>[];
+}
+
+/**
+ * Cuts the tile stream into one run per chapter (docs/CHAPTERS.md), each laid
+ * out by the justified layout on its own so a chapter always begins on a
+ * fresh row under its header.
+ *
+ * Placement is decided here, in the browser, against the photos actually
+ * loaded: a chapter starts before the first photo at or after its timeline
+ * position. A chapter whose start has not been reached by the loaded pages
+ * simply is not in the grid yet — its header appears when its first photo
+ * does.
+ *
+ * Several chapters reaching the same photo means all but the last are empty
+ * (their photos were deleted); only the last one is shown. Promo tiles sitting
+ * right before a chapter's first photo move under that chapter's header, so a
+ * credit card never dangles alone at the end of the previous chapter.
+ */
+export function groupByChapter<P>(
+  entries: readonly GridEntry<P>[],
+  chapters: readonly GalleryChapter[],
+  positionOf: (photo: P) => TimelinePosition,
+): GridSegment<P>[] {
+  const sorted = [...chapters].sort((a, b) => compareTimeline(a.start, b.start));
+  const segments: GridSegment<P>[] = [{ chapter: null, entries: [] }];
+  let next = 0;
+
+  for (const entry of entries) {
+    if (entry.kind === "photo") {
+      const position = positionOf(entry.photo);
+      let starting: GalleryChapter | null = null;
+      while (next < sorted.length && compareTimeline(sorted[next]!.start, position) <= 0) {
+        starting = sorted[next]!;
+        next += 1;
+      }
+      if (starting) {
+        const current = segments.at(-1)!;
+        let cut = current.entries.length;
+        while (cut > 0 && current.entries[cut - 1]!.kind === "promo") cut -= 1;
+        segments.push({ chapter: starting, entries: current.entries.splice(cut) });
+      }
+    }
+    segments.at(-1)!.entries.push(entry);
+  }
+
+  return segments.filter((segment) => segment.chapter !== null || segment.entries.length > 0);
 }
 
 export interface GridNavigation {
