@@ -6,7 +6,8 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { printTotals } from "@/lib/print-selections";
-import { printCopyCommand, printList } from "@/lib/print-export";
+import { printList } from "@/lib/print-export";
+import { PrintDownloadButton } from "@/components/admin/print-download-button";
 import { Uploader } from "@/components/uploader";
 import { DeletePhotoButton } from "@/components/delete-photo-button";
 import { CopyButton } from "@/components/copy-button";
@@ -244,23 +245,18 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               Fotky k tisku: <strong>{printMarkedPhotos.length}</strong>, kusů celkem:{" "}
               <strong>{printPieces}</strong>.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <PrintDownloadButton galleryId={gallery.id} count={printMarkedPhotos.length} />
               <CopyButton
                 value={printList(printItems)}
                 label="Kopírovat seznam souborů s počty kusů"
                 text="Seznam"
               />
-              <CopyButton
-                value={printCopyCommand(printItems)}
-                label="Kopírovat příkaz pro Terminál"
-                text="Příkaz pro Terminál"
-              />
             </div>
             <p className="text-admin-muted text-caption dark:text-neutral-400">
-              V Terminálu napiš <code>cd </code>, přetáhni do okna složku s exportem fotek, Enter, a
-              vlož příkaz. Vybrané fotky se zkopírují do podsložky <code>tisk</code>, u více kusů s
-              počtem v názvu (<code>5x_…</code>). Co ve složce chybí (třeba fotky od hostů), vypíše
-              jako „Chybí“.
+              Originály se stáhnou jeden po druhém do Stažených souborů, u více kusů s počtem v
+              názvu (<code>5x_…</code>). Prohlížeč se napoprvé zeptá, jestli povolit stažení více
+              souborů — povol.
             </p>
           </div>
         )}

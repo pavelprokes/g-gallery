@@ -13,7 +13,9 @@ import {
 import type { Prisma } from "@/generated/prisma/client";
 import { readTranslationsFromForm } from "@/lib/content-translations";
 import { gallerySlug, slugify } from "@/lib/gallery-slug";
-import { deleteObject } from "@/lib/r2";
+import { deleteObject, presignDownload } from "@/lib/r2";
+import { printTotals } from "@/lib/print-selections";
+import { printFileName } from "@/lib/print-export";
 import { encryptToken } from "@/lib/token-cipher";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
@@ -760,4 +762,40 @@ export async function setGalleryCover(galleryId: string, photoId: string | null)
   revalidatePath(`/admin/g/${gallery.id}`);
   revalidatePath("/admin");
   if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+}
+
+/**
+ * Short-lived download links for every photo marked for print, each saved
+ * under its print name ("5x_…" for several copies). The browser fetches the
+ * bytes from R2 itself — nothing passes through Vercel, and no ZIP is built
+ * for a few dozen files.
+ */
+export async function printDownloadLinks(galleryId: string) {
+  const session = await requireAdmin();
+
+  const parsed = z.string().min(1).safeParse(galleryId);
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: parsed.data, ownerId: session.user.id },
+    select: { id: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  const quantities = await printTotals(gallery.id);
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: [...quantities.keys()] }, galleryId: gallery.id, status: "CONFIRMED" },
+    orderBy: { fileName: "asc" },
+    select: { id: true, objectKey: true, fileName: true },
+  });
+
+  const links: { name: string; url: string }[] = [];
+  for (const photo of photos) {
+    const name = printFileName({
+      fileName: photo.fileName,
+      quantity: quantities.get(photo.id) ?? 0,
+    });
+    if (name) links.push({ name, url: await presignDownload(photo.objectKey, name) });
+  }
+  return links;
 }

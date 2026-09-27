@@ -60,6 +60,25 @@ export async function presignPut(key: string, contentType: string): Promise<stri
   return signed.url;
 }
 
+/**
+ * Presign a GET that the browser saves as `fileName` instead of displaying —
+ * the photographer's print download, straight from R2 (never through Vercel).
+ * `fileName` must already be a safe basename (src/lib/print-export.ts).
+ */
+export async function presignDownload(key: string, fileName: string): Promise<string> {
+  const url = new URL(objectUrl(key));
+  url.searchParams.set("X-Amz-Expires", String(PRESIGN_EXPIRY_SECONDS));
+  const ascii = fileName.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  url.searchParams.set(
+    "response-content-disposition",
+    `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+  );
+  const signed = await r2Client().sign(new Request(url, { method: "GET" }), {
+    aws: { signQuery: true },
+  });
+  return signed.url;
+}
+
 /** Headers the browser must send with the presigned PUT, verbatim. */
 export function presignedPutHeaders(contentType: string): Record<string, string> {
   return {

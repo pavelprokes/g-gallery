@@ -129,3 +129,32 @@ test.describe("share gallery viewer", () => {
     await expect(page.getByRole("heading", { name: "Tenhle odkaz nikam nevede" })).toBeVisible();
   });
 });
+
+test.describe("image retry", () => {
+  // src/lib/image-retry.ts is serialized into an inline script, so only a
+  // production build proves it survives bundling — and that a tile which
+  // failed once still fills in instead of staying blank. Images are answered
+  // here rather than by the local image service, so the test only measures
+  // the retry.
+  const IMAGE = fs.readFileSync(path.join(__dirname, "..", "public", "qr-sign-table.webp"));
+
+  test("an image that fails to load is fetched again", async ({ page }) => {
+    let aborted = 0;
+    await page.route(/photo-0\b/, (route) => {
+      if (route.request().resourceType() !== "image") return route.continue();
+      if (!route.request().url().includes("retry=")) {
+        aborted++;
+        return route.abort();
+      }
+      return route.fulfill({ contentType: "image/webp", body: IMAGE });
+    });
+
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+
+    const retried = page.locator('img[src*="photo-0"][src*="retry="]').first();
+    await expect
+      .poll(() => retried.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+      .toBe(true);
+    expect(aborted).toBeGreaterThan(0);
+  });
+});
