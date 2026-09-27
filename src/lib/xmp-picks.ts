@@ -17,8 +17,12 @@ import { findApp1Segment, XMP_SIGNATURE } from "@/lib/exif-gps";
 const HIGHLIGHT_KEYWORDS = new Set(["highlight", "highlights", "gold", "vyber"]);
 
 export interface XmpPicks {
-  /** Lightroom stars, -1 (rejected) to 5; null when the file has none. */
-  rating: number | null;
+  /**
+   * Lightroom stars, -1 (rejected) to 5. A packet without `xmp:Rating` is 0★:
+   * Lightroom writes no rating for an unrated photo. `null` is kept for "no
+   * XMP at all" — the caller never gets a packet then (docs/HIGHLIGHTS.md).
+   */
+  rating: number;
   /** Colour label as written ("Red", "Zelená" in a Czech Lightroom); null when none. */
   label: string | null;
   /** Carries one of the highlight keywords. */
@@ -63,7 +67,7 @@ export function parseXmpPicks(packet: string): XmpPicks {
   );
 
   return {
-    rating: Number.isInteger(rating) ? Math.max(-1, Math.min(5, rating)) : null,
+    rating: Number.isInteger(rating) ? Math.max(-1, Math.min(5, rating)) : 0,
     label: label ? label.slice(0, 32) : null,
     tagged: keywords.some((keyword) => HIGHLIGHT_KEYWORDS.has(keyword)),
   };

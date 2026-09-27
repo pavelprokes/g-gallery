@@ -102,12 +102,7 @@ export function pickHighlights(
     chapterStarts,
   );
   const score = scorer(own);
-  const moments = parts.map((part) =>
-    momentsOf(
-      part.filter((c) => c.own),
-      score,
-    ),
-  );
+  const moments = parts.map((part) => momentsOf(part, score));
   const seats = seatsPerPart(
     parts.map((part) => part.length),
     parts.map((part) => part.filter((c) => pinnedIds.has(c.id)).length),
@@ -153,35 +148,54 @@ function scorer(own: readonly HighlightCandidate[]): (c: HighlightCandidate) => 
 
 /**
  * Collapses bursts into moments: the best-scored frame of each, the middle one
- * among equals. A burst holding a pinned or an excluded photo yields nothing —
- * the photographer has already decided about that moment.
+ * among equals.
+ *
+ * A burst is a *chain* of frames less than BURST_GAP_MS apart, cut into
+ * windows of at most BURST_MAX_SPAN_MS so a long, dense sequence still yields
+ * several moments. A window within BURST_MAX_SPAN_MS of a frame the
+ * photographer pinned or excluded *on the same chain* yields nothing: that
+ * moment is decided, and the frame beside it is the same photo a second later.
  */
 function momentsOf(
-  own: readonly HighlightCandidate[],
+  part: readonly HighlightCandidate[],
   score: (c: HighlightCandidate) => number,
 ): Moment[] {
   const moments: Moment[] = [];
-  let burst: HighlightCandidate[] = [];
-  const flush = () => {
-    if (burst.length > 0 && burst.every((c) => c.pin === null)) {
-      const scored = burst.map((c) => ({ ...c, score: score(c) }));
+  for (const chain of splitWhere(part, (prev, c) => msBetween(prev, c) > BURST_GAP_MS)) {
+    const decided = chain.filter((c) => c.pin !== null);
+    const windows = splitWhere(
+      chain.filter((c) => c.own),
+      (prev, c, first) =>
+        msBetween(prev, c) > BURST_GAP_MS || msBetween(first, c) > BURST_MAX_SPAN_MS,
+    );
+    for (const window of windows) {
+      const settled = decided.some(
+        (d) =>
+          msBetween(d, window[0]!) <= BURST_MAX_SPAN_MS &&
+          msBetween(window.at(-1)!, d) <= BURST_MAX_SPAN_MS,
+      );
+      if (settled) continue;
+      const scored = window.map((c) => ({ ...c, score: score(c) }));
       const best = Math.max(...scored.map((c) => c.score));
       const top = scored.filter((c) => c.score === best);
       moments.push(top[Math.floor((top.length - 1) / 2)]!);
     }
-    burst = [];
-  };
-  for (const c of own) {
-    const previous = burst.at(-1);
-    if (
-      previous &&
-      (msBetween(previous, c) > BURST_GAP_MS || msBetween(burst[0]!, c) > BURST_MAX_SPAN_MS)
-    )
-      flush();
-    burst.push(c);
   }
-  flush();
   return moments;
+}
+
+/** Cuts a timeline wherever `cut(previous, item, firstOfRun)` says so. */
+function splitWhere<T>(
+  items: readonly T[],
+  cut: (previous: T, item: T, first: T) => boolean,
+): T[][] {
+  const runs: T[][] = [];
+  for (const item of items) {
+    const run = runs.at(-1);
+    if (run && !cut(run.at(-1)!, item, run[0]!)) run.push(item);
+    else runs.push([item]);
+  }
+  return runs;
 }
 
 function msBetween(a: TimelinePosition, b: TimelinePosition): number {

@@ -230,7 +230,8 @@ async function uploadOne(
           placeholder,
           thumb: thumbStored,
           takenAt: takenAt?.toISOString(),
-          xmpRating: picks?.rating ?? undefined,
+          // A packet without a rating is 0★; no packet at all stays unknown.
+          xmpRating: picks?.rating,
           xmpLabel: picks?.label ?? undefined,
           xmpHighlight: picks?.tagged || undefined,
         }),

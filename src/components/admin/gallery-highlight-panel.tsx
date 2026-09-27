@@ -115,9 +115,10 @@ export function GalleryHighlightPanel({
         Návrh rozloží výběr rovnoměrně přes celý den — podle kapitol, a bez nich podle pauz ve
         focení — a přednost dá fotkám, které jsi v Lightroomu odlišil od ostatních: 5★ mezi
         čtyřhvězdičkovými, jiný barevný štítek, než má většina, nebo klíčové slovo „highlight“ či
-        „výběr“. Exportuj s metadaty (Zahrnout: Všechna metadata) — polohu z fotek galerie při
-        nahrání odstraní sama. Fotky nahrané dřív tyhle značky nemají, u nich připínej ručně.
-        Připnutá fotka je ve výběru vždy, vyřazená nikdy.
+        „výběr“. Exportuj s metadaty (Zahrnout: Všechna metadata). GPS souřadnice galerie při
+        nahrání odstraní sama; textové údaje o místě (město, adresa), pokud je v Lightroomu
+        vyplňuješ, ale v originálech zůstanou. Fotky nahrané dřív tyhle značky nemají, u nich
+        připínej ručně. Připnutá fotka je ve výběru vždy, vyřazená nikdy.
       </Hint>
     </Card>
   );

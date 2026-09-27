@@ -24,11 +24,13 @@ page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly wha
    highlight. Guests' uploads are never filled in automatically, only pinned.
    - **Parts of the day**: chapters (docs/CHAPTERS.md) when there are any, else pauses in shooting
      longer than 20 minutes. Seats are shared out in proportion to each part's size (largest
-     remainder), sized in photos rather than moments; a part under 3 % of the day gets none. Pins already in a part use its share first.
+     remainder), sized in photos rather than moments; a part under 3 % of the day gets none. Pins
+     already in a part use its share first.
    - **Moments**: shots less than 4 s apart are one burst and yield one photo at most — but a burst
      never spans more than 15 s, or two shooters interleaving through a half-hour ceremony would
      make the whole ceremony one "burst". A burst the photographer already pinned or excluded a
-     frame of yields nothing.
+     frame of — or that lies within 15 s of such a frame on the same unbroken sequence — yields
+     nothing: the frame beside a pin is the same photo a second later.
    - **Within a part**: the part is cut into equal stretches, and each stretch gives its
      best-scored moment — the one nearest its middle among equals. With no marks at all this is an
      even walk through the day.
@@ -45,7 +47,9 @@ score is relative to the gallery:
 | colour label on ≤ 25 % of the photos | +4                                         |
 | stars above the gallery's usual      | +3 per star (below the usual: −3 per star) |
 
-"Usual" is the most common rating among photos **that carry one**. A photo with no rating (uploaded
+"Usual" is the most common rating among photos **that carry one**. A packet with no `xmp:Rating` is
+stored as 0★ — Lightroom writes nothing for an unrated photo, so "stars only on the best shots" must
+still score them. `null` means no XMP at all. A photo with no rating (uploaded
 before marks were read, or exported without them) scores nothing for stars — it is neither above
 nor below anything.
 
@@ -69,6 +73,10 @@ read once for both the capture time and the marks, through the same APP1 walker 
 exactly the export that keeps it. The upload's GPS strip therefore also blanks the values of every
 `exif:GPS…` property in the XMP packet (with spaces, byte for byte, so no segment length changes
 and the XML stays well-formed) — invariant #2 would otherwise hold for EXIF only.
+
+ponytail: only coordinates. Location _text_ — `photoshop:City`, `Iptc4xmpCore:Location`, the IPTC
+APP13 copy, Extended XMP — survives, and the admin hint says so rather than promising otherwise.
+Blank those the same way if a photographer who fills them in ever needs it.
 
 ## Guest side
 

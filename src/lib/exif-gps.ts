@@ -74,8 +74,8 @@ export const XMP_SIGNATURE = "http://ns.adobe.com/xap/1.0/\0";
 
 export function findExifSegment(bytes: Uint8Array): ExifSegment | null {
   const segment = findApp1Segment(bytes, EXIF_SIGNATURE);
-  // A TIFF header needs 8 bytes.
-  if (!segment || segment.end - segment.start < 2) return null;
+  // A TIFF header is 8 bytes; `readTiffHeader` reads all of them unchecked.
+  if (!segment || segment.end - segment.start < 8) return null;
   return { tiffStart: segment.start, tiffEnd: segment.end };
 }
 
@@ -162,8 +162,10 @@ export function hasGpsData(input: Uint8Array): boolean {
  * cheaply skip re-hashing.
  */
 export function stripGpsFromJpeg(input: Uint8Array): Uint8Array {
+  // Found on the input: stripping EXIF moves nothing outside its own segment,
+  // so the XMP offsets hold for the stripped copy too.
+  const ranges = xmpGpsValueRanges(input);
   const exifStripped = stripExifGps(input);
-  const ranges = xmpGpsValueRanges(exifStripped);
   if (ranges.length === 0) return exifStripped;
   // Copy-on-write, like the EXIF step: the input is never modified in place.
   const output = exifStripped === input ? new Uint8Array(input) : exifStripped;
@@ -243,13 +245,4 @@ function stripExifGps(input: Uint8Array): Uint8Array {
   outView.setUint16(ifdStart, count - 1, littleEndian);
 
   return output;
-}
-
-/** Convenience wrapper for the upload pipeline. */
-export async function stripGpsFromFile(file: File): Promise<Blob> {
-  if (!file.type.includes("jpeg")) return file;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const stripped = stripGpsFromJpeg(bytes);
-  if (stripped === bytes) return file;
-  return new Blob([stripped as BlobPart], { type: file.type });
 }

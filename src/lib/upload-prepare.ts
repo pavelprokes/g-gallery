@@ -1,5 +1,5 @@
 import { crc32HexOfBlob } from "@/lib/crc32";
-import { stripGpsFromFile } from "@/lib/exif-gps";
+import { stripGpsFromJpeg } from "@/lib/exif-gps";
 import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "@/lib/exif-taken-at";
 import { readXmpPicksFromJpeg, type XmpPicks } from "@/lib/xmp-picks";
 import { averageColorOf } from "@/lib/placeholder";
@@ -31,14 +31,17 @@ export interface PreparedUpload {
 export async function prepareUpload(file: File): Promise<PreparedUpload> {
   // GPS is stripped before the bytes ever leave the browser, and the CRC32 is
   // computed on the exact bytes that get stored so the ZIP writer can trust it.
-  const body = await stripGpsFromFile(file);
+  // One read of the file serves the strip, the capture time and the marks.
+  const bytes = file.type.includes("jpeg") ? new Uint8Array(await file.arrayBuffer()) : null;
+  const stripped = bytes ? stripGpsFromJpeg(bytes) : null;
+  const body =
+    stripped && stripped !== bytes ? new Blob([stripped as BlobPart], { type: file.type }) : file;
   // Capture time drives the gallery timeline (oldest shot first). EXIF where
   // the file has it; the file's own mtime otherwise — for a camera-roll pick
   // that is the capture time too, and it beats "when the upload ran" for
   // everything else. The server falls back to confirm time if both are junk.
-  // EXIF and Lightroom's XMP both sit in the head of the file, so it is read
-  // once for the capture time and the photographer's marks.
-  const head = await readHead(file);
+  // EXIF and Lightroom's XMP both sit in the head of the file.
+  const head = bytes?.subarray(0, EXIF_SCAN_BYTES) ?? null;
   const takenAt =
     (head && orNull(() => readTakenAtFromJpeg(head))) ??
     (Number.isFinite(file.lastModified) && file.lastModified > 0
@@ -66,16 +69,6 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
 function orNull<T>(read: () => T | null): T | null {
   try {
     return read();
-  } catch {
-    return null;
-  }
-}
-
-/** The head of a JPEG, where its metadata lives; null for anything else. */
-async function readHead(file: File): Promise<Uint8Array | null> {
-  if (!file.type.includes("jpeg")) return null;
-  try {
-    return new Uint8Array(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer());
   } catch {
     return null;
   }
