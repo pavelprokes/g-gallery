@@ -102,3 +102,24 @@ test.describe("locale switching", () => {
     await expect(page.getByRole("list", { name: "Photos in the gallery" })).toBeVisible();
   });
 });
+
+test.describe("root page link to the main site's guest-gallery page", () => {
+  // The main site has cs and en only: French guests go to the English page.
+  for (const [locale, path] of [
+    ["cs-CZ", "/galerie-pro-hosty"],
+    ["en-US", "/en/galerie-pro-hosty"],
+    ["fr-FR", "/en/galerie-pro-hosty"],
+  ] as const) {
+    test(`${locale} links to ${path}`, async ({ browser }) => {
+      const context = await browser.newContext({ locale });
+      const page = await context.newPage();
+      await page.goto("/");
+
+      const href = await page.locator('a[href*="galerie-pro-hosty"]').first().getAttribute("href");
+      expect(href).toBe(
+        `https://svatebni-fotograf-cechy.cz${path}?utm_source=galerie&utm_medium=napoveda`,
+      );
+      await context.close();
+    });
+  }
+});
