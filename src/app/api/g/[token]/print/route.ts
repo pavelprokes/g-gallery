@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { clearOptedOutName } from "@/lib/viewer-opt-out";
-import { setPrintQuantity } from "@/lib/print-selections";
+import { othersPrintTotals, setPrintQuantity } from "@/lib/print-selections";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -16,27 +16,40 @@ const bodySchema = z.object({
   displayName: z.string().trim().min(1).max(60).optional(),
 });
 
-/** The current viewer's own print selections, so the UI can render badges on load. */
+/**
+ * The current viewer's own print selections, so the UI can render badges on
+ * load — and everyone else's on the same link, summed per photo, so a
+ * selection several people make together (or one person on a second device)
+ * is visible to each of them.
+ */
 export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/print">) {
   const { token } = await ctx.params;
 
   const access = await resolveShareLink(token);
   if (!access.ok) return NextResponse.json({ error: access.reason }, { status: 403 });
 
-  const anonKey = new URL(request.url).searchParams.get("anonKey");
-  if (!anonKey || !z.uuid().safeParse(anonKey).success) {
-    return NextResponse.json({ quantities: {} });
-  }
+  const galleryId = access.shareLink.galleryId;
+  const param = new URL(request.url).searchParams.get("anonKey");
+  const anonKey = param && z.uuid().safeParse(param).success ? param : null;
 
-  const viewer = await prisma.viewer.findUnique({
-    where: { galleryId_anonKey: { galleryId: access.shareLink.galleryId, anonKey } },
-    select: { printSelections: { select: { photoId: true, quantity: true } } },
-  });
+  const [viewer, others] = await Promise.all([
+    anonKey
+      ? prisma.viewer.findUnique({
+          where: { galleryId_anonKey: { galleryId, anonKey } },
+          select: { printSelections: { select: { photoId: true, quantity: true } } },
+        })
+      : null,
+    // A link with printing off shows no printer, and must not leak the
+    // couple's order through the API either.
+    access.shareLink.allowPrintSelection
+      ? othersPrintTotals(galleryId, access.shareLink.id, anonKey)
+      : new Map<string, number>(),
+  ]);
 
   const quantities = Object.fromEntries(
     (viewer?.printSelections ?? []).map((row) => [row.photoId, row.quantity]),
   );
-  return NextResponse.json({ quantities });
+  return NextResponse.json({ quantities, others: Object.fromEntries(others) });
 }
 
 export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/print">) {
