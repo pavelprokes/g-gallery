@@ -2267,16 +2267,22 @@ function GalleryViewInner({
       {allowPrintSelection &&
         !optedOut &&
         (markingMode || printSelections.size > 0 || printSync.pending > 0) && (
-          <div className="pointer-events-none sticky top-2 z-30 flex h-0 justify-center px-3">
+          // `items-start`: in a zero-height flex row the default stretch
+          // sized the pill to 0 as well, so its background covered only the
+          // padding and the text spilled out over the photos.
+          <div className="pointer-events-none sticky top-2 z-30 flex h-0 items-start justify-center px-3">
+            {/* The header toolbar's chrome (IconButton: hairline border, brand
+                ink on tint, 44 px tall, fully round) — plus a background and
+                a shadow, because unlike the toolbar it sits over photos. */}
             <p
               role="status"
-              className="bg-brand-ink text-caption flex max-w-md flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl px-4 py-2 text-white shadow-lg"
+              className="text-body text-brand-ink bg-brand-tint/95 dark:text-brand-tint flex min-h-11 max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-[22px] border px-4 py-2 shadow-lg backdrop-blur dark:bg-neutral-950/95"
             >
               <PrinterIcon className="h-4 w-4 shrink-0" />
               <span className="font-medium">
                 {t("printSummary", { photos: printSelections.size, pieces: printPieces })}
               </span>
-              <span className="text-white/70">
+              <span className="text-brand-ink/60 dark:text-brand-tint/60">
                 {printSync.offline && printSync.pending > 0
                   ? t("printSyncOffline", { count: printSync.pending })
                   : printSync.pending > 0 || printSync.busy
@@ -2284,7 +2290,7 @@ function GalleryViewInner({
                     : t("printSyncSaved")}
               </span>
               {printOthers.size > 0 && (
-                <span className="basis-full text-white/70">
+                <span className="text-brand-ink/60 dark:text-brand-tint/60 basis-full text-center">
                   {t("printSummaryEveryone", everyonePrints)}
                 </span>
               )}
