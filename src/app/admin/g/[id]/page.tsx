@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
-import { printTotals } from "@/lib/print-selections";
+import { printTotals, printTotalsByViewer } from "@/lib/print-selections";
 import { printList } from "@/lib/print-export";
 import { placeholderStyle } from "@/lib/placeholder";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
@@ -108,11 +108,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     select: { id: true, name: true },
   });
 
-  const [counts, perPhoto, reactions, printQuantities] = await Promise.all([
+  const [counts, perPhoto, reactions, printQuantities, printByViewer] = await Promise.all([
     galleryCounts(gallery.id),
     photoCounts(gallery.id),
     reactionTotals(gallery.id),
     printTotals(gallery.id),
+    printOnly ? printTotalsByViewer(gallery.id) : [],
   ]);
 
   const printMarkedPhotos = gallery.photos.filter(
@@ -247,6 +248,14 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               Fotky k tisku: <strong>{printMarkedPhotos.length}</strong>, kusů celkem:{" "}
               <strong>{printPieces}</strong>.
             </p>
+            {/* Totals add up every guest's marks; this says whose they are. */}
+            <ul className="text-caption">
+              {printByViewer.map((row) => (
+                <li key={row.viewerId}>
+                  {row.displayName ?? "Bez jména"}: fotky {row.photos} · {row.pieces} ks
+                </li>
+              ))}
+            </ul>
             <div className="flex flex-wrap items-center gap-2">
               <PrintDownloadButton galleryId={gallery.id} count={printMarkedPhotos.length} />
               <CopyButton

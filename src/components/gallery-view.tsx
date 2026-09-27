@@ -114,6 +114,7 @@ import {
   type ReactionKind,
 } from "@/lib/reactions-shared";
 import { MAX_PRINT_QUANTITY, clampPrintQuantity } from "@/lib/print-selections-shared";
+import { PrintQueue, type PrintSendOutcome } from "@/lib/print-queue";
 
 /**
  * Undoes an optimistic write when the server refuses it.
@@ -727,6 +728,39 @@ async function fetchPhotosPage(
  * this one would have forgotten the key itself. Adopting it here keeps the
  * footer honest instead of every heart silently snapping back.
  */
+/** One print-mark write, sorted into what the queue should do next with it. */
+async function postPrintQuantity(
+  token: string,
+  photoId: string,
+  quantity: number,
+): Promise<PrintSendOutcome> {
+  const anonKey = getViewerId();
+  // Opted out or storage blocked: nothing will ever accept this mark.
+  if (!anonKey) return { status: "refused" };
+
+  const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      anonKey,
+      photoId,
+      quantity,
+      displayName: getViewerName() ?? undefined,
+    }),
+    // Lets the last tap before the tab closes finish; the stored queue covers the rest.
+    keepalive: true,
+    // A request hanging on a dead connection would hold its photo's slot forever.
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.ok) {
+    const data = (await response.json()) as { quantity: number };
+    return { status: "saved", quantity: data.quantity };
+  }
+  if (response.status >= 500 || response.status === 429) return { status: "retry" };
+  await adoptServerOptOut(response);
+  return { status: "refused" };
+}
+
 async function adoptServerOptOut(response: Response): Promise<void> {
   if (response.status !== 403) return;
   const body = (await response
@@ -875,6 +909,48 @@ function GalleryViewInner({
   const [printSelections, setPrintSelections] = useState<Map<string, number>>(() => new Map());
   // The quantity the name prompt interrupted, so it can be sent afterwards.
   const [pendingPrint, setPendingPrint] = useState<number | null>(null);
+  // Print marks go through a queue rather than straight to the server, so a
+  // dropped connection delays them instead of undoing them
+  // (src/lib/print-queue.ts). Created on first use, never during render: it
+  // reads localStorage.
+  const printQueueRef = useRef<PrintQueue | null>(null);
+  // What the server last confirmed per photo — where a refused mark goes back to.
+  const confirmedPrints = useRef(new Map<string, number>());
+  const [printSync, setPrintSync] = useState({ pending: 0, busy: false, offline: false });
+  const getPrintQueue = useCallback((): PrintQueue => {
+    if (printQueueRef.current) return printQueueRef.current;
+
+    const show = (photoId: string, quantity: number) =>
+      setPrintSelections((prev) => {
+        const copy = new Map(prev);
+        if (quantity > 0) copy.set(photoId, quantity);
+        else copy.delete(photoId);
+        return copy;
+      });
+
+    const queue = new PrintQueue(
+      `gg.printQueue.${galleryId}`,
+      (photoId, quantity) => postPrintQuantity(token, photoId, quantity),
+      {
+        saved(photoId, quantity, superseded) {
+          if (quantity > 0) confirmedPrints.current.set(photoId, quantity);
+          else confirmedPrints.current.delete(photoId);
+          // The server is authoritative — unless the viewer has already moved on.
+          if (!superseded) show(photoId, quantity);
+          setSaveFailed(false);
+        },
+        refused(photoId, superseded) {
+          if (!superseded) show(photoId, confirmedPrints.current.get(photoId) ?? 0);
+          setSaveFailed(true);
+        },
+        changed() {
+          setPrintSync({ pending: queue.size, busy: queue.busy, offline: queue.offline });
+        },
+      },
+    );
+    printQueueRef.current = queue;
+    return queue;
+  }, [galleryId, token]);
   // Which way the viewer was last moving through the lightbox — the preload
   // effect uses this to warm a photo two steps ahead, not just one, so fast
   // repeated next/prev doesn't keep outrunning the network by exactly one.
@@ -1069,13 +1145,40 @@ function GalleryViewInner({
       signal: controller.signal,
     })
       .then((response) => (response.ok ? response.json() : { quantities: {} }))
-      .then((data: { quantities: Record<string, number> }) =>
-        setPrintSelections(new Map(Object.entries(data.quantities))),
-      )
-      .catch(() => undefined);
+      .then((data: { quantities: Record<string, number> }) => {
+        confirmedPrints.current = new Map(Object.entries(data.quantities));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        // Marks still waiting from an earlier visit (or made while this loaded)
+        // win over the server's answer — they are newer — and go out now.
+        const queue = getPrintQueue();
+        const shown = new Map(confirmedPrints.current);
+        for (const [photoId, quantity] of queue.entries()) {
+          if (quantity > 0) shown.set(photoId, quantity);
+          else shown.delete(photoId);
+        }
+        setPrintSelections(shown);
+        void queue.flush();
+      });
 
     return () => controller.abort();
-  }, [allowPrintSelection, token]);
+  }, [allowPrintSelection, token, getPrintQueue]);
+
+  // A queued mark is retried when the connection comes back, and on a timer
+  // for the networks that never fire `online` (captive portals, a flaky LTE
+  // cell that is "connected" the whole time).
+  useEffect(() => {
+    if (!printSync.offline) return;
+    const retry = () => void printQueueRef.current?.flush();
+    window.addEventListener("online", retry);
+    const timer = window.setInterval(retry, 10_000);
+    return () => {
+      window.removeEventListener("online", retry);
+      window.clearInterval(timer);
+    };
+  }, [printSync.offline]);
 
   // Which photos are this viewer's own uploads. Only fetched where uploading
   // was possible at all — on a read-only link nobody has anything to take back.
@@ -1252,76 +1355,40 @@ function GalleryViewInner({
     return () => clearTimeout(timer);
   }, [savedPulseId]);
 
-  const sendPrintQuantity = useCallback(
-    async (photoId: string, quantity: number, displayName: string | undefined, revert: Revert) => {
-      const anonKey = getViewerId();
-      if (!anonKey) return;
-
-      try {
-        const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ anonKey, photoId, quantity, displayName }),
-        });
-        if (!response.ok) {
-          await adoptServerOptOut(response);
-          throw new Error(`print selection failed (${response.status})`);
-        }
-
-        // The server is authoritative — a 0 sent while the row didn't exist
-        // resolves the same way a rejected quantity would.
-        const data = (await response.json()) as { quantity: number };
-        setPrintSelections((prev) => {
-          const copy = new Map(prev);
-          if (data.quantity > 0) copy.set(photoId, data.quantity);
-          else copy.delete(photoId);
-          return copy;
-        });
-        setSaveFailed(false);
-      } catch (error) {
-        console.error(error);
-        revert();
-        setSaveFailed(true);
-      }
-    },
-    [token],
-  );
-
   const adjustPrintQuantity = useCallback(
     (photoId: string, delta: 1 | -1) => {
       const current = printSelections.get(photoId) ?? 0;
       const next = clampPrintQuantity(current + delta);
       if (next === current) return;
 
-      // Optimistic: the badge updates immediately, the server follows.
+      // Shown at once; the queue saves it, through a dropped connection too.
       setPrintSelections((prev) => {
         const copy = new Map(prev);
         if (next > 0) copy.set(photoId, next);
         else copy.delete(photoId);
         return copy;
       });
-
-      const revert = () =>
-        setPrintSelections((prev) => {
-          const copy = new Map(prev);
-          if (current > 0) copy.set(photoId, current);
-          else copy.delete(photoId);
-          return copy;
-        });
+      const queue = getPrintQueue();
+      queue.set(photoId, next);
 
       // Same "join" moment as the heart — asked once, always skippable. Only
       // reachable on an increment: a decrement implies a copy was already
-      // set, so the prompt was already shown or skipped.
+      // set, so the prompt was already shown or skipped. The mark waits in the
+      // queue until the prompt is answered, so the name travels with it.
       if (next > 0 && !getViewerName() && !hasAnsweredNamePrompt()) {
-        pendingRevert.current = revert;
         setNamePromptFor(photoId);
         setPendingPrint(next);
         return;
       }
 
-      void sendPrintQuantity(photoId, next, getViewerName() ?? undefined, revert);
+      void queue.flush();
     },
-    [printSelections, sendPrintQuantity],
+    [printSelections, getPrintQueue],
+  );
+
+  const printPieces = useMemo(
+    () => [...printSelections.values()].reduce((sum, quantity) => sum + quantity, 0),
+    [printSelections],
   );
 
   const incrementPrintQuantity = useCallback(
@@ -2108,6 +2175,35 @@ function GalleryViewInner({
         </div>
       </header>
 
+      {/* The viewer's own running print order (Pavel, 2026-09-27: a bride
+          counted 50 marks where the admin showed 28, and nothing on her screen
+          could have told her which was right). Sticky so it stays in view
+          through a 700-photo grid, zero-height so showing it never shifts the
+          virtualised rows under it, and it says whether the marks are actually
+          saved — the one thing an optimistic badge on a tile cannot. */}
+      {allowPrintSelection &&
+        !optedOut &&
+        (markingMode || printSelections.size > 0 || printSync.pending > 0) && (
+          <div className="pointer-events-none sticky top-2 z-30 flex h-0 justify-center px-3">
+            <p
+              role="status"
+              className="bg-brand-ink text-caption flex max-w-md flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl px-4 py-2 text-white shadow-lg"
+            >
+              <PrinterIcon className="h-4 w-4 shrink-0" />
+              <span className="font-medium">
+                {t("printSummary", { photos: printSelections.size, pieces: printPieces })}
+              </span>
+              <span className="text-white/70">
+                {printSync.offline && printSync.pending > 0
+                  ? t("printSyncOffline", { count: printSync.pending })
+                  : printSync.pending > 0 || printSync.busy
+                    ? t("printSyncSaving")
+                    : t("printSyncSaved")}
+              </span>
+            </p>
+          </div>
+        )}
+
       {zipState === "error" && selection.ids.size === 0 && (
         <p className={`${GUTTER} -mt-1 mb-3 text-xs text-red-600`}>{t("zipErrorAnnounce")}</p>
       )}
@@ -2528,7 +2624,7 @@ function GalleryViewInner({
             const sent = kind
               ? sendReaction(photoId, kind, name || undefined, revert)
               : printQuantity !== null
-                ? sendPrintQuantity(photoId, printQuantity, name || undefined, revert)
+                ? getPrintQueue().flush()
                 : sendFavorite(photoId, true, name || undefined, revert);
             // The same name credits this guest's own uploads, and it only
             // reaches the server with the request above — refetch after it,
