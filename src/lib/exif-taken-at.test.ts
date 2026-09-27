@@ -92,11 +92,14 @@ function wrapInJpeg(tiff: Uint8Array): Uint8Array {
 }
 
 describe("readTakenAtFromJpeg", () => {
-  it("reads DateTimeOriginal with subseconds and timezone offset", () => {
+  it("reads DateTimeOriginal with subseconds as wall-clock time, ignoring the offset", () => {
     const takenAt = readTakenAtFromJpeg(wrapInJpeg(buildTiff({ withExifIfd: true })));
     expect(takenAt).not.toBeNull();
-    // 14:03:05.420 at +02:00 pins the UTC instant.
-    expect(takenAt!.toISOString()).toBe("2026-08-22T12:03:05.420Z");
+    // 14:03:05.420 on the camera's clock is 14:03:05.420 — the recorded
+    // +02:00 does not move it, so a body that writes a (possibly wrong) zone
+    // sorts together with one that writes none.
+    expect([takenAt!.getHours(), takenAt!.getMinutes(), takenAt!.getSeconds()]).toEqual([14, 3, 5]);
+    expect(takenAt!.getMilliseconds()).toBe(420);
   });
 
   it("falls back to IFD0 DateTime when there is no Exif IFD", () => {
@@ -122,6 +125,6 @@ describe("readTakenAtFromJpeg", () => {
   it("survives a truncated read that still covers the APP1 segment", () => {
     const full = wrapInJpeg(buildTiff({ withExifIfd: true }));
     const head = full.slice(0, full.length - 2); // drop the EOI marker
-    expect(readTakenAtFromJpeg(head)?.toISOString()).toBe("2026-08-22T12:03:05.420Z");
+    expect(readTakenAtFromJpeg(head)?.getTime()).toBe(readTakenAtFromJpeg(full)?.getTime());
   });
 });

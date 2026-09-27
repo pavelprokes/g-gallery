@@ -6,10 +6,16 @@
 //   - DateTimeOriginal ("YYYY:MM:DD HH:MM:SS") has one-second resolution;
 //     SubSecTimeOriginal adds the fraction where the camera wrote one, which
 //     is what keeps a burst in shot order.
-//   - OffsetTimeOriginal ("+02:00") pins the instant to a timezone. Without
-//     it the wall-clock time is interpreted in the interpreter's local zone —
-//     for sorting a single event's photos against each other that is exactly
-//     as good, and it degrades gracefully for cameras that never write one.
+//   - The wall-clock time is what orders a wedding, and it is always
+//     interpreted in the interpreter's local zone. OffsetTimeOriginal
+//     ("+02:00") is deliberately *ignored* (2026-09-28): some bodies write
+//     one, many never do, and a body whose zone setting is off by an hour
+//     (DST not switched — common) then sorts an hour away from the others
+//     even though every camera's clock shows the same time. A real wedding
+//     (docs/CHAPTERS.md, Kamila a Petr) had its whole main body an hour
+//     off its second body and drone for exactly this reason. Lightroom sorts
+//     by wall-clock time too, so this is also the order the photographer's
+//     own export numbering follows.
 
 import {
   findExifSegment,
@@ -25,7 +31,6 @@ const DATE_TIME_ORIGINAL_TAG = 0x9003;
 const DATE_TIME_DIGITIZED_TAG = 0x9004;
 const IFD0_DATE_TIME_TAG = 0x0132;
 const SUBSEC_TIME_ORIGINAL_TAG = 0x9291;
-const OFFSET_TIME_ORIGINAL_TAG = 0x9011;
 const ASCII_TYPE = 2;
 
 /** EXIF sits in an APP1 segment near the start of the file; a JPEG's segment
@@ -92,8 +97,8 @@ function readPointerTag(reader: IfdReader, ifdOffset: number, tag: number): numb
   return null;
 }
 
-/** "YYYY:MM:DD HH:MM:SS" (+ optional subseconds and "+HH:MM" offset) → Date. */
-function parseExifDate(value: string, subSec: string | null, offset: string | null): Date | null {
+/** "YYYY:MM:DD HH:MM:SS" (+ optional subseconds) → Date, as local wall-clock time. */
+function parseExifDate(value: string, subSec: string | null): Date | null {
   const match = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(value.trim());
   if (!match) return null;
 
@@ -105,16 +110,9 @@ function parseExifDate(value: string, subSec: string | null, offset: string | nu
     ? Math.round(Number(`0.${subSec.trim().replace(/\D.*$/, "") || "0"}`) * 1000)
     : 0;
 
-  const offsetMatch = offset ? /^([+-])(\d{2}):(\d{2})$/.exec(offset.trim()) : null;
-  if (offsetMatch) {
-    const sign = offsetMatch[1] === "-" ? -1 : 1;
-    const offsetMinutes = sign * (Number(offsetMatch[2]) * 60 + Number(offsetMatch[3]));
-    const utc = Date.UTC(year, month! - 1, day!, hour!, minute!, second!, millis);
-    return new Date(utc - offsetMinutes * 60_000);
-  }
-
-  // No zone recorded: local wall-clock time. Within one event every photo is
-  // off by the same amount, so the ordering — the thing this feeds — holds.
+  // Local wall-clock time, recorded zone or not (see the header). Within one
+  // event every photo is off by the same amount, so the ordering — the thing
+  // this feeds — holds, whichever bodies wrote a zone.
   const date = new Date(year, month! - 1, day!, hour!, minute!, second!, millis);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -142,7 +140,6 @@ export function readTakenAtFromJpeg(bytes: Uint8Array): Date | null {
       const parsed = parseExifDate(
         original,
         readAsciiTag(reader, exifIfdOffset, SUBSEC_TIME_ORIGINAL_TAG),
-        readAsciiTag(reader, exifIfdOffset, OFFSET_TIME_ORIGINAL_TAG),
       );
       if (parsed) return parsed;
     }
@@ -151,7 +148,7 @@ export function readTakenAtFromJpeg(bytes: Uint8Array): Date | null {
   // Last resort: IFD0's DateTime — file modification in EXIF terms, still
   // closer to the shoot than the upload timestamp is.
   const ifd0Date = readAsciiTag(reader, header.ifd0Offset, IFD0_DATE_TIME_TAG);
-  return ifd0Date ? parseExifDate(ifd0Date, null, null) : null;
+  return ifd0Date ? parseExifDate(ifd0Date, null) : null;
 }
 
 /**
