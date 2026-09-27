@@ -98,7 +98,7 @@ describe("PrinterButton on a tile", () => {
 
   it("keeps somebody else's copies apart from this viewer's own", () => {
     render(<PrinterButton quantity={1} others={2} onIncrement={noop} onDecrement={noop} />);
-    expect(screen.getByText("+2")).toBeTruthy();
+    expect(screen.getByText("(+2)")).toBeTruthy();
   });
 });
 

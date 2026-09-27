@@ -1196,6 +1196,31 @@ function GalleryViewInner({
     [getPrintQueue, token],
   );
 
+  // The partner marking on the other phone shows up without a reload: the
+  // others' copies are refetched on coming back to the tab, and every 30 s
+  // while this viewer is picking. Only `others` — the viewer's own marks stay
+  // with the queue, which knows about in-flight writes a refetch would race.
+  const pickingPrints = markingMode || printSelections.size > 0;
+  useEffect(() => {
+    if (!allowPrintSelection || !printsLoaded) return;
+    const refresh = () => {
+      const anonKey = getViewerId();
+      if (!anonKey || document.visibilityState !== "visible") return;
+      void fetch(`/api/g/${encodeURIComponent(token)}/print?anonKey=${encodeURIComponent(anonKey)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { others: Record<string, number> } | null) => {
+          if (data) setPrintOthers(new Map(Object.entries(data.others)));
+        })
+        .catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", refresh);
+    const timer = pickingPrints ? window.setInterval(refresh, 30_000) : undefined;
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearInterval(timer);
+    };
+  }, [allowPrintSelection, printsLoaded, pickingPrints, token]);
+
   useEffect(() => {
     if (!allowPrintSelection) return;
     const controller = new AbortController();
@@ -2241,10 +2266,7 @@ function GalleryViewInner({
           saved — the one thing an optimistic badge on a tile cannot. */}
       {allowPrintSelection &&
         !optedOut &&
-        (markingMode ||
-          printSelections.size > 0 ||
-          printOthers.size > 0 ||
-          printSync.pending > 0) && (
+        (markingMode || printSelections.size > 0 || printSync.pending > 0) && (
           <div className="pointer-events-none sticky top-2 z-30 flex h-0 justify-center px-3">
             <p
               role="status"
@@ -3204,13 +3226,15 @@ export function PrinterButton({
         aria-live="polite"
       >
         {quantity}
-        {others > 0 && (
-          <span className="text-white/70" title={t("printOthers", { count: others })}>
-            <span aria-hidden> +{others}</span>
-            <span className="sr-only">{t("printOthers", { count: others })}</span>
-          </span>
-        )}
       </span>
+      {/* Outside the live region above, so a tap on + announces the new
+          quantity alone rather than re-reading the others' copies each time. */}
+      {others > 0 && (
+        <span className="text-xs text-white/70 tabular-nums">
+          <span aria-hidden>(+{others})</span>
+          <span className="sr-only">{t("printOthers", { count: others })}</span>
+        </span>
+      )}
       <button
         type="button"
         onClick={onIncrement}

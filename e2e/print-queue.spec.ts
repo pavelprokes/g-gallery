@@ -18,10 +18,17 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
 /**
  * Each project and test marks its own photo of the shared seed gallery: the
  * projects run in parallel, and one test's mark is the other's "somebody
- * else's copies".
+ * else's copies". A project added to this spec needs its own pair here.
  */
+const PHOTOS_BY_PROJECT: Record<string, [number, number]> = {
+  chromium: [0, 1],
+  "mobile-safari": [2, 3],
+};
+
 function photoFor(projectName: string, test: 0 | 1): number {
-  return (projectName === "chromium" ? 0 : 2) + test;
+  const photos = PHOTOS_BY_PROJECT[projectName];
+  if (!photos) throw new Error(`no seed photos reserved for project ${projectName}`);
+  return photos[test];
 }
 
 async function openGallery(page: Page) {
@@ -99,7 +106,6 @@ test("copies somebody else marked are visible on another device", async ({
   try {
     const partner = await other.newPage();
     await openGallery(partner);
-    await expect(partner.getByRole("status").filter({ hasText: "Se všemi:" })).toBeVisible();
     await tile(partner, index).click();
     await expect(
       partner
@@ -108,8 +114,8 @@ test("copies somebody else marked are visible on another device", async ({
     ).toBeVisible();
   } finally {
     await other.close();
+    // Left marked, a retry would count this run's copy as somebody else's.
+    await openGallery(page);
+    await unmark(page, index);
   }
-
-  await page.keyboard.press("Escape");
-  await unmark(page, index);
 });

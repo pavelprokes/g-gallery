@@ -42,20 +42,38 @@ export async function viewerPrintSelections(
 /**
  * Quantities summed across every viewer, for the admin grid — a wedding hub's
  * photo can be marked by more than one guest, and the photographer needs one
- * number to order, not a per-person breakdown. The gallery shows the same sum,
- * minus the guest's own, so whoever comes back to the selection (or opens it
- * on another device) sees what has already been picked.
+ * number to order, not a per-person breakdown.
  */
-export async function printTotals(
+export async function printTotals(galleryId: string): Promise<Map<string, number>> {
+  const grouped = await prisma.printSelection.groupBy({
+    by: ["photoId"],
+    where: { photo: { galleryId } },
+    _sum: { quantity: true },
+  });
+  return new Map(grouped.map((row) => [row.photoId, row._sum.quantity ?? 0]));
+}
+
+/**
+ * Everyone else's copies per photo, for the gallery itself: a print order is
+ * picked by the couple together, or by one of them on a second device, and
+ * whoever comes back to it has to see what is already in it.
+ *
+ * Only among viewers of the same share link. The couple's own link and the
+ * guests' wedding-page link can open the same gallery, and the couple's picks
+ * are not the guests' business (nor the other way round). Keyed on the
+ * `anonKey` rather than the viewer id, so it needs no lookup first and runs
+ * alongside the viewer's own marks.
+ */
+export async function othersPrintTotals(
   galleryId: string,
-  /** Leave one viewer out — the guest's own marks are sent separately. */
-  excludeViewerId?: string,
+  shareLinkId: string,
+  anonKey: string | null,
 ): Promise<Map<string, number>> {
   const grouped = await prisma.printSelection.groupBy({
     by: ["photoId"],
     where: {
-      photo: { galleryId },
-      ...(excludeViewerId ? { viewerId: { not: excludeViewerId } } : {}),
+      photo: { galleryId, status: "CONFIRMED" },
+      viewer: { shareLinkId, ...(anonKey ? { NOT: { anonKey } } : {}) },
     },
     _sum: { quantity: true },
   });
