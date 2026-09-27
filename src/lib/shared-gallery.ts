@@ -175,6 +175,7 @@ export async function loadGalleryViewData(
           translations: true,
           startTakenAt: true,
           startPhotoId: true,
+          slug: true,
         },
       },
     },
@@ -249,6 +250,7 @@ export async function loadGalleryViewData(
           locale,
         ),
         start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+        anchor: chapter.slug ?? chapter.id,
       })),
     ),
     archive: archiveFor(

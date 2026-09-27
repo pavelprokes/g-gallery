@@ -686,10 +686,16 @@ model GalleryChapter {
   startTakenAt DateTime
   /// …and its id, the burst tiebreaker. Deliberately not a relation.
   startPhotoId String
+  /// The link anchor (`…/g/{token}/{slug}#obrad`), from the Czech title and
+  /// frozen at creation like `ShareLink.slug`: a rename never breaks a link
+  /// already sent. Null only on rows from before it existed — the chapter's id
+  /// stands in there.
+  slug         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   /// Two chapters starting at the same photo is always a mistake.
   @@unique([galleryId, startTakenAt, startPhotoId])
+  @@unique([galleryId, slug])
   @@schema("g_gallery")
 }
