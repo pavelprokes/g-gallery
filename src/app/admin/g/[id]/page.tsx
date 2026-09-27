@@ -93,6 +93,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           translations: true,
           startTakenAt: true,
           startPhotoId: true,
+          slug: true,
         },
       },
       shareLinks: {
@@ -153,6 +154,23 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   }));
   const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Each link's copyable URL, decrypted once for both the share-link panel
+  // and the chapters' "copy link" buttons.
+  const shareLinks = gallery.shareLinks.map((link) => {
+    const token = decryptToken(link.tokenCipher);
+    return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+  });
+  // A chapter's link is a share link plus its anchor: the newest one a guest
+  // can actually open — live, copyable, and on a published gallery (a draft
+  // resolves to not-found for everyone).
+  const now = new Date();
+  const chapterShareUrl =
+    gallery.status === "PUBLISHED"
+      ? (shareLinks.find(
+          (link) => link.url && !link.revokedAt && (!link.expiresAt || link.expiresAt > now),
+        )?.url ?? null)
+      : null;
+
   // Chapters are placed exactly as a guest's grid places them
   // (src/lib/gallery-grid.ts), over the photos in timeline order.
   type AdminPhoto = (typeof gallery.photos)[number];
@@ -169,6 +187,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       id: chapter.id,
       title: chapter.title,
       start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+      anchor: chapter.id,
       count: 0,
     })),
     timelineOf,
@@ -190,6 +209,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       const first = chapterPhotos[0];
       return {
         id: chapter.id,
+        anchor: chapter.slug ?? chapter.id,
         title: chapter.title,
         translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
         count: chapterPhotos.length,
@@ -352,10 +372,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <ShareLinkPanel
         galleryId={gallery.id}
-        shareLinks={gallery.shareLinks.map((link) => {
-          const token = decryptToken(link.tokenCipher);
-          return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
-        })}
+        shareLinks={shareLinks}
         published={gallery.status === "PUBLISHED"}
         hostedByEvent={gallery.eventId !== null}
       />
@@ -376,6 +393,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <GalleryChapterPanel
         chapters={adminChapters}
+        shareUrl={chapterShareUrl}
         timelineHref="?timeline=1"
         timelineActive={timelineView}
       />

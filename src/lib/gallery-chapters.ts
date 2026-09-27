@@ -1,3 +1,5 @@
+import { slugify } from "@/lib/gallery-slug";
+
 /**
  * Chapters — named stretches of a gallery's timeline (docs/CHAPTERS.md).
  *
@@ -22,6 +24,10 @@ export interface GalleryChapter {
   id: string;
   /** Already localized for the viewer. */
   title: string;
+  /** The URL hash that links to it — the frozen slug, or the id for a
+   * chapter from before slugs existed. Never localized: an English guest's
+   * link must open the same chapter for a Czech one. */
+  anchor: string;
   start: TimelinePosition;
   /** Photos in the chapter at page load — for the header's "84 fotek" only;
    * placement never depends on it. */
@@ -60,6 +66,26 @@ export const CHAPTER_PRESETS: readonly { cs: string; en: string; fr: string }[] 
   { cs: "První tanec", en: "First dance", fr: "Première danse" },
   { cs: "Večerní zábava", en: "Evening party", fr: "La soirée" },
 ];
+
+/**
+ * A chapter's link anchor, unique within the gallery and frozen at creation.
+ *
+ * One anchor for every language, so a link means the same chapter whoever
+ * sends it and whoever opens it. It has to be *one* language, and it is
+ * English — the app's own fallback language (docs/I18N.md) and the one a
+ * guest of any nationality reads: a preset takes its English name ("Obřad" →
+ * `ceremony`, "První tanec" → `first-dance`). A custom title has no English
+ * yet when the chapter is created, so it is transliterated to plain ASCII
+ * ("Rozbíjení talíře" → `rozbijeni-talire`). A second chapter with the same
+ * name gets `-2`.
+ */
+export function chapterSlug(title: string, taken: readonly string[]): string {
+  const base = slugify(presetTranslations(title)?.en ?? title) || "chapter";
+  if (!taken.includes(base)) return base;
+  let n = 2;
+  while (taken.includes(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
 
 /** The ready-made translations for a preset title, or null for a custom one. */
 export function presetTranslations(title: string): { en: string; fr: string } | null {

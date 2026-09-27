@@ -6,6 +6,7 @@ import { deleteChapter, updateChapter } from "@/app/admin/chapter-actions";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { TranslationFields } from "@/components/admin/translation-fields";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/copy-button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
 import type { ContentTranslations } from "@/lib/content-translations";
@@ -13,6 +14,8 @@ import { CHAPTER_PRESETS, MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/ga
 
 export interface AdminChapter {
   id: string;
+  /** The link hash, `#obrad` — frozen at creation (docs/CHAPTERS.md §Links). */
+  anchor: string;
   title: string;
   translations: ContentTranslations<"title">;
   count: number;
@@ -50,10 +53,13 @@ export function ChapterPresetsList() {
  */
 export function GalleryChapterPanel({
   chapters,
+  shareUrl,
   timelineHref,
   timelineActive,
 }: {
   chapters: AdminChapter[];
+  /** The gallery's live share link, or null when it has none to link through. */
+  shareUrl: string | null;
   timelineHref: string;
   timelineActive: boolean;
 }) {
@@ -112,11 +118,20 @@ export function GalleryChapterPanel({
                   Odebrat
                 </Button>
               </div>
-              <p className="text-admin-muted text-xs dark:text-neutral-400">
-                {chapter.firstPhoto
-                  ? `${chapter.count} fotek · začíná fotkou ${chapter.firstPhoto.fileName}`
-                  : "Prázdná — fotky, u kterých začínala, jsou smazané. Hostům se neukazuje."}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-admin-muted text-xs dark:text-neutral-400">
+                  {chapter.firstPhoto
+                    ? `${chapter.count} fotek · začíná fotkou ${chapter.firstPhoto.fileName}`
+                    : "Prázdná — fotky, u kterých začínala, jsou smazané. Hostům se neukazuje."}
+                </p>
+                {shareUrl && chapter.firstPhoto && (
+                  <CopyButton
+                    value={`${shareUrl}#${chapter.anchor}`}
+                    label={`Kopírovat odkaz rovnou na kapitolu ${chapter.title}`}
+                    text={`Odkaz #${chapter.anchor}`}
+                  />
+                )}
+              </div>
               <TranslationFields
                 fields={[
                   {
