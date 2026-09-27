@@ -69,11 +69,15 @@ test.describe("wedding page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "First picks" })).toBeVisible();
     await expect(page).toHaveTitle("First picks");
     // The gallery has no venue of its own; its header borrows the wedding's.
-    await expect(page.getByText(/Domaine de Benice/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Pavel Prokeš" }).first()).toHaveAttribute(
+    const header = page.locator("header").first();
+    await expect(header.getByText(/Domaine de Benice/)).toBeVisible();
+    const credit = header.getByRole("link", { name: "Pavel Prokeš" });
+    await expect(credit).toHaveAttribute(
       "href",
       /^https:\/\/svatebni-fotograf-cechy\.cz\/\?utm_source=galerie/,
     );
+    // The page URL is the share token; it must not leave as a Referer.
+    await expect(credit).toHaveAttribute("rel", /noreferrer/);
 
     await context.close();
   });

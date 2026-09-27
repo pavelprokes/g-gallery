@@ -19,6 +19,7 @@ import {
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
 import { formatDate } from "@/lib/format-date";
+import { inheritsEventVenue } from "@/lib/gallery-venue";
 
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
@@ -34,7 +35,7 @@ import { formatDate } from "@/lib/format-date";
 export interface GalleryViewData {
   title: string;
   eventDate: string | null;
-  /** The wedding's venue, when the gallery belongs to one — galleries have no venue of their own. */
+  /** The wedding's venue, when the gallery borrows it (src/lib/gallery-venue.ts). */
   venue: string | null;
   /** Every confirmed photo, not just the first page — the header states how
    * big the gallery is before any of it has scrolled into view. */
@@ -93,7 +94,7 @@ export async function loadGalleryViewData(
       // docs/I18N.md §Content — the title in the guest's language.
       translations: true,
       eventDate: true,
-      event: { select: { eventDate: true, venue: true, translations: true } },
+      event: { select: { eventDate: true, venue: true, translations: true, trashedAt: true } },
       storagePrefix: true,
       // docs/TODO.md §7 — pre-built "download all" archive, ready or not.
       zipStatus: true,
@@ -167,19 +168,19 @@ export async function loadGalleryViewData(
   const last = page.at(-1);
 
   const titleTranslations = parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS);
-  const eventDate = gallery.eventDate ?? gallery.event?.eventDate ?? null;
 
   return {
     title: localizeField(gallery.title, titleTranslations, "title", locale),
-    eventDate: eventDate ? formatDate(eventDate, locale) : null,
-    venue: gallery.event
-      ? localizeOptionalField(
-          gallery.event.venue,
-          parseTranslations(gallery.event.translations, EVENT_TRANSLATED_FIELDS),
-          "venue",
-          locale,
-        )
-      : null,
+    eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
+    venue:
+      gallery.event && inheritsEventVenue(gallery.eventDate, gallery.event)
+        ? localizeOptionalField(
+            gallery.event.venue,
+            parseTranslations(gallery.event.translations, EVENT_TRANSLATED_FIELDS),
+            "venue",
+            locale,
+          )
+        : null,
     photoCount: gallery._count.photos,
     initialPhotos: page.map((photo) => ({
       id: photo.id,
