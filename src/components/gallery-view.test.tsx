@@ -113,6 +113,7 @@ describe("a long press on a tile", () => {
     placeholder: null,
     favoriteCount: 0,
     uploaderName: null,
+    takenAt: "2026-09-19T14:00:00.000Z",
   };
 
   const renderTile = (onPick: (index: number, id: string, shift: boolean) => void) => {

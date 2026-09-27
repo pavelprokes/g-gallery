@@ -286,6 +286,7 @@ model Gallery {
   sessions       ViewSession[]
   activityEvents ActivityEvent[]
   promos         GalleryPromo[]
+  chapters       GalleryChapter[]
 
   @@unique([eventId, eventKey])
   @@index([ownerId, status])
@@ -662,5 +663,33 @@ model Keepalive {
   id       Int      @id @default(1)
   pingedAt DateTime @default(now())
 
+  @@schema("g_gallery")
+}
+
+/// A named stretch of the gallery's timeline — "Obřad", "Hostina"
+/// (docs/CHAPTERS.md). Only the start is stored: a chapter runs until the next
+/// one begins, and the last one to the end of the gallery.
+///
+/// The start is a *timeline position*, the same `(takenAt, id)` pair the photo
+/// cursor pages by — not a foreign key to a photo. Deleting the photo a chapter
+/// was started on therefore leaves the boundary exactly where it was (the
+/// chapter simply begins at the next photo), and photos added later — a second
+/// shooter's card, a guest's upload — fall into the right chapter by time.
+model GalleryChapter {
+  id           String   @id @default(cuid())
+  galleryId    String
+  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  /// Czech original; other languages live in `translations` (docs/I18N.md §Content).
+  title        String
+  translations Json     @default("{}")
+  /// Timeline position of the first photo: that photo's `takenAt`…
+  startTakenAt DateTime
+  /// …and its id, the burst tiebreaker. Deliberately not a relation.
+  startPhotoId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Two chapters starting at the same photo is always a mistake.
+  @@unique([galleryId, startTakenAt, startPhotoId])
   @@schema("g_gallery")
 }

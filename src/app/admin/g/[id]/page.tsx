@@ -1,4 +1,8 @@
-import { GALLERY_TRANSLATED_FIELDS, parseTranslations } from "@/lib/content-translations";
+import {
+  CHAPTER_TRANSLATED_FIELDS,
+  GALLERY_TRANSLATED_FIELDS,
+  parseTranslations,
+} from "@/lib/content-translations";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -18,9 +22,18 @@ import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
+import {
+  ChapterPresetsList,
+  CHAPTER_PRESETS_LIST_ID,
+  GalleryChapterPanel,
+} from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
+import { startChapter } from "../../chapter-actions";
+import { compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
+import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { PageHeader } from "@/components/ui/page-header";
@@ -33,8 +46,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   if (!session) redirect("/sign-in");
 
   const { id } = await props.params;
-  const { print } = await props.searchParams;
+  const { print, timeline: timelineParam } = await props.searchParams;
   const printOnly = print === "1";
+  // docs/CHAPTERS.md — the photos in the guests' order, where chapters are set.
+  const timelineView = !printOnly && timelineParam === "1";
 
   const gallery = await prisma.gallery.findFirst({
     where: { id, ownerId: session.user.id },
@@ -67,6 +82,17 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           _count: { select: { favorites: true } },
           source: true,
           uploadedBy: { select: { displayName: true } },
+          takenAt: true,
+          createdAt: true,
+        },
+      },
+      chapters: {
+        select: {
+          id: true,
+          title: true,
+          translations: true,
+          startTakenAt: true,
+          startPhotoId: true,
         },
       },
       shareLinks: {
@@ -127,10 +153,142 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   }));
   const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Chapters are placed exactly as a guest's grid places them
+  // (src/lib/gallery-grid.ts), over the photos in timeline order.
+  type AdminPhoto = (typeof gallery.photos)[number];
+  const timelineOf = (photo: AdminPhoto) => ({
+    takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
+    id: photo.id,
+  });
+  const timeline = [...gallery.photos].sort((a, b) =>
+    compareTimeline(timelineOf(a), timelineOf(b)),
+  );
+  const segments = groupByChapter(
+    buildGridEntries(timeline, []),
+    gallery.chapters.map((chapter) => ({
+      id: chapter.id,
+      title: chapter.title,
+      start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+      count: 0,
+    })),
+    timelineOf,
+  );
+  const photosOf = (entries: (typeof segments)[number]["entries"]) =>
+    entries.flatMap((entry) => (entry.kind === "photo" ? [entry.photo] : []));
+  const chapterSegments = new Map(
+    segments.flatMap((segment) => (segment.chapter ? [[segment.chapter.id, segment]] : [])),
+  );
+  const adminChapters = gallery.chapters
+    .toSorted((a, b) =>
+      compareTimeline(
+        { takenAt: a.startTakenAt.toISOString(), id: a.startPhotoId },
+        { takenAt: b.startTakenAt.toISOString(), id: b.startPhotoId },
+      ),
+    )
+    .map((chapter) => {
+      const chapterPhotos = photosOf(chapterSegments.get(chapter.id)?.entries ?? []);
+      const first = chapterPhotos[0];
+      return {
+        id: chapter.id,
+        title: chapter.title,
+        translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+        count: chapterPhotos.length,
+        firstPhoto: first
+          ? {
+              objectKey: first.objectKey,
+              thumbObjectKey: first.thumbObjectKey,
+              fileName: first.fileName,
+            }
+          : null,
+      };
+    });
+
   async function publish() {
     "use server";
     await publishGallery(id);
   }
+
+  /** One photo's admin tile. `startsChapter` is set in the timeline view on
+   * the photo a chapter currently begins with. */
+  const renderPhoto = (photo: AdminPhoto, startsChapter = false) => {
+    const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
+    const printQuantity = printQuantities.get(photo.id) ?? 0;
+    const isCover = gallery.coverPhotoId === photo.id;
+    return (
+      <li key={photo.id} className="space-y-1">
+        <div
+          // Outline rather than a ring: it is drawn outside the tile, so
+          // the cropped photo underneath keeps its full square.
+          className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
+            isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
+          }`}
+          style={
+            photo.placeholder ? { backgroundColor: placeholderStyle(photo.placeholder) } : undefined
+          }
+        >
+          <AdminPhotoImage
+            objectKey={photo.objectKey}
+            thumbObjectKey={photo.thumbObjectKey}
+            alt={photo.fileName}
+          />
+          {isCover && (
+            <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
+              Titulní
+            </span>
+          )}
+        </div>
+        {photo.source === "GUEST" && (
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+            Od hostů
+            {photo.uploadedBy?.displayName && ` · ${photo.uploadedBy.displayName}`}
+          </p>
+        )}
+        <p className="text-admin-muted text-xs dark:text-neutral-400">
+          {stats.views} zobr. · {stats.uniqueViewers} unik.
+          {photo._count.favorites > 0 && (
+            <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
+          )}
+          {(reactions.get(photo.id) ?? 0) > 0 && (
+            <span className="text-amber-600"> · {reactions.get(photo.id)} reakcí</span>
+          )}
+          {printQuantity > 0 && (
+            <span className="text-brand-primary-dark"> · 🖨 {printQuantity}</span>
+          )}
+        </p>
+        {printQuantity > 0 && <CopyButton value={photo.fileName} label="Kopírovat název souboru" />}
+        <form action={setGalleryCover.bind(null, gallery.id, isCover ? null : photo.id)}>
+          <Button type="submit" variant={isCover ? "ghost" : "secondary"} size="sm">
+            {isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
+          </Button>
+        </form>
+        <DeletePhotoButton photoId={photo.id} />
+        {timelineView && (
+          <details className="text-sm">
+            <summary className="text-brand-primary-dark cursor-pointer font-semibold dark:text-neutral-200">
+              {startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
+            </summary>
+            <form
+              action={startChapter.bind(null, gallery.id, photo.id)}
+              className="mt-1 flex gap-1"
+            >
+              <Input
+                name="title"
+                list={CHAPTER_PRESETS_LIST_ID}
+                required
+                maxLength={MAX_CHAPTER_TITLE}
+                placeholder="Obřad"
+                aria-label="Název kapitoly"
+                className="min-w-0"
+              />
+              <Button type="submit" size="sm">
+                Uložit
+              </Button>
+            </form>
+          </details>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -216,6 +374,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         available={promoCards}
       />
 
+      <GalleryChapterPanel
+        chapters={adminChapters}
+        timelineHref="?timeline=1"
+        timelineActive={timelineView}
+      />
+      <ChapterPresetsList />
+
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
@@ -225,6 +390,18 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                 ? "Titulní fotka je vybraná ručně."
                 : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
             </p>
+          )}
+          {!printOnly && (
+            <a
+              href={timelineView ? "?" : "?timeline=1"}
+              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${
+                timelineView
+                  ? "border-brand-primary bg-brand-tint text-brand-primary-dark"
+                  : "border-admin-border hover:border-brand-primary hover:text-brand-primary text-brand-primary-dark bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              }`}
+            >
+              {timelineView ? "Zobrazit podle oblíbenosti" : "Časová osa a kapitoly"}
+            </a>
           )}
           {printMarkedPhotos.length > 0 && (
             <a
@@ -272,65 +449,29 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           </div>
         )}
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {visiblePhotos.map((photo) => {
-            const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
-            const printQuantity = printQuantities.get(photo.id) ?? 0;
-            const isCover = gallery.coverPhotoId === photo.id;
-            return (
-              <li key={photo.id} className="space-y-1">
-                <div
-                  // Outline rather than a ring: it is drawn outside the tile, so
-                  // the cropped photo underneath keeps its full square.
-                  className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
-                    isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
-                  }`}
-                  style={
-                    photo.placeholder
-                      ? { backgroundColor: placeholderStyle(photo.placeholder) }
-                      : undefined
-                  }
-                >
-                  <AdminPhotoImage
-                    objectKey={photo.objectKey}
-                    thumbObjectKey={photo.thumbObjectKey}
-                    alt={photo.fileName}
-                  />
-                  {isCover && (
-                    <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
-                      Titulní
-                    </span>
-                  )}
-                </div>
-                {photo.source === "GUEST" && (
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                    Od hostů
-                    {photo.uploadedBy?.displayName && ` · ${photo.uploadedBy.displayName}`}
-                  </p>
-                )}
-                <p className="text-admin-muted text-xs dark:text-neutral-400">
-                  {stats.views} zobr. · {stats.uniqueViewers} unik.
-                  {photo._count.favorites > 0 && (
-                    <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
-                  )}
-                  {(reactions.get(photo.id) ?? 0) > 0 && (
-                    <span className="text-amber-600"> · {reactions.get(photo.id)} reakcí</span>
-                  )}
-                  {printQuantity > 0 && (
-                    <span className="text-brand-primary-dark"> · 🖨 {printQuantity}</span>
-                  )}
-                </p>
-                {printQuantity > 0 && (
-                  <CopyButton value={photo.fileName} label="Kopírovat název souboru" />
-                )}
-                <form action={setGalleryCover.bind(null, gallery.id, isCover ? null : photo.id)}>
-                  <Button type="submit" variant={isCover ? "ghost" : "secondary"} size="sm">
-                    {isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
-                  </Button>
-                </form>
-                <DeletePhotoButton photoId={photo.id} />
-              </li>
-            );
-          })}
+          {timelineView
+            ? segments.map((segment) => {
+                const segmentPhotos = photosOf(segment.entries);
+                return [
+                  segment.chapter && (
+                    <li
+                      key={`chapter:${segment.chapter.id}`}
+                      className="border-brand-border col-span-full mt-3 flex items-baseline justify-between gap-3 border-b pb-1 first:mt-0 dark:border-neutral-700"
+                    >
+                      <h3 className="text-brand-ink text-lg font-semibold dark:text-neutral-100">
+                        {segment.chapter.title}
+                      </h3>
+                      <span className="text-admin-muted text-xs dark:text-neutral-400">
+                        {segmentPhotos.length} fotek
+                      </span>
+                    </li>
+                  ),
+                  ...segmentPhotos.map((photo, i) =>
+                    renderPhoto(photo, !!segment.chapter && i === 0),
+                  ),
+                ];
+              })
+            : visiblePhotos.map((photo) => renderPhoto(photo))}
         </ul>
         {visiblePhotos.length === 0 && (
           <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">

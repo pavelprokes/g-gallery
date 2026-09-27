@@ -66,6 +66,7 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       imageGrant={data.imageGrant}
       viewers={data.viewers}
       promos={data.promos}
+      chapters={data.chapters}
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
       allowUpload={access.shareLink.allowUpload}

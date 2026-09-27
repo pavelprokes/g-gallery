@@ -91,6 +91,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
+      takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
     })),
     ...(total !== undefined ? { total } : {}),
     // `takenAt` is set on every confirm and backfilled for the back catalogue;

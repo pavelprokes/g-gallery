@@ -3,10 +3,12 @@ import {
   buildGridEntries,
   buildGridNavigation,
   gridEntryKey,
+  groupByChapter,
   photoInAdjacentRow,
   type GridEntry,
 } from "@/lib/gallery-grid";
 import type { GalleryPromo } from "@/lib/promo-card";
+import type { GalleryChapter } from "@/lib/gallery-chapters";
 
 type Photo = { id: string };
 
@@ -146,5 +148,109 @@ describe("photoInAdjacentRow", () => {
 
   it("returns null for a photo index that is not in the grid", () => {
     expect(photoInAdjacentRow(nav, 99, 1)).toBeNull();
+  });
+});
+
+describe("groupByChapter", () => {
+  type TimedPhoto = { id: string; takenAt: string };
+  const at = (minute: number) => `2026-09-19T14:${String(minute).padStart(2, "0")}:00.000Z`;
+  const timed = (n: number): TimedPhoto[] =>
+    Array.from({ length: n }, (_, i) => ({ id: `p${i}`, takenAt: at(i) }));
+  const positionOf = (photo: TimedPhoto) => photo;
+  const chapter = (id: string, takenAt: string, photoId = ""): GalleryChapter => ({
+    id,
+    title: id,
+    start: { takenAt, id: photoId },
+    count: 0,
+  });
+  const shape = (segments: ReturnType<typeof groupByChapter<TimedPhoto>>) =>
+    segments.map((s) => [
+      s.chapter?.id ?? null,
+      s.entries.map((e) => (e.kind === "photo" ? e.photo.id : e.kind)),
+    ]);
+
+  it("is one untitled segment without chapters", () => {
+    const entries = buildGridEntries(timed(3), []);
+    expect(shape(groupByChapter(entries, [], positionOf))).toEqual([[null, ["p0", "p1", "p2"]]]);
+  });
+
+  it("starts each chapter at the first photo at or after its position", () => {
+    const entries = buildGridEntries(timed(5), []);
+    const segments = groupByChapter(
+      entries,
+      // Deliberately out of order — the grid sorts.
+      [chapter("hostina", at(3), "p3"), chapter("obrad", at(1), "p1")],
+      positionOf,
+    );
+    expect(shape(segments)).toEqual([
+      [null, ["p0"]],
+      ["obrad", ["p1", "p2"]],
+      ["hostina", ["p3", "p4"]],
+    ]);
+  });
+
+  it("keeps a boundary in place after the photo it was set on is deleted", () => {
+    // Chapter was started on p2, which is gone — it now begins at p3.
+    const entries = buildGridEntries(
+      timed(5).filter((p) => p.id !== "p2"),
+      [],
+    );
+    const segments = groupByChapter(entries, [chapter("obrad", at(2), "p2")], positionOf);
+    expect(shape(segments)).toEqual([
+      [null, ["p0", "p1"]],
+      ["obrad", ["p3", "p4"]],
+    ]);
+  });
+
+  it("uses the id to split a burst sharing one timestamp", () => {
+    const burst = [
+      { id: "a", takenAt: at(0) },
+      { id: "b", takenAt: at(0) },
+      { id: "c", takenAt: at(0) },
+    ];
+    const segments = groupByChapter(
+      buildGridEntries(burst, []),
+      [chapter("x", at(0), "b")],
+      positionOf,
+    );
+    expect(shape(segments)).toEqual([
+      [null, ["a"]],
+      ["x", ["b", "c"]],
+    ]);
+  });
+
+  it("shows only the last of several chapters that reach the same photo", () => {
+    // "gone" started on a photo after p0 that has since been deleted, so it
+    // reaches p1 together with "kept" — and is empty.
+    const segments = groupByChapter(
+      buildGridEntries(timed(3), []),
+      [chapter("gone", at(0), "p0-x"), chapter("kept", at(1), "p1")],
+      positionOf,
+    );
+    expect(shape(segments)).toEqual([
+      [null, ["p0"]],
+      ["kept", ["p1", "p2"]],
+    ]);
+  });
+
+  it("leaves a chapter whose start is not loaded yet out of the grid", () => {
+    const entries = buildGridEntries(timed(2), []);
+    const segments = groupByChapter(entries, [chapter("later", at(40), "p40")], positionOf);
+    expect(shape(segments)).toEqual([[null, ["p0", "p1"]]]);
+  });
+
+  it("drops the empty leading segment when a chapter starts at the first photo", () => {
+    const entries = buildGridEntries(timed(2), []);
+    const segments = groupByChapter(entries, [chapter("all", at(0), "p0")], positionOf);
+    expect(shape(segments)).toEqual([["all", ["p0", "p1"]]]);
+  });
+
+  it("moves a promo right before a chapter's first photo under its header", () => {
+    const entries = buildGridEntries(timed(4), [promo({ slot: 3 })]);
+    const segments = groupByChapter(entries, [chapter("obrad", at(2), "p2")], positionOf);
+    expect(shape(segments)).toEqual([
+      [null, ["p0", "p1"]],
+      ["obrad", ["promo", "p2", "p3"]],
+    ]);
   });
 });

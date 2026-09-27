@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { Locale } from "@/i18n/locales";
 import {
+  CHAPTER_TRANSLATED_FIELDS,
   EVENT_TRANSLATED_FIELDS,
   GALLERY_TRANSLATED_FIELDS,
   localizeField,
@@ -18,6 +19,7 @@ import {
   type SignedImageGrant,
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
+import type { GalleryChapter } from "@/lib/gallery-chapters";
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
 
@@ -51,6 +53,8 @@ export interface GalleryViewData {
     favoriteCount: number;
     /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
     uploaderName: string | null;
+    /** Timeline position, ISO — places chapter headers (docs/CHAPTERS.md). */
+    takenAt: string;
   }[];
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
@@ -59,6 +63,10 @@ export interface GalleryViewData {
    * Loaded whole rather than per page — there are at most a handful, and their
    * slots are resolved against the entire gallery. */
   promos: GalleryPromo[];
+  /** Named stretches of the timeline (docs/CHAPTERS.md), in timeline order,
+   * empty ones already dropped. Loaded whole, like promos: the chapter bar
+   * lists every chapter before any of them has been scrolled to. */
+  chapters: GalleryChapter[];
   archive: GalleryArchive;
 }
 
@@ -159,6 +167,16 @@ export async function loadGalleryViewData(
           },
         },
       },
+      chapters: {
+        orderBy: [{ startTakenAt: "asc" }, { startPhotoId: "asc" }],
+        select: {
+          id: true,
+          title: true,
+          translations: true,
+          startTakenAt: true,
+          startPhotoId: true,
+        },
+      },
     },
   });
   if (!gallery) return null;
@@ -192,6 +210,7 @@ export async function loadGalleryViewData(
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
+      takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
     })),
     initialCursor:
       hasMore && last
@@ -218,6 +237,20 @@ export async function loadGalleryViewData(
           theme: card.theme,
         };
       }),
+    chapters: await chaptersWithCounts(
+      gallery.id,
+      gallery._count.photos,
+      gallery.chapters.map((chapter) => ({
+        id: chapter.id,
+        title: localizeField(
+          chapter.title,
+          parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+          "title",
+          locale,
+        ),
+        start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+      })),
+    ),
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,
@@ -225,6 +258,40 @@ export async function loadGalleryViewData(
       gallery.zipBuiltAt,
     ),
   };
+}
+
+/**
+ * Each chapter's photo count, from how many confirmed photos sit before its
+ * start: one indexed COUNT per chapter, and a gallery has a handful. Chapters
+ * left with no photos (every one deleted, or started past the last photo) are
+ * dropped here, so neither the chapter bar nor the grid ever shows an empty
+ * one.
+ *
+ * ponytail: counts are fixed at page load, so a photo added or removed while
+ * the page is open shows in the grid but not in "84 fotek" until a reload.
+ * Placement does not use them (src/lib/gallery-grid.ts), only the label does.
+ */
+async function chaptersWithCounts(
+  galleryId: string,
+  total: number,
+  chapters: Omit<GalleryChapter, "count">[],
+): Promise<GalleryChapter[]> {
+  if (chapters.length === 0) return [];
+  const before = await Promise.all(
+    chapters.map((chapter) => {
+      const takenAt = new Date(chapter.start.takenAt);
+      return prisma.photo.count({
+        where: {
+          galleryId,
+          status: "CONFIRMED",
+          OR: [{ takenAt: { lt: takenAt } }, { takenAt, id: { lt: chapter.start.id } }],
+        },
+      });
+    }),
+  );
+  return chapters
+    .map((chapter, i) => ({ ...chapter, count: (before[i + 1] ?? total) - before[i]! }))
+    .filter((chapter) => chapter.count > 0);
 }
 
 /**

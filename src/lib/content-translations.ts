@@ -3,7 +3,8 @@ import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/i18n/locales";
 
 /**
  * Translations of the text the photographer types into the admin — wedding
- * title and venue, gallery title, promo card copy (docs/I18N.md §Content).
+ * title and venue, gallery title, promo card copy, chapter titles
+ * (docs/I18N.md §Content).
  *
  * The model's own columns hold the original, written in Czech in a Czech
  * admin; each row carries one `translations` JSON object for the other
@@ -30,6 +31,7 @@ export type ContentTranslations<F extends string> = Partial<
 export const EVENT_TRANSLATED_FIELDS = ["title", "venue"] as const;
 export const GALLERY_TRANSLATED_FIELDS = ["title"] as const;
 export const PROMO_TRANSLATED_FIELDS = ["eyebrow", "headline", "body", "ctaLabel"] as const;
+export const CHAPTER_TRANSLATED_FIELDS = ["title"] as const;
 
 function isTranslatedLocale(value: string): value is TranslatedLocale {
   return (TRANSLATED_LOCALES as readonly string[]).includes(value);

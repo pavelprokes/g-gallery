@@ -36,19 +36,23 @@ export function TranslationFields<F extends string>({
   fields,
   values,
   note,
+  open,
   className = "",
 }: {
   fields: TranslationFieldSpec<F>[];
   values?: ContentTranslations<F>;
   /** One extra sentence for this form's hint — e.g. that couple names rarely need translating. */
   note?: string;
+  /** Overrides "open once anything is translated" — for translations the app
+   * filled in itself (a chapter preset), which nobody needs to look at. */
+  open?: boolean;
   className?: string;
 }) {
   const idPrefix = useId();
   const hasAny = TRANSLATED_LOCALES.some((locale) => Object.keys(values?.[locale] ?? {}).length);
 
   return (
-    <details open={hasAny} className={`rounded-lg border px-3 py-2 ${className}`}>
+    <details open={open ?? hasAny} className={`rounded-lg border px-3 py-2 ${className}`}>
       <summary className="cursor-pointer text-sm font-semibold">
         Překlady pro hosty ({TRANSLATED_LOCALES.map((l) => l.toUpperCase()).join(", ")})
       </summary>
