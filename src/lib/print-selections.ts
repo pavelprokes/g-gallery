@@ -42,12 +42,21 @@ export async function viewerPrintSelections(
 /**
  * Quantities summed across every viewer, for the admin grid — a wedding hub's
  * photo can be marked by more than one guest, and the photographer needs one
- * number to order, not a per-person breakdown.
+ * number to order, not a per-person breakdown. The gallery shows the same sum,
+ * minus the guest's own, so whoever comes back to the selection (or opens it
+ * on another device) sees what has already been picked.
  */
-export async function printTotals(galleryId: string): Promise<Map<string, number>> {
+export async function printTotals(
+  galleryId: string,
+  /** Leave one viewer out — the guest's own marks are sent separately. */
+  excludeViewerId?: string,
+): Promise<Map<string, number>> {
   const grouped = await prisma.printSelection.groupBy({
     by: ["photoId"],
-    where: { photo: { galleryId } },
+    where: {
+      photo: { galleryId },
+      ...(excludeViewerId ? { viewerId: { not: excludeViewerId } } : {}),
+    },
     _sum: { quantity: true },
   });
   return new Map(grouped.map((row) => [row.photoId, row._sum.quantity ?? 0]));

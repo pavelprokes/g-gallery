@@ -917,6 +917,10 @@ function GalleryViewInner({
   // tap would build an absolute quantity on 0 and could overwrite copies saved
   // on an earlier visit — so marking waits for it.
   const [printsLoaded, setPrintsLoaded] = useState(false);
+  // Everyone else's copies per photo — a print order is often picked by the
+  // couple together, or by one of them on a second device, and each of them
+  // has to see what is already in it. Not editable here: only your own are.
+  const [printOthers, setPrintOthers] = useState<Map<string, number>>(() => new Map());
   const [printSync, setPrintSync] = useState({ pending: 0, busy: false, offline: false });
   const showPrintQuantity = useCallback((photoId: string, quantity: number) => {
     setPrintSelections((prev) => {
@@ -1166,9 +1170,13 @@ function GalleryViewInner({
           // A 4xx (expired or revoked link) will not improve by asking again,
           // and every mark would be refused anyway — settle on "nothing saved".
           const data = response.ok
-            ? ((await response.json()) as { quantities: Record<string, number> })
-            : { quantities: {} };
+            ? ((await response.json()) as {
+                quantities: Record<string, number>;
+                others: Record<string, number>;
+              })
+            : { quantities: {}, others: {} };
           confirmedPrints.current = new Map(Object.entries(data.quantities));
+          setPrintOthers(new Map(Object.entries(data.others)));
           setPrintsLoaded(true);
         })
         .catch(() => undefined)
@@ -1434,6 +1442,12 @@ function GalleryViewInner({
     () => [...printSelections.values()].reduce((sum, quantity) => sum + quantity, 0),
     [printSelections],
   );
+  const everyonePrints = useMemo(() => {
+    let pieces = printPieces;
+    for (const quantity of printOthers.values()) pieces += quantity;
+    const photos = new Set([...printSelections.keys(), ...printOthers.keys()]).size;
+    return { photos, pieces };
+  }, [printSelections, printOthers, printPieces]);
 
   const incrementPrintQuantity = useCallback(
     (photoId: string) => adjustPrintQuantity(photoId, 1),
@@ -2227,7 +2241,10 @@ function GalleryViewInner({
           saved — the one thing an optimistic badge on a tile cannot. */}
       {allowPrintSelection &&
         !optedOut &&
-        (markingMode || printSelections.size > 0 || printSync.pending > 0) && (
+        (markingMode ||
+          printSelections.size > 0 ||
+          printOthers.size > 0 ||
+          printSync.pending > 0) && (
           <div className="pointer-events-none sticky top-2 z-30 flex h-0 justify-center px-3">
             <p
               role="status"
@@ -2244,6 +2261,11 @@ function GalleryViewInner({
                     ? t("printSyncSaving")
                     : t("printSyncSaved")}
               </span>
+              {printOthers.size > 0 && (
+                <span className="basis-full text-white/70">
+                  {t("printSummaryEveryone", everyonePrints)}
+                </span>
+              )}
             </p>
           </div>
         )}
@@ -2389,6 +2411,7 @@ function GalleryViewInner({
                     favoriteCount={counts.get(photo.id) ?? photo.favoriteCount}
                     reactionState={reactions.get(photo.id)}
                     printQuantity={printSelections.get(photo.id) ?? 0}
+                    printOthers={printOthers.get(photo.id) ?? 0}
                     onPick={pick}
                     onOpen={openPhoto}
                     onToggleFavorite={toggleFavorite}
@@ -2575,6 +2598,7 @@ function GalleryViewInner({
             {allowPrintSelection && (
               <PrinterButton
                 quantity={printSelections.get(active.id) ?? 0}
+                others={printOthers.get(active.id) ?? 0}
                 onIncrement={() => incrementPrintQuantity(active.id)}
                 onDecrement={() => decrementPrintQuantity(active.id)}
                 size="lg"
@@ -2774,6 +2798,8 @@ interface PhotoTileProps {
   favoriteCount: number;
   reactionState: PhotoReactionState | undefined;
   printQuantity: number;
+  /** Copies everyone else has marked on this photo. */
+  printOthers?: number;
   onPick: (index: number, id: string, shiftKey: boolean) => void;
   onOpen: (index: number) => void;
   onToggleFavorite: (photoId: string) => void;
@@ -2811,6 +2837,7 @@ export const PhotoTile = memo(function PhotoTile({
   favoriteCount,
   reactionState,
   printQuantity,
+  printOthers = 0,
   onPick,
   onOpen,
   onToggleFavorite,
@@ -2964,6 +2991,7 @@ export const PhotoTile = memo(function PhotoTile({
       {allowPrintSelection && (
         <PrinterButton
           quantity={printQuantity}
+          others={printOthers}
           onIncrement={() => onIncrementPrint(photo.id)}
           onDecrement={() => onDecrementPrint(photo.id)}
           pinned={markingMode}
@@ -3091,6 +3119,7 @@ export function HeartButton({
  */
 export function PrinterButton({
   quantity,
+  others = 0,
   onIncrement,
   onDecrement,
   pinned = false,
@@ -3099,6 +3128,8 @@ export function PrinterButton({
   bare = false,
 }: {
   quantity: number;
+  /** Copies other viewers marked — shown, never changed from here. */
+  others?: number;
   onIncrement: () => void;
   onDecrement: () => void;
   /** Marking mode is on, so an idle printer shows without waiting for a hover. */
@@ -3112,11 +3143,15 @@ export function PrinterButton({
   const active = quantity > 0;
 
   if (!active) {
+    // Widens past the 44 px circle only when there is a count to fit.
+    const idleBox = others > 0 ? "h-11 min-w-11 px-2" : "h-11 w-11";
     const idleSizeClasses =
-      size === "lg" ? "h-11 w-11" : "h-11 w-11 drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]";
+      size === "lg" ? idleBox : `${idleBox} drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]`;
     const restingClasses = bare
       ? "hover:bg-white/15"
-      : pinned
+      : // Somebody else's copies are information, like a heart's count — so,
+        // like the heart, the printer then shows without a hover or a toggle.
+        pinned || others > 0
         ? "opacity-100"
         : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
           // `opacity-0`, so a phone is not left with an invisible 44px tap
@@ -3126,10 +3161,11 @@ export function PrinterButton({
       <button
         type="button"
         onClick={onIncrement}
-        aria-label={t("markForPrint")}
-        className={`flex items-center justify-center rounded-full text-white transition-opacity ${idleSizeClasses} ${restingClasses} ${className}`}
+        aria-label={others > 0 ? t("markForPrintOthers", { count: others }) : t("markForPrint")}
+        className={`flex items-center justify-center gap-1 rounded-full text-white transition-opacity ${idleSizeClasses} ${restingClasses} ${className}`}
       >
         <PrinterIcon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
+        {others > 0 && <span className="text-xs tabular-nums">{others}</span>}
       </button>
     );
   }
@@ -3168,6 +3204,12 @@ export function PrinterButton({
         aria-live="polite"
       >
         {quantity}
+        {others > 0 && (
+          <span className="text-white/70" title={t("printOthers", { count: others })}>
+            <span aria-hidden> +{others}</span>
+            <span className="sr-only">{t("printOthers", { count: others })}</span>
+          </span>
+        )}
       </span>
       <button
         type="button"

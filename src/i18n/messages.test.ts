@@ -46,15 +46,17 @@ function placeholders(message: string): string[] {
       continue;
     }
     if (char === "}") {
-      if (depth === 1 && name) args.add(`{${name}}`);
+      if (depth === 1 && name && name !== "\0") args.add(`{${name}}`);
       depth -= 1;
       continue;
     }
-    if (depth === 1) {
+    // Once the argument is named ("\0"), the rest of the group — including a
+    // plural's second comma — is ignored.
+    if (depth === 1 && name !== "\0") {
       if (char === "," && name) {
         args.add(`{${name}}`);
-        name = "\0"; // Argument named; ignore the rest of the group.
-      } else if (name !== "\0") {
+        name = "\0";
+      } else {
         name += char.trim();
       }
     }

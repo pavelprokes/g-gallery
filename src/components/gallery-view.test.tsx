@@ -85,6 +85,21 @@ describe("PrinterButton on a tile", () => {
     expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
+
+  // Copies somebody else marked are what a returning viewer (or the partner
+  // on another phone) needs to see — same rule as the heart's count above.
+  it("stays visible for somebody else's copies, before this viewer marks any", () => {
+    render(<PrinterButton quantity={0} others={3} onIncrement={noop} onDecrement={noop} />);
+    const button = screen.getByRole("button");
+    expect(hiddenOnTouch(button)).toBe(false);
+    expect(button.getAttribute("aria-label")).toBe("markForPrintOthers");
+    expect(screen.getByText("3")).toBeTruthy();
+  });
+
+  it("keeps somebody else's copies apart from this viewer's own", () => {
+    render(<PrinterButton quantity={1} others={2} onIncrement={noop} onDecrement={noop} />);
+    expect(screen.getByText("+2")).toBeTruthy();
+  });
 });
 
 describe("a long press on a tile", () => {
