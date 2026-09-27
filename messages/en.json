@@ -127,6 +127,7 @@
   "gallery": {
     "untitledPlaceholder": "Gallery",
     "galleryOgDescription": "Wedding photos on one link. Open, browse, download.",
+    "photographerCredit": "Photographer: <link>Pavel Prokeš</link>",
     "photoCount": "{count, plural, one {# photo} other {# photos}}",
     "emptyEvent": "Nothing here yet. Once the photographer adds something, it'll show up at this address.",
     "emptyCard": "Empty for now",

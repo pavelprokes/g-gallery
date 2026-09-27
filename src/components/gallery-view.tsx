@@ -87,6 +87,7 @@ const OfflineIconButton = dynamic(() =>
 );
 import { Button, buttonClasses } from "@/components/ui/button";
 import { IconButton, IconButtonLink, NavButton } from "@/components/ui/icon-button";
+import { PhotographerCredit } from "@/components/photographer-credit";
 import {
   CameraIcon,
   CheckCircleIcon,
@@ -769,6 +770,7 @@ interface GalleryViewProps {
   galleryId: string;
   title: string;
   eventDate: string | null;
+  venue: string | null;
   /** Every confirmed photo in the gallery, not just the loaded pages — the
    * header says how big it is before the viewer has scrolled anywhere. */
   photoCount: number;
@@ -804,6 +806,7 @@ function GalleryViewInner({
   galleryId,
   title,
   eventDate,
+  venue,
   photoCount,
   initialPhotos,
   initialCursor,
@@ -1748,8 +1751,8 @@ function GalleryViewInner({
 
   const toggleChrome = useCallback(() => setChromeHidden((hidden) => !hidden), []);
 
-  /** "15. 8. 2026 · 56 fotek", with either half omitted if it isn't known. */
-  const subtitle = [eventDate, liveCount > 0 ? t("photoCount", { count: liveCount }) : null]
+  /** "15. 8. 2026 · Zámek Liblice · 56 fotek", with any part omitted if it isn't known. */
+  const subtitle = [eventDate, venue, liveCount > 0 ? t("photoCount", { count: liveCount }) : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -1962,6 +1965,7 @@ function GalleryViewInner({
           {subtitle && (
             <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-0.5">{subtitle}</p>
           )}
+          <PhotographerCredit className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-0.5" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Touch only: a mouse already reveals both icons on hover, so on a

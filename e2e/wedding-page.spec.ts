@@ -68,6 +68,12 @@ test.describe("wedding page", () => {
     await page.getByRole("link", { name: /First picks/ }).click();
     await expect(page.getByRole("heading", { level: 1, name: "First picks" })).toBeVisible();
     await expect(page).toHaveTitle("First picks");
+    // The gallery has no venue of its own; its header borrows the wedding's.
+    await expect(page.getByText(/Domaine de Benice/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Pavel Prokeš" }).first()).toHaveAttribute(
+      "href",
+      /^https:\/\/svatebni-fotograf-cechy\.cz\/\?utm_source=galerie/,
+    );
 
     await context.close();
   });

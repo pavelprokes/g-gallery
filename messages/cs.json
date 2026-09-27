@@ -127,6 +127,7 @@
   "gallery": {
     "untitledPlaceholder": "Galerie",
     "galleryOgDescription": "Fotky ze svatby na jednom odkazu. Otevři, prohlédni si je, stáhni.",
+    "photographerCredit": "Fotograf: <link>Pavel Prokeš</link>",
     "photoCount": "{count, plural, one {# fotka} few {# fotky} other {# fotek}}",
     "emptyEvent": "Zatím tu nic není. Až fotograf něco přidá, objeví se to na téhle adrese.",
     "emptyCard": "Zatím prázdné",
