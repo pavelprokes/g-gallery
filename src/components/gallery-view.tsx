@@ -2271,18 +2271,19 @@ function GalleryViewInner({
           // sized the pill to 0 as well, so its background covered only the
           // padding and the text spilled out over the photos.
           <div className="pointer-events-none sticky top-2 z-30 flex h-0 items-start justify-center px-3">
-            {/* The header toolbar's chrome (IconButton: hairline border, brand
-                ink on tint, 44 px tall, fully round) — plus a background and
-                a shadow, because unlike the toolbar it sits over photos. */}
+            {/* The lightbox chrome's glass (its top bar and counter): it sits
+                over photos the same way. Blur only under a fine pointer, as
+                there — a blurred layer over a scrolling grid is the one thing
+                a low-end phone's GPU notices. */}
             <p
               role="status"
-              className="text-body text-brand-ink bg-brand-tint/95 dark:text-brand-tint flex min-h-11 max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-[22px] border px-4 py-2 shadow-lg backdrop-blur dark:bg-neutral-950/95"
+              className="text-body flex min-h-11 max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-[22px] bg-black/55 px-4 py-2 text-white pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md"
             >
               <PrinterIcon className="h-4 w-4 shrink-0" />
               <span className="font-medium">
                 {t("printSummary", { photos: printSelections.size, pieces: printPieces })}
               </span>
-              <span className="text-brand-ink/60 dark:text-brand-tint/60">
+              <span className="text-white/70">
                 {printSync.offline && printSync.pending > 0
                   ? t("printSyncOffline", { count: printSync.pending })
                   : printSync.pending > 0 || printSync.busy
@@ -2290,7 +2291,7 @@ function GalleryViewInner({
                     : t("printSyncSaved")}
               </span>
               {printOthers.size > 0 && (
-                <span className="text-brand-ink/60 dark:text-brand-tint/60 basis-full text-center">
+                <span className="basis-full text-center text-white/70">
                   {t("printSummaryEveryone", everyonePrints)}
                 </span>
               )}
