@@ -176,7 +176,7 @@ async function uploadOne(
 ): Promise<void> {
   // GPS strip, capture time, CRC32, dimensions and placeholder colour — off
   // the main thread where a worker can run (src/lib/upload-prepare-client.ts).
-  const { body, crc32, takenAt, width, height, placeholder } =
+  const { body, crc32, takenAt, width, height, placeholder, picks } =
     await prepareUploadOffMainThread(file);
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
@@ -230,6 +230,9 @@ async function uploadOne(
           placeholder,
           thumb: thumbStored,
           takenAt: takenAt?.toISOString(),
+          xmpRating: picks?.rating ?? undefined,
+          xmpLabel: picks?.label ?? undefined,
+          xmpHighlight: picks?.tagged || undefined,
         }),
       });
       if (!confirm.ok) throw await rejectionFrom(confirm);

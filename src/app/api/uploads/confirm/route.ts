@@ -27,6 +27,10 @@ const commonSchema = {
   thumb: z.enum(["webp", "jpeg"]).nullish(),
   /** Capture time (EXIF, or the file's mtime) — drives the gallery timeline. */
   takenAt: z.iso.datetime().nullish(),
+  /** Lightroom marks from the file's XMP — hints for the highlights only. */
+  xmpRating: z.number().int().min(-1).max(5).nullish(),
+  xmpLabel: z.string().trim().min(1).max(32).nullish(),
+  xmpHighlight: z.boolean().nullish(),
 };
 
 /**
@@ -68,8 +72,20 @@ export async function POST(request: Request) {
     );
   }
 
-  const { photoId, etag, crc32, sizeBytes, width, height, placeholder, thumb, takenAt } =
-    parsed.data;
+  const {
+    photoId,
+    etag,
+    crc32,
+    sizeBytes,
+    width,
+    height,
+    placeholder,
+    thumb,
+    takenAt,
+    xmpRating,
+    xmpLabel,
+    xmpHighlight,
+  } = parsed.data;
 
   let photo: { id: string; galleryId: string; objectKey: string } | null;
 
@@ -141,6 +157,9 @@ export async function POST(request: Request) {
       // Derived from the key we issued: the client only says which format it
       // managed, never where to write it.
       thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,
+      xmpRating: xmpRating ?? null,
+      xmpLabel: xmpLabel ?? null,
+      xmpHighlight: xmpHighlight ?? false,
     },
   });
 

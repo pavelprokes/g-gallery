@@ -29,6 +29,9 @@ import {
 } from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
+import { setHighlightPin } from "../../highlight-actions";
+import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
+import { pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
@@ -63,6 +66,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       trashedAt: true,
       eventId: true,
       coverPhotoId: true,
+      highlightsEnabled: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
       event: { select: { id: true, title: true } },
       photos: {
@@ -84,6 +88,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           uploadedBy: { select: { displayName: true } },
           takenAt: true,
           createdAt: true,
+          // docs/HIGHLIGHTS.md — the same pick the guests get.
+          xmpRating: true,
+          xmpLabel: true,
+          xmpHighlight: true,
+          highlightPin: true,
         },
       },
       chapters: {
@@ -223,6 +232,32 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       };
     });
 
+  // The highlights exactly as a guest's page picks them (src/lib/shared-gallery.ts),
+  // shown whether or not they are switched on, so they can be reviewed first.
+  const highlightPicks = pickHighlights(
+    gallery.photos.map(toHighlightCandidate),
+    gallery.chapters.map((chapter) => ({
+      takenAt: chapter.startTakenAt.toISOString(),
+      id: chapter.startPhotoId,
+    })),
+  );
+  const pickedPinned = new Map(highlightPicks.map((pick) => [pick.id, pick.pinned]));
+  const photosById = new Map(gallery.photos.map((photo) => [photo.id, photo]));
+  const adminHighlights = highlightPicks.flatMap((pick) => {
+    const photo = photosById.get(pick.id);
+    return photo
+      ? [
+          {
+            id: photo.id,
+            objectKey: photo.objectKey,
+            thumbObjectKey: photo.thumbObjectKey,
+            fileName: photo.fileName,
+            pinned: pick.pinned,
+          },
+        ]
+      : [];
+  });
+
   async function publish() {
     "use server";
     await publishGallery(id);
@@ -234,6 +269,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
     const printQuantity = printQuantities.get(photo.id) ?? 0;
     const isCover = gallery.coverPhotoId === photo.id;
+    const inHighlights = pickedPinned.has(photo.id);
     return (
       <li key={photo.id} className="space-y-1">
         <div
@@ -254,6 +290,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           {isCover && (
             <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
               Titulní
+            </span>
+          )}
+          {inHighlights && (
+            <span className="text-caption absolute top-1 right-1 rounded-full bg-white/90 px-2 py-0.5 font-semibold text-neutral-800">
+              ★ Výběr
             </span>
           )}
         </div>
@@ -279,6 +320,24 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         <form action={setGalleryCover.bind(null, gallery.id, isCover ? null : photo.id)}>
           <Button type="submit" variant={isCover ? "ghost" : "secondary"} size="sm">
             {isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
+          </Button>
+        </form>
+        {/* docs/HIGHLIGHTS.md — pinned always in, excluded never, else the pick decides. */}
+        <form
+          action={setHighlightPin.bind(
+            null,
+            photo.id,
+            photo.highlightPin !== null ? null : inHighlights ? false : true,
+          )}
+        >
+          <Button type="submit" variant="ghost" size="sm">
+            {photo.highlightPin === true
+              ? "Odepnout z výběru"
+              : photo.highlightPin === false
+                ? "Vrátit do návrhu výběru"
+                : inHighlights
+                  ? "Vyřadit z výběru"
+                  : "Připnout do výběru"}
           </Button>
         </form>
         <DeletePhotoButton photoId={photo.id} />
@@ -398,6 +457,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         timelineActive={timelineView}
       />
       <ChapterPresetsList />
+
+      <GalleryHighlightPanel
+        galleryId={gallery.id}
+        enabled={gallery.highlightsEnabled}
+        highlights={adminHighlights}
+        excludedCount={gallery.photos.filter((photo) => photo.highlightPin === false).length}
+      />
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -1,6 +1,7 @@
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { stripGpsFromFile } from "@/lib/exif-gps";
 import { readTakenAtFromFile } from "@/lib/exif-taken-at";
+import { readXmpPicksFromFile, type XmpPicks } from "@/lib/xmp-picks";
 import { averageColorOf } from "@/lib/placeholder";
 
 /**
@@ -23,6 +24,8 @@ export interface PreparedUpload {
   height: number | null;
   /** Average colour, painted before the image arrives. Cosmetic. */
   placeholder: string | null;
+  /** The photographer's Lightroom marks, for the highlights (docs/HIGHLIGHTS.md). */
+  picks: XmpPicks | null;
 }
 
 export async function prepareUpload(file: File): Promise<PreparedUpload> {
@@ -42,6 +45,9 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
   const dimensions = await readDimensions(body);
   // Cosmetic, so a failure here never blocks the upload.
   const placeholder = await averageColorOf(body);
+  // Read from the original: the GPS strip rewrites only EXIF, but there is no
+  // reason to depend on that.
+  const picks = await readXmpPicksFromFile(file);
   return {
     body,
     crc32,
@@ -49,6 +55,7 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
     placeholder,
+    picks,
   };
 }
 

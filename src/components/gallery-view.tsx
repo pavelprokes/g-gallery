@@ -62,6 +62,8 @@ import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
 import type { GalleryChapter } from "@/lib/gallery-chapters";
 import { PromoTile } from "@/components/promo-tile";
 import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
+import { GalleryHighlights } from "@/components/gallery-highlights";
+import type { GalleryHighlight } from "@/lib/gallery-highlights";
 import {
   clampPan,
   clampScale,
@@ -236,6 +238,23 @@ const timelineOf = (photo: GalleryPhoto) => ({ takenAt: photo.takenAt, id: photo
  * new chapter reads as a break in the day, not as a caption on the row above. */
 function chapterRowHeight(containerWidth: number): number {
   return containerWidth < 640 ? 88 : 120;
+}
+
+/**
+ * Briefly rings a grid tile — where a highlight's jump landed. An outline, not
+ * a shadow: it is painted over the photo, which fills the tile edge to edge.
+ */
+function flashTile(el: HTMLElement) {
+  if (typeof el.animate !== "function") return;
+  const ring = "var(--color-brand-primary)";
+  el.animate(
+    [
+      { outline: `4px solid ${ring}`, outlineOffset: "-4px" },
+      { outline: `4px solid ${ring}`, outlineOffset: "-4px", offset: 0.6 },
+      { outline: "4px solid transparent", outlineOffset: "-4px" },
+    ],
+    { duration: 2000, easing: "ease-out" },
+  );
 }
 
 /**
@@ -850,6 +869,8 @@ interface GalleryViewProps {
   promos: GalleryPromo[];
   /** Named stretches of the timeline, empty ones dropped (docs/CHAPTERS.md). */
   chapters: GalleryChapter[];
+  /** The "best of the day" above the grid (docs/HIGHLIGHTS.md); may be empty. */
+  highlights: GalleryHighlight[];
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -881,6 +902,7 @@ function GalleryViewInner({
   viewers,
   promos,
   chapters,
+  highlights,
   allowDownload,
   allowReactions,
   allowUpload,
@@ -1122,6 +1144,10 @@ function GalleryViewInner({
    * chapters, for the same reason it has no promo.
    */
   const showChapters = !favoritesOnly && chapters.length > 0;
+
+  /** The highlights (docs/HIGHLIGHTS.md) — like chapters, not part of the
+   * viewer's own shortlist. */
+  const showHighlights = !favoritesOnly && highlights.length > 0;
 
   useEffect(() => {
     if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
@@ -1560,9 +1586,10 @@ function GalleryViewInner({
     // without the list itself resizing (selection toggling the toolbar).
     sync();
     return () => observer.disconnect();
-    // `showChapters`: the chapter bar above the list comes and goes with the
-    // favourites filter, moving the list's top without resizing it.
-  }, [selectionActive, showChapters]);
+    // `showChapters`, `showHighlights`: the chapter bar and the highlights
+    // above the list come and go with the favourites filter, moving the
+    // list's top without resizing it.
+  }, [selectionActive, showChapters, showHighlights]);
 
   /**
    * The tiles the grid lays out: every photo, plus the owner's promo cards at
@@ -1780,6 +1807,8 @@ function GalleryViewInner({
   // the effect below that watches `pendingFocusIndex`.
   const [rovingIndex, setRovingIndex] = useState(0);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
+  /** The next pending focus is a highlight's jump landing — ring the tile. */
+  const flashOnFocus = useRef(false);
   const tileRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
   const registerTileRef = useCallback((index: number, el: HTMLButtonElement | null) => {
     if (el) tileRefs.current.set(index, el);
@@ -1835,9 +1864,55 @@ function GalleryViewInner({
     const el = tileRefs.current.get(pendingFocusIndex);
     if (el) {
       el.focus();
+      if (flashOnFocus.current) flashTile(el);
+      flashOnFocus.current = false;
       setPendingFocusIndex(null);
     }
   }, [pendingFocusIndex, virtualRows]);
+
+  /**
+   * A highlight's jump to its photo's place in the grid (docs/HIGHLIGHTS.md).
+   * The same mechanics as a chapter jump: pages are pulled until the photo is
+   * in the grid, then one instant scroll — never a smooth one, which would
+   * download every row it passed. The tile then takes focus and flashes, so
+   * the eye finds it among its neighbours.
+   */
+  const [jumpingToPhoto, setJumpingToPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!jumpingToPhoto || rows.length === 0) return;
+    const index = photos.findIndex((photo) => photo.id === jumpingToPhoto);
+    const rowIndex = index >= 0 ? nav.rowIndexForPhoto.get(index) : undefined;
+    if (rowIndex === undefined && hasNextPage) {
+      if (!isFetchingNextPage) void fetchNextPage();
+      return;
+    }
+    // Not found with nothing left to fetch: deleted since the page loaded, so
+    // there is nowhere to go.
+    if (rowIndex !== undefined) {
+      rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+      flashOnFocus.current = true;
+    }
+    // State on the next frame, once the scroll has landed — as the chapter
+    // jump does; the focus effect then finds the tile mounted.
+    const frame = requestAnimationFrame(() => {
+      if (rowIndex !== undefined) {
+        setRovingIndex(index);
+        setPendingFocusIndex(index);
+      }
+      setJumpingToPhoto(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    jumpingToPhoto,
+    rows.length,
+    photos,
+    nav,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    rowVirtualizer,
+  ]);
 
   const onGridKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLUListElement>) => {
@@ -2462,6 +2537,15 @@ function GalleryViewInner({
           {viewers.length > 0 && <ViewerChips viewers={viewers} />}
         </div>
       </header>
+
+      {showHighlights && (
+        <GalleryHighlights
+          highlights={highlights}
+          imageGrant={imageGrant}
+          jumpingTo={jumpingToPhoto}
+          onJump={setJumpingToPhoto}
+        />
+      )}
 
       {showChapters && !selectionActive && (
         <ChapterBar
