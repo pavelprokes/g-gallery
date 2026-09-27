@@ -1,11 +1,14 @@
 import { GALLERY_TRANSLATED_FIELDS, parseTranslations } from "@/lib/content-translations";
-import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
 import { galleryCounts, photoCounts } from "@/lib/activity";
 import { reactionTotals } from "@/lib/reactions";
 import { printTotals } from "@/lib/print-selections";
+import { printList } from "@/lib/print-export";
+import { placeholderStyle } from "@/lib/placeholder";
+import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
+import { PrintDownloadButton } from "@/components/admin/print-download-button";
 import { Uploader } from "@/components/uploader";
 import { DeletePhotoButton } from "@/components/delete-photo-button";
 import { CopyButton } from "@/components/copy-button";
@@ -53,6 +56,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         select: {
           id: true,
           objectKey: true,
+          // Every tile below prefers the upload-time thumbnail: served straight
+          // from the bucket, it cannot fail the way transforming a 14 MB
+          // original on first view occasionally does, and it is not billed.
+          thumbObjectKey: true,
+          placeholder: true,
           fileName: true,
           width: true,
           height: true,
@@ -111,6 +119,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
   );
   const visiblePhotos = printOnly ? printMarkedPhotos : gallery.photos;
+  const printItems = printMarkedPhotos.map((photo) => ({
+    id: photo.id,
+    fileName: photo.fileName,
+    quantity: printQuantities.get(photo.id) ?? 0,
+  }));
+  const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
   async function publish() {
     "use server";
@@ -159,11 +173,20 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Zobrazení" value={counts.views} />
         <Stat label="Unikátní diváci" value={counts.uniqueViewers} />
-        <Stat label="Fotek" value={gallery.photos.length} />
-        <Stat
-          label="Aktivní odkazy"
-          value={gallery.shareLinks.filter((l) => !l.revokedAt).length}
-        />
+        {printOnly ? (
+          <>
+            <Stat label="Fotek k tisku" value={printMarkedPhotos.length} />
+            <Stat label="Kusů k tisku" value={printPieces} />
+          </>
+        ) : (
+          <>
+            <Stat label="Fotek" value={gallery.photos.length} />
+            <Stat
+              label="Aktivní odkazy"
+              value={gallery.shareLinks.filter((l) => !l.revokedAt).length}
+            />
+          </>
+        )}
       </section>
 
       <Uploader galleryId={gallery.id} />
@@ -211,10 +234,34 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   : "border-admin-border hover:border-brand-primary hover:text-brand-primary text-brand-primary-dark bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
               }`}
             >
-              🖨 {printOnly ? "Zobrazit vše" : `Jen pro tisk (${printMarkedPhotos.length})`}
+              🖨{" "}
+              {printOnly
+                ? "Zobrazit vše"
+                : `Jen pro tisk (${printMarkedPhotos.length} · ${printPieces} ks)`}
             </a>
           )}
         </div>
+        {printOnly && printItems.length > 0 && (
+          <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
+            <p>
+              Fotky k tisku: <strong>{printMarkedPhotos.length}</strong>, kusů celkem:{" "}
+              <strong>{printPieces}</strong>.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <PrintDownloadButton galleryId={gallery.id} count={printMarkedPhotos.length} />
+              <CopyButton
+                value={printList(printItems)}
+                label="Kopírovat seznam souborů s počty kusů"
+                text="Seznam"
+              />
+            </div>
+            <p className="text-admin-muted text-caption dark:text-neutral-400">
+              Originály se stáhnou jeden po druhém do Stažených souborů, u více kusů s počtem v
+              názvu (<code>5x_…</code>). Prohlížeč se napoprvé zeptá, jestli povolit stažení více
+              souborů — povol.
+            </p>
+          </div>
+        )}
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {visiblePhotos.map((photo) => {
             const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
@@ -228,13 +275,16 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
                     isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
                   }`}
+                  style={
+                    photo.placeholder
+                      ? { backgroundColor: placeholderStyle(photo.placeholder) }
+                      : undefined
+                  }
                 >
-                  <Image
-                    src={photo.objectKey}
+                  <AdminPhotoImage
+                    objectKey={photo.objectKey}
+                    thumbObjectKey={photo.thumbObjectKey}
                     alt={photo.fileName}
-                    fill
-                    sizes="(max-width: 640px) 50vw, 200px"
-                    className="object-cover"
                   />
                   {isCover && (
                     <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">

@@ -14,9 +14,11 @@ import { useState } from "react";
 export function CopyButton({
   value,
   label = "Kopírovat odkaz",
+  text = "Kopírovat",
 }: {
   value: string;
   label?: string;
+  text?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -35,7 +37,7 @@ export function CopyButton({
       }}
     >
       <span aria-hidden>{copied ? "✓" : "⧉"}</span>
-      {copied ? "Zkopírováno" : "Kopírovat"}
+      {copied ? "Zkopírováno" : text}
     </button>
   );
 }

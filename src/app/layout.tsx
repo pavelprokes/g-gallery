@@ -6,6 +6,7 @@ import { AppAnalytics } from "@/components/analytics";
 import { LocaleBootstrap } from "@/components/locale-bootstrap";
 import { LOCALE_COOKIE } from "@/i18n/locales";
 import { bitterFont } from "@/lib/fonts";
+import { installImageRetry } from "@/lib/image-retry";
 import { DEFAULT_OG_IMAGE, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, OG_SITE_NAME } from "@/lib/og-image";
 import { SITE_ORIGIN } from "@/lib/site-url";
 import "./globals.css";
@@ -74,6 +75,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           attributes like cz-shortcut-listen onto <body> before React
           hydrates — a false-positive mismatch React can't avoid on its own. */}
       <body className={bitterFont.variable} suppressHydrationWarning>
+        {/* First in <body> so it also retries images that fail before hydration. */}
+        <script dangerouslySetInnerHTML={{ __html: `(${installImageRetry.toString()})(window)` }} />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <LocaleBootstrap locale={locale} persistedByCookie={persistedByCookie} />
           {children}
