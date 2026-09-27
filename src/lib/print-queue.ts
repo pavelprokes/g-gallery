@@ -35,8 +35,11 @@ export interface PrintQueueListener {
 export class PrintQueue {
   private readonly pending: Map<string, number>;
   private readonly inFlight = new Set<string>();
-  /** The last attempt failed for a reason worth retrying. */
-  offline = false;
+  /** Photos whose last attempt failed for a reason worth retrying. Per photo:
+   * one mark saving says nothing about another that timed out. */
+  private readonly failed = new Set<string>();
+  /** Held while the name prompt is open, so the name travels with the mark. */
+  paused = false;
 
   constructor(
     private readonly storageKey: string,
@@ -59,6 +62,10 @@ export class PrintQueue {
     return this.inFlight.size > 0;
   }
 
+  get offline(): boolean {
+    return this.failed.size > 0;
+  }
+
   set(photoId: string, quantity: number): void {
     this.pending.set(photoId, quantity);
     this.persist();
@@ -67,6 +74,7 @@ export class PrintQueue {
 
   /** Sends everything not already on its way; resolves once those settle. */
   flush(): Promise<void> {
+    if (this.paused) return Promise.resolve();
     const sends: Promise<void>[] = [];
     for (const [photoId, quantity] of this.pending) {
       if (this.inFlight.has(photoId)) continue;
@@ -84,12 +92,12 @@ export class PrintQueue {
     this.inFlight.delete(photoId);
 
     if (outcome.status === "retry") {
-      this.offline = true;
+      this.failed.add(photoId);
       this.listener.changed();
       return;
     }
 
-    this.offline = false;
+    this.failed.delete(photoId);
     const superseded = this.pending.get(photoId) !== quantity;
     if (!superseded) {
       this.pending.delete(photoId);
@@ -103,6 +111,8 @@ export class PrintQueue {
     if (superseded) await this.flush();
   }
 
+  // ponytail: two tabs on one gallery each rewrite the whole key, so one can
+  // drop the other's offline marks; merge with what is stored if that bites.
   private persist(): void {
     try {
       if (this.pending.size === 0) window.localStorage.removeItem(this.storageKey);

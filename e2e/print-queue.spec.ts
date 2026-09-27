@@ -18,7 +18,10 @@ test("a print mark made offline is saved when the connection returns", async ({
   page,
   context,
 }) => {
+  // Marking waits for the viewer's saved marks to load; so does the test.
+  const loaded = page.waitForResponse((r) => r.url().includes("/print?anonKey="));
   await page.goto(`/g/${seed.token}/${seed.slug}`);
+  await loaded;
   const grid = page.getByRole("list", { name: "Fotky v galerii" });
   await grid.locator('button[aria-label^="Otevřít"]').first().click();
 
@@ -34,12 +37,18 @@ test("a print mark made offline is saved when the connection returns", async ({
   await expect(summary).toContainText("Uloženo", { timeout: 15_000 });
 
   // Now from the server, not from this tab's memory or its stored queue.
+  const reloaded = page.waitForResponse((r) => r.url().includes("/print?anonKey="));
   await page.reload();
+  await reloaded;
   await expect(summary).toContainText("K tisku: 1 fotka · 1 ks");
   await expect(summary).toContainText("Uloženo");
 
   // Leave the shared seed gallery as it was.
   await grid.locator('button[aria-label^="Otevřít"]').first().click();
+  const unmarked = page.waitForResponse(
+    (r) => r.url().endsWith("/print") && r.request().method() === "POST",
+  );
   await page.getByRole("dialog").getByRole("button", { name: "Ubrat kopii k tisku" }).click();
-  await expect(summary).toContainText("K tisku: 0 fotek · 0 ks");
+  expect((await unmarked).ok()).toBe(true);
+  await expect(summary).toBeHidden();
 });

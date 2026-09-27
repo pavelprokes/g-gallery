@@ -36,6 +36,29 @@ describe("PrintQueue", () => {
     expect(events.saved).toHaveBeenCalledWith("a", 2, false);
   });
 
+  it("stays offline while any photo is still failing", async () => {
+    const send = vi
+      .fn<(photoId: string, quantity: number) => Promise<PrintSendOutcome>>()
+      .mockResolvedValueOnce({ status: "retry" })
+      .mockResolvedValueOnce({ status: "saved", quantity: 1 });
+    const queue = new PrintQueue(KEY, send, listener());
+
+    queue.set("a", 1);
+    queue.set("b", 1);
+    await queue.flush();
+    expect(queue.offline).toBe(true);
+    expect(queue.entries()).toEqual([["a", 1]]);
+  });
+
+  it("holds everything while paused", async () => {
+    const send = vi.fn();
+    const queue = new PrintQueue(KEY, send, listener());
+    queue.paused = true;
+    queue.set("a", 1);
+    await queue.flush();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("survives a reload through localStorage", () => {
     new PrintQueue(KEY, vi.fn(), listener()).set("a", 3);
     expect(new PrintQueue(KEY, vi.fn(), listener()).entries()).toEqual([["a", 3]]);

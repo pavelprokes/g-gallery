@@ -722,22 +722,13 @@ async function fetchPhotosPage(
   return (await response.json()) as PhotosPage;
 }
 
-/**
- * A 403 `OPTED_OUT` means this browser's key was opted out on the server —
- * from another device that took the identity over by transfer code, since
- * this one would have forgotten the key itself. Adopting it here keeps the
- * footer honest instead of every heart silently snapping back.
- */
 /** One print-mark write, sorted into what the queue should do next with it. */
 async function postPrintQuantity(
   token: string,
+  anonKey: string,
   photoId: string,
   quantity: number,
 ): Promise<PrintSendOutcome> {
-  const anonKey = getViewerId();
-  // Opted out or storage blocked: nothing will ever accept this mark.
-  if (!anonKey) return { status: "refused" };
-
   const response = await fetch(`/api/g/${encodeURIComponent(token)}/print`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -761,6 +752,12 @@ async function postPrintQuantity(
   return { status: "refused" };
 }
 
+/**
+ * A 403 `OPTED_OUT` means this browser's key was opted out on the server —
+ * from another device that took the identity over by transfer code, since
+ * this one would have forgotten the key itself. Adopting it here keeps the
+ * footer honest instead of every heart silently snapping back.
+ */
 async function adoptServerOptOut(response: Response): Promise<void> {
   if (response.status !== 403) return;
   const body = (await response
@@ -916,41 +913,59 @@ function GalleryViewInner({
   const printQueueRef = useRef<PrintQueue | null>(null);
   // What the server last confirmed per photo — where a refused mark goes back to.
   const confirmedPrints = useRef(new Map<string, number>());
+  // Whether `confirmedPrints` holds the server's answer yet. Until it does, a
+  // tap would build an absolute quantity on 0 and could overwrite copies saved
+  // on an earlier visit — so marking waits for it.
+  const [printsLoaded, setPrintsLoaded] = useState(false);
   const [printSync, setPrintSync] = useState({ pending: 0, busy: false, offline: false });
-  const getPrintQueue = useCallback((): PrintQueue => {
+  const showPrintQuantity = useCallback((photoId: string, quantity: number) => {
+    setPrintSelections((prev) => {
+      const copy = new Map(prev);
+      if (quantity > 0) copy.set(photoId, quantity);
+      else copy.delete(photoId);
+      return copy;
+    });
+  }, []);
+  /** Null without a viewer key (opted out, storage blocked): nothing to save under. */
+  const getPrintQueue = useCallback((): PrintQueue | null => {
     if (printQueueRef.current) return printQueueRef.current;
+    const anonKey = getViewerId();
+    if (!anonKey) return null;
 
-    const show = (photoId: string, quantity: number) =>
-      setPrintSelections((prev) => {
-        const copy = new Map(prev);
-        if (quantity > 0) copy.set(photoId, quantity);
-        else copy.delete(photoId);
-        return copy;
-      });
-
+    // Keyed by identity as well as gallery: a transfer code swaps the key (and
+    // reloads), and marks queued under the old one must not be replayed onto
+    // the viewer this device just adopted.
     const queue = new PrintQueue(
-      `gg.printQueue.${galleryId}`,
-      (photoId, quantity) => postPrintQuantity(token, photoId, quantity),
+      `gg.printQueue.${galleryId}.${anonKey}`,
+      (photoId, quantity) => postPrintQuantity(token, anonKey, photoId, quantity),
       {
         saved(photoId, quantity, superseded) {
           if (quantity > 0) confirmedPrints.current.set(photoId, quantity);
           else confirmedPrints.current.delete(photoId);
           // The server is authoritative — unless the viewer has already moved on.
-          if (!superseded) show(photoId, quantity);
+          if (!superseded) showPrintQuantity(photoId, quantity);
           setSaveFailed(false);
         },
         refused(photoId, superseded) {
-          if (!superseded) show(photoId, confirmedPrints.current.get(photoId) ?? 0);
+          if (!superseded) showPrintQuantity(photoId, confirmedPrints.current.get(photoId) ?? 0);
           setSaveFailed(true);
         },
         changed() {
-          setPrintSync({ pending: queue.size, busy: queue.busy, offline: queue.offline });
+          const next = { pending: queue.size, busy: queue.busy, offline: queue.offline };
+          // Every queue event would otherwise re-render the whole grid.
+          setPrintSync((prev) =>
+            prev.pending === next.pending &&
+            prev.busy === next.busy &&
+            prev.offline === next.offline
+              ? prev
+              : next,
+          );
         },
       },
     );
     printQueueRef.current = queue;
     return queue;
-  }, [galleryId, token]);
+  }, [galleryId, token, showPrintQuantity]);
   // Which way the viewer was last moving through the lightbox — the preload
   // effect uses this to warm a photo two steps ahead, not just one, so fast
   // repeated next/prev doesn't keep outrunning the network by exactly one.
@@ -1135,50 +1150,69 @@ function GalleryViewInner({
   }, [allowReactions, token]);
 
   // Print quantities are per-viewer, same reason as the hearts above.
+  const loadPrints = useCallback(
+    (signal?: AbortSignal) => {
+      const queue = getPrintQueue();
+      const anonKey = getViewerId();
+      if (!queue || !anonKey) return;
+
+      void fetch(
+        `/api/g/${encodeURIComponent(token)}/print?anonKey=${encodeURIComponent(anonKey)}`,
+        { signal },
+      )
+        .then(async (response) => {
+          if (response.status >= 500)
+            throw new Error(`print selections failed (${response.status})`);
+          // A 4xx (expired or revoked link) will not improve by asking again,
+          // and every mark would be refused anyway — settle on "nothing saved".
+          const data = response.ok
+            ? ((await response.json()) as { quantities: Record<string, number> })
+            : { quantities: {} };
+          confirmedPrints.current = new Map(Object.entries(data.quantities));
+          setPrintsLoaded(true);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (signal?.aborted) return;
+          // Marks still waiting from an earlier visit win over the server's
+          // answer — they are newer — and go out now.
+          const shown = new Map(confirmedPrints.current);
+          for (const [photoId, quantity] of queue.entries()) {
+            if (quantity > 0) shown.set(photoId, quantity);
+            else shown.delete(photoId);
+          }
+          setPrintSelections(shown);
+          void queue.flush();
+        });
+    },
+    [getPrintQueue, token],
+  );
+
   useEffect(() => {
     if (!allowPrintSelection) return;
-    const anonKey = getViewerId();
-    if (!anonKey) return;
-
     const controller = new AbortController();
-    void fetch(`/api/g/${encodeURIComponent(token)}/print?anonKey=${encodeURIComponent(anonKey)}`, {
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : { quantities: {} }))
-      .then((data: { quantities: Record<string, number> }) => {
-        confirmedPrints.current = new Map(Object.entries(data.quantities));
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (controller.signal.aborted) return;
-        // Marks still waiting from an earlier visit (or made while this loaded)
-        // win over the server's answer — they are newer — and go out now.
-        const queue = getPrintQueue();
-        const shown = new Map(confirmedPrints.current);
-        for (const [photoId, quantity] of queue.entries()) {
-          if (quantity > 0) shown.set(photoId, quantity);
-          else shown.delete(photoId);
-        }
-        setPrintSelections(shown);
-        void queue.flush();
-      });
-
+    loadPrints(controller.signal);
     return () => controller.abort();
-  }, [allowPrintSelection, token, getPrintQueue]);
+  }, [allowPrintSelection, loadPrints]);
 
-  // A queued mark is retried when the connection comes back, and on a timer
-  // for the networks that never fire `online` (captive portals, a flaky LTE
-  // cell that is "connected" the whole time).
+  // A queued mark — or a load that failed, e.g. the gallery reopened with no
+  // signal — is retried when the connection comes back, and on a timer for the
+  // networks that never fire `online` (captive portals, a flaky LTE cell that
+  // is "connected" the whole time).
+  const printsUnloaded = allowPrintSelection && !optedOut && !printsLoaded;
   useEffect(() => {
-    if (!printSync.offline) return;
-    const retry = () => void printQueueRef.current?.flush();
+    if (!printSync.offline && !printsUnloaded) return;
+    const retry = () => {
+      if (printsUnloaded) loadPrints();
+      else void printQueueRef.current?.flush();
+    };
     window.addEventListener("online", retry);
     const timer = window.setInterval(retry, 10_000);
     return () => {
       window.removeEventListener("online", retry);
       window.clearInterval(timer);
     };
-  }, [printSync.offline]);
+  }, [printSync.offline, printsUnloaded, loadPrints]);
 
   // Which photos are this viewer's own uploads. Only fetched where uploading
   // was possible at all — on a read-only link nobody has anything to take back.
@@ -1361,14 +1395,16 @@ function GalleryViewInner({
       const next = clampPrintQuantity(current + delta);
       if (next === current) return;
 
-      // Shown at once; the queue saves it, through a dropped connection too.
-      setPrintSelections((prev) => {
-        const copy = new Map(prev);
-        if (next > 0) copy.set(photoId, next);
-        else copy.delete(photoId);
-        return copy;
-      });
       const queue = getPrintQueue();
+      // No identity, or the saved marks never loaded: a tap now would go
+      // nowhere or overwrite copies already saved. Say so rather than pretend.
+      if (!queue || !printsLoaded) {
+        setSaveFailed(true);
+        return;
+      }
+
+      // Shown at once; the queue saves it, through a dropped connection too.
+      showPrintQuantity(photoId, next);
       queue.set(photoId, next);
 
       // Same "join" moment as the heart — asked once, always skippable. Only
@@ -1376,6 +1412,7 @@ function GalleryViewInner({
       // set, so the prompt was already shown or skipped. The mark waits in the
       // queue until the prompt is answered, so the name travels with it.
       if (next > 0 && !getViewerName() && !hasAnsweredNamePrompt()) {
+        queue.paused = true;
         setNamePromptFor(photoId);
         setPendingPrint(next);
         return;
@@ -1383,8 +1420,15 @@ function GalleryViewInner({
 
       void queue.flush();
     },
-    [printSelections, getPrintQueue],
+    [printSelections, printsLoaded, getPrintQueue, showPrintQuantity],
   );
+
+  const resumePrints = useCallback((): Promise<void> => {
+    const queue = getPrintQueue();
+    if (!queue) return Promise.resolve();
+    queue.paused = false;
+    return queue.flush();
+  }, [getPrintQueue]);
 
   const printPieces = useMemo(
     () => [...printSelections.values()].reduce((sum, quantity) => sum + quantity, 0),
@@ -2624,7 +2668,7 @@ function GalleryViewInner({
             const sent = kind
               ? sendReaction(photoId, kind, name || undefined, revert)
               : printQuantity !== null
-                ? getPrintQueue().flush()
+                ? resumePrints()
                 : sendFavorite(photoId, true, name || undefined, revert);
             // The same name credits this guest's own uploads, and it only
             // reaches the server with the request above — refetch after it,
