@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { OG_LOCALES } from "@/i18n/locales";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
+import { previewMetadata } from "@/lib/og-image";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
 
@@ -32,24 +32,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = t("pageTitle");
   const description = t("pageDescription");
 
+  const preview = previewMetadata({ title, description, locale, imageKey: null });
+
   return {
     title,
     description,
     alternates: { canonical: "/" },
     robots: { index: true, follow: true },
-    openGraph: {
-      title,
-      description,
-      url: "/",
-      siteName: "g-gallery",
-      locale: OG_LOCALES[locale],
-      type: "website",
-    },
-    twitter: {
-      card: "summary",
-      title,
-      description,
-    },
+    openGraph: { ...preview.openGraph, url: "/" },
+    twitter: preview.twitter,
   };
 }
 

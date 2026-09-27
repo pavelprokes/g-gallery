@@ -6,6 +6,7 @@ import { AppAnalytics } from "@/components/analytics";
 import { LocaleBootstrap } from "@/components/locale-bootstrap";
 import { LOCALE_COOKIE } from "@/i18n/locales";
 import { bitterFont } from "@/lib/fonts";
+import { DEFAULT_OG_IMAGE, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, OG_SITE_NAME } from "@/lib/og-image";
 import { SITE_ORIGIN } from "@/lib/site-url";
 import "./globals.css";
 
@@ -39,6 +40,27 @@ export const metadata: Metadata = {
     template: "%s · Pavel Prokeš",
   },
   description: "Svatební fotografie na jednom odkazu.",
+  // The preview for every page that does not build its own (sign-in, admin,
+  // 404) — a link pasted from any of them still shows the branded card rather
+  // than a bare URL. Pages with a photo replace this whole object; see
+  // previewMetadata in src/lib/og-image.ts.
+  openGraph: {
+    type: "website",
+    siteName: OG_SITE_NAME,
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE,
+        width: OG_IMAGE_WIDTH,
+        height: OG_IMAGE_HEIGHT,
+        type: "image/jpeg",
+        alt: OG_SITE_NAME,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [DEFAULT_OG_IMAGE],
+  },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

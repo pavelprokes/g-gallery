@@ -39,6 +39,16 @@ test.describe("wedding page", () => {
     await expect(page.getByRole("link", { name: /Kompletní set/ })).toHaveCount(0);
   });
 
+  test("previews in a chat with the photographer's gallery, not the guests'", async ({ page }) => {
+    await page.goto(`/s/${seed.weddingToken}/${seed.weddingSlug}`);
+
+    // The guests' gallery is the first card by position; the preview skips it
+    // for the photographer's, which is what the couple is sharing.
+    const image = page.locator('meta[property="og:image"]');
+    await expect(image).toHaveAttribute("content", /1200.*630.*prvni-vyber/);
+    await expect(image).not.toHaveAttribute("content", /od-hostu/);
+  });
+
   test("a French guest reads what the photographer translated, and English where they did not", async ({
     browser,
   }) => {
