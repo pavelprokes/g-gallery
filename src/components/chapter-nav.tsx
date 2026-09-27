@@ -6,37 +6,14 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import type { GalleryChapter } from "@/lib/gallery-chapters";
 
 /**
- * The gallery's chapters as a row of chips under the header (docs/CHAPTERS.md).
- *
- * Sticky, so "skip to the ceremony" is one tap from anywhere in a 700-photo
- * grid; the chip of the chapter being read is highlighted and kept scrolled
- * into view, which doubles as a "you are here". Blur only under a fine
- * pointer, as with the print summary: a blurred layer over a scrolling grid is
- * what a low-end phone's GPU notices.
- *
- * When the chips overflow, each side that has more to show gets a fade and an
- * arrow — the fade says "there is more" on a phone, where a hidden scrollbar
- * otherwise gives no hint; the arrow pages the row, which a mouse without a
- * horizontal wheel has no other way to do. A vertical wheel over the bar
- * scrolls it sideways too, until it reaches an end and the page takes over.
- * The arrows are pointer conveniences only: keyboard and screen-reader users
- * Tab through the chips, and a focused chip scrolls itself into view.
+ * A row that scrolls sideways: whether each side has more to show, and a way
+ * to page it — for a mouse without a horizontal wheel, which has no other.
+ * A vertical wheel over the row scrolls it sideways too, until it reaches an
+ * end and the page takes over. Shared by the chapter bar and the highlights
+ * (docs/HIGHLIGHTS.md). `content` re-measures when what the row holds changes.
  */
-export function ChapterBar({
-  chapters,
-  currentId,
-  jumpingTo,
-  onJump,
-  height,
-}: {
-  chapters: GalleryChapter[];
-  currentId: string | null;
-  jumpingTo: string | null;
-  onJump: (chapterId: string) => void;
-  height: number;
-}) {
-  const t = useTranslations("gallery");
-  const scrollerRef = useRef<HTMLDivElement>(null);
+export function useSideScroll<T extends HTMLElement>(content: unknown) {
+  const scrollerRef = useRef<T>(null);
   const [more, setMore] = useState({ before: false, after: false });
 
   useEffect(() => {
@@ -78,13 +55,49 @@ export function ChapterBar({
       scroller.removeEventListener("wheel", onWheel);
       observer.disconnect();
     };
-  }, [chapters]);
+  }, [content]);
 
   const page = (direction: 1 | -1) => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
   };
+
+  return { scrollerRef, more, page };
+}
+
+/**
+ * The gallery's chapters as a row of chips under the header (docs/CHAPTERS.md).
+ *
+ * Sticky, so "skip to the ceremony" is one tap from anywhere in a 700-photo
+ * grid; the chip of the chapter being read is highlighted and kept scrolled
+ * into view, which doubles as a "you are here". Blur only under a fine
+ * pointer, as with the print summary: a blurred layer over a scrolling grid is
+ * what a low-end phone's GPU notices.
+ *
+ * When the chips overflow, each side that has more to show gets a fade and an
+ * arrow — the fade says "there is more" on a phone, where a hidden scrollbar
+ * otherwise gives no hint; the arrow pages the row, which a mouse without a
+ * horizontal wheel has no other way to do. A vertical wheel over the bar
+ * scrolls it sideways too, until it reaches an end and the page takes over.
+ * The arrows are pointer conveniences only: keyboard and screen-reader users
+ * Tab through the chips, and a focused chip scrolls itself into view.
+ */
+export function ChapterBar({
+  chapters,
+  currentId,
+  jumpingTo,
+  onJump,
+  height,
+}: {
+  chapters: GalleryChapter[];
+  currentId: string | null;
+  jumpingTo: string | null;
+  onJump: (chapterId: string) => void;
+  height: number;
+}) {
+  const t = useTranslations("gallery");
+  const { scrollerRef, more, page } = useSideScroll<HTMLDivElement>(chapters);
 
   // Keep the current chip visible as the grid scrolls past chapters. Only the
   // bar's own horizontal scroll moves — never the page.
@@ -98,7 +111,9 @@ export function ChapterBar({
     if (left < scroller.scrollLeft || right > scroller.scrollLeft + scroller.clientWidth) {
       scroller.scrollTo({ left, behavior: "smooth" });
     }
-  }, [currentId]);
+    // `scrollerRef` is a stable ref object; listed because it now comes from
+    // a hook and the linter cannot tell.
+  }, [currentId, scrollerRef]);
 
   return (
     <nav
@@ -180,7 +195,7 @@ export function ChapterBar({
  * A chip cut off by the edge of the row fades out instead of ending in a hard
  * line — visual only: a mask never takes clicks away from what is under it.
  */
-function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
+export function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
   if (!more.before && !more.after) return undefined;
   const start = more.before ? "transparent 0, black 1.5rem" : "black 0";
   const end = more.after ? "black calc(100% - 1.5rem), transparent 100%" : "black 100%";
@@ -191,7 +206,7 @@ function edgeMask(more: { before: boolean; after: boolean }): string | undefined
  * Sits *beside* the row, never over it: the scrolling area narrows by the
  * arrow's width, so no chip can end up underneath a button.
  */
-function ScrollArrow({ side, onClick }: { side: "before" | "after"; onClick: () => void }) {
+export function ScrollArrow({ side, onClick }: { side: "before" | "after"; onClick: () => void }) {
   return (
     <button
       type="button"

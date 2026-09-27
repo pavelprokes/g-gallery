@@ -19,7 +19,13 @@ import {
   type SignedImageGrant,
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
-import { chapterAnchor, type GalleryChapter } from "@/lib/gallery-chapters";
+import { chapterAnchor, type GalleryChapter, type TimelinePosition } from "@/lib/gallery-chapters";
+import {
+  HIGHLIGHT_CANDIDATE_SELECT,
+  pickHighlights,
+  toHighlightCandidate,
+  type GalleryHighlight,
+} from "@/lib/gallery-highlights";
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
 
@@ -67,6 +73,9 @@ export interface GalleryViewData {
    * empty ones already dropped. Loaded whole, like promos: the chapter bar
    * lists every chapter before any of them has been scrolled to. */
   chapters: GalleryChapter[];
+  /** The "best of the day" shown above the grid (docs/HIGHLIGHTS.md), in
+   * timeline order; empty when switched off or the gallery is too small. */
+  highlights: GalleryHighlight[];
   archive: GalleryArchive;
 }
 
@@ -109,6 +118,7 @@ export async function loadGalleryViewData(
       zipObjectKey: true,
       zipSizeBytes: true,
       zipBuiltAt: true,
+      highlightsEnabled: true,
       // One filtered aggregate rides along with the row we are already
       // fetching, so the header's "56 fotek" costs no extra round trip.
       _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
@@ -253,6 +263,15 @@ export async function loadGalleryViewData(
         anchor: chapterAnchor(chapter),
       })),
     ),
+    highlights: gallery.highlightsEnabled
+      ? await loadHighlights(
+          gallery.id,
+          gallery.chapters.map((chapter) => ({
+            takenAt: chapter.startTakenAt.toISOString(),
+            id: chapter.startPhotoId,
+          })),
+        )
+      : [],
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,
@@ -294,6 +313,41 @@ async function chaptersWithCounts(
   return chapters
     .map((chapter, i) => ({ ...chapter, count: (before[i + 1] ?? total) - before[i]! }))
     .filter((chapter) => chapter.count > 0);
+}
+
+/**
+ * The highlights (docs/HIGHLIGHTS.md): picked over every confirmed photo, so
+ * one query reads the few columns the picker needs across the whole gallery,
+ * and a second fetches what the chosen handful need to be drawn.
+ *
+ * ponytail: recomputed on every page load — a 2 000-photo gallery is 2 000
+ * small rows. Store the pick on the gallery if that ever shows up in timings.
+ */
+async function loadHighlights(
+  galleryId: string,
+  chapterStarts: TimelinePosition[],
+): Promise<GalleryHighlight[]> {
+  const candidates = await prisma.photo.findMany({
+    where: { galleryId, status: "CONFIRMED" },
+    select: HIGHLIGHT_CANDIDATE_SELECT,
+  });
+  const picks = pickHighlights(candidates.map(toHighlightCandidate), chapterStarts);
+  if (picks.length === 0) return [];
+
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: picks.map((pick) => pick.id) } },
+    select: {
+      id: true,
+      objectKey: true,
+      thumbObjectKey: true,
+      fileName: true,
+      width: true,
+      height: true,
+      placeholder: true,
+    },
+  });
+  const byId = new Map(photos.map((photo) => [photo.id, photo]));
+  return picks.flatMap((pick) => byId.get(pick.id) ?? []);
 }
 
 /**

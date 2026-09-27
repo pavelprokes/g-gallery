@@ -247,6 +247,7 @@ async function main() {
   };
 
   const chapters = await makeChaptersGallery(user.id);
+  const highlights = await makeHighlightsGallery(user.id);
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -272,6 +273,7 @@ async function main() {
       naming,
       archives,
       chapters,
+      highlights,
     }),
   );
 
@@ -454,6 +456,9 @@ async function makeChaptersGallery(ownerId: string) {
       status: "PUBLISHED",
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-chapters-${Date.now()}`,
+      // Its spec counts which photos the page requests; the highlights strip
+      // would add some from the middle of the day (e2e/highlights.spec.ts).
+      highlightsEnabled: false,
     },
   });
 
@@ -517,5 +522,62 @@ async function makeChaptersGallery(ownerId: string) {
     titles: starts.map((s) => s.title),
     anchors: starts.map((s) => s.slug),
     lastChapterAt: 125,
+  };
+}
+
+/**
+ * A gallery for the highlights (docs/HIGHLIGHTS.md): long enough for the
+ * automatic pick, two parts of the day split by a long pause, one photo
+ * rated above the rest, one pinned by hand past the first two photo pages —
+ * so jumping to it has to fetch metadata the grid does not have yet.
+ */
+async function makeHighlightsGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Výběr",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-highlights-${Date.now()}`,
+    },
+  });
+
+  const photoCount = 130;
+  const starred = 30;
+  const pinned = 125;
+  const excluded = 70;
+  for (let i = 0; i < photoCount; i += 1) {
+    // Minutes 0–59, then a 40-minute pause, then the rest.
+    const minute = i < 60 ? i : i + 40;
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/highlight-photo-${i}.jpg`,
+        fileName: `highlight_${i}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#6b8f71",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: new Date(Date.UTC(2026, 7, 22, 10, minute)),
+        xmpRating: i === starred ? 5 : 4,
+        highlightPin: i === pinned ? true : i === excluded ? false : null,
+      },
+    });
+  }
+
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+
+  return {
+    token,
+    slug,
+    starredFile: `highlight_${starred}.jpg`,
+    pinnedFile: `highlight_${pinned}.jpg`,
+    excludedFile: `highlight_${excluded}.jpg`,
   };
 }
