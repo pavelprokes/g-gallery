@@ -87,6 +87,12 @@ export function chapterSlug(title: string, taken: readonly string[]): string {
   return `${base}-${n}`;
 }
 
+/** A stored chapter's link anchor: its frozen slug, or its id for a row that
+ * never got one. The one place this fallback lives. */
+export function chapterAnchor(chapter: { id: string; slug: string | null }): string {
+  return chapter.slug ?? chapter.id;
+}
+
 /** The ready-made translations for a preset title, or null for a custom one. */
 export function presetTranslations(title: string): { en: string; fr: string } | null {
   const needle = title.trim().toLocaleLowerCase("cs");

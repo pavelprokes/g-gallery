@@ -20,12 +20,14 @@
  *   TZ=Europe/Prague pnpm backfill:taken-at
  *
  * Chapters (docs/CHAPTERS.md) start at a photo's timeline position, so any
- * chapter whose starting photo moved is moved with it afterwards.
+ * chapter whose starting photo moved is moved with it afterwards — and any
+ * chapter from before link anchors existed gets its anchor.
  */
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "../src/lib/exif-taken-at";
+import { chapterSlug } from "../src/lib/gallery-chapters";
 
 const CONCURRENCY = 6;
 
@@ -112,6 +114,28 @@ async function main() {
     chaptersMoved += 1;
   }
   console.log(`chapters moved with their first photo: ${chaptersMoved} of ${chapters.length}`);
+
+  // Chapters created before link anchors existed link by their id
+  // (`#cm1x9k…`). Give each its readable anchor, the same one a new chapter
+  // with that title gets. Only null slugs are touched — a slug, once set, is
+  // frozen, because links to it may already be out.
+  const unslugged = await prisma.galleryChapter.findMany({
+    where: { slug: null },
+    orderBy: [{ startTakenAt: "asc" }, { startPhotoId: "asc" }],
+    select: { id: true, galleryId: true, title: true },
+  });
+  for (const chapter of unslugged) {
+    const taken = await prisma.galleryChapter.findMany({
+      where: { galleryId: chapter.galleryId, slug: { not: null } },
+      select: { slug: true },
+    });
+    const slug = chapterSlug(
+      chapter.title,
+      taken.flatMap((row) => (row.slug ? [row.slug] : [])),
+    );
+    await prisma.galleryChapter.update({ where: { id: chapter.id }, data: { slug } });
+  }
+  console.log(`chapters given a link anchor: ${unslugged.length}`);
   await prisma.$disconnect();
   if (failed > 0) process.exitCode = 1;
 }

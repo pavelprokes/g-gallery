@@ -112,7 +112,7 @@ arrows sit **beside** the scrolling row, never over it — the row narrows by th
 can end up underneath a button (an overlaid arrow was tried first and hid the chip it covered). The
 fade is a CSS mask, which is visual only and takes no clicks. An arrow pages the row by 80 % of its
 width; a vertical mouse wheel over the bar scrolls it sideways until it reaches an end, then lets
-the page scroll. The arrows are `aria-hidden` and out of the tab order: keyboard and screen-reader
+the page scroll (Ctrl+wheel and trackpad pinch stay the browser's zoom). The arrows are `aria-hidden` and out of the tab order: keyboard and screen-reader
 users Tab through the chips, and a focused chip scrolls itself into view. No scroll snapping: it
 fought the wheel (a notch shorter than half a chip snapped straight back) and pulled the first chip
 flush to the edge, so the row opened already scrolled. The overflow state is re-measured when the
@@ -129,7 +129,9 @@ never reaches the server, so this adds nothing to what the token already exposes
   because it has to be _one_ language and English is the app's fallback (docs/I18N.md) and the one
   any guest reads: a preset takes its English name (`ceremony`, `first-dance`), a custom title —
   which has no English yet when it is created — is transliterated to plain ASCII
-  (`rozbijeni-talire`). A duplicate gets `-2`. Rows from before the column existed link by id.
+  (`rozbijeni-talire`). A duplicate gets `-2`. Rows from before the column existed are given one by
+  `pnpm backfill:taken-at`; until then they link by id (`chapterAnchor`, the one place that
+  fallback lives).
   Deleting a chapter frees its anchor, on purpose: a re-created "Obřad" takes `ceremony` back, and
   the ceremony links already sent open the ceremony again.
 - **Opening a link** with a known anchor jumps to that chapter exactly as a chip does. An anchor that
@@ -138,12 +140,17 @@ never reaches the server, so this adds nothing to what the token already exposes
   Editing the hash by hand works the same. The hash is read on arrival and on `hashchange` only,
   never because the chapter list re-rendered: after a `router.refresh()` (the locale switcher) the
   hash is the one this page wrote while the viewer scrolled, and re-reading it would snap them back
-  to their chapter's header. In favourites-only mode a link is left untouched for later.
+  to their chapter's header. In favourites-only mode a link is ignored rather than wiped (and a jump
+  in flight when the filter goes on is dropped quietly); once the filter is off, the reader's own
+  chapter replaces it as they scroll.
 - **The URL follows the reader.** As the chapter under the bar changes, the hash is _replaced_
   (never pushed — scrolling must not fill the back button with chapters). It is left alone at the
   very top of the page, so a gallery just opened keeps the URL it was opened with (which is also
   what lets an incoming `#ceremony` survive until the jump reads it), and while the lightbox is
-  open, because the lightbox's own history entry is the current one then.
+  open, because the lightbox's own history entry is the current one then. It is replaced with
+  `null` state, as Next documents for the History API, so the app router syncs to it — passing
+  `history.state` through (Next's own marker included) skips the sync, and the next router commit
+  puts the old hash back.
 - **Chips are links** (`<a href="#ceremony">`): a plain click jumps, a long-press or right-click
   copies the chapter's URL, a modified click is left to the browser.
 - **The admin** panel has a copy button per chapter: the newest live share link plus its anchor.

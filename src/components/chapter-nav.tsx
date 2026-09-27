@@ -49,6 +49,7 @@ export function ChapterBar({
       setMore((prev) => (prev.before === next.before && prev.after === next.after ? prev : next));
     };
     const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return; // Ctrl+wheel and trackpad pinch are the browser's zoom
       if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return; // already sideways
       const max = scroller.scrollWidth - scroller.clientWidth;
       const canMove = event.deltaY > 0 ? scroller.scrollLeft < max - 1 : scroller.scrollLeft > 1;
@@ -139,8 +140,18 @@ export function ChapterBar({
               // It was a button, and a chip still reads as one: Space jumps
               // too, instead of scrolling the page.
               onKeyDown={(event) => {
-                if (event.key !== " ") return;
+                // Shift+Space pages up, and a held key must not jump again
+                // on every repeat.
+                if (
+                  event.key !== " " ||
+                  event.shiftKey ||
+                  event.ctrlKey ||
+                  event.metaKey ||
+                  event.altKey
+                )
+                  return;
                 event.preventDefault();
+                if (event.repeat) return;
                 onJump(chapter.id);
               }}
               className={`text-body flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 whitespace-nowrap transition-colors ${

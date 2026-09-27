@@ -29,7 +29,7 @@ import {
 } from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
-import { compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
+import { chapterAnchor, compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -187,7 +187,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       id: chapter.id,
       title: chapter.title,
       start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
-      anchor: chapter.id,
+      anchor: chapterAnchor(chapter),
       count: 0,
     })),
     timelineOf,
@@ -209,7 +209,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       const first = chapterPhotos[0];
       return {
         id: chapter.id,
-        anchor: chapter.slug ?? chapter.id,
+        anchor: chapterAnchor(chapter),
         title: chapter.title,
         translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
         count: chapterPhotos.length,
