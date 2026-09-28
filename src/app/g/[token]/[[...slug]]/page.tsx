@@ -7,6 +7,7 @@ import { SharePasswordForm } from "@/components/share-password-form";
 import { ShareLinkDead } from "@/components/share-link-dead";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { galleryShareMetadata, unavailableShareMetadata } from "@/lib/share-metadata";
+import { gallerySignPath, requestedSharePath } from "@/lib/sign-url";
 
 // Dynamic by definition: token validity, expiry, revocation, and the password
 // unlock cookie are checked server-side on every request (docs/PLAN.md §4).
@@ -28,15 +29,20 @@ export async function generateMetadata(
   const { token, slug } = await props.params;
   const t = await getTranslations("gallery");
   const locale = await getLocale();
-  // The address exactly as it was shared: the slug is cosmetic, so whatever
-  // the sender pasted is as canonical as any other spelling of it.
-  const url = ["", "g", token, ...(slug ?? [])].map(encodeURIComponent).join("/");
 
   const access = await resolveShareLink(token);
 
-  if (!access.ok) return unavailableShareMetadata(t, locale, url);
+  if (!access.ok) return unavailableShareMetadata(t, locale, requestedSharePath("g", token, slug));
 
-  return galleryShareMetadata(access.shareLink.galleryId, t, locale, url);
+  // og:url is the link's own frozen form, the one the admin copies, so every
+  // spelling of it (with or without the cosmetic slug) is one object to
+  // Facebook, refreshed by one "Scrape again".
+  return galleryShareMetadata(
+    access.shareLink.galleryId,
+    t,
+    locale,
+    gallerySignPath(token, access.shareLink.slug),
+  );
 }
 
 export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {

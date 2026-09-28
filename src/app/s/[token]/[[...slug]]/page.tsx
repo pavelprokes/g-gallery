@@ -11,6 +11,7 @@ import {
   galleryShareMetadata,
   unavailableShareMetadata,
 } from "@/lib/share-metadata";
+import { eventSignPath, requestedSharePath } from "@/lib/sign-url";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { EventPartGone } from "@/components/share-link-dead";
@@ -49,23 +50,22 @@ export async function generateMetadata(
 
   const segments = slug ?? [];
 
-  if (!event) {
-    const requested = ["", "s", token, ...segments].map(encodeURIComponent).join("/");
-    return unavailableShareMetadata(t, locale, requested);
-  }
+  if (!event) return unavailableShareMetadata(t, locale, requestedSharePath("s", token, segments));
 
   const requestedKey = segments[1];
   const inlineCard = !requestedKey && event.cards.length === 1 ? event.cards[0] : undefined;
   const card = inlineCard ?? event.cards.find((c) => c.eventKey === requestedKey);
 
-  // The canonical spelling, the one the page itself redirects to, so a link
-  // pasted without its slug still previews as the same page.
-  const hubUrl = `/s/${encodeURIComponent(token)}/${event.slug}`;
+  // og:url uses the wedding's own slug whatever was pasted (none, or a stale
+  // one), so every spelling of the page is one object to Facebook. A gallery
+  // under it keeps its key even while gated: it is a different page from the
+  // hub, and merging it into the hub's object would outlive the password.
+  const hubUrl = eventSignPath(token, event.slug);
+  const url = card?.eventKey && !inlineCard ? `${hubUrl}/${card.eventKey}` : hubUrl;
 
   if (card?.eventKey) {
     const galleryToken = compositeToken(token, card.eventKey);
     const access = await resolveShareLink(galleryToken);
-    const url = inlineCard ? hubUrl : `${hubUrl}/${card.eventKey}`;
     if (access.ok) {
       return galleryShareMetadata(access.shareLink.galleryId, t, locale, url);
     }
@@ -74,7 +74,7 @@ export async function generateMetadata(
   // The hub previews with the photographer's gallery — the one its visitors
   // open first — and falls back to the guests' only when there is no other.
   const previewCard = splitEventCards(event.cards).main[0] ?? event.cards[0];
-  return eventShareMetadata(event.title, previewCard?.id ?? null, t, locale, hubUrl);
+  return eventShareMetadata(event.title, previewCard?.id ?? null, t, locale, url);
 }
 
 export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug]]">) {

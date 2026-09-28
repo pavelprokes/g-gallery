@@ -51,6 +51,14 @@ test.describe("wedding page", () => {
       "content",
       new RegExp(`/s/${seed.weddingToken}/${seed.weddingSlug}$`),
     );
+
+    // A gallery under it is its own page, under the canonical slug even when
+    // the link was pasted with a stale one.
+    await page.goto(`/s/${seed.weddingToken}/stary-nazev/prvni-vyber`);
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      new RegExp(`/s/${seed.weddingToken}/${seed.weddingSlug}/prvni-vyber$`),
+    );
   });
 
   test("a French guest reads what the photographer translated, and English where they did not", async ({
