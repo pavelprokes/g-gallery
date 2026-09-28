@@ -12,6 +12,16 @@ import {
 } from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
+import {
+  CHAPTER_START_SELECT,
+  ORDER_KEY_SELECT,
+  beforePosition,
+  chapterStartOf,
+  compareChapterStarts,
+  orderKeyOf,
+  photoOrderBy,
+  type PhotoOrder,
+} from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 import {
   IMAGE_GRANT_TTL_SECONDS,
@@ -59,8 +69,8 @@ export interface GalleryViewData {
     favoriteCount: number;
     /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
     uploaderName: string | null;
-    /** Timeline position, ISO — places chapter headers (docs/CHAPTERS.md). */
-    takenAt: string;
+    /** Key in the gallery's order — places chapter headers (docs/CHAPTERS.md). */
+    orderKey: string;
   }[];
   initialCursor: string | null;
   imageGrant: SignedImageGrant | null;
@@ -103,6 +113,7 @@ export async function loadGalleryViewData(
   access: ResolvedShareLink,
   locale: Locale,
 ): Promise<GalleryViewData | null> {
+  const order = access.photoOrder;
   const gallery = await prisma.gallery.findUnique({
     where: { id: access.galleryId },
     select: {
@@ -127,12 +138,12 @@ export async function loadGalleryViewData(
       // API route uses for every subsequent page.
       photos: {
         where: { status: "CONFIRMED" },
-        // Capture order, oldest shot first (2026-08-25, Pavel's call —
-        // replaces newest-upload-first): the gallery reads as the day
-        // happened. Must match the cursor-paginated API route's own orderBy
+        // The gallery's order (src/lib/photo-order.ts): capture order,
+        // oldest shot first (2026-08-25), or the photographer's file
+        // numbering. Must match the cursor-paginated API route's own orderBy
         // exactly, or scrolling past the first page would reshuffle what the
         // viewer already saw.
-        orderBy: [{ takenAt: "asc" }, { id: "asc" }],
+        orderBy: photoOrderBy(order),
         take: PHOTOS_PAGE_SIZE + 1,
         select: {
           id: true,
@@ -142,8 +153,7 @@ export async function loadGalleryViewData(
           width: true,
           height: true,
           placeholder: true,
-          takenAt: true,
-          createdAt: true,
+          ...ORDER_KEY_SELECT,
           _count: { select: { favorites: true } },
           ...UPLOADER_SELECT,
         },
@@ -178,13 +188,11 @@ export async function loadGalleryViewData(
         },
       },
       chapters: {
-        orderBy: [{ startTakenAt: "asc" }, { startPhotoId: "asc" }],
         select: {
           id: true,
           title: true,
           translations: true,
-          startTakenAt: true,
-          startPhotoId: true,
+          ...CHAPTER_START_SELECT,
           slug: true,
         },
       },
@@ -197,14 +205,17 @@ export async function loadGalleryViewData(
   const last = page.at(-1);
 
   const titleTranslations = parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS);
+  // In the gallery's order — `chaptersWithCounts` counts each one up to the next.
+  const chapterRows = gallery.chapters.toSorted(compareChapterStarts(order));
 
   // Independent of each other, so none of them waits on another's round trip.
   const [imageGrant, chapters, highlights] = await Promise.all([
     mintImageGrant(gallery.storagePrefix),
     chaptersWithCounts(
       gallery.id,
+      order,
       gallery._count.photos,
-      gallery.chapters.map((chapter) => ({
+      chapterRows.map((chapter) => ({
         id: chapter.id,
         title: localizeField(
           chapter.title,
@@ -212,17 +223,15 @@ export async function loadGalleryViewData(
           "title",
           locale,
         ),
-        start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+        start: chapterStartOf(order, chapter),
         anchor: chapterAnchor(chapter),
       })),
     ),
     gallery.highlightsEnabled
       ? loadHighlights(
           gallery.id,
-          gallery.chapters.map((chapter) => ({
-            takenAt: chapter.startTakenAt.toISOString(),
-            id: chapter.startPhotoId,
-          })),
+          order,
+          chapterRows.map((chapter) => chapterStartOf(order, chapter)),
         )
       : Promise.resolve([]),
   ]);
@@ -250,12 +259,10 @@ export async function loadGalleryViewData(
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
-      takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
+      orderKey: orderKeyOf(order, photo),
     })),
     initialCursor:
-      hasMore && last
-        ? encodeCursor({ takenAt: last.takenAt ?? last.createdAt, id: last.id })
-        : null,
+      hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
     // Filtered here as well as on write: a row can predate a validation rule,
@@ -301,21 +308,17 @@ export async function loadGalleryViewData(
  */
 async function chaptersWithCounts(
   galleryId: string,
+  order: PhotoOrder,
   total: number,
   chapters: Omit<GalleryChapter, "count">[],
 ): Promise<GalleryChapter[]> {
   if (chapters.length === 0) return [];
   const before = await Promise.all(
-    chapters.map((chapter) => {
-      const takenAt = new Date(chapter.start.takenAt);
-      return prisma.photo.count({
-        where: {
-          galleryId,
-          status: "CONFIRMED",
-          OR: [{ takenAt: { lt: takenAt } }, { takenAt, id: { lt: chapter.start.id } }],
-        },
-      });
-    }),
+    chapters.map((chapter) =>
+      prisma.photo.count({
+        where: { galleryId, status: "CONFIRMED", ...beforePosition(order, chapter.start) },
+      }),
+    ),
   );
   return chapters
     .map((chapter, i) => ({ ...chapter, count: (before[i + 1] ?? total) - before[i]! }))
@@ -332,13 +335,17 @@ async function chaptersWithCounts(
  */
 async function loadHighlights(
   galleryId: string,
+  order: PhotoOrder,
   chapterStarts: TimelinePosition[],
 ): Promise<GalleryHighlight[]> {
   const candidates = await prisma.photo.findMany({
     where: { galleryId, status: "CONFIRMED" },
     select: HIGHLIGHT_CANDIDATE_SELECT,
   });
-  const picks = pickHighlights(candidates.map(toHighlightCandidate), chapterStarts);
+  const picks = pickHighlights(
+    candidates.map((candidate) => toHighlightCandidate(order, candidate)),
+    chapterStarts,
+  );
   if (picks.length === 0) return [];
 
   const photos = await prisma.photo.findMany({

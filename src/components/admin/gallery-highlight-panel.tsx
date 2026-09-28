@@ -64,7 +64,7 @@ export function GalleryHighlightPanel({
 
       {pinnedCount > MAX_PINNED && (
         <p className="text-admin-danger mb-3 text-sm">
-          Připnuto {pinnedCount} fotek — hosté uvidí jen prvních {MAX_PINNED} podle času pořízení.
+          Připnuto {pinnedCount} fotek — hosté uvidí jen prvních {MAX_PINNED} v pořadí galerie.
           Pozdější připnuté se neukážou, dokud některé neodepneš.
         </p>
       )}

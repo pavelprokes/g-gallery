@@ -1,3 +1,6 @@
+import type { TimelinePosition } from "@/lib/gallery-chapters";
+import { isValidOrderKey, type PhotoOrder } from "@/lib/photo-order";
+
 /**
  * Keyset pagination cursor for the gallery photo timeline.
  *
@@ -14,29 +17,41 @@
  * batch or a chatty one-row-at-a-time trickle. */
 export const PHOTOS_PAGE_SIZE = 60;
 
-/** Timeline position: capture time first, id as the burst tiebreaker
- * (2026-08-25 — the gallery reads oldest shot first, the day as it happened,
- * replacing the newest-upload-first ordering of 2026-08-23). */
-export interface PhotoCursor {
-  takenAt: Date;
-  id: string;
+/**
+ * A place in the gallery's order (src/lib/photo-order.ts), plus the order it
+ * was taken in. A gallery can be switched between orders while a guest is
+ * scrolling it; a cursor from the other order would name a key of the wrong
+ * kind, so it is refused rather than turned into a wrong page.
+ */
+export interface PhotoCursor extends TimelinePosition {
+  order: PhotoOrder;
 }
 
 export function encodeCursor(cursor: PhotoCursor): string {
-  const json = JSON.stringify({ takenAt: cursor.takenAt.toISOString(), id: cursor.id });
+  const json = JSON.stringify({ o: cursor.order, key: cursor.key, id: cursor.id });
   return Buffer.from(json, "utf8").toString("base64url");
 }
 
-export function decodeCursor(token: string): PhotoCursor | null {
+/** Null for anything malformed, or from a different order than `order`. */
+export function decodeCursor(token: string, order: PhotoOrder): PhotoCursor | null {
   try {
     const raw = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as {
+      o?: unknown;
+      key?: unknown;
       takenAt?: unknown;
       id?: unknown;
     };
-    if (typeof raw.takenAt !== "string" || typeof raw.id !== "string" || !raw.id) return null;
-    const takenAt = new Date(raw.takenAt);
-    if (Number.isNaN(takenAt.getTime())) return null;
-    return { takenAt, id: raw.id };
+    if (typeof raw.id !== "string" || !raw.id) return null;
+    // Cursors minted before orders existed carried `takenAt` alone — a page
+    // loaded before the deploy keeps scrolling after it.
+    const cursor: PhotoCursor | null =
+      raw.o === undefined && typeof raw.takenAt === "string"
+        ? { order: "TAKEN_AT", key: raw.takenAt, id: raw.id }
+        : typeof raw.key === "string" && (raw.o === "TAKEN_AT" || raw.o === "FILE_NAME")
+          ? { order: raw.o, key: raw.key, id: raw.id }
+          : null;
+    if (!cursor || cursor.order !== order || !isValidOrderKey(order, cursor.key)) return null;
+    return cursor;
   } catch {
     return null;
   }

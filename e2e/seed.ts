@@ -247,6 +247,7 @@ async function main() {
   };
 
   const chapters = await makeChaptersGallery(user.id);
+  const fileOrder = await makeFileOrderGallery(user.id);
   const highlights = await makeHighlightsGallery(user.id);
 
   fs.writeFileSync(
@@ -273,6 +274,7 @@ async function main() {
       naming,
       archives,
       chapters,
+      fileOrder,
       highlights,
     }),
   );
@@ -522,6 +524,86 @@ async function makeChaptersGallery(ownerId: string) {
     titles: starts.map((s) => s.title),
     anchors: starts.map((s) => s.slug),
     lastChapterAt: 125,
+  };
+}
+
+/**
+ * A gallery shown in file-name order (docs/PHOTO-ORDER.md), built like the
+ * wedding that asked for it: the photographer's export numbering
+ * (`svatba_0001_PPR…`), and a second camera — every fifth photo — whose clock
+ * reads an hour early, so capture-time order would pull its photos an hour
+ * back. More photos than one page, so the cursor has to carry the order.
+ * Inserted last-first, so neither ids nor insertion order happen to agree
+ * with the file names.
+ */
+async function makeFileOrderGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Pořadí podle názvu",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-file-order-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+      highlightsEnabled: false,
+    },
+  });
+
+  const photoCount = 70;
+  const secondBody = (n: number) => n % 5 === 0;
+  const takenAt = (n: number) =>
+    new Date(Date.UTC(2026, 8, 5, 8, n) - (secondBody(n) ? 3_600_000 : 0));
+  const fileName = (n: number) =>
+    `svatba_${String(n).padStart(4, "0")}_${secondBody(n) ? "_P5D" : "PPR"}${5000 + n}.jpg`;
+  const rows = new Map<number, { id: string; fileOrderKey: string }>();
+  for (let n = photoCount; n >= 1; n -= 1) {
+    const photo = await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/order-photo-${n}.jpg`,
+        fileName: fileName(n),
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#8a6f5a",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: takenAt(n),
+      },
+      // The key comes from the database trigger, not from here.
+      select: { id: true, fileOrderKey: true },
+    });
+    rows.set(n, photo);
+  }
+
+  const starts = [
+    { title: "Přípravy", slug: "getting-ready", at: 1 },
+    { title: "Obřad", slug: "ceremony", at: 30 },
+  ];
+  for (const { title, slug, at } of starts) {
+    await prisma.galleryChapter.create({
+      data: {
+        galleryId: gallery.id,
+        title,
+        slug,
+        startTakenAt: takenAt(at),
+        startFileOrderKey: rows.get(at)!.fileOrderKey,
+        startPhotoId: rows.get(at)!.id,
+      },
+    });
+  }
+
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+
+  return {
+    token,
+    slug,
+    fileNames: Array.from({ length: photoCount }, (_, i) => fileName(i + 1)),
+    chapterAt: 30,
   };
 }
 

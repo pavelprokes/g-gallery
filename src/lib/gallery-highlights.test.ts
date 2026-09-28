@@ -17,6 +17,7 @@ function photo(
   const at = DAY + minutes * 60_000 + seconds * 1000;
   return {
     id: `p${String(at).padStart(16, "0")}`,
+    key: new Date(at).toISOString(),
     takenAt: new Date(at).toISOString(),
     rating: 4,
     label: null,
@@ -109,8 +110,23 @@ describe("pickHighlights", () => {
     // pauses, and the final part still gets its seat.
     const lastPart = photos.filter((p) => minutesOf(p.id) >= 380);
     const start = lastPart[0]!;
-    const picks = pickHighlights(photos, [{ takenAt: start.takenAt, id: start.id }]);
+    const picks = pickHighlights(photos, [{ key: start.key, id: start.id }]);
     expect(picks.filter((p) => minutesOf(p.id) >= 380)).toHaveLength(1);
+  });
+
+  it("does not merge a second camera an hour off into one burst (file-name order)", () => {
+    // In file-name order the photos sit where the photographer numbered them,
+    // but one camera's clock reads an hour early: going back in time is a gap
+    // like going forward is, not a four-second burst.
+    const photos = wedding().map((p, i) =>
+      i % 3 === 1
+        ? { ...p, takenAt: new Date(Date.parse(p.takenAt) - 3_600_000).toISOString() }
+        : p,
+    );
+    const picks = pickHighlights(photos);
+    expect(picks).toHaveLength(HIGHLIGHT_COUNT);
+    // Spread over the whole day, not collapsed into its first stretch.
+    expect(Math.max(...picks.map((p) => minutesOf(p.id)))).toBeGreaterThan(240);
   });
 
   it("shows only the pins in a small gallery", () => {

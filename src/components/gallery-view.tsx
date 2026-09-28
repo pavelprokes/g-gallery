@@ -155,9 +155,9 @@ export interface GalleryPhoto {
   favoriteCount: number;
   /** A guest photo's volunteered credit; null for the photographer's own. */
   uploaderName: string | null;
-  /** Capture time, ISO — the timeline position chapters start at
-   * (docs/CHAPTERS.md). */
-  takenAt: string;
+  /** Its key in the gallery's order (src/lib/photo-order.ts) — capture time
+   * or file name — which is what chapters start at (docs/CHAPTERS.md). */
+  orderKey: string;
 }
 
 export interface GalleryViewer {
@@ -232,7 +232,7 @@ function entryAspect(entry: GridEntry<GalleryPhoto>): number {
 }
 
 const photoIdOf = (photo: GalleryPhoto) => photo.id;
-const timelineOf = (photo: GalleryPhoto) => ({ takenAt: photo.takenAt, id: photo.id });
+const timelineOf = (photo: GalleryPhoto) => ({ key: photo.orderKey, id: photo.id });
 
 /** A chapter header's row height (docs/CHAPTERS.md): room above the title so a
  * new chapter reads as a break in the day, not as a caption on the row above. */

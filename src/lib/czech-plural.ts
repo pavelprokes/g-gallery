@@ -35,6 +35,8 @@ export const FORMS = {
   // Accusative: what follows a verb like "Stáhnout". Czech declines, so the
   // nominative set above reads as broken there ("Stáhnout 1 fotka").
   photoAccusative: { one: "fotku", few: "fotky", many: "fotek" },
+  // Genitive, after "u": "liší se u 1 fotky / 3 fotek".
+  photoGenitive: { one: "fotky", few: "fotek", many: "fotek" },
   selected: { one: "vybraná", few: "vybrané", many: "vybraných" },
   day: { one: "den", few: "dny", many: "dní" },
   visit: { one: "návštěva", few: "návštěvy", many: "návštěv" },

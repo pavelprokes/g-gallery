@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
+import { ORDER_KEY_SELECT, afterPosition, orderKeyOf, photoOrderBy } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,12 @@ const querySchema = z.object({
 });
 
 /**
- * Keyset (cursor) pagination over a gallery's confirmed photos, in capture
- * order — oldest shot first (`takenAt asc`, 2026-08-25), the day as it
- * happened. The same ordering the first server-rendered page already uses
- * (`src/app/g/[token]/[[...slug]]/page.tsx`), so switching pages never
+ * Keyset (cursor) pagination over a gallery's confirmed photos, in the
+ * gallery's order (src/lib/photo-order.ts) — oldest shot first, or the
+ * photographer's file numbering. The same ordering the first server-rendered
+ * page already uses (`src/lib/shared-gallery.ts`), so switching pages never
  * reshuffles what the viewer has already seen. `id` is the tiebreaker: EXIF
- * time is second-resolution, so a burst shares a `takenAt`.
+ * time is second-resolution, so a burst shares a key.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/photos">) {
   const { token } = await ctx.params;
@@ -29,7 +30,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!parsed.success) return NextResponse.json({ error: "invalid_query" }, { status: 400 });
 
-  const cursor = parsed.data.cursor ? decodeCursor(parsed.data.cursor) : null;
+  const order = access.shareLink.photoOrder;
+  const cursor = parsed.data.cursor ? decodeCursor(parsed.data.cursor, order) : null;
   if (parsed.data.cursor && !cursor) {
     return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
@@ -44,16 +46,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       where: {
         galleryId: access.shareLink.galleryId,
         status: "CONFIRMED",
-        ...(cursor
-          ? {
-              OR: [
-                { takenAt: { gt: cursor.takenAt } },
-                { takenAt: cursor.takenAt, id: { gt: cursor.id } },
-              ],
-            }
-          : {}),
+        ...(cursor ? afterPosition(order, cursor) : {}),
       },
-      orderBy: [{ takenAt: "asc" }, { id: "asc" }],
+      orderBy: photoOrderBy(order),
       take: PHOTOS_PAGE_SIZE + 1,
       select: {
         id: true,
@@ -63,8 +58,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
         width: true,
         height: true,
         placeholder: true,
-        takenAt: true,
-        createdAt: true,
+        ...ORDER_KEY_SELECT,
         _count: { select: { favorites: true } },
         ...UPLOADER_SELECT,
       },
@@ -91,14 +85,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       placeholder: photo.placeholder,
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
-      takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
+      orderKey: orderKeyOf(order, photo),
     })),
     ...(total !== undefined ? { total } : {}),
-    // `takenAt` is set on every confirm and backfilled for the back catalogue;
-    // `createdAt` covers the impossible null without throwing away the page.
     nextCursor:
-      hasMore && last
-        ? encodeCursor({ takenAt: last.takenAt ?? last.createdAt, id: last.id })
-        : null,
+      hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
   });
 }

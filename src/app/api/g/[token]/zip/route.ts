@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { photoOrderBy } from "@/lib/photo-order";
 import { resolveShareLink } from "@/lib/share-access";
 import { MANIFEST_TTL_SECONDS, signManifest, uniqueNames, type Manifest } from "@/lib/zip-manifest";
 
@@ -50,9 +51,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
       status: "CONFIRMED",
       ...(photoIds.length > 0 ? { id: { in: photoIds } } : {}),
     },
-    // Same capture-order timeline the gallery shows, so the archive unpacks
-    // in the order the day happened.
-    orderBy: [{ takenAt: "asc" }, { id: "asc" }],
+    // The order the gallery shows (src/lib/photo-order.ts), so the archive
+    // unpacks the way the guest has been looking at it.
+    orderBy: photoOrderBy(access.shareLink.photoOrder),
     select: { id: true, objectKey: true, fileName: true, sizeBytes: true, crc32: true },
   });
 

@@ -15,6 +15,9 @@ chapter (it must stay an instant scroll, or it downloads every photo it passes).
 **`docs/HIGHLIGHTS.md`** is the authority for the "best of the day" strip above the grid (adopted
 2026-09-28) — read it before touching `pickHighlights`, the `xmp*`/`highlightPin` columns, or the
 jump from a highlight to its photo (same instant-scroll rule as chapters).
+**`docs/PHOTO-ORDER.md`** is the authority for the order a gallery shows its photos in (capture time
+or file name, adopted 2026-09-28) — read it before touching `src/lib/photo-order.ts`, anything that
+orders or pages photos, `fileOrderKey` (a database trigger maintains it), or chapter starts.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).

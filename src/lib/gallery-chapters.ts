@@ -9,13 +9,13 @@ import { slugify } from "@/lib/gallery-slug";
  */
 
 /**
- * A place on the gallery's timeline — the same `(takenAt, id)` pair the photo
- * cursor pages by (src/lib/photo-cursor.ts). `takenAt` travels as an ISO
- * string: `toISOString()` always has the same fixed-width shape, so two of
- * them compare correctly as plain strings.
+ * A place in the gallery's order — `(key, id)`, the same pair the photo
+ * cursor pages by (src/lib/photo-cursor.ts). `key` is the capture time as an
+ * ISO string or the file-name key, whichever order the gallery is shown in
+ * (src/lib/photo-order.ts); both compare correctly as plain strings.
  */
 export interface TimelinePosition {
-  takenAt: string;
+  key: string;
   id: string;
 }
 
@@ -35,13 +35,14 @@ export interface GalleryChapter {
 }
 
 /**
- * Timeline order, identical to the database's `orderBy: [takenAt, id]`.
+ * The gallery's order, identical to the database's `orderBy: [key, id]`
+ * (`photoOrderBy` in src/lib/photo-order.ts).
  *
- * Ids are cuids — lowercase ASCII letters and digits — which sort the same
- * under a plain string comparison and under Postgres's collation.
+ * Ids are cuids and file-name keys are [0-9a-z] — both sort the same under a
+ * plain string comparison and under Postgres's collation.
  */
 export function compareTimeline(a: TimelinePosition, b: TimelinePosition): number {
-  if (a.takenAt !== b.takenAt) return a.takenAt < b.takenAt ? -1 : 1;
+  if (a.key !== b.key) return a.key < b.key ? -1 : 1;
   if (a.id !== b.id) return a.id < b.id ? -1 : 1;
   return 0;
 }
