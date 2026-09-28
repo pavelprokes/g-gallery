@@ -17,8 +17,10 @@ way into the gallery, not a second copy of it.
 page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly what guests get.
 
 1. **The photographer's hand wins.** `Photo.highlightPin`: `true` is always in, `false` never,
-   `null` is left to the fill. Pins above `MAX_PINNED` (six, the same as the pick) are ignored, so
-   the highlights never show more than six photos (Pavel, 2026-09-28: "five or six" — it was ten).
+   `null` is left to the fill. At most `MAX_PINNED` (six, the same as the pick) show, so the
+   highlights never hold more than six photos (Pavel, 2026-09-28: "five or six" — it was ten). The
+   admin refuses a seventh pin; pins beyond six from before (or a race past the check) are thinned
+   evenly over the day, never cut at its morning.
 2. **Automatic fill for the rest of the six seats**, only when the gallery has at least
    `MIN_PHOTOS_FOR_AUTO` (40) of the photographer's own photos — a handful out of thirty is not a
    highlight. Guests' uploads are never filled in automatically, only pinned.
@@ -121,10 +123,11 @@ that asserts "nothing from the middle is requested" runs on a gallery with highl
 "Odepnout"/"Vyřadit" per photo, "Vrátit vyřazené", and "Skrýt/Ukázat hostům"
 (`Gallery.highlightsEnabled`, **off by default** since 2026-09-28 — Pavel turns them on for a
 gallery once the pick is worth showing; existing galleries were switched off too, except those
-with a photo already pinned). Every grid tile below has one button
+where a photo was already pinned in or excluded). Every grid tile below has one button
 for the photo's state: pin, drop from the pick, unpin, or hand back to the pick. The pick is shown
 even while switched off, so it can be reviewed first. An empty pick says why (too few photos, or
-everything excluded), and more than six pins say which ones guests will not see.
+everything excluded), more than six pins say guests see six of them spread over the day, and once six are pinned a tile
+says the pick is full instead of offering a seventh.
 
 ## Not built (yet)
 

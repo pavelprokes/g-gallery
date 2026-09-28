@@ -26,7 +26,7 @@ const tileName = (file: string) =>
 const gridName = (file: string) => new RegExp(`^(Otevřít|Open|Ouvrir) ${file}$`);
 
 test.describe("gallery highlights", () => {
-  test("shows ten photos: the pinned one, the one rated above the rest, never the excluded one", async ({
+  test("shows six photos: the pinned one, the one rated above the rest, never the excluded one", async ({
     page,
   }) => {
     await page.goto(`/g/${token}/${slug}`);

@@ -64,13 +64,14 @@ export function GalleryHighlightPanel({
 
       {pinnedCount > MAX_PINNED && (
         <p className="text-admin-danger mb-3 text-sm">
-          Připnuto {pinnedCount} fotek — hosté uvidí jen prvních {MAX_PINNED} v pořadí galerie.
-          Pozdější připnuté se neukážou, dokud některé neodepneš.
+          Připnuto {pinnedCount} fotek — hosté uvidí {MAX_PINNED} z nich, rozprostřených přes celý
+          den. Odepni ty, které vidět nemusí. Pozdější připnuté se neukážou, dokud některé
+          neodepneš.
         </p>
       )}
 
       {highlights.length > 0 && (
-        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {highlights.map((photo) => (
             <li key={photo.id} className="space-y-1">
               <div className="relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900">

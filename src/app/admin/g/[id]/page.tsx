@@ -28,7 +28,7 @@ import { startChapter } from "../../chapter-actions";
 import { setHighlightPin } from "../../highlight-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
-import { pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
+import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
 import {
   CHAPTER_START_SELECT,
@@ -240,6 +240,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     gallery.chapters.map((chapter) => chapterStartOf(order, chapter)),
   );
   const pickedPinned = new Map(highlightPicks.map((pick) => [pick.id, pick.pinned]));
+  const pinnedCount = gallery.photos.filter((photo) => photo.highlightPin === true).length;
   const photosById = new Map(gallery.photos.map((photo) => [photo.id, photo]));
   const adminHighlights = highlightPicks.flatMap((pick) => {
     const photo = photosById.get(pick.id);
@@ -321,23 +322,29 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           </Button>
         </form>
         {/* docs/HIGHLIGHTS.md — pinned always in, excluded never, else the pick decides. */}
-        <form
-          action={setHighlightPin.bind(
-            null,
-            photo.id,
-            photo.highlightPin !== null ? null : inHighlights ? false : true,
-          )}
-        >
-          <Button type="submit" variant="ghost" size="sm">
-            {photo.highlightPin === true
-              ? "Odepnout z výběru"
-              : photo.highlightPin === false
-                ? "Vrátit do návrhu výběru"
-                : inHighlights
-                  ? "Vyřadit z výběru"
-                  : "Připnout do výběru"}
-          </Button>
-        </form>
+        {photo.highlightPin === null && !inHighlights && pinnedCount >= MAX_PINNED ? (
+          <p className="text-admin-muted px-2 text-xs dark:text-neutral-400">
+            Výběr je plný ({MAX_PINNED} připnutých) — nejdřív některou odepni.
+          </p>
+        ) : (
+          <form
+            action={setHighlightPin.bind(
+              null,
+              photo.id,
+              photo.highlightPin !== null ? null : inHighlights ? false : true,
+            )}
+          >
+            <Button type="submit" variant="ghost" size="sm">
+              {photo.highlightPin === true
+                ? "Odepnout z výběru"
+                : photo.highlightPin === false
+                  ? "Vrátit do návrhu výběru"
+                  : inHighlights
+                    ? "Vyřadit z výběru"
+                    : "Připnout do výběru"}
+            </Button>
+          </form>
+        )}
         <DeletePhotoButton photoId={photo.id} />
         {timelineView && (
           <StartChapterDetails
@@ -453,7 +460,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         enabled={gallery.highlightsEnabled}
         highlights={adminHighlights}
         excludedCount={gallery.photos.filter((photo) => photo.highlightPin === false).length}
-        pinnedCount={gallery.photos.filter((photo) => photo.highlightPin === true).length}
+        pinnedCount={pinnedCount}
         ownCount={gallery.photos.filter((photo) => photo.source === "OWNER").length}
       />
 

@@ -464,9 +464,6 @@ async function makeChaptersGallery(ownerId: string) {
       status: "PUBLISHED",
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-chapters-${Date.now()}`,
-      // Its spec counts which photos the page requests; the highlights strip
-      // would add some from the middle of the day (e2e/highlights.spec.ts).
-      highlightsEnabled: false,
     },
   });
 
@@ -551,7 +548,6 @@ async function makeFileOrderGallery(ownerId: string) {
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-file-order-${Date.now()}`,
       photoOrder: "FILE_NAME",
-      highlightsEnabled: false,
     },
   });
 
