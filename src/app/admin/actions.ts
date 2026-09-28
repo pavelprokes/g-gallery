@@ -550,7 +550,14 @@ export async function createGalleryForEvent(eventId: string, formData: FormData)
 
   await prisma.gallery.update({
     where: { id: galleryId },
-    data: { eventLinkId: link.id, listedOnEvent: false },
+    data: {
+      eventLinkId: link.id,
+      listedOnEvent: false,
+      // A guests' gallery is ordered by when its photos were taken: phones
+      // name files by their own counters, which say nothing about the day
+      // (docs/PHOTO-ORDER.md). Everything else defaults to file-name order.
+      ...(formData.get("allowUpload") ? { photoOrder: "TAKEN_AT" as const } : {}),
+    },
   });
 
   revalidatePath(`/admin/e/${event.id}`);

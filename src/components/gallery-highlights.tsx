@@ -2,21 +2,36 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { useId, useState } from "react";
-import { edgeMask, ScrollArrow, useSideScroll } from "@/components/chapter-nav";
+import { useId, useState, type CSSProperties } from "react";
 import type { GalleryHighlight } from "@/lib/gallery-highlights";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import { srcFor } from "@/lib/image-src";
+import { GRID_GAP } from "@/lib/justified-layout";
 import { placeholderStyle } from "@/lib/placeholder";
-
-/** Tile height; tiles are as wide as their photo's aspect makes them. */
-const HEIGHT_PX = { phone: 160, wide: 224 };
 
 /** Photos uploaded before dimensions were captured fall back to 3:2, as in the grid. */
 const FALLBACK_ASPECT = 1.5;
 
+/** How far past its target a tile may grow to fill a row (see the tile). */
+const MAX_GROWTH = 1.6;
+
 /**
  * The highlights: a short "best of the day" above the grid (docs/HIGHLIGHTS.md).
+ *
+ * Laid out like the grid — justified rows, uncropped, edge to edge, the
+ * grid's gap — only larger, so the day's best reads as the opening of the
+ * gallery rather than as a strip of thumbnails to scroll sideways through.
+ *
+ * Justified in CSS alone, so the server renders it exactly as it will stay:
+ * each tile's flex basis and grow are both proportional to its aspect ratio,
+ * so the space a row has left is shared out in proportion to width and every
+ * tile in a row ends up the same height (its `aspect-ratio` sets it); a filler
+ * after the last tile keeps a short final row at the target height instead of
+ * stretched across. `--row` is the target row height: on a phone the width /
+ * 1.45, so a 3:2 landscape (1.5) is too wide to share a row and fills it
+ * alone, while two portraits (2 × 0.67) fit side by side; 260 px wider up —
+ * rows then grow to fill the width, so they land a little taller: one or two
+ * a row on a tablet, three to four on a desktop, the grid's tiles a size up.
  *
  * A tile is a way *into* the gallery, not a second copy of it: tapping one
  * takes the viewer to that photo's own place in the grid, among the shots
@@ -38,51 +53,40 @@ export function GalleryHighlights({
 }) {
   const t = useTranslations("gallery");
   const headingId = useId();
-  const { scrollerRef, more, page } = useSideScroll<HTMLUListElement>(highlights, {
-    // A 160–224 px strip at the top of the page: the pointer rests on it while
-    // the viewer wheels down, and the page must scroll, not the strip.
-    wheelSideways: false,
-  });
 
   return (
-    <section aria-labelledby={headingId} className="mb-4">
-      <div className="px-4 sm:px-3">
-        <h2 id={headingId} className="text-xl font-semibold tracking-tight sm:text-2xl">
-          {t("highlightsTitle")}
-        </h2>
-        <p className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-0.5">
-          {t("highlightsHint")}
-        </p>
-      </div>
-      <div className="mt-3 flex items-center">
-        {more.before && <ScrollArrow side="before" onClick={() => page(-1)} />}
-        <ul
-          ref={scrollerRef}
-          className="flex min-w-0 flex-1 snap-x snap-proximity scroll-px-4 [scrollbar-width:none] gap-1 overflow-x-auto px-4 sm:scroll-px-3 sm:px-3 [&::-webkit-scrollbar]:hidden"
-          style={{ maskImage: edgeMask(more), WebkitMaskImage: edgeMask(more) }}
-        >
-          {highlights.map((photo, i) => (
-            <HighlightTile
-              key={photo.id}
-              photo={photo}
-              imageGrant={imageGrant}
-              busy={jumpingTo === photo.id}
-              // The strip is the first thing on the page; its first few tiles
-              // are what the viewer sees before anything else loads.
-              priority={i < 3}
-              label={t("highlightOpen", { fileName: photo.fileName })}
-              onJump={onJump}
-            />
-          ))}
-        </ul>
-        {more.after && <ScrollArrow side="after" onClick={() => page(1)} />}
-      </div>
+    <section aria-labelledby={headingId} className="mb-6">
+      <h2 id={headingId} className="px-4 text-xl font-semibold tracking-tight sm:px-3 sm:text-2xl">
+        {t("highlightsTitle")}
+      </h2>
+      <ul
+        className="mt-3 flex flex-wrap [--row:calc(100vw/1.45)] sm:[--row:260px]"
+        style={{ gap: GRID_GAP }}
+      >
+        {highlights.map((photo, i) => (
+          <HighlightTile
+            key={photo.id}
+            photo={photo}
+            aspect={photo.width && photo.height ? photo.width / photo.height : FALLBACK_ASPECT}
+            imageGrant={imageGrant}
+            busy={jumpingTo === photo.id}
+            // The highlights open the page; the first few are what the viewer
+            // sees before anything else loads.
+            priority={i < 3}
+            label={t("highlightOpen", { fileName: photo.fileName })}
+            onJump={onJump}
+          />
+        ))}
+        {/* Takes the rest of a short last row, so its tiles keep their size. */}
+        <li aria-hidden className="grow-[1000]" />
+      </ul>
     </section>
   );
 }
 
 function HighlightTile({
   photo,
+  aspect,
   imageGrant,
   busy,
   priority,
@@ -90,6 +94,7 @@ function HighlightTile({
   onJump,
 }: {
   photo: GalleryHighlight;
+  aspect: number;
   imageGrant: SignedImageGrant | null;
   busy: boolean;
   priority: boolean;
@@ -99,19 +104,32 @@ function HighlightTile({
   // Same fallback as a grid tile: a missing browser-made thumbnail falls back
   // to a transformation of the original.
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
-  const aspect = photo.width && photo.height ? photo.width / photo.height : FALLBACK_ASPECT;
 
   return (
-    <li className="shrink-0 snap-start">
+    <li
+      className="min-w-0"
+      style={
+        {
+          flexGrow: aspect,
+          flexBasis: `calc(var(--row) * ${aspect})`,
+          // A tile left alone on its row (a portrait before a landscape that
+          // cannot join it) would grow to the full width and, keeping its
+          // shape, turn several screens tall. A full row grows well under
+          // this cap; a lone tile stops at it and leaves the rest empty.
+          maxWidth: `calc(var(--row) * ${aspect * MAX_GROWTH})`,
+          aspectRatio: aspect,
+        } as CSSProperties
+      }
+    >
       <button
         type="button"
         onClick={() => onJump(photo.id)}
         aria-label={label}
         aria-busy={busy || undefined}
-        className={`on-media relative block h-40 overflow-hidden rounded-sm sm:h-56 ${
+        className={`on-media relative block h-full w-full overflow-hidden ${
           busy ? "cursor-progress" : ""
         }`}
-        style={{ aspectRatio: aspect, backgroundColor: placeholderStyle(photo.placeholder) }}
+        style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
       >
         <Image
           // The button is what a screen reader announces; see its label.
@@ -122,8 +140,10 @@ function HighlightTile({
           )}
           onError={() => setThumbnailFailed(true)}
           fill
-          sizes={`(min-width: 640px) ${Math.ceil(HEIGHT_PX.wide * aspect)}px, ${Math.ceil(
-            HEIGHT_PX.phone * aspect,
+          // Up to a small tablet a landscape can take the whole width and a
+          // portrait about half; wider up a tile is at most its capped growth.
+          sizes={`(max-width: 799px) ${aspect < 1 ? 50 : 100}vw, ${Math.ceil(
+            aspect * 260 * MAX_GROWTH,
           )}px`}
           priority={priority}
           className="duration-toggle object-cover transition-transform hover:scale-105"

@@ -22,18 +22,14 @@ import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
-import {
-  ChapterPresetsList,
-  CHAPTER_PRESETS_LIST_ID,
-  GalleryChapterPanel,
-} from "@/components/admin/gallery-chapter-panel";
+import { GalleryChapterPanel, StartChapterDetails } from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
 import { setHighlightPin } from "../../highlight-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
-import { chapterAnchor, compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
+import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
 import {
   CHAPTER_START_SELECT,
   ORDER_KEY_SELECT,
@@ -46,7 +42,6 @@ import {
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { PageHeader } from "@/components/ui/page-header";
@@ -268,7 +263,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
   /** One photo's admin tile. `startsChapter` is set in the timeline view on
    * the photo a chapter currently begins with. */
-  const renderPhoto = (photo: AdminPhoto, startsChapter = false) => {
+  const renderPhoto = (photo: AdminPhoto, startsChapter: string | null = null) => {
     const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
     const printQuantity = printQuantities.get(photo.id) ?? 0;
     const isCover = gallery.coverPhotoId === photo.id;
@@ -345,28 +340,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         </form>
         <DeletePhotoButton photoId={photo.id} />
         {timelineView && (
-          <details className="text-sm">
-            <summary className="text-brand-primary-dark cursor-pointer font-semibold dark:text-neutral-200">
-              {startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
-            </summary>
-            <form
-              action={startChapter.bind(null, gallery.id, photo.id)}
-              className="mt-1 flex gap-1"
-            >
-              <Input
-                name="title"
-                list={CHAPTER_PRESETS_LIST_ID}
-                required
-                maxLength={MAX_CHAPTER_TITLE}
-                placeholder="Obřad"
-                aria-label="Název kapitoly"
-                className="min-w-0"
-              />
-              <Button type="submit" size="sm">
-                Uložit
-              </Button>
-            </form>
-          </details>
+          <StartChapterDetails
+            summary={startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
+            defaultTitle={startsChapter ?? undefined}
+            action={startChapter.bind(null, gallery.id, photo.id)}
+          />
         )}
       </li>
     );
@@ -457,6 +435,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         galleryId={gallery.id}
         order={order}
         displaced={displacedBetweenOrders(gallery.photos)}
+        takesGuestPhotos={
+          gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
+          gallery.photos.some((photo) => photo.source === "GUEST")
+        }
       />
 
       <GalleryChapterPanel
@@ -465,7 +447,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         timelineHref="?timeline=1"
         timelineActive={timelineView}
       />
-      <ChapterPresetsList />
 
       <GalleryHighlightPanel
         galleryId={gallery.id}
@@ -562,7 +543,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     </li>
                   ),
                   ...segmentPhotos.map((photo, i) =>
-                    renderPhoto(photo, !!segment.chapter && i === 0),
+                    renderPhoto(photo, segment.chapter && i === 0 ? segment.chapter.title : null),
                   ),
                 ];
               })

@@ -133,11 +133,19 @@ export async function updateChapter(chapterId: string, formData: FormData) {
     if (value && value !== oldPreset?.[locale]) kept[locale] = { title: value };
   }
 
+  // Renamed *to* a preset — one tap on "Hostina" — the translations still in
+  // the form belong to the old title ("Plate smashing" for "Rozbíjení
+  // talíře"); the preset's own replace them.
+  const renamedToPreset = title.data !== chapter.title && presetTranslations(title.data);
+
   await prisma.galleryChapter.update({
     where: { id: chapter.id },
     data: {
       title: title.data,
-      translations: withPresetTranslations(title.data, kept) as Prisma.InputJsonObject,
+      translations: withPresetTranslations(
+        title.data,
+        renamedToPreset ? {} : kept,
+      ) as Prisma.InputJsonObject,
     },
   });
 

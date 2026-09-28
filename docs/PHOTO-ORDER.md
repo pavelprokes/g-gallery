@@ -21,10 +21,19 @@ gallery can now be shown in that order instead.
 
 `Gallery.photoOrder`, per gallery, set in the admin (panel "Pořadí fotek"):
 
-| Order                | Key                  | Use when                                           |
-| -------------------- | -------------------- | -------------------------------------------------- |
-| `TAKEN_AT` (default) | `Photo.takenAt`, ISO | originals keep their camera names; guest galleries |
-| `FILE_NAME`          | `Photo.fileOrderKey` | the export numbers the files in Lightroom's order  |
+| Order                 | Key                  | Use when                                             |
+| --------------------- | -------------------- | ---------------------------------------------------- |
+| `FILE_NAME` (default) | `Photo.fileOrderKey` | the export numbers the files in Lightroom's order    |
+| `TAKEN_AT`            | `Photo.takenAt`, ISO | guests' galleries; originals with their camera names |
+
+File-name order is the default since 2026-09-28 (Pavel: the photographer exports from Lightroom
+with a sequence "almost always"). A **guests' gallery** gets capture time instead, set where one is made as such: the wedding
+page's "pro hosty" gallery (`createGalleryForEvent`). Ticking uploads on a link does not change the
+order — a delivery may let guests add a few, and an explicit choice in the admin is never
+overridden; the admin hint points a standalone guests' gallery at capture time. The default's migration
+switched existing galleries only where it could not make things worse — no upload link, no guest
+photos, and either no photos yet or file names whose first numbers are distinct and run almost
+without gaps (an export sequence; two bodies' camera counters never do).
 
 Either way a photo's place is `(key, id)` — `TimelinePosition` in `src/lib/gallery-chapters.ts`,
 with every query and comparison built by `src/lib/photo-order.ts`. `id` breaks ties (a burst shares a
@@ -87,4 +96,5 @@ collapsing onto one photo, the one guests saw keeps it).
 
 A guest's phone names its files `IMG_4821.jpg`; in file-name order those sort among the
 photographer's by name, which is to say not usefully. File-name order is for galleries the
-photographer delivers; a guest gallery keeps capture time. The admin hint says so.
+photographer delivers; a guests' gallery is given capture time when it is made (above), and the
+admin hint says so.
