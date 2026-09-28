@@ -263,7 +263,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
   /** One photo's admin tile. `startsChapter` is set in the timeline view on
    * the photo a chapter currently begins with. */
-  const renderPhoto = (photo: AdminPhoto, startsChapter = false) => {
+  const renderPhoto = (photo: AdminPhoto, startsChapter: string | null = null) => {
     const stats = perPhoto.get(photo.id) ?? { views: 0, uniqueViewers: 0 };
     const printQuantity = printQuantities.get(photo.id) ?? 0;
     const isCover = gallery.coverPhotoId === photo.id;
@@ -342,6 +342,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         {timelineView && (
           <StartChapterDetails
             summary={startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
+            defaultTitle={startsChapter ?? undefined}
             action={startChapter.bind(null, gallery.id, photo.id)}
           />
         )}
@@ -434,6 +435,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         galleryId={gallery.id}
         order={order}
         displaced={displacedBetweenOrders(gallery.photos)}
+        takesGuestPhotos={
+          gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
+          gallery.photos.some((photo) => photo.source === "GUEST")
+        }
       />
 
       <GalleryChapterPanel
@@ -538,7 +543,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                     </li>
                   ),
                   ...segmentPhotos.map((photo, i) =>
-                    renderPhoto(photo, !!segment.chapter && i === 0),
+                    renderPhoto(photo, segment.chapter && i === 0 ? segment.chapter.title : null),
                   ),
                 ];
               })

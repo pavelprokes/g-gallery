@@ -87,12 +87,14 @@ Blank those the same way if a photographer who fills them in ever needs it.
 bar. Hidden in favourites-only mode, like chapters and promos. Laid out like the grid itself
 (Pavel, 2026-09-28) — justified rows, uncropped, the grid's gap (`GRID_GAP`), edge to edge with no
 side gutter — only a size up. On a phone a landscape shot fills the width alone and two portraits
-share a row; wider up rows aim at 260 px and grow to fill, two a row on a tablet, three to four on a
+share a row; wider up rows aim at 260 px and grow to fill, one or two a row on a tablet, three to four on a
 desktop. It replaced a horizontal strip of 160–224 px thumbnails, which read as a row of previews to
 scroll past rather than as the opening of the gallery. No hint line under the heading.
 
 Justified in **CSS alone** (flex basis and grow both proportional to each photo's aspect ratio, a
-filler keeping a short last row at the target size), not with `justifyRows`: the server renders it
+filler keeping a short last row at the target size, and a cap at 1.6× the target so a tile left
+alone on its row — a portrait before a landscape that cannot join it — does not grow to the full
+width and several screens tall), not with `justifyRows`: the server renders it
 exactly as it stays, so the page does not jump when the highlights would otherwise appear after
 hydration, and the first tiles' images can be preloaded.
 

@@ -12,6 +12,9 @@ import { placeholderStyle } from "@/lib/placeholder";
 /** Photos uploaded before dimensions were captured fall back to 3:2, as in the grid. */
 const FALLBACK_ASPECT = 1.5;
 
+/** How far past its target a tile may grow to fill a row (see the tile). */
+const MAX_GROWTH = 1.6;
+
 /**
  * The highlights: a short "best of the day" above the grid (docs/HIGHLIGHTS.md).
  *
@@ -27,8 +30,8 @@ const FALLBACK_ASPECT = 1.5;
  * stretched across. `--row` is the target row height: on a phone the width /
  * 1.45, so a 3:2 landscape (1.5) is too wide to share a row and fills it
  * alone, while two portraits (2 × 0.67) fit side by side; 260 px wider up —
- * rows then grow to fill the width, so they land a little taller: two a row
- * on a tablet, three to four on a desktop, the grid's tiles a size up.
+ * rows then grow to fill the width, so they land a little taller: one or two
+ * a row on a tablet, three to four on a desktop, the grid's tiles a size up.
  *
  * A tile is a way *into* the gallery, not a second copy of it: tapping one
  * takes the viewer to that photo's own place in the grid, among the shots
@@ -109,6 +112,11 @@ function HighlightTile({
         {
           flexGrow: aspect,
           flexBasis: `calc(var(--row) * ${aspect})`,
+          // A tile left alone on its row (a portrait before a landscape that
+          // cannot join it) would grow to the full width and, keeping its
+          // shape, turn several screens tall. A full row grows well under
+          // this cap; a lone tile stops at it and leaves the rest empty.
+          maxWidth: `calc(var(--row) * ${aspect * MAX_GROWTH})`,
           aspectRatio: aspect,
         } as CSSProperties
       }
@@ -132,9 +140,11 @@ function HighlightTile({
           )}
           onError={() => setThumbnailFailed(true)}
           fill
-          // A phone shows a landscape across the whole width; wider screens
-          // aim at the 260 px row, a little more once a row stretches.
-          sizes={`(max-width: 639px) 100vw, ${Math.ceil(aspect * 320)}px`}
+          // Up to a small tablet a landscape can take the whole width and a
+          // portrait about half; wider up a tile is at most its capped growth.
+          sizes={`(max-width: 799px) ${aspect < 1 ? 50 : 100}vw, ${Math.ceil(
+            aspect * 260 * MAX_GROWTH,
+          )}px`}
           priority={priority}
           className="duration-toggle object-cover transition-transform hover:scale-105"
         />

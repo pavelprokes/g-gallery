@@ -192,11 +192,6 @@ function itemsPerRow(containerWidth: number): number | undefined {
   return containerWidth < 640 ? 2 : undefined;
 }
 
-/** Gap between tiles, both within a row and between rows — the layout
- * algorithm and the row's own flex gap must agree, or rows would overlap
- * or leave a seam. Shared with the highlights (src/lib/justified-layout.ts). */
-const GAP = GRID_GAP;
-
 /**
  * Horizontal gutter for the page's text chrome — header, selection toolbar,
  * footer. The grid gets no gutter of its own: it runs edge to edge on a
@@ -1638,7 +1633,7 @@ function GalleryViewInner({
         segment.entries.map((entry) => ({ item: entry, aspect: entryAspect(entry) })),
         containerWidth,
         targetRowHeight(containerWidth),
-        GAP,
+        GRID_GAP,
         itemsPerRow(containerWidth),
       );
       if (!segment.chapter) return justified;
@@ -1674,7 +1669,7 @@ function GalleryViewInner({
     overscan: 4,
     scrollMargin,
     scrollPaddingStart: showChapters ? CHAPTER_BAR_HEIGHT : 0,
-    gap: GAP,
+    gap: GRID_GAP,
   });
 
   /**
@@ -2733,7 +2728,7 @@ function GalleryViewInner({
               className="absolute top-0 left-0 flex w-full"
               style={{
                 height: virtualRow.size,
-                gap: GAP,
+                gap: GRID_GAP,
                 transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
               }}
             >

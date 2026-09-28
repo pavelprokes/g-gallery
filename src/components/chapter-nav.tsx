@@ -6,20 +6,16 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import type { GalleryChapter } from "@/lib/gallery-chapters";
 
 /**
- * A row that scrolls sideways: whether each side has more to show, and a way
- * to page it — for a mouse without a horizontal wheel, which has no other.
- * Shared by the chapter bar and the highlights (docs/HIGHLIGHTS.md).
- * `content` re-measures when what the row holds changes.
+ * The chapter bar's sideways scrolling: whether each side has more to show,
+ * and a way to page it — for a mouse without a horizontal wheel, which has no
+ * other. `content` re-measures when what the row holds changes.
  *
- * `wheelSideways`: a vertical wheel over the row scrolls it sideways until it
- * reaches an end. Right for the chapter bar — a thin strip the pointer only
- * crosses on purpose. Wrong for anything tall enough that the pointer rests on
- * it while the viewer scrolls the page: it would swallow the page's scroll.
+ * A vertical wheel over the row scrolls it sideways until it reaches an end:
+ * right for a thin strip the pointer only crosses on purpose (it would be
+ * wrong for anything tall enough to rest the pointer on while scrolling the
+ * page — which is why the highlights no longer scroll sideways at all).
  */
-export function useSideScroll<T extends HTMLElement>(
-  content: unknown,
-  { wheelSideways }: { wheelSideways: boolean },
-) {
+function useSideScroll<T extends HTMLElement>(content: unknown) {
   const scrollerRef = useRef<T>(null);
   const [more, setMore] = useState({ before: false, after: false });
 
@@ -50,7 +46,7 @@ export function useSideScroll<T extends HTMLElement>(
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
-    if (wheelSideways) scroller.addEventListener("wheel", onWheel, { passive: false });
+    scroller.addEventListener("wheel", onWheel, { passive: false });
     // The chips too, not just the row: they change width without the row
     // doing so — most often when the brand font replaces the fallback.
     const observer = new ResizeObserver(update);
@@ -62,7 +58,7 @@ export function useSideScroll<T extends HTMLElement>(
       scroller.removeEventListener("wheel", onWheel);
       observer.disconnect();
     };
-  }, [content, wheelSideways]);
+  }, [content]);
 
   const page = (direction: 1 | -1) => {
     const scroller = scrollerRef.current;
@@ -104,9 +100,7 @@ export function ChapterBar({
   height: number;
 }) {
   const t = useTranslations("gallery");
-  const { scrollerRef, more, page } = useSideScroll<HTMLDivElement>(chapters, {
-    wheelSideways: true,
-  });
+  const { scrollerRef, more, page } = useSideScroll<HTMLDivElement>(chapters);
 
   // Keep the current chip visible as the grid scrolls past chapters. Only the
   // bar's own horizontal scroll moves — never the page.
@@ -204,7 +198,7 @@ export function ChapterBar({
  * A chip cut off by the edge of the row fades out instead of ending in a hard
  * line — visual only: a mask never takes clicks away from what is under it.
  */
-export function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
+function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
   if (!more.before && !more.after) return undefined;
   const start = more.before ? "transparent 0, black 1.5rem" : "black 0";
   const end = more.after ? "black calc(100% - 1.5rem), transparent 100%" : "black 100%";
@@ -215,7 +209,7 @@ export function edgeMask(more: { before: boolean; after: boolean }): string | un
  * Sits *beside* the row, never over it: the scrolling area narrows by the
  * arrow's width, so no chip can end up underneath a button.
  */
-export function ScrollArrow({ side, onClick }: { side: "before" | "after"; onClick: () => void }) {
+function ScrollArrow({ side, onClick }: { side: "before" | "after"; onClick: () => void }) {
   return (
     <button
       type="button"

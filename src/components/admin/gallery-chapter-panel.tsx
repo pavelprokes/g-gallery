@@ -40,9 +40,12 @@ function isPresetOnly(chapter: AdminChapter): boolean {
  */
 export function StartChapterDetails({
   summary,
+  defaultTitle,
   action,
 }: {
   summary: string;
+  /** The chapter's title, when this photo already starts one (a rename). */
+  defaultTitle?: string;
   action: (formData: FormData) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +56,11 @@ export function StartChapterDetails({
       </summary>
       {open && (
         <form action={action} className="mt-1 space-y-2">
-          <ChapterTitleField placeholder="Obřad" label="Název kapitoly" />
+          <ChapterTitleField
+            placeholder="Obřad"
+            label="Název kapitoly"
+            defaultValue={defaultTitle}
+          />
           <Button type="submit" size="sm">
             Uložit
           </Button>

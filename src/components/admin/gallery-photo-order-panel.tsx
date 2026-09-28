@@ -26,11 +26,14 @@ export function GalleryPhotoOrderPanel({
   galleryId,
   order,
   displaced,
+  takesGuestPhotos,
 }: {
   galleryId: string;
   order: PhotoOrder;
   /** Photos the other order would move (`photosOutOfPlace`). */
   displaced: number;
+  /** Guests can add photos here, or already have. */
+  takesGuestPhotos: boolean;
 }) {
   const current = ORDERS.find((o) => o.value === order)!;
   const other = ORDERS.find((o) => o.value !== order)!;
@@ -55,6 +58,12 @@ export function GalleryPhotoOrderPanel({
         </div>
       </div>
       <p className="text-admin-muted text-sm dark:text-neutral-400">{current.hint}</p>
+      {order === "FILE_NAME" && takesGuestPhotos && (
+        <p className="text-admin-danger mt-2 text-sm">
+          Do galerie nahrávají hosté. Fotky z telefonů mají názvy podle počítadla telefonu
+          (IMG_4821…), ne podle průběhu dne — pro ně je lepší řazení podle času pořízení.
+        </p>
+      )}
       <p className="text-admin-muted mt-2 text-sm dark:text-neutral-400">
         {displaced === 0
           ? "U této galerie vychází obě řazení stejně."
