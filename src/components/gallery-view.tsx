@@ -59,6 +59,7 @@ import {
   type GridEntry,
 } from "@/lib/gallery-grid";
 import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
+import type { PhotoOrder } from "@/lib/photo-order";
 import type { GalleryChapter } from "@/lib/gallery-chapters";
 import { PromoTile } from "@/components/promo-tile";
 import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
@@ -155,9 +156,9 @@ export interface GalleryPhoto {
   favoriteCount: number;
   /** A guest photo's volunteered credit; null for the photographer's own. */
   uploaderName: string | null;
-  /** Capture time, ISO — the timeline position chapters start at
-   * (docs/CHAPTERS.md). */
-  takenAt: string;
+  /** Its key in the gallery's order (src/lib/photo-order.ts) — capture time
+   * or file name — which is what chapters start at (docs/CHAPTERS.md). */
+  orderKey: string;
 }
 
 export interface GalleryViewer {
@@ -232,7 +233,7 @@ function entryAspect(entry: GridEntry<GalleryPhoto>): number {
 }
 
 const photoIdOf = (photo: GalleryPhoto) => photo.id;
-const timelineOf = (photo: GalleryPhoto) => ({ takenAt: photo.takenAt, id: photo.id });
+const timelineOf = (photo: GalleryPhoto) => ({ key: photo.orderKey, id: photo.id });
 
 /** A chapter header's row height (docs/CHAPTERS.md): room above the title so a
  * new chapter reads as a break in the day, not as a caption on the row above. */
@@ -758,6 +759,8 @@ function LightboxPhoto({
 }
 
 interface PhotosPage {
+  /** The order the items' `orderKey`s are in — absent on the seeded first page. */
+  order?: PhotoOrder;
   items: GalleryPhoto[];
   nextCursor: string | null;
   /** The gallery's confirmed total — first page only. */
@@ -768,11 +771,23 @@ async function fetchPhotosPage(
   token: string,
   cursor: string | null,
   signal: AbortSignal,
+  photoOrder: PhotoOrder,
 ): Promise<PhotosPage> {
   const url = `/api/g/${encodeURIComponent(token)}/photos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`;
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`failed to fetch photos page (${response.status})`);
-  return (await response.json()) as PhotosPage;
+  const page = response.ok ? ((await response.json()) as PhotosPage) : null;
+  // The photographer switched the gallery's order while this page was open
+  // (docs/PHOTO-ORDER.md): the loaded pages, the chapter starts and the
+  // highlights all came in the old order, and splicing the new one onto them
+  // misplaces every chapter header. Rare enough that starting over is right.
+  if (response.status === 409 || (page?.order && page.order !== photoOrder)) {
+    window.location.reload();
+    // Pending until the reload lands: an error would be retried (another
+    // request, another reload) and could flash an error state first.
+    return new Promise<never>(() => {});
+  }
+  if (!page) throw new Error(`failed to fetch photos page (${response.status})`);
+  return page;
 }
 
 /** One print-mark write, sorted into what the queue should do next with it. */
@@ -860,6 +875,8 @@ interface GalleryViewProps {
   photoCount: number;
   initialPhotos: GalleryPhoto[];
   initialCursor: string | null;
+  /** The order `initialPhotos` came in; a page fetched in another one reloads. */
+  photoOrder: PhotoOrder;
   imageGrant: SignedImageGrant | null;
   viewers: GalleryViewer[];
   /** The owner's credit cards placed in this gallery (docs/PROMO-CARDS.md).
@@ -898,6 +915,7 @@ function GalleryViewInner({
   photoCount,
   initialPhotos,
   initialCursor,
+  photoOrder,
   imageGrant,
   viewers,
   promos,
@@ -1102,7 +1120,7 @@ function GalleryViewInner({
   // there is no client fetch for the initial paint.
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["gallery-photos", token],
-    queryFn: ({ pageParam, signal }) => fetchPhotosPage(token, pageParam, signal),
+    queryFn: ({ pageParam, signal }) => fetchPhotosPage(token, pageParam, signal, photoOrder),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialData: {

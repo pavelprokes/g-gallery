@@ -1,4 +1,5 @@
 import "server-only";
+import type { PhotoOrder } from "@/lib/photo-order";
 import { hashShareToken } from "@/lib/share-token";
 import { splitEventToken } from "@/lib/event-token";
 import { isUnlocked } from "@/lib/share-unlock";
@@ -20,6 +21,8 @@ export interface ResolvedShareLink {
   hasPassword: boolean;
   /** Cosmetic URL segment, frozen at creation (docs/TODO.md §6). */
   slug: string | null;
+  /** The order the gallery's photos are shown in (src/lib/photo-order.ts). */
+  photoOrder: PhotoOrder;
 }
 
 interface ShareLinkRecord {
@@ -35,7 +38,7 @@ interface ShareLinkRecord {
   failedUnlockAttempts: number;
   unlockLockedUntil: Date | null;
   slug: string | null;
-  gallery: { status: string };
+  gallery: { status: string; photoOrder: PhotoOrder };
 }
 
 // After this many consecutive wrong-password attempts, the link is locked out.
@@ -79,7 +82,7 @@ const LINK_FIELDS = {
   failedUnlockAttempts: true,
   unlockLockedUntil: true,
   slug: true,
-  gallery: { select: { status: true } },
+  gallery: { select: { status: true, photoOrder: true } },
 } as const;
 
 /**
@@ -150,6 +153,7 @@ function toResolved(link: ShareLinkRecord): ResolvedShareLink {
     allowPrintSelection: link.allowPrintSelection,
     hasPassword: link.passwordHash !== null,
     slug: link.slug,
+    photoOrder: link.gallery.photoOrder,
   };
 }
 

@@ -23,7 +23,10 @@ gap or overlap to validate, and nothing a photographer can get into an inconsist
 ## The start is a timeline position, not a photo
 
 `GalleryChapter.startTakenAt` + `startPhotoId` are the same `(takenAt, id)` pair the photo cursor
-pages by (`src/lib/photo-cursor.ts`) — deliberately **not** a foreign key:
+pages by (`src/lib/photo-cursor.ts`) — deliberately **not** a foreign key. A gallery shown in
+file-name order (docs/PHOTO-ORDER.md, 2026-09-28) places the chapter at `(startFileOrderKey,
+startPhotoId)` instead; both keys are stored at creation, so switching a gallery's order keeps every
+chapter on the photo it was started on.
 
 - **Deleting the photo a chapter was started on moves nothing.** The boundary stays at its place on
   the timeline and the chapter begins at the next photo. A relation would have had to cascade
@@ -33,7 +36,8 @@ pages by (`src/lib/photo-cursor.ts`) — deliberately **not** a foreign key:
 - The photographer thinks "the ceremony starts at this shot", and that is exactly what is stored.
 
 Known ceiling: a second camera whose clock was wrong interleaves in the wrong place. That is already
-true of the whole timeline order (2026-08-25) and chapters neither fix nor worsen it.
+true of the whole capture-time order (2026-08-25) and chapters neither fix nor worsen it — the
+answer to it is file-name order (docs/PHOTO-ORDER.md).
 
 Several chapters that end up reaching the same photo (their own photos deleted) collapse: only the
 last one is shown. A chapter with no photos at all — every one deleted, or started past the last
@@ -70,7 +74,8 @@ starting at the first photo, row 0 is a header.
 
 ## Placement happens in the browser
 
-Each photo in the grid carries its `takenAt`, and `groupByChapter` places headers against the
+Each photo in the grid carries its `orderKey` (its capture time, or its file-name key — whichever
+order the gallery is shown in), and `groupByChapter` places headers against the
 photos actually loaded. The alternative — a server-computed "chapter starts at index N" — goes
 stale the moment the grid refetches (a guest upload, the tab regaining focus) and puts a header one
 photo off its boundary. A chapter whose start has not been reached by the loaded pages is simply not

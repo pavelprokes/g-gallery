@@ -152,15 +152,15 @@ describe("photoInAdjacentRow", () => {
 });
 
 describe("groupByChapter", () => {
-  type TimedPhoto = { id: string; takenAt: string };
+  type TimedPhoto = { id: string; key: string };
   const at = (minute: number) => `2026-09-19T14:${String(minute).padStart(2, "0")}:00.000Z`;
   const timed = (n: number): TimedPhoto[] =>
-    Array.from({ length: n }, (_, i) => ({ id: `p${i}`, takenAt: at(i) }));
+    Array.from({ length: n }, (_, i) => ({ id: `p${i}`, key: at(i) }));
   const positionOf = (photo: TimedPhoto) => photo;
-  const chapter = (id: string, takenAt: string, photoId = ""): GalleryChapter => ({
+  const chapter = (id: string, key: string, photoId = ""): GalleryChapter => ({
     id,
     title: id,
-    start: { takenAt, id: photoId },
+    start: { key, id: photoId },
     anchor: id,
     count: 0,
   });
@@ -205,9 +205,9 @@ describe("groupByChapter", () => {
 
   it("uses the id to split a burst sharing one timestamp", () => {
     const burst = [
-      { id: "a", takenAt: at(0) },
-      { id: "b", takenAt: at(0) },
-      { id: "c", takenAt: at(0) },
+      { id: "a", key: at(0) },
+      { id: "b", key: at(0) },
+      { id: "c", key: at(0) },
     ];
     const segments = groupByChapter(
       buildGridEntries(burst, []),

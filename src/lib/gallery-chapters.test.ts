@@ -33,9 +33,16 @@ describe("presetTranslations", () => {
 
 describe("compareTimeline", () => {
   it("orders by time, then by id", () => {
-    const a = { takenAt: "2026-09-19T14:00:00.000Z", id: "b" };
-    expect(compareTimeline(a, { ...a, takenAt: "2026-09-19T14:01:00.000Z" })).toBe(-1);
+    const a = { key: "2026-09-19T14:00:00.000Z", id: "b" };
+    expect(compareTimeline(a, { ...a, key: "2026-09-19T14:01:00.000Z" })).toBe(-1);
     expect(compareTimeline(a, { ...a, id: "a" })).toBe(1);
     expect(compareTimeline(a, { ...a })).toBe(0);
+  });
+
+  it("orders file-name keys by the size of their numbers, not their text", () => {
+    // svatba_9.jpg and svatba_10.jpg, as the database keys them.
+    const nine = { key: "svatba0019jpg", id: "z" };
+    const ten = { key: "svatba00210jpg", id: "a" };
+    expect(compareTimeline(nine, ten)).toBe(-1);
   });
 });

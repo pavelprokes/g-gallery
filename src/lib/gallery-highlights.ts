@@ -1,4 +1,5 @@
 import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
+import { ORDER_KEY_SELECT, orderKeyOf, positionOf, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * The highlights — a short "best of the day" at the top of a gallery
@@ -54,6 +55,9 @@ const HABITUAL_LABEL_SHARE = 0.25;
 const MIN_PART_SHARE = 0.03;
 
 export interface HighlightCandidate extends TimelinePosition {
+  /** Capture time, ISO — pauses and bursts are measured in it, whatever
+   * order the gallery is shown in (src/lib/photo-order.ts). */
+  takenAt: string;
   /** Lightroom stars from the export; null when the file carried none. */
   rating: number | null;
   label: string | null;
@@ -100,6 +104,7 @@ export function pickHighlights(
   const parts = cutIntoParts(
     timeline.filter((c) => c.own || pinnedIds.has(c.id)),
     chapterStarts,
+    count,
   );
   const score = scorer(own);
   const moments = parts.map((part) => momentsOf(part, score));
@@ -161,19 +166,22 @@ function momentsOf(
   score: (c: HighlightCandidate) => number,
 ): Moment[] {
   const moments: Moment[] = [];
-  for (const chain of splitWhere(part, (prev, c) => msBetween(prev, c) > BURST_GAP_MS)) {
+  for (const chain of splitWhere(part, (prev, c) => gapBetween(prev, c) > BURST_GAP_MS)) {
     const decided = chain.filter((c) => c.pin !== null);
     const windows = splitWhere(
       chain.filter((c) => c.own),
       (prev, c, first) =>
-        msBetween(prev, c) > BURST_GAP_MS || msBetween(first, c) > BURST_MAX_SPAN_MS,
+        gapBetween(prev, c) > BURST_GAP_MS || gapBetween(first, c) > BURST_MAX_SPAN_MS,
     );
     for (const window of windows) {
-      const settled = decided.some(
-        (d) =>
-          msBetween(d, window[0]!) <= BURST_MAX_SPAN_MS &&
-          msBetween(window.at(-1)!, d) <= BURST_MAX_SPAN_MS,
-      );
+      // The window's span in time — in file-name order its frames need not
+      // run forwards (two bodies a few seconds apart).
+      const times = window.map((c) => Date.parse(c.takenAt));
+      const [from, to] = [Math.min(...times), Math.max(...times)];
+      const settled = decided.some((d) => {
+        const at = Date.parse(d.takenAt);
+        return at >= from - BURST_MAX_SPAN_MS && at <= to + BURST_MAX_SPAN_MS;
+      });
       if (settled) continue;
       const scored = window.map((c) => ({ ...c, score: score(c) }));
       const best = Math.max(...scored.map((c) => c.score));
@@ -198,15 +206,52 @@ function splitWhere<T>(
   return runs;
 }
 
-function msBetween(a: TimelinePosition, b: TimelinePosition): number {
+function msBetween(a: { takenAt: string }, b: { takenAt: string }): number {
   return Date.parse(b.takenAt) - Date.parse(a.takenAt);
 }
 
-/** The day's parts: chapters when the photographer set them, else pauses. */
-function cutIntoParts<T extends TimelinePosition>(
+function inClockOrder(timeline: readonly { takenAt: string }[]): boolean {
+  return timeline.every((item, i) => i === 0 || msBetween(timeline[i - 1]!, item) >= -PART_GAP_MS);
+}
+
+/**
+ * How far apart two neighbours were shot. In capture-time order this is
+ * `msBetween` itself; in file-name order a camera whose clock was off makes
+ * the next photo "earlier", and that is a gap as much as a later one is.
+ */
+function gapBetween(a: { takenAt: string }, b: { takenAt: string }): number {
+  return Math.abs(msBetween(a, b));
+}
+
+/**
+ * The day's parts: chapters when the photographer set them, else pauses in
+ * shooting — else, when the capture times cannot be trusted to show a pause,
+ * equal stretches of the gallery.
+ *
+ * Capture times go backwards only in file-name order (src/lib/photo-order.ts).
+ * By seconds, that is two bodies' clocks disagreeing a little and changes
+ * nothing. By more than a pause, a camera's clock was off: every switch to or
+ * from it would read as a pause, cutting the day into slivers too small to
+ * earn a seat. An even walk through the photographer's own order is what the
+ * fill does without marks anyway. Judged on the photographer's own photos
+ * only — a pinned guest photo sorts by its phone's file name, wherever that
+ * lands, and says nothing about the photographer's clocks.
+ */
+function cutIntoParts<T extends HighlightCandidate>(
   timeline: readonly T[],
   chapterStarts: readonly TimelinePosition[],
+  count: number,
 ): T[][] {
+  // A chapter starting past the last photo is hidden from guests; it cuts
+  // nothing here either, and must not stand in for "the day has chapters".
+  const last = timeline.at(-1);
+  chapterStarts = last ? chapterStarts.filter((start) => compareTimeline(start, last) <= 0) : [];
+  if (chapterStarts.length === 0 && !inClockOrder(timeline.filter((c) => c.own))) {
+    const size = Math.max(1, Math.ceil(timeline.length / count));
+    return Array.from({ length: Math.ceil(timeline.length / size) }, (_, i) =>
+      timeline.slice(i * size, (i + 1) * size),
+    );
+  }
   const starts = [...chapterStarts].sort(compareTimeline);
   const parts: T[][] = [];
   let next = 0;
@@ -329,8 +374,7 @@ export interface GalleryHighlight {
 /** The columns `toHighlightCandidate` reads — for a Prisma `select`. */
 export const HIGHLIGHT_CANDIDATE_SELECT = {
   id: true,
-  takenAt: true,
-  createdAt: true,
+  ...ORDER_KEY_SELECT,
   source: true,
   xmpRating: true,
   xmpLabel: true,
@@ -338,20 +382,24 @@ export const HIGHLIGHT_CANDIDATE_SELECT = {
   highlightPin: true,
 } as const;
 
-/** A photo row as the picker sees it. Same timeline fallback as the cursor. */
-export function toHighlightCandidate(photo: {
-  id: string;
-  takenAt: Date | null;
-  createdAt: Date;
-  source: string;
-  xmpRating: number | null;
-  xmpLabel: string | null;
-  xmpHighlight: boolean;
-  highlightPin: boolean | null;
-}): HighlightCandidate {
+/** A photo row as the picker sees it, placed in the gallery's order. */
+export function toHighlightCandidate(
+  order: PhotoOrder,
+  photo: {
+    id: string;
+    takenAt: Date | null;
+    createdAt: Date;
+    fileOrderKey: string;
+    source: string;
+    xmpRating: number | null;
+    xmpLabel: string | null;
+    xmpHighlight: boolean;
+    highlightPin: boolean | null;
+  },
+): HighlightCandidate {
   return {
-    id: photo.id,
-    takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
+    ...positionOf(order, photo),
+    takenAt: orderKeyOf("TAKEN_AT", photo),
     rating: photo.xmpRating,
     label: photo.xmpLabel,
     tagged: photo.xmpHighlight,

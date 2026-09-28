@@ -137,6 +137,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       archive={data.archive}
       initialPhotos={data.initialPhotos}
       initialCursor={data.initialCursor}
+      photoOrder={data.photoOrder}
       imageGrant={data.imageGrant}
       viewers={data.viewers}
       promos={data.promos}

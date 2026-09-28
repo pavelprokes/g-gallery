@@ -90,6 +90,8 @@ export async function startChapter(galleryId: string, photoId: string, formData:
     );
     try {
       await prisma.galleryChapter.create({
+        // `startFileOrderKey` is filled in by a database trigger from the
+        // start photo (docs/PHOTO-ORDER.md), like the photo's own key.
         data: { ...at, title: title.data, translations, slug },
       });
       break;

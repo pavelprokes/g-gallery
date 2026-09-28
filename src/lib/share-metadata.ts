@@ -8,33 +8,44 @@ import {
 } from "@/lib/content-translations";
 import { pickCover } from "@/lib/event-access";
 import { previewMetadata } from "@/lib/og-image";
+import { photoOrderBy, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * The photo a shared link previews with: the gallery's chosen cover, or else
- * the first photo a visitor sees — the grid's own order, oldest shot first
- * (`takenAt asc`, `id asc`), not the newest upload, which on a guest gallery
+ * the first photo a visitor sees — in the grid's own order
+ * (src/lib/photo-order.ts), not the newest upload, which on a guest gallery
  * is whatever someone posted last.
  */
 async function galleryPreview(galleryId: string) {
-  return prisma.gallery.findUnique({
-    where: { id: galleryId },
-    select: {
-      title: true,
-      translations: true,
-      coverPhoto: { select: { objectKey: true, status: true } },
-      photos: {
-        where: { status: "CONFIRMED" },
-        orderBy: [{ takenAt: "asc" }, { id: "asc" }],
-        take: 1,
-        select: { objectKey: true, status: true },
+  // The first photo is looked up in both orders alongside the gallery, rather
+  // than after it: generateMetadata runs on every page view, and one round
+  // trip of latency beats one query of work.
+  const firstIn = (order: PhotoOrder) =>
+    prisma.photo.findFirst({
+      where: { galleryId, status: "CONFIRMED" },
+      orderBy: photoOrderBy(order),
+      select: { objectKey: true, status: true },
+    });
+  const [gallery, firstByTime, firstByName] = await Promise.all([
+    prisma.gallery.findUnique({
+      where: { id: galleryId },
+      select: {
+        title: true,
+        translations: true,
+        photoOrder: true,
+        coverPhoto: { select: { objectKey: true, status: true } },
       },
-    },
-  });
+    }),
+    firstIn("TAKEN_AT"),
+    firstIn("FILE_NAME"),
+  ]);
+  if (!gallery) return null;
+  const first = gallery.photoOrder === "FILE_NAME" ? firstByName : firstByTime;
+  return { ...gallery, preview: pickCover(gallery.coverPhoto, first) };
 }
 
 async function galleryPreviewKey(galleryId: string): Promise<string | null> {
-  const gallery = await galleryPreview(galleryId);
-  return pickCover(gallery?.coverPhoto, gallery?.photos[0])?.objectKey ?? null;
+  return (await galleryPreview(galleryId))?.preview?.objectKey ?? null;
 }
 
 const noIndex = { index: false, follow: false } as const;
@@ -57,7 +68,7 @@ export async function galleryShareMetadata(
       )
     : t("untitledPlaceholder");
   const description = t("galleryOgDescription");
-  const cover = pickCover(gallery?.coverPhoto, gallery?.photos[0]);
+  const cover = gallery?.preview;
 
   return {
     title: { absolute: title },

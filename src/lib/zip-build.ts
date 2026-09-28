@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { compareTimeline } from "@/lib/gallery-chapters";
+import { ORDER_KEY_SELECT, positionOf } from "@/lib/photo-order";
 import { serverEnv } from "@/lib/env";
 import {
   signBuildManifest,
@@ -175,16 +177,27 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
       id: true,
       title: true,
       storagePrefix: true,
+      photoOrder: true,
       photos: {
         where: { status: "CONFIRMED" },
-        // Capture order — the archive unpacks in the order the day happened.
-        orderBy: [{ takenAt: "asc" }, { id: "asc" }],
-        select: { objectKey: true, fileName: true, sizeBytes: true, crc32: true },
+        select: {
+          id: true,
+          objectKey: true,
+          fileName: true,
+          sizeBytes: true,
+          crc32: true,
+          ...ORDER_KEY_SELECT,
+        },
       },
     },
   });
   // Deleted between the scan and here — the next tick picks something else.
   if (!gallery) return { attempted: false, reason: "nothing_eligible", skipped: choice.skipped };
+  // The order the gallery shows (src/lib/photo-order.ts) — the archive
+  // unpacks the way the guests have been looking at it. Sorted here rather
+  // than in the query, which runs before the gallery's order is known.
+  const order = gallery.photoOrder;
+  gallery.photos.sort((a, b) => compareTimeline(positionOf(order, a), positionOf(order, b)));
 
   const missing = gallery.photos.findIndex((p) => !p.crc32 || !p.sizeBytes);
   if (missing >= 0) {

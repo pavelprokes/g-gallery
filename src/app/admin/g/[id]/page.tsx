@@ -30,9 +30,19 @@ import {
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
 import { setHighlightPin } from "../../highlight-actions";
+import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
+import {
+  CHAPTER_START_SELECT,
+  ORDER_KEY_SELECT,
+  chapterStartOf,
+  compareChapterStarts,
+  photosOutOfPlace,
+  positionOf,
+  type PhotoOrder,
+} from "@/lib/photo-order";
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -67,11 +77,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       eventId: true,
       coverPhotoId: true,
       highlightsEnabled: true,
+      photoOrder: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
       event: { select: { id: true, title: true } },
       photos: {
         where: { status: "CONFIRMED" },
-        orderBy: [{ favorites: { _count: "desc" } }, { takenAt: "asc" }, { id: "asc" }],
+        // Sorted below, once the gallery's order is known.
         select: {
           id: true,
           objectKey: true,
@@ -86,8 +97,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           _count: { select: { favorites: true } },
           source: true,
           uploadedBy: { select: { displayName: true } },
-          takenAt: true,
-          createdAt: true,
+          ...ORDER_KEY_SELECT,
           // docs/HIGHLIGHTS.md — the same pick the guests get.
           xmpRating: true,
           xmpLabel: true,
@@ -100,8 +110,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           id: true,
           title: true,
           translations: true,
-          startTakenAt: true,
-          startPhotoId: true,
+          ...CHAPTER_START_SELECT,
           slug: true,
         },
       },
@@ -134,6 +143,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     },
   });
   if (!gallery) notFound();
+  // Most-loved first; ties — most of the gallery — in the guests' order.
+  gallery.photos.sort(
+    (a, b) =>
+      b._count.favorites - a._count.favorites ||
+      compareTimeline(positionOf(gallery.photoOrder, a), positionOf(gallery.photoOrder, b)),
+  );
 
   // The whole card library, so the picker can offer one that is not placed
   // here yet — and so the panel can tell "no cards written" from "all of them
@@ -181,12 +196,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       : null;
 
   // Chapters are placed exactly as a guest's grid places them
-  // (src/lib/gallery-grid.ts), over the photos in timeline order.
+  // (src/lib/gallery-grid.ts), over the photos in the gallery's order.
+  const order = gallery.photoOrder;
   type AdminPhoto = (typeof gallery.photos)[number];
-  const timelineOf = (photo: AdminPhoto) => ({
-    takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
-    id: photo.id,
-  });
+  const timelineOf = (photo: AdminPhoto) => positionOf(order, photo);
   const timeline = [...gallery.photos].sort((a, b) =>
     compareTimeline(timelineOf(a), timelineOf(b)),
   );
@@ -195,7 +208,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     gallery.chapters.map((chapter) => ({
       id: chapter.id,
       title: chapter.title,
-      start: { takenAt: chapter.startTakenAt.toISOString(), id: chapter.startPhotoId },
+      start: chapterStartOf(order, chapter),
       anchor: chapterAnchor(chapter),
       count: 0,
     })),
@@ -206,40 +219,30 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   const chapterSegments = new Map(
     segments.flatMap((segment) => (segment.chapter ? [[segment.chapter.id, segment]] : [])),
   );
-  const adminChapters = gallery.chapters
-    .toSorted((a, b) =>
-      compareTimeline(
-        { takenAt: a.startTakenAt.toISOString(), id: a.startPhotoId },
-        { takenAt: b.startTakenAt.toISOString(), id: b.startPhotoId },
-      ),
-    )
-    .map((chapter) => {
-      const chapterPhotos = photosOf(chapterSegments.get(chapter.id)?.entries ?? []);
-      const first = chapterPhotos[0];
-      return {
-        id: chapter.id,
-        anchor: chapterAnchor(chapter),
-        title: chapter.title,
-        translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
-        count: chapterPhotos.length,
-        firstPhoto: first
-          ? {
-              objectKey: first.objectKey,
-              thumbObjectKey: first.thumbObjectKey,
-              fileName: first.fileName,
-            }
-          : null,
-      };
-    });
+  const adminChapters = gallery.chapters.toSorted(compareChapterStarts(order)).map((chapter) => {
+    const chapterPhotos = photosOf(chapterSegments.get(chapter.id)?.entries ?? []);
+    const first = chapterPhotos[0];
+    return {
+      id: chapter.id,
+      anchor: chapterAnchor(chapter),
+      title: chapter.title,
+      translations: parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+      count: chapterPhotos.length,
+      firstPhoto: first
+        ? {
+            objectKey: first.objectKey,
+            thumbObjectKey: first.thumbObjectKey,
+            fileName: first.fileName,
+          }
+        : null,
+    };
+  });
 
   // The highlights exactly as a guest's page picks them (src/lib/shared-gallery.ts),
   // shown whether or not they are switched on, so they can be reviewed first.
   const highlightPicks = pickHighlights(
-    gallery.photos.map(toHighlightCandidate),
-    gallery.chapters.map((chapter) => ({
-      takenAt: chapter.startTakenAt.toISOString(),
-      id: chapter.startPhotoId,
-    })),
+    gallery.photos.map((photo) => toHighlightCandidate(order, photo)),
+    gallery.chapters.map((chapter) => chapterStartOf(order, chapter)),
   );
   const pickedPinned = new Map(highlightPicks.map((pick) => [pick.id, pick.pinned]));
   const photosById = new Map(gallery.photos.map((photo) => [photo.id, photo]));
@@ -450,6 +453,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         available={promoCards}
       />
 
+      <GalleryPhotoOrderPanel
+        galleryId={gallery.id}
+        order={order}
+        displaced={displacedBetweenOrders(gallery.photos)}
+      />
+
       <GalleryChapterPanel
         chapters={adminChapters}
         shareUrl={chapterShareUrl}
@@ -567,4 +576,17 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       </section>
     </div>
   );
+}
+
+/**
+ * How many photos the other order would move — tells the photographer whether
+ * switching would change anything here.
+ */
+function displacedBetweenOrders(photos: readonly Parameters<typeof positionOf>[1][]): number {
+  const inOrder = (order: PhotoOrder) =>
+    photos
+      .map((photo) => positionOf(order, photo))
+      .sort(compareTimeline)
+      .map((position) => position.id);
+  return photosOutOfPlace(inOrder("TAKEN_AT"), inOrder("FILE_NAME"));
 }
