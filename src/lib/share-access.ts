@@ -18,6 +18,8 @@ export interface ResolvedShareLink {
   allowUpload: boolean;
   allowPrintSelection: boolean;
   hasPassword: boolean;
+  /** Cosmetic URL segment, frozen at creation (docs/TODO.md §6). */
+  slug: string | null;
 }
 
 interface ShareLinkRecord {
@@ -32,6 +34,7 @@ interface ShareLinkRecord {
   revokedAt: Date | null;
   failedUnlockAttempts: number;
   unlockLockedUntil: Date | null;
+  slug: string | null;
   gallery: { status: string };
 }
 
@@ -75,6 +78,7 @@ const LINK_FIELDS = {
   revokedAt: true,
   failedUnlockAttempts: true,
   unlockLockedUntil: true,
+  slug: true,
   gallery: { select: { status: true } },
 } as const;
 
@@ -145,6 +149,7 @@ function toResolved(link: ShareLinkRecord): ResolvedShareLink {
     allowUpload: link.allowUpload,
     allowPrintSelection: link.allowPrintSelection,
     hasPassword: link.passwordHash !== null,
+    slug: link.slug,
   };
 }
 

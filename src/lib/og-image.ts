@@ -59,12 +59,19 @@ export function previewMetadata({
   title,
   description,
   locale,
+  url,
   imageKey,
   imageAlt,
 }: {
   title: string;
   description: string;
   locale: Locale;
+  /**
+   * The page's own address, root-relative (`metadataBase` makes it absolute).
+   * Facebook treats `og:url` as the canonical identity of what is shared and
+   * warns when it is missing.
+   */
+  url?: string;
   /** The photo to show; null falls back to the branded card. */
   imageKey: string | null;
   imageAlt?: string;
@@ -82,6 +89,7 @@ export function previewMetadata({
     openGraph: {
       type: "website",
       siteName: OG_SITE_NAME,
+      ...(url ? { url } : {}),
       locale: OG_LOCALES[locale],
       title,
       description,

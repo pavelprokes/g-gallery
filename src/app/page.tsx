@@ -33,15 +33,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = t("pageTitle");
   const description = t("pageDescription");
 
-  const preview = previewMetadata({ title, description, locale, imageKey: null });
+  const preview = previewMetadata({ title, description, locale, url: "/", imageKey: null });
 
   return {
     title,
     description,
     alternates: { canonical: "/" },
     robots: { index: true, follow: true },
-    openGraph: { ...preview.openGraph, url: "/" },
-    twitter: preview.twitter,
+    ...preview,
   };
 }
 

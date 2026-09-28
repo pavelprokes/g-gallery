@@ -43,6 +43,7 @@ export async function galleryShareMetadata(
   galleryId: string,
   t: (key: string) => string,
   locale: Locale,
+  url: string,
 ): Promise<Metadata> {
   const gallery = await galleryPreview(galleryId);
 
@@ -62,7 +63,7 @@ export async function galleryShareMetadata(
     title: { absolute: title },
     description,
     robots: noIndex,
-    ...previewMetadata({ title, description, locale, imageKey: cover?.objectKey ?? null }),
+    ...previewMetadata({ title, description, locale, url, imageKey: cover?.objectKey ?? null }),
   };
 }
 
@@ -76,6 +77,7 @@ export async function eventShareMetadata(
   previewGalleryId: string | null,
   t: (key: string) => string,
   locale: Locale,
+  url: string,
 ): Promise<Metadata> {
   const description = t("galleryOgDescription");
   const imageKey = previewGalleryId ? await galleryPreviewKey(previewGalleryId) : null;
@@ -84,7 +86,7 @@ export async function eventShareMetadata(
     title: { absolute: title },
     description,
     robots: noIndex,
-    ...previewMetadata({ title, description, locale, imageKey }),
+    ...previewMetadata({ title, description, locale, url, imageKey }),
   };
 }
 
@@ -94,13 +96,17 @@ export async function eventShareMetadata(
  * of a gallery the holder cannot open, so a password-protected album's cover
  * never leaks into a chat.
  */
-export function unavailableShareMetadata(t: (key: string) => string, locale: Locale): Metadata {
+export function unavailableShareMetadata(
+  t: (key: string) => string,
+  locale: Locale,
+  url: string,
+): Metadata {
   const title = t("untitledPlaceholder");
   const description = t("galleryOgDescription");
   return {
     title,
     description,
     robots: noIndex,
-    ...previewMetadata({ title, description, locale, imageKey: null }),
+    ...previewMetadata({ title, description, locale, url, imageKey: null }),
   };
 }

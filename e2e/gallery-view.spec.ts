@@ -63,6 +63,19 @@ test.describe("share gallery viewer", () => {
       "content",
       "summary_large_image",
     );
+    // Facebook's debugger flags a preview without og:url.
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      new RegExp(`/g/${seed.token}/${seed.slug}$`),
+    );
+
+    // Pasted without the slug, or with a stale one, it is still the same
+    // object to Facebook: og:url is the link's own frozen form.
+    await page.goto(`/g/${seed.token}/stary-nazev`);
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      new RegExp(`/g/${seed.token}/${seed.slug}$`),
+    );
   });
 
   test("lightbox opens, navigates, and closes via history back", async ({ page }) => {

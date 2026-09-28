@@ -25,6 +25,15 @@ export function eventSignPath(token: string, slug: string): string {
   return `/s/${token}/${slug}`;
 }
 
+/**
+ * The path a visitor asked for, rebuilt from the route's params: for a link
+ * that does not resolve, where there is no canonical form to fall back on.
+ * Next hands params over decoded, so each segment is encoded again here.
+ */
+export function requestedSharePath(route: "g" | "s", token: string, slug: string[] = []): string {
+  return ["", route, token, ...slug].map(encodeURIComponent).join("/");
+}
+
 /** A printed sign needs a full URL — there is no "current request" to resolve a path against. */
 export function absoluteSignUrl(path: string): string {
   return `${SITE_ORIGIN}${path}`;

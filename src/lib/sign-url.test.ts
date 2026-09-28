@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { absoluteSignUrl, eventSignPath, gallerySignPath } from "./sign-url";
+import { absoluteSignUrl, eventSignPath, gallerySignPath, requestedSharePath } from "./sign-url";
 
 describe("gallerySignPath", () => {
   it("builds the same shape CopyableLink already renders for a share link", () => {
@@ -26,5 +26,17 @@ describe("absoluteSignUrl", () => {
     expect(absoluteSignUrl("/g/-va8I3IzPVLyNLDnfcyS_Q/test-galerie")).toBe(
       "https://photos.svatebni-fotograf-cechy.cz/g/-va8I3IzPVLyNLDnfcyS_Q/test-galerie",
     );
+  });
+});
+
+describe("requestedSharePath", () => {
+  it("re-encodes the decoded params into the path that was requested", () => {
+    expect(requestedSharePath("g", "tok", ["svatba-šťastných x"])).toBe(
+      "/g/tok/svatba-%C5%A1%C5%A5astn%C3%BDch%20x",
+    );
+  });
+
+  it("drops nothing and adds nothing when there is no slug", () => {
+    expect(requestedSharePath("s", "tok")).toBe("/s/tok");
   });
 });
