@@ -22,7 +22,7 @@ import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
-import { ChapterTitleField, GalleryChapterPanel } from "@/components/admin/gallery-chapter-panel";
+import { GalleryChapterPanel, StartChapterDetails } from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
 import { setHighlightPin } from "../../highlight-actions";
@@ -340,17 +340,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         </form>
         <DeletePhotoButton photoId={photo.id} />
         {timelineView && (
-          <details className="text-sm">
-            <summary className="text-brand-primary-dark cursor-pointer font-semibold dark:text-neutral-200">
-              {startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
-            </summary>
-            <form action={startChapter.bind(null, gallery.id, photo.id)} className="mt-1 space-y-2">
-              <ChapterTitleField placeholder="Obřad" label="Název kapitoly" />
-              <Button type="submit" size="sm">
-                Uložit
-              </Button>
-            </form>
-          </details>
+          <StartChapterDetails
+            summary={startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
+            action={startChapter.bind(null, gallery.id, photo.id)}
+          />
         )}
       </li>
     );

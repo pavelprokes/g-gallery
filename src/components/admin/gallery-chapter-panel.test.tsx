@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 // test uses none of them.
 vi.mock("@/app/admin/chapter-actions", () => ({ deleteChapter: vi.fn(), updateChapter: vi.fn() }));
 
-import { ChapterTitleField } from "./gallery-chapter-panel";
+import { ChapterTitleField, StartChapterDetails } from "./gallery-chapter-panel";
 
 describe("ChapterTitleField", () => {
   it("fills the title with a tapped preset, and says which one is chosen", () => {
@@ -29,5 +29,21 @@ describe("ChapterTitleField", () => {
     render(<ChapterTitleField label="Název kapitoly" defaultValue="Rozbíjení talíře" />);
     expect(screen.getByRole("textbox", { name: "Název kapitoly" })).toHaveValue("Rozbíjení talíře");
     expect(screen.getByRole("button", { name: "Obřad" })).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+describe("StartChapterDetails", () => {
+  it("renders its form only once opened — the timeline has one on every photo", () => {
+    const { container } = render(
+      <StartChapterDetails summary="Tady začíná kapitola" action={vi.fn()} />,
+    );
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    const details = container.querySelector("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+
+    expect(screen.getByRole("textbox", { name: "Název kapitoly" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hostina" })).toBeInTheDocument();
   });
 });

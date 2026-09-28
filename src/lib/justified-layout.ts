@@ -9,6 +9,11 @@
  * right.
  */
 
+/** Gap between the grid's tiles, within a row and between rows — shared by
+ * every surface laid out like the grid, so they read as one. Tight on
+ * purpose: the photos, not the grid, are the thing being looked at. */
+export const GRID_GAP = 4;
+
 export interface JustifiedItem<T> {
   item: T;
   width: number;

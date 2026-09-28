@@ -2,37 +2,33 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import type { GalleryHighlight } from "@/lib/gallery-highlights";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import { srcFor } from "@/lib/image-src";
-import { justifyRows } from "@/lib/justified-layout";
+import { GRID_GAP } from "@/lib/justified-layout";
 import { placeholderStyle } from "@/lib/placeholder";
 
 /** Photos uploaded before dimensions were captured fall back to 3:2, as in the grid. */
 const FALLBACK_ASPECT = 1.5;
 
-/** The grid's own gap (src/components/gallery-view.tsx), so the two read as one surface. */
-const GAP = 4;
-
-/**
- * Row height the highlights aim for — the grid's tiles, a size up. On a phone
- * it follows the width: at `width / 1.3` a 3:2 landscape (1.5) fills the row
- * on its own and two portraits (2 × 0.67) share one, where the grid would
- * pair everything. Wider screens get two to three photos a row.
- */
-function targetRowHeight(containerWidth: number): number {
-  if (containerWidth < 640) return containerWidth / 1.3;
-  if (containerWidth < 900) return 260;
-  return 340;
-}
-
 /**
  * The highlights: a short "best of the day" above the grid (docs/HIGHLIGHTS.md).
  *
- * Laid out like the grid itself — justified rows, uncropped, edge to edge —
- * only larger, so the day's best reads as the opening of the gallery rather
- * than as a strip of thumbnails to scroll sideways through.
+ * Laid out like the grid — justified rows, uncropped, edge to edge, the
+ * grid's gap — only larger, so the day's best reads as the opening of the
+ * gallery rather than as a strip of thumbnails to scroll sideways through.
+ *
+ * Justified in CSS alone, so the server renders it exactly as it will stay:
+ * each tile's flex basis and grow are both proportional to its aspect ratio,
+ * so the space a row has left is shared out in proportion to width and every
+ * tile in a row ends up the same height (its `aspect-ratio` sets it); a filler
+ * after the last tile keeps a short final row at the target height instead of
+ * stretched across. `--row` is the target row height: on a phone the width /
+ * 1.45, so a 3:2 landscape (1.5) is too wide to share a row and fills it
+ * alone, while two portraits (2 × 0.67) fit side by side; 260 px wider up —
+ * rows then grow to fill the width, so they land a little taller: two a row
+ * on a tablet, three to four on a desktop, the grid's tiles a size up.
  *
  * A tile is a way *into* the gallery, not a second copy of it: tapping one
  * takes the viewer to that photo's own place in the grid, among the shots
@@ -54,66 +50,32 @@ export function GalleryHighlights({
 }) {
   const t = useTranslations("gallery");
   const headingId = useId();
-  const listRef = useRef<HTMLUListElement>(null);
-  const [width, setWidth] = useState(0);
 
-  // Measured before paint, so the rows appear laid out rather than jumping
-  // into place a frame later.
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const sync = () => setWidth(el.getBoundingClientRect().width);
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const rows = useMemo(
-    () =>
-      justifyRows(
-        highlights.map((photo) => ({
-          item: photo,
-          aspect: photo.width && photo.height ? photo.width / photo.height : FALLBACK_ASPECT,
-        })),
-        width,
-        targetRowHeight(width),
-        GAP,
-      ),
-    [highlights, width],
-  );
-
-  let index = 0;
   return (
     <section aria-labelledby={headingId} className="mb-6">
       <h2 id={headingId} className="px-4 text-xl font-semibold tracking-tight sm:px-3 sm:text-2xl">
         {t("highlightsTitle")}
       </h2>
-      <ul ref={listRef} className="mt-3 flex flex-col" style={{ gap: GAP }}>
-        {rows.map((row) => (
-          <li key={row.items[0]!.item.id}>
-            <ul className="flex" style={{ gap: GAP }}>
-              {row.items.map(({ item: photo, width: w, height: h }) => {
-                const i = index++;
-                return (
-                  <HighlightTile
-                    key={photo.id}
-                    photo={photo}
-                    width={w}
-                    height={h}
-                    imageGrant={imageGrant}
-                    busy={jumpingTo === photo.id}
-                    // The highlights open the page; the first few are what
-                    // the viewer sees before anything else loads.
-                    priority={i < 3}
-                    label={t("highlightOpen", { fileName: photo.fileName })}
-                    onJump={onJump}
-                  />
-                );
-              })}
-            </ul>
-          </li>
+      <ul
+        className="mt-3 flex flex-wrap [--row:calc(100vw/1.45)] sm:[--row:260px]"
+        style={{ gap: GRID_GAP }}
+      >
+        {highlights.map((photo, i) => (
+          <HighlightTile
+            key={photo.id}
+            photo={photo}
+            aspect={photo.width && photo.height ? photo.width / photo.height : FALLBACK_ASPECT}
+            imageGrant={imageGrant}
+            busy={jumpingTo === photo.id}
+            // The highlights open the page; the first few are what the viewer
+            // sees before anything else loads.
+            priority={i < 3}
+            label={t("highlightOpen", { fileName: photo.fileName })}
+            onJump={onJump}
+          />
         ))}
+        {/* Takes the rest of a short last row, so its tiles keep their size. */}
+        <li aria-hidden className="grow-[1000]" />
       </ul>
     </section>
   );
@@ -121,8 +83,7 @@ export function GalleryHighlights({
 
 function HighlightTile({
   photo,
-  width,
-  height,
+  aspect,
   imageGrant,
   busy,
   priority,
@@ -130,8 +91,7 @@ function HighlightTile({
   onJump,
 }: {
   photo: GalleryHighlight;
-  width: number;
-  height: number;
+  aspect: number;
   imageGrant: SignedImageGrant | null;
   busy: boolean;
   priority: boolean;
@@ -143,7 +103,16 @@ function HighlightTile({
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   return (
-    <li className="shrink-0" style={{ width, height }}>
+    <li
+      className="min-w-0"
+      style={
+        {
+          flexGrow: aspect,
+          flexBasis: `calc(var(--row) * ${aspect})`,
+          aspectRatio: aspect,
+        } as CSSProperties
+      }
+    >
       <button
         type="button"
         onClick={() => onJump(photo.id)}
@@ -163,7 +132,9 @@ function HighlightTile({
           )}
           onError={() => setThumbnailFailed(true)}
           fill
-          sizes={`${Math.ceil(width)}px`}
+          // A phone shows a landscape across the whole width; wider screens
+          // aim at the 260 px row, a little more once a row stretches.
+          sizes={`(max-width: 639px) 100vw, ${Math.ceil(aspect * 320)}px`}
           priority={priority}
           className="duration-toggle object-cover transition-transform hover:scale-105"
         />

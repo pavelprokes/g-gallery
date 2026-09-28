@@ -34,6 +34,36 @@ function isPresetOnly(chapter: AdminChapter): boolean {
 }
 
 /**
+ * "Tady začíná kapitola" on one photo of the timeline. The form — a field and
+ * a row of name buttons — is only rendered once opened: the timeline shows it
+ * on every photo, and a 700-photo wedding would otherwise ship 700 of them.
+ */
+export function StartChapterDetails({
+  summary,
+  action,
+}: {
+  summary: string;
+  action: (formData: FormData) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="text-sm" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="text-brand-primary-dark cursor-pointer font-semibold dark:text-neutral-200">
+        {summary}
+      </summary>
+      {open && (
+        <form action={action} className="mt-1 space-y-2">
+          <ChapterTitleField placeholder="Obřad" label="Název kapitoly" />
+          <Button type="submit" size="sm">
+            Uložit
+          </Button>
+        </form>
+      )}
+    </details>
+  );
+}
+
+/**
  * A chapter's title: a text field, and under it the usual chapter names as
  * buttons that fill it in. Replaces a `<datalist>`, which a phone either never
  * opens (iOS offers it only above the keyboard, once typing has started) or
@@ -126,7 +156,7 @@ export function GalleryChapterPanel({
             className="border-admin-border rounded-lg border p-3 dark:border-neutral-800"
           >
             <form action={updateChapter.bind(null, chapter.id)} className="space-y-3">
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex items-start gap-3">
                 <div className="relative size-14 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900">
                   {chapter.firstPhoto && (
                     <AdminPhotoImage
@@ -136,12 +166,20 @@ export function GalleryChapterPanel({
                     />
                   )}
                 </div>
-                <div className="min-w-48 flex-1">
+                <div className="min-w-0 flex-1">
                   <Label htmlFor={`${fieldId}-${chapter.id}`} className="mb-1">
                     Název
                   </Label>
-                  <ChapterTitleField id={`${fieldId}-${chapter.id}`} defaultValue={chapter.title} />
+                  <ChapterTitleField
+                    // Remounted when the saved title changes (a rename on the
+                    // timeline), so the field never saves a stale one back.
+                    key={chapter.title}
+                    id={`${fieldId}-${chapter.id}`}
+                    defaultValue={chapter.title}
+                  />
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <Button type="submit" variant="secondary" size="lg">
                   Uložit
                 </Button>
@@ -201,7 +239,8 @@ export function GalleryChapterPanel({
       <Hint className="mt-2">
         Kapitola začíná u fotky, kterou vybereš na časové ose, a končí tam, kde začíná další. Hostům
         se nahoře v galerii ukážou jako záložky, přes které skočí rovnou na obřad nebo první tanec.
-        Fotky přidané později se do kapitol zařadí samy podle času pořízení.
+        Fotky přidané později se do kapitol zařadí samy podle pořadí galerie (názvu souboru nebo
+        času pořízení).
       </Hint>
     </Card>
   );

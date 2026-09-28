@@ -49,7 +49,7 @@ import {
 import imageLoader from "@/lib/image-loader";
 import { fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
-import { justifyRows, type JustifiedRow } from "@/lib/justified-layout";
+import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
   buildGridEntries,
   buildGridNavigation,
@@ -194,9 +194,8 @@ function itemsPerRow(containerWidth: number): number | undefined {
 
 /** Gap between tiles, both within a row and between rows — the layout
  * algorithm and the row's own flex gap must agree, or rows would overlap
- * or leave a seam. Tight on purpose: the photos, not the grid, are the
- * thing being looked at. */
-const GAP = 4;
+ * or leave a seam. Shared with the highlights (src/lib/justified-layout.ts). */
+const GAP = GRID_GAP;
 
 /**
  * Horizontal gutter for the page's text chrome — header, selection toolbar,
@@ -1602,8 +1601,8 @@ function GalleryViewInner({
     // The parent too: anything above the list that changes height — text
     // re-wrapping when the brand font loads or the locale switches, a notice
     // mounting — resizes the parent without resizing the list, and moves
-    // `offsetTop`. The highlights' heading and hint are the tallest of these
-    // (docs/HIGHLIGHTS.md).
+    // `offsetTop`. The highlights are the tallest of these: their rows
+    // re-flow with the width (docs/HIGHLIGHTS.md).
     if (el.parentElement) observer.observe(el.parentElement);
     // The observer's own first callback covers the initial size, but not a
     // later offsetTop shift caused by sibling content changing height

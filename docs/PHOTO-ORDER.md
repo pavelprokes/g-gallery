@@ -27,9 +27,10 @@ gallery can now be shown in that order instead.
 | `TAKEN_AT`            | `Photo.takenAt`, ISO | guests' galleries; originals with their camera names |
 
 File-name order is the default since 2026-09-28 (Pavel: the photographer exports from Lightroom
-with a sequence "almost always"). A **guests' gallery** gets capture time instead, set where one is
-made: the wedding page's "pro hosty" gallery (`createGalleryForEvent`), and an upload link created
-on a gallery with none of the photographer's photos (`createShareLink`). The default's migration
+with a sequence "almost always"). A **guests' gallery** gets capture time instead, set where one is made as such: the wedding
+page's "pro hosty" gallery (`createGalleryForEvent`). Ticking uploads on a link does not change the
+order — a delivery may let guests add a few, and an explicit choice in the admin is never
+overridden; the admin hint points a standalone guests' gallery at capture time. The default's migration
 switched existing galleries only where it could not make things worse — no upload link, no guest
 photos, and either no photos yet or file names whose first numbers are distinct and run almost
 without gaps (an export sequence; two bodies' camera counters never do).
