@@ -1,5 +1,5 @@
 import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
-import { ORDER_KEY_SELECT, positionOf, type PhotoOrder } from "@/lib/photo-order";
+import { ORDER_KEY_SELECT, orderKeyOf, positionOf, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * The highlights — a short "best of the day" at the top of a gallery
@@ -242,6 +242,10 @@ function cutIntoParts<T extends HighlightCandidate>(
   chapterStarts: readonly TimelinePosition[],
   count: number,
 ): T[][] {
+  // A chapter starting past the last photo is hidden from guests; it cuts
+  // nothing here either, and must not stand in for "the day has chapters".
+  const last = timeline.at(-1);
+  chapterStarts = last ? chapterStarts.filter((start) => compareTimeline(start, last) <= 0) : [];
   if (chapterStarts.length === 0 && !inClockOrder(timeline.filter((c) => c.own))) {
     const size = Math.max(1, Math.ceil(timeline.length / count));
     return Array.from({ length: Math.ceil(timeline.length / size) }, (_, i) =>
@@ -395,7 +399,7 @@ export function toHighlightCandidate(
 ): HighlightCandidate {
   return {
     ...positionOf(order, photo),
-    takenAt: (photo.takenAt ?? photo.createdAt).toISOString(),
+    takenAt: orderKeyOf("TAKEN_AT", photo),
     rating: photo.xmpRating,
     label: photo.xmpLabel,
     tagged: photo.xmpHighlight,

@@ -11,7 +11,7 @@ describe("photo cursor", () => {
   });
 
   it("round-trips a file-name cursor", () => {
-    const key = "svatba000000000006p000000000005d000000002738jpg";
+    const key = "svatba0016p0015d0042738jpg";
     const token = encodeCursor({ order: "FILE_NAME", key, id: "abc123" });
     expect(decodeCursor(token, "FILE_NAME")).toEqual({ order: "FILE_NAME", key, id: "abc123" });
   });

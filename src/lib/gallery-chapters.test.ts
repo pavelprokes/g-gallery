@@ -39,10 +39,10 @@ describe("compareTimeline", () => {
     expect(compareTimeline(a, { ...a })).toBe(0);
   });
 
-  it("orders file-name keys by their padded numbers, not their text", () => {
+  it("orders file-name keys by the size of their numbers, not their text", () => {
     // svatba_9.jpg and svatba_10.jpg, as the database keys them.
-    const nine = { key: "svatba000000000009jpg", id: "z" };
-    const ten = { key: "svatba000000000010jpg", id: "a" };
+    const nine = { key: "svatba0019jpg", id: "z" };
+    const ten = { key: "svatba00210jpg", id: "a" };
     expect(compareTimeline(nine, ten)).toBe(-1);
   });
 });

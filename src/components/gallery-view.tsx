@@ -782,7 +782,9 @@ async function fetchPhotosPage(
   // misplaces every chapter header. Rare enough that starting over is right.
   if (response.status === 409 || (page?.order && page.order !== photoOrder)) {
     window.location.reload();
-    throw new Error("gallery order changed — reloading");
+    // Pending until the reload lands: an error would be retried (another
+    // request, another reload) and could flash an error state first.
+    return new Promise<never>(() => {});
   }
   if (!page) throw new Error(`failed to fetch photos page (${response.status})`);
   return page;

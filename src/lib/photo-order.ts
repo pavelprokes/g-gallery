@@ -53,37 +53,28 @@ export function photoOrderBy(order: PhotoOrder): Prisma.PhotoOrderByWithRelation
 }
 
 /** Photos strictly after `position` — the next page of the keyset cursor. */
-export function afterPosition(
-  order: PhotoOrder,
-  position: TimelinePosition,
-): Prisma.PhotoWhereInput {
-  if (order === "FILE_NAME") {
-    return {
-      OR: [
-        { fileOrderKey: { gt: position.key } },
-        { fileOrderKey: position.key, id: { gt: position.id } },
-      ],
-    };
-  }
-  const takenAt = new Date(position.key);
-  return { OR: [{ takenAt: { gt: takenAt } }, { takenAt, id: { gt: position.id } }] };
+export function afterPosition(order: PhotoOrder, position: TimelinePosition) {
+  return strictly(order, position, "gt");
 }
 
 /** Photos strictly before `position` — what precedes a chapter's start. */
-export function beforePosition(
+export function beforePosition(order: PhotoOrder, position: TimelinePosition) {
+  return strictly(order, position, "lt");
+}
+
+function strictly(
   order: PhotoOrder,
   position: TimelinePosition,
+  side: "gt" | "lt",
 ): Prisma.PhotoWhereInput {
+  const id = { [side]: position.id };
   if (order === "FILE_NAME") {
     return {
-      OR: [
-        { fileOrderKey: { lt: position.key } },
-        { fileOrderKey: position.key, id: { lt: position.id } },
-      ],
+      OR: [{ fileOrderKey: { [side]: position.key } }, { fileOrderKey: position.key, id }],
     };
   }
   const takenAt = new Date(position.key);
-  return { OR: [{ takenAt: { lt: takenAt } }, { takenAt, id: { lt: position.id } }] };
+  return { OR: [{ takenAt: { [side]: takenAt } }, { takenAt, id }] };
 }
 
 /** The chapter columns `chapterStartOf` reads — spread into a Prisma `select`. */
@@ -143,6 +134,8 @@ export function photosOutOfPlace(a: readonly string[], b: readonly string[]): nu
 /** A well-formed key for the order — what a cursor coming back from a client
  * must carry before it is put into a query. */
 export function isValidOrderKey(order: PhotoOrder, key: string): boolean {
-  if (order === "FILE_NAME") return /^[0-9a-z]*$/.test(key) && key.length <= 1024;
+  // A 512-character file name keys to at most ~2.5 times its length (every
+  // digit run gains a length prefix, "æ" becomes "ae"); 4096 is well clear.
+  if (order === "FILE_NAME") return /^[0-9a-z]*$/.test(key) && key.length <= 4096;
   return !Number.isNaN(new Date(key).getTime());
 }

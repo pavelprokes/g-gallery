@@ -44,8 +44,8 @@ seed, a script) can forget it.
 - Lowercased; Latin diacritics folded to plain letters (`Příprava` → `priprava`, `Łukasz` →
   `lukasz`; `æ`, `œ`, `ß` spelled out).
 - Split into runs of digits and runs of a–z; everything else (`_`, `-`, `.`, spaces) is dropped.
-- Every number is written as its length (two digits) followed by its digits without leading zeros:
-  `9` → `019`, `10` → `0210`. Numbers compare by size at any length — `svatba_9` before
+- Every number is written as its length (three digits — a file name is at most 512 characters)
+  followed by its digits without leading zeros: `9` → `0019`, `10` → `00210`. Numbers compare by size at any length — `svatba_9` before
   `svatba_10`, a 13-digit phone timestamp after a 12-digit one — and the export's own padding
   (`0001`) makes no difference. `0006` and `6` are the same number; the id breaks the tie.
 
@@ -58,8 +58,10 @@ have that guarantee.
 `GalleryChapter.startFileOrderKey` is filled in the same way, by a trigger from `startPhotoId`: the
 start photo's key, or — for a start photo that does not exist — a key past every photo
 (`g_gallery.past_last_file_order_key()`), where the chapter is hidden exactly as it is in capture
-order. The migration gave each chapter whose start photo had already been deleted the photo it had
-been starting at since: the next one in capture order.
+order. A later write that keeps the same start photo keeps the key: the photo may have been
+deleted since, and the stored key is what holds the chapter in place. The migration gave each chapter whose start photo had already been deleted the photo it had
+been starting at since: the next one in capture order (latest chapter first, so of several
+collapsing onto one photo, the one guests saw keeps it).
 
 ## What follows the order
 

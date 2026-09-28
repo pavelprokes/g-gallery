@@ -82,9 +82,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       event: { select: { id: true, title: true } },
       photos: {
         where: { status: "CONFIRMED" },
-        // Most-loved first; ties (most of the gallery) follow the guests'
-        // order, which the sort below applies once that order is known.
-        orderBy: [{ favorites: { _count: "desc" } }, { takenAt: "asc" }, { id: "asc" }],
+        // Sorted below, once the gallery's order is known.
         select: {
           id: true,
           objectKey: true,
@@ -145,14 +143,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     },
   });
   if (!gallery) notFound();
-  if (gallery.photoOrder !== "TAKEN_AT") {
-    const order = gallery.photoOrder;
-    gallery.photos.sort(
-      (a, b) =>
-        b._count.favorites - a._count.favorites ||
-        compareTimeline(positionOf(order, a), positionOf(order, b)),
-    );
-  }
+  // Most-loved first; ties — most of the gallery — in the guests' order.
+  gallery.photos.sort(
+    (a, b) =>
+      b._count.favorites - a._count.favorites ||
+      compareTimeline(positionOf(gallery.photoOrder, a), positionOf(gallery.photoOrder, b)),
+  );
 
   // The whole card library, so the picker can offer one that is not placed
   // here yet — and so the panel can tell "no cards written" from "all of them

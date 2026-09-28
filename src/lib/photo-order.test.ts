@@ -13,7 +13,7 @@ import {
 const photo = {
   takenAt: new Date("2026-09-05T08:07:33.880Z"),
   createdAt: new Date("2026-09-20T10:00:00.000Z"),
-  fileOrderKey: "svatba000000000006p000000000005d000000002738jpg",
+  fileOrderKey: "svatba0016p0015d0042738jpg",
 };
 
 describe("orderKeyOf", () => {
@@ -56,18 +56,18 @@ describe("queries", () => {
 describe("chapter starts", () => {
   const obrad = {
     startTakenAt: new Date("2026-09-05T11:00:00.000Z"),
-    startFileOrderKey: "svatba000000000002jpg",
+    startFileOrderKey: "svatba0012jpg",
     startPhotoId: "b",
   };
   const pripravy = {
     startTakenAt: new Date("2026-09-05T12:00:00.000Z"),
-    startFileOrderKey: "svatba000000000001jpg",
+    startFileOrderKey: "svatba0011jpg",
     startPhotoId: "a",
   };
 
   it("start on the same photo in either order, at that order's key", () => {
     expect(chapterStartOf("TAKEN_AT", obrad)).toEqual({ key: "2026-09-05T11:00:00.000Z", id: "b" });
-    expect(chapterStartOf("FILE_NAME", obrad)).toEqual({ key: "svatba000000000002jpg", id: "b" });
+    expect(chapterStartOf("FILE_NAME", obrad)).toEqual({ key: "svatba0012jpg", id: "b" });
   });
 
   it("sort by the gallery's order — the two orders can disagree", () => {
@@ -83,10 +83,11 @@ describe("isValidOrderKey", () => {
   it("accepts only what the database could have produced", () => {
     expect(isValidOrderKey("TAKEN_AT", "2026-09-05T08:07:33.880Z")).toBe(true);
     expect(isValidOrderKey("TAKEN_AT", "not-a-date")).toBe(false);
-    expect(isValidOrderKey("FILE_NAME", "svatba000000000001jpg")).toBe(true);
+    expect(isValidOrderKey("FILE_NAME", "svatba0011jpg")).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "")).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "Svatba_01")).toBe(false);
-    expect(isValidOrderKey("FILE_NAME", "a".repeat(1025))).toBe(false);
+    expect(isValidOrderKey("FILE_NAME", "a".repeat(1280))).toBe(true);
+    expect(isValidOrderKey("FILE_NAME", "a".repeat(4097))).toBe(false);
   });
 });
 

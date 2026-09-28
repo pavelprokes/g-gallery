@@ -19,10 +19,11 @@ ALTER TABLE "g_gallery"."Photo" ADD COLUMN     "fileOrderKey" TEXT NOT NULL DEFA
 --     "priprava", "Łukasz" → "lukasz"; æ, œ and ß spelled out);
 --   - split into runs of digits and runs of a-z, everything else ("_", "-",
 --     ".", spaces) dropped;
---   - each digit run written as its length (two digits) followed by the number
---     without leading zeros, so numbers compare by size at any length:
---     "9" → "019" < "10" → "0210", and a 13-digit phone timestamp sorts after
---     a 12-digit one. "0006" and "6" are the same number; the id breaks the tie.
+--   - each digit run written as its length (three digits — a file name is at
+--     most 512 characters) followed by the number without leading zeros, so
+--     numbers compare by size at any length: "9" → "0019" < "10" → "00210",
+--     and a 13-digit phone timestamp sorts after a 12-digit one. "0006" and
+--     "6" are the same number; the id breaks the tie.
 -- The result is only [0-9a-z], which every collation and a plain JavaScript
 -- string comparison order identically: the grid compares these keys in the
 -- browser (chapter headers) against an order the database produced.
@@ -31,7 +32,7 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT coalesce(
     string_agg(
       CASE
-        WHEN m[1] ~ '^[0-9]' THEN lpad(least(length(d.digits), 99)::text, 2, '0') || d.digits
+        WHEN m[1] ~ '^[0-9]' THEN lpad(length(d.digits)::text, 3, '0') || d.digits
         ELSE m[1]
       END,
       '' ORDER BY n
@@ -85,6 +86,8 @@ WHERE p."id" = c."startPhotoId";
 -- it in exactly the same place and gives it a file-name key too. If that photo
 -- already starts a chapter, or there is none, the chapter was already hidden
 -- (collapsed, or past the end); it stays hidden in file-name order as well.
+-- Latest first: of several chapters collapsing onto one photo, the last is
+-- the one guests see, so it is the one that gets the photo.
 DO $$
 DECLARE
   chapter RECORD;
@@ -94,7 +97,7 @@ BEGIN
     SELECT c."id", c."galleryId", c."startTakenAt", c."startPhotoId"
     FROM "g_gallery"."GalleryChapter" AS c
     WHERE NOT EXISTS (SELECT 1 FROM "g_gallery"."Photo" AS p WHERE p."id" = c."startPhotoId")
-    ORDER BY c."startTakenAt", c."startPhotoId"
+    ORDER BY c."startTakenAt" DESC, c."startPhotoId" DESC
   LOOP
     SELECT p."id", coalesce(p."takenAt", p."createdAt") AS "at", p."fileOrderKey"
     INTO next_photo
@@ -128,10 +131,16 @@ $$;
 -- New chapters take their photo's key here too, whatever wrote them — the app,
 -- the seed, or a deploy's old code still running while this one rolls out.
 -- A start photo that does not exist places the chapter past the last photo,
--- where it is hidden, as it is in capture order.
+-- where it is hidden, as it is in capture order. A write that leaves the start
+-- photo as it was keeps the key as it was: that photo may since have been
+-- deleted, and the stored key is what keeps the chapter in its place.
 CREATE FUNCTION "g_gallery"."chapter_set_start_file_order_key"() RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW."startPhotoId" = OLD."startPhotoId" THEN
+    NEW."startFileOrderKey" := OLD."startFileOrderKey";
+    RETURN NEW;
+  END IF;
   SELECT p."fileOrderKey" INTO NEW."startFileOrderKey"
   FROM "g_gallery"."Photo" AS p
   WHERE p."id" = NEW."startPhotoId";
