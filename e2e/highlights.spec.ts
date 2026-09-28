@@ -31,7 +31,7 @@ test.describe("gallery highlights", () => {
   }) => {
     await page.goto(`/g/${token}/${slug}`);
     const strip = page.getByRole("region", { name: STRIP });
-    await expect(strip.getByRole("button")).toHaveCount(10);
+    await expect(strip.getByRole("button")).toHaveCount(6);
     await expect(strip.getByRole("button", { name: tileName(pinnedFile) })).toBeVisible();
     await expect(strip.getByRole("button", { name: tileName(starredFile) })).toBeAttached();
     await expect(strip.getByRole("button", { name: tileName(excludedFile) })).toHaveCount(0);

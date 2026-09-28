@@ -105,13 +105,13 @@ describe("pickHighlights", () => {
 
   it("uses chapters instead of pauses when there are some", () => {
     const photos = wedding();
-    // One chapter start at the very end: nearly everything is one part, the
-    // last few minutes another — so the split follows the chapter, not the
-    // pauses, and the final part still gets its seat.
-    const lastPart = photos.filter((p) => minutesOf(p.id) >= 380);
+    // One chapter start late in the party: nearly everything is one part,
+    // the last hour another — so the split follows the chapter, not the
+    // pauses, and the final part gets its one seat of the six.
+    const lastPart = photos.filter((p) => minutesOf(p.id) >= 340);
     const start = lastPart[0]!;
     const picks = pickHighlights(photos, [{ key: start.key, id: start.id }]);
-    expect(picks.filter((p) => minutesOf(p.id) >= 380)).toHaveLength(1);
+    expect(picks.filter((p) => minutesOf(p.id) >= 340)).toHaveLength(1);
   });
 
   it("does not merge a second camera an hour off into one burst (file-name order)", () => {
@@ -150,10 +150,10 @@ describe("pickHighlights", () => {
     ]);
   });
 
-  it("lets pins fill every seat", () => {
+  it("lets pins fill every seat, and never more than the section holds", () => {
     const photos = wedding().map((p, i) => (i < 12 ? { ...p, pin: true } : p));
     const picks = pickHighlights(photos);
-    expect(picks).toHaveLength(12);
+    expect(picks).toHaveLength(HIGHLIGHT_COUNT);
     expect(picks.every((p) => p.pinned)).toBe(true);
   });
 

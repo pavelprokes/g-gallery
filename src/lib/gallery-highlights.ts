@@ -19,15 +19,17 @@ import { ORDER_KEY_SELECT, orderKeyOf, positionOf, type PhotoOrder } from "@/lib
  * through the day — a sensible default the photographer then adjusts.
  */
 
-/** How many photos the highlights show when filled automatically. */
-export const HIGHLIGHT_COUNT = 10;
+/** How many photos the highlights show (Pavel, 2026-09-28: five or six, not
+ * ten — a taste of the day above the gallery, not a second one). */
+export const HIGHLIGHT_COUNT = 6;
 
-/** Pins beyond this are ignored — the section is a teaser, not a second gallery. */
-export const MAX_PINNED = 24;
+/** Pins beyond this are ignored, so pins alone never show more than the
+ * automatic pick would: the section stays a teaser. */
+export const MAX_PINNED = HIGHLIGHT_COUNT;
 
 /**
  * Below this many of the photographer's own photos there is no automatic fill:
- * ten out of thirty is a third of the gallery repeated, not a highlight.
+ * a handful out of thirty is the gallery repeated, not a highlight.
  */
 export const MIN_PHOTOS_FOR_AUTO = 40;
 

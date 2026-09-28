@@ -627,6 +627,8 @@ async function makeHighlightsGallery(ownerId: string) {
       status: "PUBLISHED",
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-highlights-${Date.now()}`,
+      // Off by default; the photographer turns them on (docs/HIGHLIGHTS.md).
+      highlightsEnabled: true,
     },
   });
 
