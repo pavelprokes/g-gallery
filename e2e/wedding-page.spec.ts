@@ -47,6 +47,10 @@ test.describe("wedding page", () => {
     const image = page.locator('meta[property="og:image"]');
     await expect(image).toHaveAttribute("content", /1200.*630.*prvni-vyber/);
     await expect(image).not.toHaveAttribute("content", /od-hostu/);
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      new RegExp(`/s/${seed.weddingToken}/${seed.weddingSlug}$`),
+    );
   });
 
   test("a French guest reads what the photographer translated, and English where they did not", async ({

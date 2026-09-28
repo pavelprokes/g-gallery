@@ -63,6 +63,11 @@ test.describe("share gallery viewer", () => {
       "content",
       "summary_large_image",
     );
+    // Facebook's debugger flags a preview without og:url.
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      new RegExp(`/g/${seed.token}/${seed.slug}$`),
+    );
   });
 
   test("lightbox opens, navigates, and closes via history back", async ({ page }) => {

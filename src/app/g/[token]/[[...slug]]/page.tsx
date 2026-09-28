@@ -25,16 +25,18 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(
   props: PageProps<"/g/[token]/[[...slug]]">,
 ): Promise<Metadata> {
-  const { token } = await props.params;
+  const { token, slug } = await props.params;
   const t = await getTranslations("gallery");
-
   const locale = await getLocale();
+  // The address exactly as it was shared: the slug is cosmetic, so whatever
+  // the sender pasted is as canonical as any other spelling of it.
+  const url = ["", "g", token, ...(slug ?? [])].map(encodeURIComponent).join("/");
 
   const access = await resolveShareLink(token);
 
-  if (!access.ok) return unavailableShareMetadata(t, locale);
+  if (!access.ok) return unavailableShareMetadata(t, locale, url);
 
-  return galleryShareMetadata(access.shareLink.galleryId, t, locale);
+  return galleryShareMetadata(access.shareLink.galleryId, t, locale, url);
 }
 
 export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[...slug]]">) {

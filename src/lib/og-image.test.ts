@@ -68,6 +68,13 @@ describe("previewMetadata", () => {
     expect(twitter).toMatchObject({ card: "summary_large_image" });
   });
 
+  it("carries the page's own address as og:url when given one", () => {
+    expect(
+      previewMetadata({ ...base, url: "/g/tok/slug", imageKey: null }).openGraph,
+    ).toMatchObject({ url: "/g/tok/slug" });
+    expect(previewMetadata({ ...base, imageKey: null }).openGraph).not.toHaveProperty("url");
+  });
+
   it("falls back to the branded card when there is no photo", () => {
     vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://photos.example.cz");
     const { openGraph, twitter } = previewMetadata({ ...base, imageKey: null });

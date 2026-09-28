@@ -47,25 +47,34 @@ export async function generateMetadata(
   const event = await resolveEvent(token, locale);
   const t = await getTranslations("gallery");
 
-  if (!event) return unavailableShareMetadata(t, locale);
-
   const segments = slug ?? [];
+
+  if (!event) {
+    const requested = ["", "s", token, ...segments].map(encodeURIComponent).join("/");
+    return unavailableShareMetadata(t, locale, requested);
+  }
+
   const requestedKey = segments[1];
   const inlineCard = !requestedKey && event.cards.length === 1 ? event.cards[0] : undefined;
   const card = inlineCard ?? event.cards.find((c) => c.eventKey === requestedKey);
 
+  // The canonical spelling, the one the page itself redirects to, so a link
+  // pasted without its slug still previews as the same page.
+  const hubUrl = `/s/${encodeURIComponent(token)}/${event.slug}`;
+
   if (card?.eventKey) {
     const galleryToken = compositeToken(token, card.eventKey);
     const access = await resolveShareLink(galleryToken);
+    const url = inlineCard ? hubUrl : `${hubUrl}/${card.eventKey}`;
     if (access.ok) {
-      return galleryShareMetadata(access.shareLink.galleryId, t, locale);
+      return galleryShareMetadata(access.shareLink.galleryId, t, locale, url);
     }
   }
 
   // The hub previews with the photographer's gallery — the one its visitors
   // open first — and falls back to the guests' only when there is no other.
   const previewCard = splitEventCards(event.cards).main[0] ?? event.cards[0];
-  return eventShareMetadata(event.title, previewCard?.id ?? null, t, locale);
+  return eventShareMetadata(event.title, previewCard?.id ?? null, t, locale, hubUrl);
 }
 
 export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug]]">) {
