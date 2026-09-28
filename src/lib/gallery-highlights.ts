@@ -19,15 +19,18 @@ import { ORDER_KEY_SELECT, orderKeyOf, positionOf, type PhotoOrder } from "@/lib
  * through the day — a sensible default the photographer then adjusts.
  */
 
-/** How many photos the highlights show when filled automatically. */
-export const HIGHLIGHT_COUNT = 10;
+/** How many photos the highlights show (Pavel, 2026-09-28: five or six, not
+ * ten — a taste of the day above the gallery, not a second one). */
+export const HIGHLIGHT_COUNT = 6;
 
-/** Pins beyond this are ignored — the section is a teaser, not a second gallery. */
-export const MAX_PINNED = 24;
+/** Pins that can show at once — never more than the pick would. The admin
+ * refuses a pin past it; any extra (older data) are thinned evenly over the
+ * day rather than cut at its morning. */
+export const MAX_PINNED = HIGHLIGHT_COUNT;
 
 /**
  * Below this many of the photographer's own photos there is no automatic fill:
- * ten out of thirty is a third of the gallery repeated, not a highlight.
+ * a handful out of thirty is the gallery repeated, not a highlight.
  */
 export const MIN_PHOTOS_FOR_AUTO = 40;
 
@@ -90,7 +93,10 @@ export function pickHighlights(
   count: number = HIGHLIGHT_COUNT,
 ): HighlightPick[] {
   const timeline = [...candidates].sort(compareTimeline);
-  const pinned = timeline.filter((c) => c.pin === true).slice(0, MAX_PINNED);
+  const pinned = spread(
+    timeline.filter((c) => c.pin === true),
+    Math.min(count, MAX_PINNED),
+  );
   const own = timeline.filter((c) => c.own);
 
   const budget = count - pinned.length;
@@ -124,6 +130,20 @@ export function pickHighlights(
   ]
     .sort(compareTimeline)
     .map(({ id, pinned }) => ({ id, pinned }));
+}
+
+/**
+ * `n` of `items`, evenly spaced from the first to the last — more pins than
+ * seats (from before the section held six, or from a race past the admin's
+ * limit) show the whole day, not just its morning.
+ */
+function spread<T>(items: readonly T[], n: number): T[] {
+  if (items.length <= n) return [...items];
+  if (n <= 1) return items.slice(0, n);
+  return Array.from(
+    { length: n },
+    (_, i) => items[Math.round((i * (items.length - 1)) / (n - 1))]!,
+  );
 }
 
 /**

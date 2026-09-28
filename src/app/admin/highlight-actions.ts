@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
+import { MAX_PINNED } from "@/lib/gallery-highlights";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3), and every write
@@ -28,6 +29,20 @@ export async function setHighlightPin(photoId: string, pin: boolean | null) {
     select: { id: true, galleryId: true },
   });
   if (!photo) throw new Error("NOT_FOUND");
+
+  // The section shows MAX_PINNED at most; a pin past it would push out
+  // another one without a word (docs/HIGHLIGHTS.md).
+  if (input.data.pin === true) {
+    const pinned = await prisma.photo.count({
+      where: {
+        galleryId: photo.galleryId,
+        highlightPin: true,
+        status: "CONFIRMED",
+        NOT: { id: photo.id },
+      },
+    });
+    if (pinned >= MAX_PINNED) throw new Error("HIGHLIGHTS_FULL");
+  }
 
   await prisma.photo.update({ where: { id: photo.id }, data: { highlightPin: input.data.pin } });
   revalidatePath(`/admin/g/${photo.galleryId}`);

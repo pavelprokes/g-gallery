@@ -105,13 +105,15 @@ describe("pickHighlights", () => {
 
   it("uses chapters instead of pauses when there are some", () => {
     const photos = wedding();
-    // One chapter start at the very end: nearly everything is one part, the
-    // last few minutes another — so the split follows the chapter, not the
-    // pauses, and the final part still gets its seat.
-    const lastPart = photos.filter((p) => minutesOf(p.id) >= 380);
+    // One chapter start late in the party: nearly everything is one part,
+    // the last hour another — so the split follows the chapter, not the
+    // pauses, and the final part gets its one seat of the six. (A chapter
+    // under about a twelfth of the day gets none: six seats cannot give
+    // every chapter one, and largest remainder is the fair way to choose.)
+    const lastPart = photos.filter((p) => minutesOf(p.id) >= 340);
     const start = lastPart[0]!;
     const picks = pickHighlights(photos, [{ key: start.key, id: start.id }]);
-    expect(picks.filter((p) => minutesOf(p.id) >= 380)).toHaveLength(1);
+    expect(picks.filter((p) => minutesOf(p.id) >= 340)).toHaveLength(1);
   });
 
   it("does not merge a second camera an hour off into one burst (file-name order)", () => {
@@ -150,11 +152,25 @@ describe("pickHighlights", () => {
     ]);
   });
 
-  it("lets pins fill every seat", () => {
+  it("lets pins fill every seat, and never more than the section holds", () => {
     const photos = wedding().map((p, i) => (i < 12 ? { ...p, pin: true } : p));
     const picks = pickHighlights(photos);
-    expect(picks).toHaveLength(12);
+    expect(picks).toHaveLength(HIGHLIGHT_COUNT);
     expect(picks.every((p) => p.pinned)).toBe(true);
+    expect(pickHighlights(photos, [], 4)).toHaveLength(4);
+  });
+
+  it("thins more pins than seats evenly over the day, not to its morning", () => {
+    const all = wedding();
+    // Twelve pins from getting ready to the end of the party.
+    const pinnedAt = new Set(
+      Array.from({ length: 12 }, (_, i) => all[Math.round((i * (all.length - 1)) / 11)]!.id),
+    );
+    const photos = all.map((p) => (pinnedAt.has(p.id) ? { ...p, pin: true } : p));
+    const minutes = pickHighlights(photos).map((p) => minutesOf(p.id));
+    expect(minutes).toHaveLength(HIGHLIGHT_COUNT);
+    expect(Math.min(...minutes)).toBe(0);
+    expect(Math.max(...minutes)).toBeGreaterThanOrEqual(390);
   });
 
   it("gives a densely shot ceremony its seats — two shooters never make one endless burst", () => {

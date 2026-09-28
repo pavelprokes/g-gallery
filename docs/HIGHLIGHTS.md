@@ -7,7 +7,7 @@ photographer adjusts it in the admin). Authority for the strip of photos above t
 ## Why
 
 A delivered wedding is 500–800 photos. Most people who open the link look at the first screen and
-maybe a few more; ten photos that tell the whole day are what they should see first. Tapping one
+maybe a few more; five or six photos that tell the whole day are what they should see first. Tapping one
 takes them **to that photo's own place in the gallery**, among the shots around it — the strip is a
 way into the gallery, not a second copy of it.
 
@@ -17,10 +17,12 @@ way into the gallery, not a second copy of it.
 page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly what guests get.
 
 1. **The photographer's hand wins.** `Photo.highlightPin`: `true` is always in, `false` never,
-   `null` is left to the fill. Pins above `MAX_PINNED` (24) are ignored; pins alone can exceed the
-   usual ten.
-2. **Automatic fill for the rest of the ten seats**, only when the gallery has at least
-   `MIN_PHOTOS_FOR_AUTO` (40) of the photographer's own photos — ten out of thirty is not a
+   `null` is left to the fill. At most `MAX_PINNED` (six, the same as the pick) show, so the
+   highlights never hold more than six photos (Pavel, 2026-09-28: "five or six" — it was ten). The
+   admin refuses a seventh pin; pins beyond six from before (or a race past the check) are thinned
+   evenly over the day, never cut at its morning.
+2. **Automatic fill for the rest of the six seats**, only when the gallery has at least
+   `MIN_PHOTOS_FOR_AUTO` (40) of the photographer's own photos — a handful out of thirty is not a
    highlight. Guests' uploads are never filled in automatically, only pinned.
    - **Parts of the day**: chapters (docs/CHAPTERS.md) when there are any, else pauses in shooting
      longer than 20 minutes. Seats are shared out in proportion to each part's size (largest
@@ -28,7 +30,7 @@ page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly wha
      already in a part use its share first. In a gallery shown in file-name order
      (docs/PHOTO-ORDER.md) whose own capture times run backwards by more than a pause — a
      camera with its clock off — pauses cannot be told from camera switches, so with no chapters the
-     day is cut into ten equal stretches of the photographer's own order instead.
+     day is cut into six equal stretches of the photographer's own order instead.
    - **Moments**: shots less than 4 s apart (either way — see above) are one burst and yield one photo at most — but a burst
      never spans more than 15 s, or two shooters interleaving through a half-hour ceremony would
      make the whole ceremony one "burst". A burst the photographer already pinned or excluded a
@@ -119,11 +121,13 @@ that asserts "nothing from the middle is requested" runs on a gallery with highl
 
 `GalleryHighlightPanel` on the gallery page: the current pick with "Připnutá"/"Návrh" badges,
 "Odepnout"/"Vyřadit" per photo, "Vrátit vyřazené", and "Skrýt/Ukázat hostům"
-(`Gallery.highlightsEnabled`, **on by default** — the automatic pick is a sensible start that the
-photographer adjusts, not something to opt into per gallery). Every grid tile below has one button
+(`Gallery.highlightsEnabled`, **off by default** since 2026-09-28 — Pavel turns them on for a
+gallery once the pick is worth showing; existing galleries were switched off too, except those
+where a photo was already pinned in or excluded). Every grid tile below has one button
 for the photo's state: pin, drop from the pick, unpin, or hand back to the pick. The pick is shown
 even while switched off, so it can be reviewed first. An empty pick says why (too few photos, or
-everything excluded), and more than 24 pins say which ones guests will not see.
+everything excluded), more than six pins say guests see six of them spread over the day, and once six are pinned a tile
+says the pick is full instead of offering a seventh.
 
 ## Not built (yet)
 

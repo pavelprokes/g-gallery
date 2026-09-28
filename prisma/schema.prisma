@@ -268,9 +268,9 @@ model Gallery {
   zipAttempts      Int       @default(0)
 
   /// Whether guests see the highlights at the top of the gallery
-  /// (docs/HIGHLIGHTS.md). On by default: the automatic pick is a sensible
-  /// start the photographer adjusts, not something to opt into per gallery.
-  highlightsEnabled Boolean    @default(true)
+  /// (docs/HIGHLIGHTS.md). Off by default (Pavel, 2026-09-28): the
+  /// photographer turns them on for a gallery once the pick is worth showing.
+  highlightsEnabled Boolean    @default(false)
   /// The order guests see the photos in (docs/PHOTO-ORDER.md): the file
   /// names — the photographer's own export numbering, which is Lightroom's
   /// order even where a camera's clock was off — or capture time, which a

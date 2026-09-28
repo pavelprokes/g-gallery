@@ -26,12 +26,12 @@ const tileName = (file: string) =>
 const gridName = (file: string) => new RegExp(`^(Otevřít|Open|Ouvrir) ${file}$`);
 
 test.describe("gallery highlights", () => {
-  test("shows ten photos: the pinned one, the one rated above the rest, never the excluded one", async ({
+  test("shows six photos: the pinned one, the one rated above the rest, never the excluded one", async ({
     page,
   }) => {
     await page.goto(`/g/${token}/${slug}`);
     const strip = page.getByRole("region", { name: STRIP });
-    await expect(strip.getByRole("button")).toHaveCount(10);
+    await expect(strip.getByRole("button")).toHaveCount(6);
     await expect(strip.getByRole("button", { name: tileName(pinnedFile) })).toBeVisible();
     await expect(strip.getByRole("button", { name: tileName(starredFile) })).toBeAttached();
     await expect(strip.getByRole("button", { name: tileName(excludedFile) })).toHaveCount(0);
