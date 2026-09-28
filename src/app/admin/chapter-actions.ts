@@ -59,7 +59,7 @@ export async function startChapter(galleryId: string, photoId: string, formData:
       status: "CONFIRMED",
       gallery: { ownerId: session.user.id },
     },
-    select: { id: true, takenAt: true, createdAt: true, fileOrderKey: true },
+    select: { id: true, takenAt: true, createdAt: true },
   });
   if (!photo) throw new Error("NOT_FOUND");
 
@@ -90,15 +90,9 @@ export async function startChapter(galleryId: string, photoId: string, formData:
     );
     try {
       await prisma.galleryChapter.create({
-        // Both keys, so the chapter keeps this photo as its start whichever
-        // order the gallery is shown in (src/lib/photo-order.ts).
-        data: {
-          ...at,
-          startFileOrderKey: photo.fileOrderKey,
-          title: title.data,
-          translations,
-          slug,
-        },
+        // `startFileOrderKey` is filled in by a database trigger from the
+        // start photo (docs/PHOTO-ORDER.md), like the photo's own key.
+        data: { ...at, title: title.data, translations, slug },
       });
       break;
     } catch (error) {

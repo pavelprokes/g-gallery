@@ -116,6 +116,30 @@ export function compareChapterStarts(order: PhotoOrder) {
     compareTimeline(chapterStartOf(order, a), chapterStartOf(order, b));
 }
 
+/**
+ * How many photos would have to be moved to turn one order into the other:
+ * all of them minus the longest run both orders keep in the same relative
+ * order. One photo moved five places is one, not the five it passes.
+ */
+export function photosOutOfPlace(a: readonly string[], b: readonly string[]): number {
+  const rank = new Map(b.map((id, i) => [id, i]));
+  // Longest increasing subsequence of `a`'s ids ranked by `b`, O(n log n).
+  const tails: number[] = [];
+  for (const id of a) {
+    const r = rank.get(id);
+    if (r === undefined) continue;
+    let lo = 0;
+    let hi = tails.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (tails[mid]! < r) lo = mid + 1;
+      else hi = mid;
+    }
+    tails[lo] = r;
+  }
+  return a.length - tails.length;
+}
+
 /** A well-formed key for the order — what a cursor coming back from a client
  * must carry before it is put into a query. */
 export function isValidOrderKey(order: PhotoOrder, key: string): boolean {

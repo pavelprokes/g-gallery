@@ -26,9 +26,9 @@ page (`src/lib/shared-gallery.ts`) and the admin, so the admin shows exactly wha
      longer than 20 minutes. Seats are shared out in proportion to each part's size (largest
      remainder), sized in photos rather than moments; a part under 3 % of the day gets none. Pins
      already in a part use its share first. In a gallery shown in file-name order
-     (docs/PHOTO-ORDER.md) whose capture times run backwards somewhere — a camera with its clock
-     off — pauses cannot be told from camera switches, so with no chapters the day is cut into ten
-     equal stretches of the photographer's own order instead.
+     (docs/PHOTO-ORDER.md) whose own capture times run backwards by more than a pause — a
+     camera with its clock off — pauses cannot be told from camera switches, so with no chapters the
+     day is cut into ten equal stretches of the photographer's own order instead.
    - **Moments**: shots less than 4 s apart (either way — see above) are one burst and yield one photo at most — but a burst
      never spans more than 15 s, or two shooters interleaving through a half-hour ceremony would
      make the whole ceremony one "burst". A burst the photographer already pinned or excluded a

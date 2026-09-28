@@ -350,11 +350,11 @@ model Photo {
   /// the gallery timeline (oldest first — the day as it happened). Null only
   /// while a row is still PENDING; confirm always sets it.
   takenAt            DateTime?
-  /// `fileName` as a sort key: lowercased, letters and digits only, every run
-  /// of digits zero-padded to 12, so `svatba_9` sorts before `svatba_10`.
-  /// Maintained by a database trigger from `fileName` (docs/PHOTO-ORDER.md),
-  /// never written by the app. Only [0-9a-z], so the database and a plain
-  /// JavaScript string comparison agree on its order.
+  /// `fileName` as a natural-sort key: lowercased, diacritics folded, letters
+  /// and numbers only, each number prefixed with its length so `svatba_9`
+  /// sorts before `svatba_10`. Maintained by a database trigger from
+  /// `fileName` (docs/PHOTO-ORDER.md), never written by the app. Only
+  /// [0-9a-z], so the database and a plain JavaScript comparison agree.
   fileOrderKey       String      @default("")
   /// The photographer's Lightroom marks, read from the export's XMP in the
   /// browser at upload (src/lib/xmp-picks.ts). Hints for the automatic
@@ -724,7 +724,8 @@ model GalleryChapter {
   startPhotoId      String
   /// The first photo's `fileOrderKey`, for galleries ordered by file name —
   /// kept for the same reason as `startTakenAt`: the chapter keeps its place
-  /// if that photo is deleted.
+  /// if that photo is deleted. Filled in by a database trigger from
+  /// `startPhotoId` (docs/PHOTO-ORDER.md); past every photo if it has none.
   startFileOrderKey String   @default("")
   /// The link anchor (`…/g/{token}/{slug}#obrad`), from the Czech title and
   /// frozen at creation like `ShareLink.slug`: a rename never breaks a link

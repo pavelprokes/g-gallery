@@ -29,10 +29,11 @@ export function GalleryPhotoOrderPanel({
 }: {
   galleryId: string;
   order: PhotoOrder;
-  /** Photos whose place differs between the two orders. */
+  /** Photos the other order would move (`photosOutOfPlace`). */
   displaced: number;
 }) {
   const current = ORDERS.find((o) => o.value === order)!;
+  const other = ORDERS.find((o) => o.value !== order)!;
   return (
     <Card as="section">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -56,8 +57,8 @@ export function GalleryPhotoOrderPanel({
       <p className="text-admin-muted text-sm dark:text-neutral-400">{current.hint}</p>
       <p className="text-admin-muted mt-2 text-sm dark:text-neutral-400">
         {displaced === 0
-          ? "U této galerie vychází obě pořadí stejně."
-          : `Podle času a podle názvu se pořadí liší u ${pluralize(displaced, FORMS.photoGenitive)}.`}
+          ? "U této galerie vychází obě řazení stejně."
+          : `Řazení ${other.label.toLocaleLowerCase("cs")} by přesunulo ${pluralize(displaced, FORMS.photoAccusative)}.`}
       </p>
     </Card>
   );

@@ -33,7 +33,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const order = access.shareLink.photoOrder;
   const cursor = parsed.data.cursor ? decodeCursor(parsed.data.cursor, order) : null;
   if (parsed.data.cursor && !cursor) {
-    return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
+    // A well-formed cursor from the other order: the photographer switched
+    // the order while this page was open. The client reloads rather than
+    // splice two orders together (docs/PHOTO-ORDER.md).
+    const other = order === "FILE_NAME" ? "TAKEN_AT" : "FILE_NAME";
+    return decodeCursor(parsed.data.cursor, other)
+      ? NextResponse.json({ error: "order_changed" }, { status: 409 })
+      : NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
 
   // The gallery's total rides along with the first page. The page's own
@@ -75,6 +81,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const last = page.at(-1);
 
   return NextResponse.json({
+    // Which order `orderKey` is in — a page open across a switch notices here.
+    order,
     items: page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,

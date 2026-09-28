@@ -129,6 +129,18 @@ describe("pickHighlights", () => {
     expect(Math.max(...picks.map((p) => minutesOf(p.id)))).toBeGreaterThan(240);
   });
 
+  it("keeps the pauses when two bodies are only seconds apart", () => {
+    // File-name order interleaving two bodies a few seconds out of step still
+    // cuts the day at its real pauses: same pick as in clock order.
+    const photos = wedding();
+    const jittered = photos.map((p, i) =>
+      i % 2 ? { ...p, takenAt: new Date(Date.parse(p.takenAt) - 3_000).toISOString() } : p,
+    );
+    expect(pickHighlights(jittered).map((p) => p.id)).toEqual(
+      pickHighlights(photos).map((p) => p.id),
+    );
+  });
+
   it("shows only the pins in a small gallery", () => {
     const small = wedding().slice(0, MIN_PHOTOS_FOR_AUTO - 1);
     expect(pickHighlights(small)).toEqual([]);

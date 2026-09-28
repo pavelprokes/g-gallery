@@ -39,6 +39,7 @@ import {
   ORDER_KEY_SELECT,
   chapterStartOf,
   compareChapterStarts,
+  photosOutOfPlace,
   positionOf,
   type PhotoOrder,
 } from "@/lib/photo-order";
@@ -582,8 +583,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 }
 
 /**
- * How many photos sit in a different place in the other order — tells the
- * photographer whether switching the order would change anything here.
+ * How many photos the other order would move — tells the photographer whether
+ * switching would change anything here.
  */
 function displacedBetweenOrders(photos: readonly Parameters<typeof positionOf>[1][]): number {
   const inOrder = (order: PhotoOrder) =>
@@ -591,6 +592,5 @@ function displacedBetweenOrders(photos: readonly Parameters<typeof positionOf>[1
       .map((photo) => positionOf(order, photo))
       .sort(compareTimeline)
       .map((position) => position.id);
-  const byName = inOrder("FILE_NAME");
-  return inOrder("TAKEN_AT").filter((id, i) => byName[i] !== id).length;
+  return photosOutOfPlace(inOrder("TAKEN_AT"), inOrder("FILE_NAME"));
 }

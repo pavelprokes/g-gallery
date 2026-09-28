@@ -73,6 +73,8 @@ export interface GalleryViewData {
     orderKey: string;
   }[];
   initialCursor: string | null;
+  /** The order `initialPhotos` and every `orderKey` are in (src/lib/photo-order.ts). */
+  photoOrder: PhotoOrder;
   imageGrant: SignedImageGrant | null;
   viewers: { id: string; displayName: string }[];
   /** The owner's credit cards placed in this gallery (docs/PROMO-CARDS.md).
@@ -263,6 +265,7 @@ export async function loadGalleryViewData(
     })),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
+    photoOrder: order,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
     // Filtered here as well as on write: a row can predate a validation rule,

@@ -30,8 +30,9 @@ Either way a photo's place is `(key, id)` — `TimelinePosition` in `src/lib/gal
 with every query and comparison built by `src/lib/photo-order.ts`. `id` breaks ties (a burst shares a
 second; two cameras can share a name).
 
-The admin panel shows how many photos sit in a different place in the other order, so the choice is
-made on this gallery's numbers, not in the abstract.
+The admin panel says how many photos the other order would move — the gallery minus the longest
+run both orders keep in the same relative order, so one photo moved five places counts once — and
+the choice is made on this gallery's numbers, not in the abstract.
 
 ## The file-name key
 
@@ -40,10 +41,13 @@ write to either column, calling `g_gallery.photo_file_order_key(text)`
 (`prisma/migrations/*_photo_order`). The app never writes it, so no writer (the presign route, the
 seed, a script) can forget it.
 
-- Lowercased, Czech and other Latin diacritics folded to plain letters (`Příprava` → `priprava`).
+- Lowercased; Latin diacritics folded to plain letters (`Příprava` → `priprava`, `Łukasz` →
+  `lukasz`; `æ`, `œ`, `ß` spelled out).
 - Split into runs of digits and runs of a–z; everything else (`_`, `-`, `.`, spaces) is dropped.
-- Every run of digits is zero-padded to 12, so `svatba_9` sorts before `svatba_10` (natural sort)
-  — the export's own padding (`0001`) does not matter, nor does crossing 999 or 9999.
+- Every number is written as its length (two digits) followed by its digits without leading zeros:
+  `9` → `019`, `10` → `0210`. Numbers compare by size at any length — `svatba_9` before
+  `svatba_10`, a 13-digit phone timestamp after a 12-digit one — and the export's own padding
+  (`0001`) makes no difference. `0006` and `6` are the same number; the id breaks the tie.
 
 The result is only `[0-9a-z]`. **That is load-bearing**: the grid places chapter headers in the
 browser by comparing keys as plain JavaScript strings against an order the database produced, and
@@ -51,17 +55,26 @@ for this alphabet every collation — Postgres's `en_US.UTF-8` included — agre
 (checked on 3 000 random keys, 2026-09-28). A key with punctuation or upper case in it would not
 have that guarantee.
 
+`GalleryChapter.startFileOrderKey` is filled in the same way, by a trigger from `startPhotoId`: the
+start photo's key, or — for a start photo that does not exist — a key past every photo
+(`g_gallery.past_last_file_order_key()`), where the chapter is hidden exactly as it is in capture
+order. The migration gave each chapter whose start photo had already been deleted the photo it had
+been starting at since: the next one in capture order.
+
 ## What follows the order
 
 - **Grid and cursor.** The first server-rendered page and every cursor page use `photoOrderBy`. The
-  cursor carries the order it was minted in; one from the other order (the gallery was switched
-  while a guest scrolled) is refused as `invalid_cursor` rather than turned into a wrong page. A
-  cursor from before orders existed is read as capture time.
+  cursor carries the order it was minted in. A gallery switched while a guest has it open answers
+  that guest's next page with `409 order_changed` — and a refetch of the first page reports the new
+  `order` — and the page **reloads**: its loaded photos, chapter starts and highlights all came in
+  the old order, and splicing the new one onto them would misplace every chapter header. A cursor
+  from before orders existed is read as capture time.
 - **Chapters.** A chapter stores its start in both orders (`startTakenAt`, `startFileOrderKey`, with
   `startPhotoId`), so switching keeps every chapter on its photo, and on its place if that photo is
   deleted (docs/CHAPTERS.md).
 - **Highlights.** Picked and ordered in the gallery's order; pauses and bursts are still measured in
-  capture time, as distances, and when capture times run backwards the day is split evenly instead
+  capture time, as distances. When the photographer's own capture times run backwards by more than
+  a pause (a camera's clock off) and there are no chapters, the day is split evenly instead
   (docs/HIGHLIGHTS.md).
 - **ZIP.** Live downloads and pre-built archives list entries in the gallery's order. Switching the
   order does not rebuild an existing archive — same files, and the next rebuild picks it up.

@@ -7,6 +7,7 @@ import {
   isValidOrderKey,
   orderKeyOf,
   photoOrderBy,
+  photosOutOfPlace,
 } from "./photo-order";
 
 const photo = {
@@ -86,5 +87,27 @@ describe("isValidOrderKey", () => {
     expect(isValidOrderKey("FILE_NAME", "")).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "Svatba_01")).toBe(false);
     expect(isValidOrderKey("FILE_NAME", "a".repeat(1025))).toBe(false);
+  });
+});
+
+describe("photosOutOfPlace", () => {
+  const byName = Array.from({ length: 16 }, (_, i) => `svatba_${i + 1}`);
+
+  it("counts the one photo that moved, not the places it passed", () => {
+    // Kamila a Petr, 2026-09-05: the second body's svatba_6 sorted second by time.
+    const byTime = ["svatba_1", "svatba_6", ...byName.slice(1, 5), ...byName.slice(6)];
+    expect(photosOutOfPlace(byTime, byName)).toBe(1);
+  });
+
+  it("is zero when the orders agree, and n - 1 when one is the other reversed", () => {
+    expect(photosOutOfPlace(byName, byName)).toBe(0);
+    expect(photosOutOfPlace(byName.toReversed(), byName)).toBe(15);
+  });
+
+  it("counts a whole camera an hour off as that camera's photos", () => {
+    // Every third photo from a body whose clock put it an hour earlier.
+    const early = byName.filter((_, i) => i % 3 === 2);
+    const byTime = [...early, ...byName.filter((_, i) => i % 3 !== 2)];
+    expect(photosOutOfPlace(byTime, byName)).toBe(early.length);
   });
 });

@@ -174,11 +174,14 @@ function momentsOf(
         gapBetween(prev, c) > BURST_GAP_MS || gapBetween(first, c) > BURST_MAX_SPAN_MS,
     );
     for (const window of windows) {
-      const settled = decided.some(
-        (d) =>
-          msBetween(d, window[0]!) <= BURST_MAX_SPAN_MS &&
-          msBetween(window.at(-1)!, d) <= BURST_MAX_SPAN_MS,
-      );
+      // The window's span in time — in file-name order its frames need not
+      // run forwards (two bodies a few seconds apart).
+      const times = window.map((c) => Date.parse(c.takenAt));
+      const [from, to] = [Math.min(...times), Math.max(...times)];
+      const settled = decided.some((d) => {
+        const at = Date.parse(d.takenAt);
+        return at >= from - BURST_MAX_SPAN_MS && at <= to + BURST_MAX_SPAN_MS;
+      });
       if (settled) continue;
       const scored = window.map((c) => ({ ...c, score: score(c) }));
       const best = Math.max(...scored.map((c) => c.score));
@@ -208,7 +211,7 @@ function msBetween(a: { takenAt: string }, b: { takenAt: string }): number {
 }
 
 function inClockOrder(timeline: readonly { takenAt: string }[]): boolean {
-  return timeline.every((item, i) => i === 0 || msBetween(timeline[i - 1]!, item) >= 0);
+  return timeline.every((item, i) => i === 0 || msBetween(timeline[i - 1]!, item) >= -PART_GAP_MS);
 }
 
 /**
@@ -225,18 +228,21 @@ function gapBetween(a: { takenAt: string }, b: { takenAt: string }): number {
  * shooting — else, when the capture times cannot be trusted to show a pause,
  * equal stretches of the gallery.
  *
- * Capture times go backwards only in file-name order (src/lib/photo-order.ts),
- * and there it means a camera's clock was off: every switch to or from that
- * camera would read as an hour's pause, cutting the day into slivers too small
- * to earn a seat. An even walk through the photographer's own order is what
- * the fill does without marks anyway.
+ * Capture times go backwards only in file-name order (src/lib/photo-order.ts).
+ * By seconds, that is two bodies' clocks disagreeing a little and changes
+ * nothing. By more than a pause, a camera's clock was off: every switch to or
+ * from it would read as a pause, cutting the day into slivers too small to
+ * earn a seat. An even walk through the photographer's own order is what the
+ * fill does without marks anyway. Judged on the photographer's own photos
+ * only — a pinned guest photo sorts by its phone's file name, wherever that
+ * lands, and says nothing about the photographer's clocks.
  */
 function cutIntoParts<T extends HighlightCandidate>(
   timeline: readonly T[],
   chapterStarts: readonly TimelinePosition[],
   count: number,
 ): T[][] {
-  if (chapterStarts.length === 0 && !inClockOrder(timeline)) {
+  if (chapterStarts.length === 0 && !inClockOrder(timeline.filter((c) => c.own))) {
     const size = Math.max(1, Math.ceil(timeline.length / count));
     return Array.from({ length: Math.ceil(timeline.length / size) }, (_, i) =>
       timeline.slice(i * size, (i + 1) * size),

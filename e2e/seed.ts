@@ -555,7 +555,7 @@ async function makeFileOrderGallery(ownerId: string) {
     new Date(Date.UTC(2026, 8, 5, 8, n) - (secondBody(n) ? 3_600_000 : 0));
   const fileName = (n: number) =>
     `svatba_${String(n).padStart(4, "0")}_${secondBody(n) ? "_P5D" : "PPR"}${5000 + n}.jpg`;
-  const rows = new Map<number, { id: string; fileOrderKey: string }>();
+  const rows = new Map<number, { id: string }>();
   for (let n = photoCount; n >= 1; n -= 1) {
     const photo = await prisma.photo.create({
       data: {
@@ -570,8 +570,8 @@ async function makeFileOrderGallery(ownerId: string) {
         sizeBytes: 900_000,
         takenAt: takenAt(n),
       },
-      // The key comes from the database trigger, not from here.
-      select: { id: true, fileOrderKey: true },
+      // Its file-name key comes from the database trigger, not from here.
+      select: { id: true },
     });
     rows.set(n, photo);
   }
@@ -587,7 +587,7 @@ async function makeFileOrderGallery(ownerId: string) {
         title,
         slug,
         startTakenAt: takenAt(at),
-        startFileOrderKey: rows.get(at)!.fileOrderKey,
+        // Its file-name key comes from the database trigger, like the photo's.
         startPhotoId: rows.get(at)!.id,
       },
     });

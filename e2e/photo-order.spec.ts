@@ -34,6 +34,21 @@ test.describe("photo order by file name", () => {
     expect(seen).toEqual(fileNames);
   });
 
+  test("a cursor from the other order is told the order changed, not served a wrong page", async ({
+    request,
+  }) => {
+    // What a page opened before the photographer switched the order would send.
+    const stale = Buffer.from(
+      JSON.stringify({ o: "TAKEN_AT", key: "2026-09-05T08:30:00.000Z", id: "x" }),
+    ).toString("base64url");
+    const response = await request.get(`/api/g/${token}/photos?cursor=${stale}`);
+    expect(response.status()).toBe(409);
+    expect(await response.json()).toEqual({ error: "order_changed" });
+
+    const garbage = await request.get(`/api/g/${token}/photos?cursor=nonsense`);
+    expect(garbage.status()).toBe(400);
+  });
+
   test("the grid opens on the first file, with the second camera in its place", async ({
     page,
   }) => {

@@ -8,7 +8,7 @@ import {
 } from "@/lib/content-translations";
 import { pickCover } from "@/lib/event-access";
 import { previewMetadata } from "@/lib/og-image";
-import { photoOrderBy } from "@/lib/photo-order";
+import { photoOrderBy, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * The photo a shared link previews with: the gallery's chosen cover, or else
@@ -17,26 +17,31 @@ import { photoOrderBy } from "@/lib/photo-order";
  * is whatever someone posted last.
  */
 async function galleryPreview(galleryId: string) {
-  const gallery = await prisma.gallery.findUnique({
-    where: { id: galleryId },
-    select: {
-      title: true,
-      translations: true,
-      photoOrder: true,
-      coverPhoto: { select: { objectKey: true, status: true } },
-    },
-  });
+  // The first photo is looked up in both orders alongside the gallery, rather
+  // than after it: generateMetadata runs on every page view, and one round
+  // trip of latency beats one query of work.
+  const firstIn = (order: PhotoOrder) =>
+    prisma.photo.findFirst({
+      where: { galleryId, status: "CONFIRMED" },
+      orderBy: photoOrderBy(order),
+      select: { objectKey: true, status: true },
+    });
+  const [gallery, firstByTime, firstByName] = await Promise.all([
+    prisma.gallery.findUnique({
+      where: { id: galleryId },
+      select: {
+        title: true,
+        translations: true,
+        photoOrder: true,
+        coverPhoto: { select: { objectKey: true, status: true } },
+      },
+    }),
+    firstIn("TAKEN_AT"),
+    firstIn("FILE_NAME"),
+  ]);
   if (!gallery) return null;
-  // Only looked up when there is no usable cover to show instead.
-  const cover = pickCover(gallery.coverPhoto, null);
-  const first = cover
-    ? null
-    : await prisma.photo.findFirst({
-        where: { galleryId, status: "CONFIRMED" },
-        orderBy: photoOrderBy(gallery.photoOrder),
-        select: { objectKey: true, status: true },
-      });
-  return { ...gallery, preview: cover ?? first };
+  const first = gallery.photoOrder === "FILE_NAME" ? firstByName : firstByTime;
+  return { ...gallery, preview: pickCover(gallery.coverPhoto, first) };
 }
 
 async function galleryPreviewKey(galleryId: string): Promise<string | null> {
