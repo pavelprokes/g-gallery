@@ -105,6 +105,8 @@ async function main() {
       status: "PUBLISHED",
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-guest-${Date.now()}`,
+      // As the admin makes a guests' gallery (docs/PHOTO-ORDER.md).
+      photoOrder: "TAKEN_AT",
     },
   });
 
@@ -358,6 +360,8 @@ async function makeGuestGallery(ownerId: string, title: string): Promise<GuestLi
       status: "PUBLISHED",
       publishedAt: new Date(),
       storagePrefix: `galleries/e2e-name-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      // As the admin makes a guests' gallery (docs/PHOTO-ORDER.md).
+      photoOrder: "TAKEN_AT",
     },
   });
   const token = generateShareToken();
@@ -410,6 +414,8 @@ async function makeEventGallery(
       eventId,
       eventKey,
       listedOnEvent,
+      // As the wedding page's "pro hosty" makes a guests' gallery (docs/PHOTO-ORDER.md).
+      ...(allowUpload ? { photoOrder: "TAKEN_AT" as const } : {}),
     },
   });
 

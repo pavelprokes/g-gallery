@@ -271,10 +271,11 @@ model Gallery {
   /// (docs/HIGHLIGHTS.md). On by default: the automatic pick is a sensible
   /// start the photographer adjusts, not something to opt into per gallery.
   highlightsEnabled Boolean    @default(true)
-  /// The order guests see the photos in (docs/PHOTO-ORDER.md): capture time,
-  /// or the file names — the photographer's own export numbering, which is
-  /// Lightroom's order even where a camera's clock was off.
-  photoOrder        PhotoOrder @default(TAKEN_AT)
+  /// The order guests see the photos in (docs/PHOTO-ORDER.md): the file
+  /// names — the photographer's own export numbering, which is Lightroom's
+  /// order even where a camera's clock was off — or capture time, which a
+  /// guests' gallery gets (phones name their files, not the day).
+  photoOrder        PhotoOrder @default(FILE_NAME)
 
   /// Which wedding page lists this gallery, if any. Nullable by design:
   /// a standalone gallery with no wedding page around it stays legal.

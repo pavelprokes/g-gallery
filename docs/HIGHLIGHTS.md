@@ -84,14 +84,16 @@ Blank those the same way if a photographer who fills them in ever needs it.
 ## Guest side
 
 `GalleryHighlights` (`src/components/gallery-highlights.tsx`), between the header and the chapter
-bar. Hidden in favourites-only mode, like chapters and promos. Horizontal strip with the chapter
-bar's side-scroll behaviour (`useSideScroll` in `src/components/chapter-nav.tsx`: fade, arrows) —
-but **not** its vertical-wheel-scrolls-sideways: the strip is 160–224 px tall at the top of the
-page, the pointer rests on it while the viewer wheels down, and it would swallow the page's scroll.
-Snap is `proximity`, not `mandatory`, for the same reason.
+bar. Hidden in favourites-only mode, like chapters and promos. Laid out like the grid itself
+(Pavel, 2026-09-28) — justified rows through `justifyRows`, uncropped, the grid's 4 px gap, edge to
+edge with no side gutter — only a size up: on a phone rows aim at the width / 1.3 (a landscape shot fills
+the width alone, two portraits share it), 260 px on a tablet, 340 px on a desktop. It replaced a
+horizontal strip of 160–224 px thumbnails, which read as a row of previews to scroll past rather
+than as the opening of the gallery. No hint line under the heading: the tiles explain themselves
+once tapped.
 
-The list's scroll margin is re-read when anything above it resizes, not only the list itself: the
-strip's heading and hint re-wrap when the brand font loads or the locale changes.
+The grid list's scroll margin is re-read when anything above it resizes, not only the list itself:
+the highlights' rows re-flow when the width changes.
 
 **A highlight is never a photo in the grid's stream.** It is not in the `photos` array, so the
 lightbox, arrow keys, selection, favourites, print marks and the ZIP never see it (same rule as

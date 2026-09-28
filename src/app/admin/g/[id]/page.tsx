@@ -22,18 +22,14 @@ import { DeleteGalleryButton } from "@/components/delete-gallery-button";
 import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
-import {
-  ChapterPresetsList,
-  CHAPTER_PRESETS_LIST_ID,
-  GalleryChapterPanel,
-} from "@/components/admin/gallery-chapter-panel";
+import { ChapterTitleField, GalleryChapterPanel } from "@/components/admin/gallery-chapter-panel";
 import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
 import { startChapter } from "../../chapter-actions";
 import { setHighlightPin } from "../../highlight-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
-import { chapterAnchor, compareTimeline, MAX_CHAPTER_TITLE } from "@/lib/gallery-chapters";
+import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
 import {
   CHAPTER_START_SELECT,
   ORDER_KEY_SELECT,
@@ -46,7 +42,6 @@ import {
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { PageHeader } from "@/components/ui/page-header";
@@ -349,19 +344,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             <summary className="text-brand-primary-dark cursor-pointer font-semibold dark:text-neutral-200">
               {startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
             </summary>
-            <form
-              action={startChapter.bind(null, gallery.id, photo.id)}
-              className="mt-1 flex gap-1"
-            >
-              <Input
-                name="title"
-                list={CHAPTER_PRESETS_LIST_ID}
-                required
-                maxLength={MAX_CHAPTER_TITLE}
-                placeholder="Obřad"
-                aria-label="Název kapitoly"
-                className="min-w-0"
-              />
+            <form action={startChapter.bind(null, gallery.id, photo.id)} className="mt-1 space-y-2">
+              <ChapterTitleField placeholder="Obřad" label="Název kapitoly" />
               <Button type="submit" size="sm">
                 Uložit
               </Button>
@@ -465,7 +449,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         timelineHref="?timeline=1"
         timelineActive={timelineView}
       />
-      <ChapterPresetsList />
 
       <GalleryHighlightPanel
         galleryId={gallery.id}

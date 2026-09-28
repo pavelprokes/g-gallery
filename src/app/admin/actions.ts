@@ -120,9 +120,22 @@ export async function createShareLink(
 
   const gallery = await prisma.gallery.findFirst({
     where: { id: parsed.data.galleryId, ownerId: session.user.id },
-    select: { id: true, title: true, eventDate: true },
+    select: {
+      id: true,
+      title: true,
+      eventDate: true,
+      _count: { select: { photos: { where: { source: "OWNER" } } } },
+    },
   });
   if (!gallery) throw new Error("NOT_FOUND");
+
+  // An upload link on a gallery with none of the photographer's photos makes
+  // it a guests' gallery: ordered by capture time, since phones name files by
+  // their own counters (docs/PHOTO-ORDER.md). A delivery that also lets guests
+  // add a few keeps whatever order it has.
+  if (parsed.data.allowUpload && gallery._count.photos === 0) {
+    await prisma.gallery.update({ where: { id: gallery.id }, data: { photoOrder: "TAKEN_AT" } });
+  }
 
   const token = generateShareToken();
   const slug = gallerySlug(gallery.title, gallery.eventDate);
@@ -550,7 +563,14 @@ export async function createGalleryForEvent(eventId: string, formData: FormData)
 
   await prisma.gallery.update({
     where: { id: galleryId },
-    data: { eventLinkId: link.id, listedOnEvent: false },
+    data: {
+      eventLinkId: link.id,
+      listedOnEvent: false,
+      // A guests' gallery is ordered by when its photos were taken: phones
+      // name files by their own counters, which say nothing about the day
+      // (docs/PHOTO-ORDER.md). Everything else defaults to file-name order.
+      ...(formData.get("allowUpload") ? { photoOrder: "TAKEN_AT" as const } : {}),
+    },
   });
 
   revalidatePath(`/admin/e/${event.id}`);

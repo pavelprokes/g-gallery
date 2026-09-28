@@ -6,14 +6,14 @@ import type { PhotoOrder } from "@/lib/photo-order";
 
 const ORDERS: { value: PhotoOrder; label: string; hint: string }[] = [
   {
-    value: "TAKEN_AT",
-    label: "Podle času pořízení",
-    hint: "Podle času z fotoaparátu. Když má některé tělo nebo dron posunuté hodiny, jeho fotky se zařadí jinam.",
-  },
-  {
     value: "FILE_NAME",
     label: "Podle názvu souboru",
     hint: "Podle číslování z exportu (svatba_0001, svatba_0002…) — tedy přesně v pořadí z Lightroomu. Fotky od hostů bez takového číslování se zařadí podle svého názvu.",
+  },
+  {
+    value: "TAKEN_AT",
+    label: "Podle času pořízení",
+    hint: "Podle času z fotoaparátu — vhodné pro galerii od hostů. Když má některé tělo nebo dron posunuté hodiny, jeho fotky se zařadí jinam.",
   },
 ];
 
