@@ -87,10 +87,10 @@ Všechno níže je v kódu a v produkci. Řazeno podle toho, co pár zajímá ne
 
 ### Na svatbě
 
-| Funkce             | Jak to říct                                                                           | Pozor                                                             |
-| ------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Projekce           | Fotky od hostů se promítají na plátno nebo televizi a nové naskočí **do půl minuty**. | Obnovuje se každých 30 s, nepsat „v reálném čase“ ani „okamžitě“. |
-| Cedulka s QR kódem | Tiskovou cedulku s QR kódem připraví fotograf.                                        | Jeden hotový design, žádný výběr ze šablon.                       |
+| Funkce             | Jak to říct                                                                                  | Pozor                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Projekce           | Fotky od hostů se promítají na plátno nebo televizi a nové naskočí **zhruba do půl minuty**. | Obnovuje se každých 30 s (nová fotka pak jde na řadu hned, nejhůř tak kolem 40 s), nepsat „v reálném čase“ ani „okamžitě“. |
+| Cedulka s QR kódem | Tiskovou cedulku s QR kódem připraví fotograf.                                               | Jeden hotový design, žádný výběr ze šablon.                                                                                |
 
 ### Co galerie **neumí** (nikde to nenaznačovat)
 
@@ -198,7 +198,7 @@ Doplňující věta: _Odkaz ani QR kód se nemění. Co si hosté uložili na sv
 ### 7.5 Projekce
 
 - **Nadpis:** Svatba z pohledu hostů, na plátně ještě ten večer.
-- **Text:** Stačí notebook u projektoru nebo televize. Nové fotky od hostů naskočí do půl minuty a
+- **Text:** Stačí notebook u projektoru nebo televize. Nové fotky od hostů naskočí zhruba do půl minuty a
   prolínají se samy, nikdo u toho nemusí stát.
 
 ### 7.6 Soukromí
@@ -286,7 +286,7 @@ theme. Nic nekopíruj z `g-gallery`.
 - **Nezačínat slovem „QR kód“.** Nejdřív říct, co pár získá. QR je až způsob.
 - **Neslibovat video**, hledání obličejů, schvalování fotek předem ani tisk.
 - **Nepsat „soukromá galerie“.** Správně je „neveřejná“, „nedá se najít“, „vidí ji ten, kdo má odkaz“.
-- **Nepsat „v reálném čase“ ani „okamžitě“** u projekce. Správně „do půl minuty“.
+- **Nepsat „v reálném čase“ ani „okamžitě“** u projekce. Správně „zhruba do půl minuty“.
 - **Nezveřejňovat ceny ze §5** kromě „součást celodenního focení“, dokud je Pavel nepotvrdí.
 - **Neuvádět čísla z referencí**, která nedodal Pavel.
 - **Časová omezení psát předem.** Když něco platí jen po nějakou dobu (galerie minimálně rok), napsat
@@ -319,8 +319,88 @@ theme. Nic nekopíruj z `g-gallery`.
 
 Nejsou úkolem agenta hlavního webu. Jsou tu, aby se na ně nezapomnělo. Udělají se v tomto repozitáři.
 
-- Kořenová stránka `photos.…` v bloku o projekci slibuje „v reálném čase“. Projekce se ale obnovuje
-  každých 30 s. Sjednotit na „do půl minuty“ (`messages/*.json`, `marketing.highlights.projector`).
-- Kořenová stránka `photos.…` má odkazovat na novou podstránku hlavního webu (až bude její adresa
-  známá) a její titulek přizpůsobit roli nápovědy pro hosty (§10).
-- Patička galerie odkazuje na hlavní web bez UTM. Pokud Pavel chce měřit i ji, doplnit UTM (§9).
+- [x] Kořenová stránka `photos.…` v bloku o projekci slibovala „v reálném čase“. Sjednoceno na „zhruba
+      do půl minuty“ (`messages/*.json`, `marketing.highlights.projector` a `marketing.features`,
+      2026-09-28).
+- [x] Kořenová stránka `photos.…` odkazuje na podstránku hlavního webu (`/galerie-pro-hosty`,
+      `guestGalleryPageUrl` v `src/app/page.tsx`) a titulek odpovídá roli nápovědy („Nápověda ke svatební
+      galerii“).
+- [ ] Patička galerie odkazuje na hlavní web bez UTM. Pokud Pavel chce měřit i ji, doplnit UTM (§9).
+
+## 15. Viditelnost v AI asistentech (GEO)
+
+Doplněno 2026-09-28 z auditu v `docs/AI-VISIBILITY.md` (tam jsou důkazy, zdroje a měření). Shrnutí: na
+dotaz na jméno Pavla asistenti i vyhledávače najdou, na obecné dotazy („nejlepší svatební fotograf
+…“, „kolik stojí…“, „wedding photographer Czech castle“, „svatební galerie pro hosty QR“) ne. Web sám
+to celé nevyřeší, velká část je mimo web (katalogy, recenze, zmínky, viz audit). Tady je to, co patří
+na hlavní web, v pořadí podle dopadu.
+
+Nic z toho není „trik na AI“. Jde o to, aby roboti web mohli přečíst a aby na něm byla fakta napsaná
+jednoznačně. Žádný skrytý text, žádné pokyny pro AI v obsahu stránky, žádné vymyšlené recenze ani
+čísla. Každé číslo a tvrzení musí dodat nebo potvrdit Pavel.
+
+### 15.1 Roboti se na web dostanou (nejdřív, dopad nejvyšší)
+
+- Zkontrolovat `robots.txt`: nesmí blokovat `Googlebot`, `Bingbot`, `OAI-SearchBot` (ChatGPT
+  vyhledávání), `PerplexityBot`, `Claude-SearchBot`. Trénovací roboti (`GPTBot`, `ClaudeBot`,
+  `Google-Extended`, `CCBot`) jsou na rozhodnutí Pavla, na citace v odpovědích vliv nemají.
+- **Cloudflare** (pokud je hlavní web přes něj proxovaný): v AI Crawl Control nechat povolenou
+  kategorii „Search“. Pozor: blokování kategorie „Training“ (i starý přepínač „Block AI Bots“) může
+  zablokovat i víceúčelové roboty, tedy Googlebota a Bingbota. Ověřit v logu, že dostávají 200.
+  Zkontrolovat i „Managed robots.txt“, který umí AI roboty zakázat za web.
+- Každá důležitá stránka (úvod, ceník, svatební fotograf, lokality, EN stránky, galerie pro hosty) musí
+  mít hlavní text v HTML bez JavaScriptu.
+
+### 15.2 Fakta napsaná textem, na jednom místě, všude stejně
+
+- **Ceny textem**: „celodenní focení od … Kč“, co je v balíčku. AI cituje, co je napsané, ne co je
+  v obrázku nebo v PDF.
+- **Oblast působení jmenovitě**: „Praha, střední Čechy, …, do 100 km od Prahy bez cestovného“ (pokud to
+  platí, dnes to uvádí výsledky vyhledávání).
+- **Počty a roky**: 14 let, 200+ svateb, dron, jazyky, kterými Pavel mluví. Jen ověřené, všude stejné.
+- **Adresa**: v patičce musí zůstat sídlo s IČO (Křižíkova 424/127, Praha 8 – Karlín, § 435 občanského
+  zákoníku), jako v patičce galerie. Web a výsledky vyhledávání dnes uvádějí i „Praha 8 – Střížkov“.
+  Pavel rozhodne, jestli jde o druhé místo (ateliér), nebo o starou adresu. Buď ji odstranit, nebo
+  jasně označit, co je co.
+
+### 15.3 Strukturovaná data (kvůli přesnosti, ne jako páka na AI)
+
+- Na úvodní stránce `ProfessionalService` (podtyp `LocalBusiness`): `name`, `url`, `telephone`,
+  `email`, `address` (to, co rozhodne Pavel v §15.2), `areaServed` (jmenovitě), `sameAs` (Facebook,
+  Firmy.cz, katalogy), `priceRange` jen pokud je cena na stránce. Stabilní `@id` (např.
+  `https://svatebni-fotograf-cechy.cz/#business`), aby se na něj dalo odkazovat.
+- **Ne `AggregateRating` z vlastních recenzí**: Google u LocalBusiness/Organization hvězdičky
+  z recenzí, které firma ukazuje sama o sobě, nezobrazuje. Nemá to přínos a vypadá to jako manipulace.
+- `FAQPage` u skutečných FAQ (už v §6.2 a §10).
+- Podle studií z roku 2026 strukturovaná data citace v AI měřitelně nezvyšují. Mají smysl proto, aby
+  fakta byla strojově jednoznačná.
+
+### 15.4 Anglická verze
+
+Na anglické dotazy („wedding photographer Czech Republic castle“, „English speaking wedding
+photographer Prague“) dnes Pavel ve výsledcích není. Vyhrávají žebříčky, katalogy a zahraniční
+fotografové. Posílit `/en/destination-wedding-photographer`: konkrétní místa (zámky, kde fotil),
+ceny v EUR textem, co je v balíčku, že mluví anglicky, jak probíhá domluva na dálku. Obě jazykové verze
+propojit přes `hreflang` (každá stránka odkazuje na sebe i na druhou, `x-default`).
+
+### 15.5 Galerie pro hosty jako kategorie
+
+V kategorii „svatební galerie pro hosty přes QR“ dnes vyhrávají specializované služby (weddApp,
+FotoDrop, Snapshare, MomentsForLove). Podstránka z §6.2 je jediné místo, které tu může soutěžit. Kořen
+`photos.…` zůstává nápovědou (§10) a o tyto dotazy záměrně nesoutěží. Roboti bez jazykové
+preference ho dostanou anglicky (výchozí jazyk galerie, `docs/I18N.md`), takže podstránce z §6.2
+česky nekonkuruje.
+
+### 15.6 Měření
+
+- Do poptávkového formuláře pole „Jak jste mě našli?“ (Google, ChatGPT nebo jiná AI, Instagram,
+  Facebook, doporučení, katalog, jiné). Je to nejspolehlivější signál, protože aplikace ChatGPT často
+  neposílá referrer.
+- V GA4 (pokud web GA4 má) vlastní skupinu kanálů „AI asistenti“ nad „Referral“, regex na zdroj
+  návštěvy: `chatgpt\.com|perplexity\.ai|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com`.
+
+### 15.7 Volitelné
+
+- `llms.txt` v kořeni webu: krátký popis, služby, oblast, kontakt, odkazy na hlavní stránky. Google ho
+  podle vlastních slov nepoužívá a podle Ahrefs ho téměř nikdo nestahuje. Stojí ale 20 minut. Jen
+  fakta z §15.2.
