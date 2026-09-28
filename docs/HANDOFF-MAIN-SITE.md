@@ -353,15 +353,18 @@ jednoznačně. Žádný skrytý text, žádné pokyny pro AI v obsahu stránky, 
 
 ### 15.2 Fakta napsaná textem, na jednom místě, všude stejně
 
-- **Ceny textem**: „celodenní focení od … Kč“, co je v balíčku. AI cituje, co je napsané, ne co je
-  v obrázku nebo v PDF.
+- **Ceny textem**: „celodenní focení od … Kč“, kolik hodin, kolik fotek, co je v balíčku. AI cituje, co
+  je napsané, ne co je v obrázku nebo v PDF. Na dotaz „svatební fotograf Praha cena celodenní“ dnes
+  vyhrávají stránky s cenou ve větě (např. „24 900 Kč za 10 hodin“) a průvodce „cena 2026“, `/cenik`
+  se tam neukázal. Částky dodá Pavel, nevymýšlet.
 - **Oblast působení jmenovitě**: „Praha, střední Čechy, …, do 100 km od Prahy bez cestovného“ (pokud to
   platí, dnes to uvádí výsledky vyhledávání).
 - **Počty a roky**: 14 let, 200+ svateb, dron, jazyky, kterými Pavel mluví. Jen ověřené, všude stejné.
 - **Adresa**: v patičce musí zůstat sídlo s IČO (Křižíkova 424/127, Praha 8 – Karlín, § 435 občanského
-  zákoníku), jako v patičce galerie. Web a výsledky vyhledávání dnes uvádějí i „Praha 8 – Střížkov“.
-  Pavel rozhodne, jestli jde o druhé místo (ateliér), nebo o starou adresu. Buď ji odstranit, nebo
-  jasně označit, co je co.
+  zákoníku), jako v patičce galerie. Web dnes uvádí „Roudnická 450/16, 182 00 Praha 8 – Střížkov“ a
+  souhrny vyhledávání ji u dotazu na Pavlovo jméno opakují, takže asistenti znají dvě adresy. Pavel
+  rozhodne, jestli jde o druhé místo (ateliér), nebo o starou adresu. Buď ji odstranit, nebo jasně
+  označit, co je co (sídlo vs. ateliér).
 
 ### 15.3 Strukturovaná data (kvůli přesnosti, ne jako páka na AI)
 

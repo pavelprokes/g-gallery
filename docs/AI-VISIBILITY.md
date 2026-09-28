@@ -82,19 +82,38 @@ Weak:
   photographers).
 - **Guest-gallery category** ("svatební galerie pro hosty QR"): specialised services only
   (weddApp, FotoDrop, Snapshare, MomentsForLove).
-- **Address**: Firmy.cz and this app's footer give the registered address (Karlín, with IČO —
-  legally required on the website, § 435 občanský zákoník); the main site / snippets also say
-  "Praha 8 – Střížkov". Pavel decides what the second one is.
+- **Address**: Firmy.cz and this app's footer give the registered address "Křižíkova 424/127,
+  186 00 Praha 8 – Karlín" (with IČO — legally required on the website, § 435 občanský
+  zákoník); the main site gives "Roudnická 450/16, 182 00 Praha 8 – Střížkov", and search
+  summaries of a brand query repeat that one. Assistants therefore state two addresses. Pavel
+  decides what the second one is.
 
 This app:
 
 - `robots.txt` allows everything; non-public routes carry their own `noindex` (the reasoning is in
   `src/app/robots.ts`). The root (`/`) is the only indexable page, with `FAQPage` data.
-- The root was not found in the index. First step: Search Console URL Inspection.
+- The root was not found in the index. First step: Search Console URL Inspection. The re-run
+  below shows what that costs: asked about the domain, a search summary _guessed_ it is "likely a
+  photo gallery or portfolio section" — with nothing indexed to quote, an assistant makes it up.
 - Crawlers send no `Accept-Language`, so they get the English render (`DEFAULT_LOCALE`,
   `docs/I18N.md`). **Accepted on purpose**, see below.
 - The projector claim "in real time" was false (the slideshow polls every 30 s) — fixed to
   "within about half a minute" in all three catalogs.
+
+### Re-run, same day (after #42 merged)
+
+Same queries, same results — expected: #42 changed documentation and one line of copy, and
+search and assistants take 30+ days to reflect anything. New detail it surfaced:
+
+- **The second address is concrete**: Roudnická 450/16, Praha 8 – Střížkov (above).
+- **The unindexed root gets guessed at** (above).
+- **More directories cited for generic queries**: [Svatební katalog][katalog] and
+  [PojdFotit.cz][pojdfotit] for "nejlepší svatební fotograf střední Čechy"; [WPJA][wpja] for
+  "wedding photographer Czech Republic castle". Two more guest-gallery services: Share love,
+  Svatbaa.
+- **Price queries go to pages that state a price as text** — "24 900 Kč za 10 hodin"
+  ([FotoEmotion][fotoemotion]), fotoprofici's "cena 2026" guide. `/cenik` did not appear for
+  "svatební fotograf Praha cena celodenní".
 
 ## Decisions for this repo
 
@@ -108,7 +127,8 @@ This app:
 
 ## Off-site checklist (Pavel)
 
-1. **Address**: decide what "Praha 8 – Střížkov" is (studio? old address?). The registered
+1. **Address**: decide what "Roudnická 450/16, Praha 8 – Střížkov" (main site) is — studio? old
+   address? — next to the registered "Křižíkova 424/127, Praha 8 – Karlín". The registered
    address stays on both websites; Google Business Profile and Firmy.cz can run as a service-area
    business (address hidden) or show the studio, clearly labelled. Then make every listing match.
 2. **Google Business Profile**: categories, service area by town, services with prices, photos;
@@ -116,11 +136,13 @@ This app:
 3. **Bing Places** (Bing, Copilot; ChatGPT search partly uses Bing) and **Apple Business** (Maps,
    Siri).
 4. **Firmy.cz** — the source for Seznam Asistent: complete it, reviews, same facts.
-5. **Directories assistants cite**: mywed, fotoprofici, fotografove.info, the expats.cz directory
-   (English), venue "recommended vendors" pages for castles he has shot at.
+5. **Directories assistants cite**: mywed, fotoprofici, fotografove.info, Svatební katalog
+   (svatebni-katalog.cz), PojdFotit.cz; in English the expats.cz directory and WPJA; venue
+   "recommended vendors" pages for castles he has shot at.
 6. **Rankings and guides**: ask to be considered for country guides (e.g. Tov Studio) and Czech
    wedding blogs; real mentions, never paid fake reviews.
-7. **Search Console** on both domains: URL Inspection of `https://photos.svatebni-fotograf-cechy.cz/`,
+7. **Search Console** on both domains: URL Inspection of `https://photos.svatebni-fotograf-cechy.cz/`
+   (not indexed, so assistants guess what it is),
    Performance → Generative AI (impressions only, since June 2026 —
    [Google][gsc-ai]). **Bing Webmaster Tools** → AI Performance (Copilot citations —
    [Bing][bing-ai]).
@@ -169,6 +191,10 @@ time") is worth more than a missing mention: it is specific and fixable.
 [bs]: https://www.budemesvoji.cz/listing/svatebni-fotograf-pavel-prokes/
 [ph]: https://photographs.cz/fotograf/svatebni-fotograf-pavel-prokes
 [mywed]: https://mywed.com/cs/Czech-Republic-wedding-photographers/
+[katalog]: https://www.svatebni-katalog.cz/svatebni-katalog/svatebni-fotograf-video/stredocesky-kraj
+[pojdfotit]: https://pojdfotit.cz/fotograf/fotograf-stredni-cechy/
+[wpja]: https://www.wpja.com/wedding-venues/Czech%20Republic
+[fotoemotion]: https://fotoemotion.cz/svatebni-fotograf-cenik/
 [fp]: https://fotoprofici.cz/fotografove/svatebni-fotograf/pruvodce/kolik-stoji-svatebni-fotograf/
 [tov]: https://tovstudiophoto.com/best-wedding-photographers-in-czech-republic/
 [expats]: https://www.expats.cz/directory/listing/best-wedding-photographer-bcrqe
