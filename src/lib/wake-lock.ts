@@ -26,7 +26,11 @@ export async function holdScreenAwake(): Promise<HeldWakeLock | null> {
   async function acquire() {
     if (released || document.visibilityState !== "visible") return;
     try {
-      sentinel = await navigator.wakeLock.request("screen");
+      const acquired = await navigator.wakeLock.request("screen");
+      // Released while the request was in flight: hand the lock straight back,
+      // or it outlives its owner and keeps the screen on for good.
+      if (released) void acquired.release().catch(() => undefined);
+      else sentinel = acquired;
     } catch {
       // Denied (low battery, unsupported, not a user gesture) — not an error
       // the guest should ever hear about.

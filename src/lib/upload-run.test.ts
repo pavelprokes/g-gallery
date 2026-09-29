@@ -1,5 +1,55 @@
-import { describe, expect, it, vi } from "vitest";
-import { pendingQuery, runUploads } from "./upload-run";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CANCELLED, pendingQuery, runUploads } from "./upload-run";
+
+/**
+ * The original goes up by XHR (for upload progress), so R2 is faked at that
+ * level: every PUT reports its full size once and answers 200 with an ETag on
+ * the next microtask, unless `hold` keeps it open to observe concurrency.
+ */
+class FakeXHR {
+  static open = 0;
+  static peak = 0;
+  static hold: Promise<void> | null = null;
+  /** Status for the next PUTs, consumed one per request; 200 once empty. */
+  static statuses: number[] = [];
+  upload: { onprogress: ((event: { loaded: number }) => void) | null } = { onprogress: null };
+  status = 0;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  private finished = false;
+  open() {}
+  setRequestHeader() {}
+  getResponseHeader(name: string) {
+    return name.toLowerCase() === "etag" ? '"abc"' : null;
+  }
+  send(body: Blob) {
+    FakeXHR.open += 1;
+    FakeXHR.peak = Math.max(FakeXHR.peak, FakeXHR.open);
+    void (FakeXHR.hold ?? Promise.resolve()).then(() => {
+      if (this.finished) return;
+      this.finished = true;
+      FakeXHR.open -= 1;
+      this.upload.onprogress?.({ loaded: body.size });
+      this.status = FakeXHR.statuses.shift() ?? 200;
+      this.onload?.();
+    });
+  }
+  abort() {
+    if (this.finished) return;
+    this.finished = true;
+    FakeXHR.open -= 1;
+    this.onabort?.();
+  }
+}
+
+beforeEach(() => {
+  FakeXHR.open = 0;
+  FakeXHR.peak = 0;
+  FakeXHR.hold = null;
+  FakeXHR.statuses = [];
+  vi.stubGlobal("XMLHttpRequest", FakeXHR);
+});
 
 // The thumbnail itself is covered in thumbnail.test.ts; what matters here is
 // that the owner/guest split this module already carries reaches it, because
@@ -215,6 +265,184 @@ describe("runUploads — guest name", () => {
     expect(bodyOf("/api/uploads/presign").displayName).toBe("Petra");
     expect(bodyOf("/api/uploads/confirm")).not.toHaveProperty("displayName");
 
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("runUploads — rolling queue", () => {
+  function jpegs(count: number): File[] {
+    return Array.from(
+      { length: count },
+      (_, i) => new File([new Uint8Array(100 + i)], `IMG_${i}.jpg`, { type: "image/jpeg" }),
+    );
+  }
+
+  function stubServer(presignGate?: Promise<void>) {
+    let photo = 0;
+    const presignSizes: number[] = [];
+    const resumeIdsSeen: (string | undefined)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/uploads/presign")) {
+          if (presignGate) await presignGate;
+          if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+          const files = JSON.parse(String(init?.body)).files as { resumePhotoId?: string }[];
+          presignSizes.push(files.length);
+          files.forEach((f) => resumeIdsSeen.push(f.resumePhotoId));
+          const uploads = files.map((f) => ({
+            photoId: f.resumePhotoId ?? `p${++photo}`,
+            objectKey: "k",
+            url: "https://r2.example/put",
+            headers: {},
+          }));
+          return new Response(JSON.stringify({ uploads }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+    return Object.assign(presignSizes, { resumeIdsSeen });
+  }
+
+  it("uploads everything with at most four PUTs in flight and reports bytes", async () => {
+    const presignSizes = stubServer();
+    const files = jpegs(10);
+    const states: Record<number, string> = {};
+    const bytes: Record<number, number> = {};
+
+    await runUploads({
+      files,
+      credentials: { kind: "owner", galleryId: "gal_1" },
+      resumeIds: files.map(() => undefined),
+      onItem: (index, patch) => {
+        states[index] = patch.state;
+      },
+      onBytes: (index, sent) => {
+        bytes[index] = sent;
+      },
+      onFatal: () => {
+        throw new Error("nothing here is fatal");
+      },
+    });
+
+    expect(Object.values(states)).toEqual(files.map(() => "done"));
+    expect(FakeXHR.peak).toBeLessThanOrEqual(4);
+    // Presign never exceeds one batch and covers every file exactly once.
+    expect(presignSizes.every((size) => size <= 8)).toBe(true);
+    expect(presignSizes.reduce((a, b) => a + b, 0)).toBe(10);
+    expect(Object.keys(bytes)).toHaveLength(10);
+    vi.unstubAllGlobals();
+  });
+
+  it("cancels in-flight and queued files so they can be retried", async () => {
+    stubServer();
+    let release!: () => void;
+    FakeXHR.hold = new Promise((resolve) => {
+      release = resolve;
+    });
+    const files = jpegs(6);
+    const results: Record<number, { state: string; error?: string }> = {};
+    const controller = new AbortController();
+
+    const run = runUploads({
+      files,
+      credentials: { kind: "owner", galleryId: "gal_1" },
+      resumeIds: files.map(() => undefined),
+      signal: controller.signal,
+      onItem: (index, patch) => {
+        results[index] = patch;
+      },
+      onFatal: () => undefined,
+    });
+
+    await vi.waitFor(() => expect(FakeXHR.open).toBe(4));
+    controller.abort();
+    release();
+    await run;
+
+    const finals = Object.values(results);
+    expect(finals).toHaveLength(6);
+    expect(finals.every((r) => r.state === "error" && r.error === CANCELLED)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("runUploads — expiry and late presign", () => {
+  const jpeg = (name: string) => new File([new Uint8Array(10)], name, { type: "image/jpeg" });
+
+  it("re-signs an expired URL for the same photo row instead of failing", async () => {
+    let photo = 0;
+    const resumes: (string | undefined)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes("/api/uploads/presign")) {
+          const files = JSON.parse(String(init?.body)).files as { resumePhotoId?: string }[];
+          files.forEach((f) => resumes.push(f.resumePhotoId));
+          const uploads = files.map((f) => ({
+            photoId: f.resumePhotoId ?? `p${++photo}`,
+            objectKey: "k",
+            url: "u",
+            headers: {},
+          }));
+          return new Response(JSON.stringify({ uploads }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+    FakeXHR.statuses = [403];
+    const states: string[] = [];
+
+    await runUploads({
+      files: [jpeg("a.jpg")],
+      credentials: { kind: "owner", galleryId: "gal_1" },
+      resumeIds: [undefined],
+      onItem: (_index, patch) => states.push(patch.state),
+      onFatal: () => undefined,
+    });
+
+    expect(states.at(-1)).toBe("done");
+    expect(resumes).toEqual([undefined, "p1"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("does not report into a run that already ended when cancelled mid-presign", async () => {
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        await gate;
+        if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+        return new Response(JSON.stringify({ uploads: [] }), { status: 200 });
+      }),
+    );
+    const controller = new AbortController();
+    let ended = false;
+    const lateCalls: string[] = [];
+
+    const run = runUploads({
+      files: [jpeg("a.jpg"), jpeg("b.jpg")],
+      credentials: { kind: "owner", galleryId: "gal_1" },
+      resumeIds: [undefined, undefined],
+      signal: controller.signal,
+      onItem: (_index, patch) => {
+        if (ended) lateCalls.push(patch.state);
+      },
+      onFatal: () => {
+        if (ended) lateCalls.push("fatal");
+      },
+    });
+    controller.abort();
+    openGate();
+    await run;
+    ended = true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(lateCalls).toEqual([]);
     vi.unstubAllGlobals();
   });
 });
