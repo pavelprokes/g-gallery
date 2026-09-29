@@ -85,8 +85,8 @@ Weak:
 - **Address**: Firmy.cz and this app's footer give the registered address "Křižíkova 424/127,
   186 00 Praha 8 – Karlín" (with IČO — legally required on the website, § 435 občanský
   zákoník); the main site gives "Roudnická 450/16, 182 00 Praha 8 – Střížkov", and search
-  summaries of a brand query repeat that one. Assistants therefore state two addresses. Pavel
-  decides what the second one is.
+  summaries of a brand query repeat that one. Assistants therefore state two addresses.
+  **Decided 2026-09-29 (Pavel): Karlín is the one address everywhere**; Střížkov goes.
 
 This app:
 
@@ -105,7 +105,8 @@ This app:
 Same queries, same results — expected: #42 changed documentation and one line of copy, and
 search and assistants take 30+ days to reflect anything. New detail it surfaced:
 
-- **The second address is concrete**: Roudnická 450/16, Praha 8 – Střížkov (above).
+- **The second address is concrete**: Roudnická 450/16, Praha 8 – Střížkov (above; since
+  decided: Karlín only).
 - **The unindexed root gets guessed at** (above).
 - **More directories cited for generic queries**: [Svatební katalog][katalog] and
   [PojdFotit.cz][pojdfotit] for "nejlepší svatební fotograf střední Čechy"; [WPJA][wpja] for
@@ -121,16 +122,17 @@ search and assistants take 30+ days to reflect anything. New detail it surfaced:
 | --------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Fix the projector claim                       | Done     | An assistant repeats what the page says; a wrong fact is the costliest finding.                                                                                                                                                                                                                                                                                     |
 | Per-locale URLs for `/` (`?lang=` + hreflang) | Not done | The root is guest help; the sales page is the main site's `/galerie-pro-hosty` (`HANDOFF-MAIN-SITE.md` §10 — the two must not compete). Would break "the URL never carries the locale" (`docs/I18N.md`), needs a proxy branch and a switcher fix, and Google lists parameter URLs as "not recommended". Revisit only if Pavel wants the help page to rank in Czech. |
-| `ProfessionalService` JSON-LD on `/`          | Not done | A `LocalBusiness` needs an address, which is undecided (above); the entity belongs on the main site's home page with a stable `@id`. This page may reference that `@id` once it exists.                                                                                                                                                                             |
+| `ProfessionalService` JSON-LD on `/`          | Not done | The entity belongs on the main site's home page with a stable `@id`. This page may reference that `@id` once it exists.                                                                                                                                                                                                                                             |
 | Named groups per AI bot in `robots.txt`       | Not done | A crawler obeys only its most specific group (RFC 9309): `Googlebot: Allow /` changes nothing today, and a later `Disallow` under `*` would silently not apply to the named bots.                                                                                                                                                                                   |
 | `llms.txt` on `photos`                        | Not done | Nothing to describe beyond a help page; optional on the main site (§15.7 of the handoff).                                                                                                                                                                                                                                                                           |
 
 ## Off-site checklist (Pavel)
 
-1. **Address**: decide what "Roudnická 450/16, Praha 8 – Střížkov" (main site) is — studio? old
-   address? — next to the registered "Křižíkova 424/127, Praha 8 – Karlín". The registered
-   address stays on both websites; Google Business Profile and Firmy.cz can run as a service-area
-   business (address hidden) or show the studio, clearly labelled. Then make every listing match.
+1. **Address — decided 2026-09-29: "Křižíkova 424/127, 186 00 Praha 8 – Karlín" everywhere.**
+   Replace "Roudnická 450/16, Praha 8 – Střížkov" on the main site (HANDOFF-MAIN-SITE.md §15.2)
+   and in every listing that has it; Firmy.cz and this app's footer already match. Google
+   Business Profile: this address, or a service-area business with the address hidden — never
+   Střížkov.
 2. **Google Business Profile**: categories, service area by town, services with prices, photos;
    ask recent couples for reviews.
 3. **Bing Places** (Bing, Copilot; ChatGPT search partly uses Bing) and **Apple Business** (Maps,

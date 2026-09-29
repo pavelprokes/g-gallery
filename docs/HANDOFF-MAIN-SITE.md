@@ -362,14 +362,15 @@ jednoznačně. Žádný skrytý text, žádné pokyny pro AI v obsahu stránky, 
 - **Počty a roky**: 14 let, 200+ svateb, dron, jazyky, kterými Pavel mluví. Jen ověřené, všude stejné.
 - **Adresa**: v patičce musí zůstat sídlo s IČO (Křižíkova 424/127, Praha 8 – Karlín, § 435 občanského
   zákoníku), jako v patičce galerie. Web dnes uvádí „Roudnická 450/16, 182 00 Praha 8 – Střížkov“ a
-  souhrny vyhledávání ji u dotazu na Pavlovo jméno opakují, takže asistenti znají dvě adresy. Pavel
-  rozhodne, jestli jde o druhé místo (ateliér), nebo o starou adresu. Buď ji odstranit, nebo jasně
-  označit, co je co (sídlo vs. ateliér).
+  souhrny vyhledávání ji u dotazu na Pavlovo jméno opakují, takže asistenti znají dvě adresy.
+  **Rozhodnuto 2026-09-29 (Pavel): jediná adresa všude je Křižíkova 424/127, 186 00 Praha 8 –
+  Karlín.** Střížkov (Roudnická 450/16) z webu odstranit všude: patička, kontakt, strukturovaná data,
+  texty.
 
 ### 15.3 Strukturovaná data (kvůli přesnosti, ne jako páka na AI)
 
 - Na úvodní stránce `ProfessionalService` (podtyp `LocalBusiness`): `name`, `url`, `telephone`,
-  `email`, `address` (to, co rozhodne Pavel v §15.2), `areaServed` (jmenovitě), `sameAs` (Facebook,
+  `email`, `address` (Karlín, §15.2), `areaServed` (jmenovitě), `sameAs` (Facebook,
   Firmy.cz, katalogy), `priceRange` jen pokud je cena na stránce. Stabilní `@id` (např.
   `https://svatebni-fotograf-cechy.cz/#business`), aby se na něj dalo odkazovat.
 - **Ne `AggregateRating` z vlastních recenzí**: Google u LocalBusiness/Organization hvězdičky
