@@ -15,6 +15,7 @@ import path from "node:path";
 import { prisma } from "../src/lib/db";
 import { generateShareToken, hashShareToken } from "../src/lib/share-token";
 import { gallerySlug } from "../src/lib/gallery-slug";
+import { refreshWovenOrder } from "../src/lib/woven-order-db";
 
 async function main() {
   let user = await prisma.user.findFirst({ where: { email: "e2e@example.com" } });
@@ -250,6 +251,7 @@ async function main() {
 
   const chapters = await makeChaptersGallery(user.id);
   const fileOrder = await makeFileOrderGallery(user.id);
+  const wovenOrder = await makeWovenOrderGallery(user.id);
   const highlights = await makeHighlightsGallery(user.id);
 
   fs.writeFileSync(
@@ -277,6 +279,7 @@ async function main() {
       archives,
       chapters,
       fileOrder,
+      wovenOrder,
       highlights,
     }),
   );
@@ -607,6 +610,88 @@ async function makeFileOrderGallery(ownerId: string) {
     fileNames: Array.from({ length: photoCount }, (_, i) => fileName(i + 1)),
     chapterAt: 30,
   };
+}
+
+/**
+ * File-name order with guests woven in by time (docs/PHOTO-ORDER.md): the same
+ * export as `makeFileOrderGallery` — a second body an hour early — plus four
+ * guests' phone photos, whose names (`IMG_…`) would sort them before every
+ * `svatba_…` by name. One is taken while the early body was shooting, one
+ * before the first export photo, one after the chapter starts. Woven by the
+ * app's own `refreshWovenOrder`, as switching the order in the admin does.
+ */
+async function makeWovenOrderGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Hosté podle času",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-woven-order-${Date.now()}`,
+      photoOrder: "FILE_NAME_GUESTS_BY_TIME",
+    },
+  });
+
+  const photoCount = 70;
+  const secondBody = (n: number) => n % 5 === 0;
+  const at = (minute: number, second = 0) => new Date(Date.UTC(2026, 8, 5, 8, minute, second));
+  const takenAt = (n: number) => new Date(at(n).getTime() - (secondBody(n) ? 3_600_000 : 0));
+  const fileName = (n: number) =>
+    `svatba_${String(n).padStart(4, "0")}_${secondBody(n) ? "_P5D" : "PPR"}${5000 + n}.jpg`;
+  const photo = (name: string, key: string, taken: Date, source: "OWNER" | "GUEST") =>
+    prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${key}.jpg`,
+        fileName: name,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#8a6f5a",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: taken,
+        source,
+      },
+      select: { id: true },
+    });
+
+  const rows = new Map<number, { id: string }>();
+  for (let n = photoCount; n >= 1; n -= 1) {
+    rows.set(n, await photo(fileName(n), `woven-${n}`, takenAt(n), "OWNER"));
+  }
+  // [file name, taken at, the export photo it follows (0 = opens the gallery)]
+  const guests = [
+    ["IMG_4801.jpg", at(0, 30), 0],
+    ["IMG_4802.jpg", at(10, 30), 10],
+    ["IMG_4803.jpg", at(12, 30), 12],
+    ["IMG_4804.jpg", at(45, 30), 45],
+  ] as const;
+  for (const [name, taken] of guests) await photo(name, name, taken, "GUEST");
+
+  await prisma.galleryChapter.create({
+    data: {
+      galleryId: gallery.id,
+      title: "Obřad",
+      slug: "ceremony",
+      startTakenAt: takenAt(30),
+      startPhotoId: rows.get(30)!.id,
+    },
+  });
+  await refreshWovenOrder(gallery.id);
+
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+
+  const expected: string[] = guests.filter(([, , after]) => after === 0).map(([name]) => name);
+  for (let n = 1; n <= photoCount; n += 1) {
+    expected.push(fileName(n));
+    for (const [name, , after] of guests) if (after === n) expected.push(name);
+  }
+  return { token, slug, fileNames: expected, chapterFrom: expected.indexOf(fileName(30)) };
 }
 
 /**

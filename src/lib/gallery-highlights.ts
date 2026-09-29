@@ -410,6 +410,7 @@ export function toHighlightCandidate(
     takenAt: Date | null;
     createdAt: Date;
     fileOrderKey: string;
+    wovenAt: Date | null;
     source: string;
     xmpRating: number | null;
     xmpLabel: string | null;

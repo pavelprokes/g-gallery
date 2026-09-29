@@ -1,5 +1,5 @@
 import type { TimelinePosition } from "@/lib/gallery-chapters";
-import { isValidOrderKey, type PhotoOrder } from "@/lib/photo-order";
+import { isPhotoOrder, isValidOrderKey, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * Keyset pagination cursor for the gallery photo timeline.
@@ -47,7 +47,7 @@ export function decodeCursor(token: string, order: PhotoOrder): PhotoCursor | nu
     const cursor: PhotoCursor | null =
       raw.o === undefined && typeof raw.takenAt === "string"
         ? { order: "TAKEN_AT", key: raw.takenAt, id: raw.id }
-        : typeof raw.key === "string" && (raw.o === "TAKEN_AT" || raw.o === "FILE_NAME")
+        : typeof raw.key === "string" && isPhotoOrder(raw.o)
           ? { order: raw.o, key: raw.key, id: raw.id }
           : null;
     if (!cursor || cursor.order !== order || !isValidOrderKey(order, cursor.key)) return null;

@@ -28,6 +28,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "../src/lib/exif-taken-at";
 import { chapterSlug } from "../src/lib/gallery-chapters";
+import { refreshWovenOrder } from "../src/lib/woven-order-db";
 
 const CONCURRENCY = 6;
 
@@ -136,6 +137,16 @@ async function main() {
     await prisma.galleryChapter.update({ where: { id: chapter.id }, data: { slug } });
   }
   console.log(`chapters given a link anchor: ${unslugged.length}`);
+
+  // Galleries with guests woven in by time (docs/PHOTO-ORDER.md) place the
+  // photographer's photos by their capture times too — re-weave any that
+  // just moved. Galleries in the other orders are skipped inside.
+  const woven = await prisma.gallery.findMany({
+    where: { photoOrder: "FILE_NAME_GUESTS_BY_TIME" },
+    select: { id: true },
+  });
+  for (const gallery of woven) await refreshWovenOrder(gallery.id);
+  console.log(`galleries re-woven: ${woven.length}`);
   await prisma.$disconnect();
   if (failed > 0) process.exitCode = 1;
 }

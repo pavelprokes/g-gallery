@@ -35,10 +35,12 @@ import {
   ORDER_KEY_SELECT,
   chapterStartOf,
   compareChapterStarts,
+  PHOTO_ORDERS,
   photosOutOfPlace,
   positionOf,
   type PhotoOrder,
 } from "@/lib/photo-order";
+import { weaveTimes } from "@/lib/woven-order";
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -441,7 +443,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       <GalleryPhotoOrderPanel
         galleryId={gallery.id}
         order={order}
-        displaced={displacedBetweenOrders(gallery.photos)}
+        displaced={displacedByOrder(order, gallery.photos)}
         takesGuestPhotos={
           gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
           gallery.photos.some((photo) => photo.source === "GUEST")
@@ -567,14 +569,32 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 }
 
 /**
- * How many photos the other order would move — tells the photographer whether
- * switching would change anything here.
+ * How many photos each order would move from the current one — tells the
+ * photographer whether switching would change anything here. The woven order
+ * is computed on the spot rather than read from `wovenAt`, which is only kept
+ * while a gallery uses it.
  */
-function displacedBetweenOrders(photos: readonly Parameters<typeof positionOf>[1][]): number {
+function displacedByOrder(
+  current: PhotoOrder,
+  photos: readonly (Parameters<typeof positionOf>[1] & { source: "OWNER" | "GUEST" })[],
+): Record<PhotoOrder, number> {
+  const woven = weaveTimes(
+    photos.map((photo) => ({
+      id: photo.id,
+      source: photo.source,
+      fileOrderKey: photo.fileOrderKey,
+      capturedAt: photo.takenAt ?? photo.createdAt,
+    })),
+  );
   const inOrder = (order: PhotoOrder) =>
     photos
-      .map((photo) => positionOf(order, photo))
+      .map((photo) =>
+        positionOf(order, { ...photo, wovenAt: woven.get(photo.id) ?? photo.wovenAt }),
+      )
       .sort(compareTimeline)
       .map((position) => position.id);
-  return photosOutOfPlace(inOrder("TAKEN_AT"), inOrder("FILE_NAME"));
+  const reference = inOrder(current);
+  return Object.fromEntries(
+    PHOTO_ORDERS.map((order) => [order, photosOutOfPlace(reference, inOrder(order))]),
+  ) as Record<PhotoOrder, number>;
 }

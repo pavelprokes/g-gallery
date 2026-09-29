@@ -8,7 +8,7 @@ import {
 } from "@/lib/content-translations";
 import { pickCover } from "@/lib/event-access";
 import { previewMetadata } from "@/lib/og-image";
-import { photoOrderBy, type PhotoOrder } from "@/lib/photo-order";
+import { PHOTO_ORDERS, photoOrderBy, type PhotoOrder } from "@/lib/photo-order";
 
 /**
  * The photo a shared link previews with: the gallery's chosen cover, or else
@@ -26,7 +26,7 @@ async function galleryPreview(galleryId: string) {
       orderBy: photoOrderBy(order),
       select: { objectKey: true, status: true },
     });
-  const [gallery, firstByTime, firstByName] = await Promise.all([
+  const [gallery, ...firsts] = await Promise.all([
     prisma.gallery.findUnique({
       where: { id: galleryId },
       select: {
@@ -36,11 +36,10 @@ async function galleryPreview(galleryId: string) {
         coverPhoto: { select: { objectKey: true, status: true } },
       },
     }),
-    firstIn("TAKEN_AT"),
-    firstIn("FILE_NAME"),
+    ...PHOTO_ORDERS.map(firstIn),
   ]);
   if (!gallery) return null;
-  const first = gallery.photoOrder === "FILE_NAME" ? firstByName : firstByTime;
+  const first = firsts[PHOTO_ORDERS.indexOf(gallery.photoOrder)] ?? null;
   return { ...gallery, preview: pickCover(gallery.coverPhoto, first) };
 }
 
