@@ -17,7 +17,10 @@ import { prepareUploadOffMainThread } from "@/lib/upload-prepare-client";
  * minutes while a 500-photo session runs far longer (docs/PLAN.md §5).
  */
 const PRESIGN_BATCH = 8;
-const CONCURRENCY = 3;
+// Four parallel PUTs saturate a home uplink; more only slows every file down
+// and makes each failure costlier (browsers cap HTTP/1.1 at ~6 per host, and
+// the thumbnail PUTs share that host).
+const CONCURRENCY = 4;
 const MAX_RETRIES = 3;
 
 export type UploadCredentials =
@@ -147,9 +150,11 @@ async function presign(
   credentials: UploadCredentials,
   files: File[],
   resumeIds: (string | undefined)[],
+  signal?: AbortSignal,
 ): Promise<PresignedUpload[]> {
   const response = await fetch("/api/uploads/presign", {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...credentialFields(credentials),
@@ -169,10 +174,87 @@ async function presign(
   return data.uploads;
 }
 
+/**
+ * The original goes up by XHR, not fetch: `upload.onprogress` is the only
+ * byte-level upload progress every browser has. Streaming fetch bodies
+ * (`duplex: "half"`) are Chromium-only and report what was buffered, not what
+ * was sent. Headers must match what was signed, byte for byte; the browser
+ * sets Content-Length from the Blob.
+ */
+function putWithProgress(
+  url: string,
+  headers: Record<string, string>,
+  body: Blob,
+  signal: AbortSignal | undefined,
+  onProgress: (sent: number) => void,
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError());
+    const xhr = new XMLHttpRequest();
+    // Listener before open()/send(), or some engines never fire it.
+    xhr.upload.onprogress = (event) => onProgress(event.loaded);
+    xhr.open("PUT", url);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    const onAbort = () => xhr.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settle = () => signal?.removeEventListener("abort", onAbort);
+    xhr.onload = () => {
+      settle();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.getResponseHeader("etag"));
+      else if (xhr.status === 403) reject(new SignatureExpired());
+      else reject(new Error(`R2 PUT failed (${xhr.status})`));
+    };
+    xhr.onerror = () => {
+      settle();
+      reject(new Error("R2 PUT failed (network)"));
+    };
+    xhr.onabort = () => {
+      settle();
+      reject(abortError());
+    };
+    xhr.send(body);
+  });
+}
+
+/**
+ * R2 answers 403 once a presigned URL is past its 15 minutes. Retrying the same
+ * URL cannot help; the caller signs the file again (see `runUploads`).
+ */
+class SignatureExpired extends Error {
+  constructor() {
+    super("R2 PUT failed (403)");
+    this.name = "SignatureExpired";
+  }
+}
+
+const sleep = (ms: number, signal: AbortSignal | undefined) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(abortError());
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(abortError());
+      },
+      { once: true },
+    );
+  });
+
+function abortError(): DOMException {
+  return new DOMException("Upload cancelled", "AbortError");
+}
+
+function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function uploadOne(
   file: File,
   target: PresignedUpload,
   credentials: UploadCredentials,
+  signal: AbortSignal | undefined,
+  onBytes: (sent: number) => void,
 ): Promise<void> {
   // GPS strip, capture time, CRC32, dimensions and placeholder colour — off
   // the main thread where a worker can run (src/lib/upload-prepare-client.ts).
@@ -187,20 +269,22 @@ async function uploadOne(
   // disagree with it. Owner uploads land in a desktop grid and get a bigger,
   // slightly less compressed tile; guest uploads are unchanged.
   const thumbnail = target.thumbTargets ? await makeThumbnail(body, credentials.kind) : null;
+  if (signal?.aborted) throw abortError();
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (signal?.aborted) throw abortError();
     try {
-      const put = await fetch(target.url, {
-        method: "PUT",
-        // Headers must match what was signed, byte for byte.
-        headers: target.headers,
-        body,
-      });
-      if (!put.ok) throw new Error(`R2 PUT failed (${put.status})`);
+      // A retry starts the file from zero; the overall bar must not count the
+      // failed attempt's bytes twice.
+      onBytes(0);
+      const etag = await putWithProgress(target.url, target.headers, body, signal, onBytes);
 
       // Best-effort and deliberately after the original: the photo is what
       // matters, and a failed thumbnail must never cost someone their upload.
+      // From here on the file finishes even if the run is cancelled — the
+      // original is already in R2, and dropping the confirm would mean sending
+      // all of it again on retry.
       let thumbStored: "webp" | "jpeg" | null = null;
       const thumbTarget = thumbnail && target.thumbTargets?.[thumbnail.format];
       if (thumbnail && thumbTarget) {
@@ -222,7 +306,7 @@ async function uploadOne(
         body: JSON.stringify({
           ...credentialFields(credentials),
           photoId: target.photoId,
-          etag: put.headers.get("etag") ?? "unknown",
+          etag: etag ?? "unknown",
           crc32,
           sizeBytes: body.size,
           width: width ?? undefined,
@@ -240,13 +324,17 @@ async function uploadOne(
       return;
     } catch (error) {
       lastError = error;
+      if (isAbort(error) || error instanceof SignatureExpired) throw error;
       // A refusal with a reason will not become an acceptance on retry.
       if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 2 ** attempt * 500));
+      await sleep(2 ** attempt * 500, signal);
     }
   }
   throw lastError instanceof Error ? lastError : new Error("upload failed");
 }
+
+/** Error string for a file stopped by `signal` — lets the UI offer it for retry. */
+export const CANCELLED = "cancelled";
 
 export interface UploadRunOptions {
   files: File[];
@@ -258,6 +346,18 @@ export interface UploadRunOptions {
   onFatal: (rejection: UploadRejection) => void;
   /** Files skipped before the run started. The rest still upload. */
   onSkipped?: (rejection: UploadRejection, count: number) => void;
+  /**
+   * Bytes of the original sent so far, many times a second. Keep it out of
+   * React state — a ref repainted on a timer — or 2 000 files will jank.
+   */
+  onBytes?: (index: number, sent: number) => void;
+  /** Aborts in-flight PUTs; everything unfinished ends as `error` / `CANCELLED`. */
+  signal?: AbortSignal;
+}
+
+interface Job {
+  index: number;
+  target: PresignedUpload;
 }
 
 /** Resolves when every file has reached `done` or `error`, or the run was cut short. */
@@ -268,6 +368,8 @@ export async function runUploads({
   onItem,
   onFatal,
   onSkipped,
+  onBytes,
+  signal,
 }: UploadRunOptions): Promise<void> {
   // Unsupported files are dropped here rather than left for the server, which
   // validates a presign batch as a whole: one HEIC among eight photos would
@@ -297,64 +399,111 @@ export async function runUploads({
   if (firstSkip) onSkipped?.(firstSkip, skipped);
   if (queue.length === 0) return;
 
-  for (let offset = 0; offset < queue.length; offset += PRESIGN_BATCH) {
-    const indices = queue.slice(offset, offset + PRESIGN_BATCH);
-    const batch = indices.map((index) => files[index]!);
-    let targets: PresignedUpload[];
-    try {
-      targets = await presign(
-        credentials,
-        batch,
-        indices.map((index) => resumeIds[index]),
-      );
-    } catch (error) {
-      if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) {
-        onFatal(error);
-        // Everything still queued is marked so the list does not sit on
-        // "pending" forever with no explanation.
-        for (const index of queue.slice(offset)) onItem(index, { state: "error" });
-        return;
-      }
-      const message = error instanceof UploadRejection ? error.code : (error as Error).message;
-      indices.forEach((index) => onItem(index, { state: "error", error: message }));
-      if (error instanceof UploadRejection) onFatal(error);
-      continue;
-    }
+  // Rolling pool: workers pull the next signed file the moment they are free,
+  // and the next presign starts in the background while signed targets are
+  // still queued. The old "sign 8, upload 8, wait for the slowest" loop left
+  // slots idle at the tail of every batch and during every presign round-trip.
+  // At most CONCURRENCY - 1 + CONCURRENCY signed files wait (under two upload
+  // rounds); on a very slow uplink a URL can still expire, and that file is
+  // simply signed again.
+  const settled = new Set<number>();
+  const settle = (index: number, patch: { state: UploadItemState; error?: string }) => {
+    if (patch.state === "done" || patch.state === "error") settled.add(index);
+    onItem(index, patch);
+  };
 
-    // Bounded concurrency: a shared cursor over this batch.
-    let cursor = 0;
-    let fatal: UploadRejection | null = null;
-    const workers = Array.from({ length: Math.min(CONCURRENCY, batch.length) }, async () => {
-      for (;;) {
-        if (fatal) return;
-        const local = cursor++;
-        if (local >= batch.length) return;
-        const index = indices[local]!;
-        const file = batch[local]!;
-        const target = targets[local];
-        if (!target) {
-          onItem(index, { state: "error", error: "no presigned target" });
-          continue;
+  const toSign = [...queue];
+  const signed: Job[] = [];
+  let signing: Promise<void> | null = null;
+  let fatal: UploadRejection | null = null;
+
+  const topUp = () => {
+    if (signing || fatal || signal?.aborted || toSign.length === 0) return;
+    if (signed.length >= CONCURRENCY) return;
+    const indices = toSign.splice(0, Math.min(PRESIGN_BATCH, CONCURRENCY));
+    signing = presign(
+      credentials,
+      indices.map((index) => files[index]!),
+      indices.map((index) => resumeIds[index]),
+      signal,
+    )
+      .then((targets) =>
+        indices.forEach((index, position) => {
+          const target = targets[position];
+          if (target) signed.push({ index, target });
+          else settle(index, { state: "error", error: "no presigned target" });
+        }),
+      )
+      .catch((error: unknown) => {
+        // Cancelled: the leftover pass below marks these files CANCELLED.
+        if (isAbort(error)) return;
+        if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) {
+          fatal = error;
+          return;
         }
-        onItem(index, { state: "uploading" });
+        const message = error instanceof UploadRejection ? error.code : (error as Error).message;
+        indices.forEach((index) => settle(index, { state: "error", error: message }));
+        if (error instanceof UploadRejection) onFatal(error);
+      })
+      .finally(() => {
+        signing = null;
+      });
+  };
+
+  const next = async (): Promise<Job | null> => {
+    for (;;) {
+      if (fatal || signal?.aborted) return null;
+      topUp();
+      const job = signed.shift();
+      if (job) {
+        topUp();
+        return job;
+      }
+      if (!signing) return null;
+      await signing;
+    }
+  };
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    for (let job = await next(); job; job = await next()) {
+      const { index } = job;
+      let { target } = job;
+      settle(index, { state: "uploading" });
+      try {
+        const progress = (sent: number) => onBytes?.(index, sent);
         try {
-          await uploadOne(file, target, credentials);
-          onItem(index, { state: "done" });
+          await uploadOne(files[index]!, target, credentials, signal, progress);
         } catch (error) {
-          if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) fatal = error;
-          onItem(index, {
-            state: "error",
-            error: error instanceof UploadRejection ? error.code : (error as Error).message,
-          });
+          if (!(error instanceof SignatureExpired)) throw error;
+          // Re-sign the same row (resumePhotoId) — no duplicate photo is created.
+          const [fresh] = await presign(credentials, [files[index]!], [target.photoId], signal);
+          if (!fresh) throw error;
+          target = fresh;
+          await uploadOne(files[index]!, target, credentials, signal, progress);
         }
+        settle(index, { state: "done" });
+      } catch (error) {
+        if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) fatal ??= error;
+        settle(index, {
+          state: "error",
+          error: isAbort(error)
+            ? CANCELLED
+            : error instanceof UploadRejection
+              ? error.code
+              : (error as Error).message,
+        });
       }
-    });
-    await Promise.all(workers);
-
-    if (fatal) {
-      onFatal(fatal);
-      for (const index of queue.slice(offset + batch.length)) onItem(index, { state: "error" });
-      return;
     }
-  }
+  });
+  await Promise.all(workers);
+  // A presign still in flight would otherwise report into a run that has
+  // already ended — or into the next one, which reuses the same indices.
+  while (signing) await signing;
+
+  // Everything that never started is marked so the list does not sit on
+  // "pending" forever with no explanation.
+  const leftover = fatal ? undefined : signal?.aborted ? CANCELLED : undefined;
+  for (const index of queue)
+    if (!settled.has(index)) settle(index, { state: "error", error: leftover });
+  if (fatal) onFatal(fatal);
 }
