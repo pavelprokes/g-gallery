@@ -45,10 +45,11 @@ function daysUntilPurge(purgeAt: Date): number {
 }
 
 /** The chart plus the two numbers it splits — the numbers are the accessible
- *  twin of the columns, never a caption for them. */
+ *  twin of the columns, never a caption for them. From `sm` up only: on a
+ *  phone the row has no room beside the title, see {@link ViewLine}. */
 function ViewStats({ series, max, label }: { series: ViewSeries; max: number; label: string }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="hidden items-center gap-3 sm:flex">
       <ViewSparkline series={series} max={max} label={label} />
       <div className="w-24 text-xs tabular-nums">
         <p className="font-semibold">{pluralize(series.unique, FORMS.viewer)}</p>
@@ -57,6 +58,24 @@ function ViewStats({ series, max, label }: { series: ViewSeries; max: number; la
     </div>
   );
 }
+
+/** The same two numbers as one line under the title, for phones. */
+function ViewLine({ series }: { series: ViewSeries }) {
+  return (
+    <p className="text-admin-muted mt-0.5 text-xs tabular-nums sm:hidden">
+      <span className="text-brand-ink font-semibold">{pluralize(series.unique, FORMS.viewer)}</span>
+      {" · "}
+      {pluralize(series.total, FORMS.visit)} za 14 dní
+    </p>
+  );
+}
+
+/** A date that never breaks across lines ("12. 8." / "2026"). */
+const day = (date: Date) => formatDate(date, "cs").replaceAll(" ", "\u00a0");
+
+/** The title link covers the whole row, so a thumb anywhere opens it; controls
+ *  in the row sit above it with `relative z-10`. */
+const ROW_LINK = "font-medium after:absolute after:inset-0 hover:underline";
 
 export default async function AdminPage() {
   const session = await getAdminSession();
@@ -195,27 +214,30 @@ export default async function AdminPage() {
               );
               const series = eventSeries.get(event.id) ?? emptySeries(days);
               return (
-                <li key={event.id} className="space-y-3 p-4">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                <li key={event.id} className="relative space-y-3 p-4">
+                  <div className="flex items-center gap-x-4 gap-y-3">
                     <CoverThumb cover={cover} />
                     <div className="min-w-0 flex-1 basis-48">
-                      <Link href={`/admin/e/${event.id}`} className="font-medium hover:underline">
+                      <Link href={`/admin/e/${event.id}`} className={ROW_LINK}>
                         {event.title}
                       </Link>
                       <p className="text-admin-muted mt-1 text-xs dark:text-neutral-400">
                         {[
                           pluralize(event.galleries.length, FORMS.gallery),
                           event.venue,
-                          event.eventDate ? formatDate(event.eventDate, "cs") : null,
+                          event.eventDate ? day(event.eventDate) : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
+                      <ViewLine series={series} />
                     </div>
                     <ViewStats series={series} max={eventMax} label={event.title} />
                   </div>
                   {token ? (
-                    <CopyableLink href={`/s/${token}/${event.slug}`} />
+                    <div className="relative z-10">
+                      <CopyableLink href={`/s/${token}/${event.slug}`} />
+                    </div>
                   ) : (
                     <UnrecoverableLink reason="Adresu už nelze zobrazit — svatba vznikla dřív, než se odkazy ukládaly čitelně." />
                   )}
@@ -243,23 +265,27 @@ export default async function AdminPage() {
           const status = GALLERY_STATUS[gallery.status];
           const series = gallerySeries.get(gallery.id) ?? emptySeries(days);
           return (
-            <li key={gallery.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
+            <li key={gallery.id} className="relative flex items-center gap-x-4 gap-y-3 p-4">
               <CoverThumb cover={coverOf(gallery.coverPhoto, gallery.photos)} />
               <div className="min-w-0 flex-1 basis-48">
-                <Link href={`/admin/g/${gallery.id}`} className="font-medium hover:underline">
+                <Link href={`/admin/g/${gallery.id}`} className={ROW_LINK}>
                   {gallery.title}
                 </Link>
                 <p className="text-admin-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs dark:text-neutral-400">
-                  <Badge tone={status.tone}>{status.label}</Badge>
+                  {/* Published is the normal state; only the exceptions get a label. */}
+                  {gallery.status !== "PUBLISHED" && (
+                    <Badge tone={status.tone}>{status.label}</Badge>
+                  )}
                   <span>
                     {[
                       pluralize(gallery._count.photos, FORMS.photo),
-                      gallery.eventDate ? formatDate(gallery.eventDate, "cs") : null,
+                      gallery.eventDate ? day(gallery.eventDate) : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
                 </p>
+                <ViewLine series={series} />
               </div>
               <ViewStats series={series} max={galleryMax} label={gallery.title} />
             </li>

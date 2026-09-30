@@ -214,27 +214,41 @@ export async function revokeShareLink(shareLinkId: string) {
  * its own retention, purge job and UI, and the gallery-level trash already
  * covers the "I deleted the wrong thing entirely" case.
  */
-export async function deletePhoto(photoId: string) {
+const deletePhotosSchema = z.array(z.string().min(1).max(64)).min(1).max(2000);
+
+/**
+ * Removes the selected photos for good — one or a whole cull. The couple's
+ * veto over a guest upload runs through here (docs/GUEST-GALLERIES.md §7).
+ * Only photos in the owner's galleries are touched; any other id is ignored.
+ */
+export async function deletePhotos(photoIds: string[]) {
   const session = await requireAdmin();
 
-  const photo = await prisma.photo.findFirst({
-    where: { id: photoId, gallery: { ownerId: session.user.id } },
+  const parsed = deletePhotosSchema.safeParse(photoIds);
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: parsed.data }, gallery: { ownerId: session.user.id } },
     select: { id: true, objectKey: true, galleryId: true },
   });
-  if (!photo) throw new Error("NOT_FOUND");
+  if (photos.length === 0) throw new Error("NOT_FOUND");
 
-  // Row first: an orphaned object is swept up by the weekly reconcile job
+  // Rows first: an orphaned object is swept up by the weekly reconcile job
   // (src/lib/reconcile.ts), whereas an orphaned row would keep rendering a
   // tile whose bytes are gone.
-  await prisma.photo.delete({ where: { id: photo.id } });
-  await deleteObject(photo.objectKey);
+  await prisma.photo.deleteMany({ where: { id: { in: photos.map((photo) => photo.id) } } });
+  // ponytail: 10 R2 deletes at a time; a failure leaves orphans for reconcile, same as before.
+  for (let i = 0; i < photos.length; i += 10) {
+    await Promise.all(photos.slice(i, i + 10).map((photo) => deleteObject(photo.objectKey)));
+  }
 
   // Same staleness rule as a new upload: the pre-built archive no longer
   // matches the gallery's contents, and a photographer part-way through a cull
   // is exactly who the rebuild should wait for (docs/TODO.md §7).
-  await markGalleryPhotosChanged(photo.galleryId);
-
-  revalidatePath(`/admin/g/${photo.galleryId}`);
+  for (const galleryId of new Set(photos.map((photo) => photo.galleryId))) {
+    await markGalleryPhotosChanged(galleryId);
+    revalidatePath(`/admin/g/${galleryId}`);
+  }
 }
 
 /** How long a trashed gallery is recoverable before the purge cron deletes it for good. */

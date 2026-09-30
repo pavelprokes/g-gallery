@@ -11,6 +11,7 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   adminCookie: { name: string; value: string };
   galleryId: string;
   photoCount: number;
+  selectGalleryIds: Record<string, string>;
 };
 
 test.beforeEach(async ({ context, baseURL }) => {
@@ -57,7 +58,7 @@ test("overview: newest wedding day first, and no broken-image icons", async ({ p
   expect(await lists.count()).toBe(2);
   for (const list of await lists.all()) {
     const dates = (await list.locator(":scope > li").allInnerTexts())
-      .map((row) => row.match(/(\d{1,2})\. (\d{1,2})\. (\d{4})/))
+      .map((row) => row.match(/(\d{1,2})\.\s(\d{1,2})\.\s(\d{4})/))
       .filter((m) => m !== null)
       .map(([, d, mo, y]) => Date.UTC(+y!, +mo! - 1, +d!));
     expect(dates.length).toBeGreaterThan(1);
@@ -69,4 +70,59 @@ test("gallery page: status in Czech, never the raw enum", async ({ page }) => {
   await page.goto(`/admin/g/${seed.galleryId}`);
   await expect(page.getByText(`Publikováno · ${seed.photoCount} fotek`)).toBeVisible();
   await expect(page.getByText("PUBLISHED")).toHaveCount(0);
+});
+
+test.describe("photo selection", () => {
+  // One gallery, changed as it goes — the steps depend on each other.
+  test.describe.configure({ mode: "serial" });
+  const galleryUrl = () => `/admin/g/${seed.selectGalleryIds[test.info().project.name]}`;
+
+  test("a tap selects a photo, and the bar sets it as the cover", async ({ page }) => {
+    await page.goto(galleryUrl());
+    const bar = page.getByRole("toolbar", { name: "Akce s vybranými fotkami" });
+    await expect(bar).toBeHidden();
+
+    await page.getByRole("checkbox", { name: "Vybrat vyber_3.jpg" }).check();
+    await expect(bar).toContainText("Vybráno: 1 fotka");
+    await bar.getByRole("button", { name: "Nastavit jako titulní" }).click();
+
+    // The action refreshes the page and clears the selection.
+    await expect(bar).toBeHidden();
+    const tile = page.locator("label", {
+      has: page.getByRole("checkbox", { name: "Vybrat vyber_3.jpg" }),
+    });
+    await expect(tile.getByText("Titulní")).toBeVisible();
+  });
+
+  test("shift-click selects a range, Escape clears it", async ({ page }) => {
+    await page.goto(galleryUrl());
+    const boxes = page.getByRole("checkbox", { name: /^Vybrat vyber_/ });
+    await boxes.nth(0).click();
+    await boxes.nth(3).click({ modifiers: ["Shift"] });
+    const bar = page.getByRole("toolbar", { name: "Akce s vybranými fotkami" });
+    await expect(bar).toContainText("Vybráno: 4 fotky");
+    // Only a single photo can be the cover.
+    await expect(bar.getByRole("button", { name: "Nastavit jako titulní" })).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(bar).toBeHidden();
+    await expect(boxes.nth(0)).not.toBeChecked();
+  });
+
+  test("deletes the selected photos after a confirm", async ({ page }) => {
+    await page.goto(galleryUrl());
+    const boxes = page.getByRole("checkbox", { name: /^Vybrat vyber_/ });
+    await expect(boxes).toHaveCount(6);
+    await page.getByRole("checkbox", { name: "Vybrat vyber_5.jpg" }).check();
+    await page.getByRole("checkbox", { name: "Vybrat vyber_6.jpg" }).check();
+
+    page.once("dialog", (dialog) => {
+      expect(dialog.message()).toBe("Smazat 2 fotky? Tohle už nejde vzít zpět.");
+      void dialog.accept();
+    });
+    await page.getByRole("toolbar").getByRole("button", { name: "Smazat" }).click();
+
+    await expect(boxes).toHaveCount(4);
+    await expect(page.getByRole("checkbox", { name: "Vybrat vyber_5.jpg" })).toHaveCount(0);
+  });
 });

@@ -14,7 +14,7 @@ import { placeholderStyle } from "@/lib/placeholder";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { PrintDownloadButton } from "@/components/admin/print-download-button";
 import { Uploader } from "@/components/uploader";
-import { DeletePhotoButton } from "@/components/delete-photo-button";
+import { PhotoSelection } from "@/components/admin/photo-selection";
 import { CopyButton } from "@/components/copy-button";
 import { decryptToken } from "@/lib/token-cipher";
 import { ShareLinkPanel } from "@/components/share-link-panel";
@@ -23,9 +23,8 @@ import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
 import { GalleryChapterPanel, StartChapterDetails } from "@/components/admin/gallery-chapter-panel";
-import { publishGallery, restoreGallery, setGalleryCover } from "../../actions";
+import { publishGallery, restoreGallery } from "../../actions";
 import { startChapter } from "../../chapter-actions";
-import { setHighlightPin } from "../../highlight-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
@@ -274,24 +273,50 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     const isCover = gallery.coverPhotoId === photo.id;
     const inHighlights = pickedPinned.has(photo.id);
     return (
-      <li key={photo.id} className="space-y-1">
-        <div
-          // Outline rather than a ring: it is drawn outside the tile, so
-          // the cropped photo underneath keeps its full square.
-          className={`relative aspect-square overflow-hidden rounded bg-neutral-100 dark:bg-neutral-900 ${
-            isCover ? "outline-brand-primary outline-2 outline-offset-2" : ""
-          }`}
-          style={
-            photo.placeholder ? { backgroundColor: placeholderStyle(photo.placeholder) } : undefined
-          }
-        >
-          <AdminPhotoImage
-            objectKey={photo.objectKey}
-            thumbObjectKey={photo.thumbObjectKey}
-            alt={photo.fileName}
+      // content-visibility: a 600-photo gallery only lays out the rows on screen.
+      <li
+        key={photo.id}
+        className="space-y-1 [contain-intrinsic-size:auto_220px] [content-visibility:auto]"
+      >
+        {/* The whole tile toggles the checkbox — the bar below holds the actions
+            (src/components/admin/photo-selection.tsx). */}
+        <label className="group has-focus-visible:outline-brand-primary bg-brand-tint relative block aspect-square cursor-pointer overflow-hidden rounded has-focus-visible:outline-2 has-focus-visible:-outline-offset-2">
+          {/* Shrinks when selected, like Google Photos — the tint shows around it. */}
+          <span
+            className="absolute inset-0 overflow-hidden transition-transform duration-150 group-has-checked:scale-[0.86] group-has-checked:rounded"
+            style={
+              photo.placeholder
+                ? { backgroundColor: placeholderStyle(photo.placeholder) }
+                : undefined
+            }
+          >
+            <AdminPhotoImage
+              objectKey={photo.objectKey}
+              thumbObjectKey={photo.thumbObjectKey}
+              alt={photo.fileName}
+            />
+          </span>
+          {/* Drawn inside the tile: content-visibility clips anything outside it. */}
+          <span
+            aria-hidden
+            className={`group-has-checked:ring-brand-primary pointer-events-none absolute inset-0 rounded ring-inset group-has-checked:ring-4 ${
+              isCover ? "ring-brand-primary ring-2" : ""
+            }`}
+          />
+          <input
+            type="checkbox"
+            name="photo"
+            value={photo.id}
+            data-cover={isCover ? "1" : undefined}
+            data-pin={String(photo.highlightPin)}
+            data-highlight={inHighlights ? "1" : undefined}
+            aria-label={`Vybrat ${photo.fileName}`}
+            // Shown on hover, on touch screens, and on every tile once
+            // anything is selected — then a tap anywhere reads as "select".
+            className="accent-brand-primary absolute top-2 left-2 size-5 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100 checked:opacity-100 focus-visible:opacity-100 in-data-selecting:opacity-100 pointer-coarse:opacity-100"
           />
           {isCover && (
-            <span className="bg-brand-primary text-caption absolute top-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
+            <span className="bg-brand-primary text-caption absolute bottom-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
               Titulní
             </span>
           )}
@@ -300,14 +325,17 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               ★ Výběr
             </span>
           )}
-        </div>
+        </label>
         {photo.source === "GUEST" && (
-          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+          <p className="truncate text-xs text-emerald-700 dark:text-emerald-400">
             Od hostů
             {photo.uploadedBy?.displayName && ` · ${photo.uploadedBy.displayName}`}
           </p>
         )}
-        <p className="text-admin-muted text-xs dark:text-neutral-400">
+        <p
+          className="text-admin-muted text-xs tabular-nums dark:text-neutral-400"
+          title={`${stats.views} zobrazení, ${stats.uniqueViewers} unikátních diváků`}
+        >
           {stats.views} zobr. · {stats.uniqueViewers} unik.
           {photo._count.favorites > 0 && (
             <span className="text-rose-600"> · ♥ {photo._count.favorites}</span>
@@ -320,36 +348,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           )}
         </p>
         {printQuantity > 0 && <CopyButton value={photo.fileName} label="Kopírovat název souboru" />}
-        <form action={setGalleryCover.bind(null, gallery.id, isCover ? null : photo.id)}>
-          <Button type="submit" variant={isCover ? "ghost" : "secondary"} size="sm">
-            {isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
-          </Button>
-        </form>
-        {/* docs/HIGHLIGHTS.md — pinned always in, excluded never, else the pick decides. */}
-        {photo.highlightPin === null && !inHighlights && pinnedCount >= MAX_PINNED ? (
-          <p className="text-admin-muted px-2 text-xs dark:text-neutral-400">
-            Výběr je plný ({MAX_PINNED} připnutých) — nejdřív některou odepni.
-          </p>
-        ) : (
-          <form
-            action={setHighlightPin.bind(
-              null,
-              photo.id,
-              photo.highlightPin !== null ? null : inHighlights ? false : true,
-            )}
-          >
-            <Button type="submit" variant="ghost" size="sm">
-              {photo.highlightPin === true
-                ? "Odepnout z výběru"
-                : photo.highlightPin === false
-                  ? "Vrátit do návrhu výběru"
-                  : inHighlights
-                    ? "Vyřadit z výběru"
-                    : "Připnout do výběru"}
-            </Button>
-          </form>
-        )}
-        <DeletePhotoButton photoId={photo.id} />
         {timelineView && (
           <StartChapterDetails
             summary={startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}
@@ -535,31 +533,38 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             </p>
           </div>
         )}
-        <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {timelineView
-            ? segments.map((segment) => {
-                const segmentPhotos = photosOf(segment.entries);
-                return [
-                  segment.chapter && (
-                    <li
-                      key={`chapter:${segment.chapter.id}`}
-                      className="border-brand-border col-span-full mt-3 flex items-baseline justify-between gap-3 border-b pb-1 first:mt-0 dark:border-neutral-700"
-                    >
-                      <h3 className="text-brand-ink text-lg font-semibold dark:text-neutral-100">
-                        {segment.chapter.title}
-                      </h3>
-                      <span className="text-admin-muted text-xs dark:text-neutral-400">
-                        {segmentPhotos.length} fotek
-                      </span>
-                    </li>
-                  ),
-                  ...segmentPhotos.map((photo, i) =>
-                    renderPhoto(photo, segment.chapter && i === 0 ? segment.chapter.title : null),
-                  ),
-                ];
-              })
-            : visiblePhotos.map((photo) => renderPhoto(photo))}
-        </ul>
+        <p className="text-admin-muted text-caption mt-1 dark:text-neutral-400">
+          Klepnutím fotku vyberete
+          <span className="pointer-coarse:hidden">, se Shiftem celý úsek</span>. Akce se objeví
+          dole.
+        </p>
+        <PhotoSelection galleryId={gallery.id} pinnedCount={pinnedCount} maxPinned={MAX_PINNED}>
+          <ul className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
+            {timelineView
+              ? segments.map((segment) => {
+                  const segmentPhotos = photosOf(segment.entries);
+                  return [
+                    segment.chapter && (
+                      <li
+                        key={`chapter:${segment.chapter.id}`}
+                        className="border-brand-border col-span-full mt-3 flex items-baseline justify-between gap-3 border-b pb-1 first:mt-0 dark:border-neutral-700"
+                      >
+                        <h3 className="text-brand-ink text-lg font-semibold dark:text-neutral-100">
+                          {segment.chapter.title}
+                        </h3>
+                        <span className="text-admin-muted text-xs dark:text-neutral-400">
+                          {segmentPhotos.length} fotek
+                        </span>
+                      </li>
+                    ),
+                    ...segmentPhotos.map((photo, i) =>
+                      renderPhoto(photo, segment.chapter && i === 0 ? segment.chapter.title : null),
+                    ),
+                  ];
+                })
+              : visiblePhotos.map((photo) => renderPhoto(photo))}
+          </ul>
+        </PhotoSelection>
         {visiblePhotos.length === 0 && (
           <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">
             {printOnly ? "Žádná fotka není označená k tisku." : "Zatím žádné potvrzené fotky."}

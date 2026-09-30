@@ -25,7 +25,7 @@ export function SignOutButton() {
     <button
       type="button"
       disabled={pending}
-      className="text-admin-muted hover:text-admin-danger text-sm font-semibold transition-colors disabled:opacity-55"
+      className="text-admin-muted hover:text-admin-danger inline-flex min-h-11 items-center px-1 text-sm font-semibold transition-colors disabled:opacity-55"
       onClick={async () => {
         setPending(true);
         try {
