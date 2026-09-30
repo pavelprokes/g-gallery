@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { formatDate, formatDateTime, TIME_ZONE } from "@/lib/format-date";
+import { formatDate, formatDateTime, formatTime, previousDay } from "@/lib/format-date";
 import { getAdminSession } from "@/lib/auth-guard";
 import { ownerFeed, markFeedRead, type FeedCursor } from "@/lib/feed";
 import { groupFeed, type FeedGroup } from "@/lib/feed-group";
@@ -69,14 +69,16 @@ export default async function UpdatesPage(props: PageProps<"/admin/updates">) {
 
       {days.length === 0 ? (
         <p className="text-admin-muted text-sm dark:text-neutral-400">
-          Zatím žádná aktivita. Objeví se tu reakce, oblíbené fotky a stažení — ne samotná
-          zobrazení, těch by byly stovky.
+          {olderPage
+            ? "Starší aktivita už není."
+            : "Zatím žádná aktivita. Objeví se tu reakce, oblíbené fotky a stažení — ne samotná zobrazení, těch by byly stovky."}
         </p>
       ) : (
-        days.map(([day, groups]) => (
-          <section key={day} aria-labelledby={`day-${day}`}>
+        days.map(([day, groups], index) => (
+          // An index id: a date label has spaces, which an IDREF cannot hold.
+          <section key={day} aria-labelledby={`day-${index}`}>
             <h2
-              id={`day-${day}`}
+              id={`day-${index}`}
               className="text-admin-muted mb-2 text-xs font-semibold tracking-wide uppercase"
             >
               {day}
@@ -114,12 +116,14 @@ export default async function UpdatesPage(props: PageProps<"/admin/updates">) {
 function byDay(groups: FeedGroup[]): [string, FeedGroup[]][] {
   const now = new Date();
   const today = formatDate(now, "cs");
-  const yesterday = formatDate(new Date(now.getTime() - 24 * 60 * 60 * 1000), "cs");
+  const yesterday = formatDate(previousDay(now), "cs");
   const days = new Map<string, FeedGroup[]>();
   for (const group of groups) {
     const date = formatDate(group.latest, "cs");
     const label = date === today ? "Dnes" : date === yesterday ? "Včera" : date;
-    days.set(label, [...(days.get(label) ?? []), group]);
+    const day = days.get(label);
+    if (day) day.push(group);
+    else days.set(label, [group]);
   }
   return [...days];
 }
@@ -148,9 +152,9 @@ function FeedRow({ group }: { group: FeedGroup }) {
                 <Image src={key} alt="" fill sizes="40px" className="object-cover" />
               </span>
             ))}
-            {group.count > group.photos.length && (
+            {group.photoCount > group.photos.length && (
               <span className="text-admin-muted self-center text-xs">
-                +{group.count - group.photos.length}
+                +{group.photoCount - group.photos.length}
               </span>
             )}
           </span>
@@ -177,15 +181,17 @@ function iconFor(group: FeedGroup): string {
 /** Viewers who never entered a name stay anonymous, by design. */
 function describe(group: FeedGroup): string {
   const who = group.viewerName ?? "Někdo";
-  const photos = pluralize(group.count, FORMS.photoAccusative);
-  const many = group.count > 1;
+  const photos = pluralize(group.photoCount, FORMS.photoAccusative);
+  const many = group.photoCount > 1;
   switch (group.type) {
     case "REACTION":
       return many ? `${who} zareagoval na ${photos}` : `${who} zareagoval na fotku`;
     case "FAVORITE":
       return many ? `${who} přidal ${photos} do oblíbených` : `${who} přidal fotku do oblíbených`;
     case "DOWNLOAD":
-      return many ? `${who} stáhl ${photos}` : `${who} stáhl fotku`;
+      // The archive route records neither who nor how many photos (one photo
+      // or the whole gallery), so the row claims only that it happened.
+      return group.events > 1 ? `Stažení z galerie · ${group.events}×` : "Stažení z galerie";
     case "VISITOR_IDENTIFIED":
       return `${who} se představil`;
     default:
@@ -193,14 +199,11 @@ function describe(group: FeedGroup): string {
   }
 }
 
-const clock = (date: Date) =>
-  date.toLocaleTimeString("cs-CZ", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
-
 /** "27. 9. 2026 9:14", or "9:08–9:14" for a run within one day. */
 function when(group: FeedGroup): string {
-  if (group.count === 1) return formatDateTime(group.latest, "cs");
+  if (group.events === 1) return formatDateTime(group.latest, "cs");
   const sameDay = formatDate(group.earliest, "cs") === formatDate(group.latest, "cs");
   return sameDay
-    ? `${clock(group.earliest)}–${clock(group.latest)}`
+    ? `${formatTime(group.earliest, "cs")}–${formatTime(group.latest, "cs")}`
     : `${formatDateTime(group.earliest, "cs")} – ${formatDateTime(group.latest, "cs")}`;
 }

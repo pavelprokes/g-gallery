@@ -821,8 +821,9 @@ async function makeSelectGallery(ownerId: string) {
 }
 
 /**
- * The admin Activity feed's fixtures, in a gallery of their own: one guest's
- * eight downloads in one sitting (must read as one row), and 110 favourites a
+ * The admin Activity feed's fixtures, in a gallery of their own: eight archive
+ * downloads in one sitting (must read as one row; like production, they carry
+ * no viewer), and 110 favourites a
  * day apart in 2025 — more than one page, so "Načíst starší" has work to do.
  */
 async function makeActivity(ownerId: string) {
@@ -835,16 +836,8 @@ async function makeActivity(ownerId: string) {
       storagePrefix: `galleries/e2e-activity-${Date.now()}`,
     },
   });
-  const viewer = await prisma.viewer.create({
-    data: {
-      galleryId: gallery.id,
-      anonKey: `e2e-activity-${Date.now()}`,
-      displayName: "Teta Jana",
-    },
-  });
   const downloads = [8, 9, 9, 10, 11, 12, 13, 14].map((minute) => ({
     galleryId: gallery.id,
-    viewerId: viewer.id,
     type: "DOWNLOAD" as const,
     createdAt: new Date(Date.UTC(2026, 8, 27, 7, minute)),
   }));

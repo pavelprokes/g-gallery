@@ -136,10 +136,9 @@ test("activity: a sitting of downloads is one row, older pages load by cursor", 
   page,
 }) => {
   await page.goto("/admin/updates");
-  // Eight downloads, 9:08–9:14 Prague time, by a guest who gave her name.
-  await expect(page.getByRole("link", { name: "Teta Jana stáhl 8 fotek" })).toBeVisible();
+  // Eight archive downloads, 9:08–9:14 Prague time.
+  await expect(page.getByRole("link", { name: "Stažení z galerie · 8×" })).toBeVisible();
   await expect(page.getByText("E2E Aktivita · 9:08–9:14")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Teta Jana stáhl fotku" })).toHaveCount(0);
 
   // 110 favourites a day apart do not fit on one page.
   await page.getByRole("link", { name: "Načíst starší" }).click();
