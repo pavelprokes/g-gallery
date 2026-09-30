@@ -86,7 +86,9 @@ export default async function AdminPage() {
   const [galleries, trashed, events, trashedEvents, sessions] = await Promise.all([
     prisma.gallery.findMany({
       where: { ownerId: session.user.id, trashedAt: null },
-      orderBy: { createdAt: "desc" },
+      // Newest wedding first — by the day it happened, not the day its row was
+      // created (a 2023 gallery uploaded this week must not top the list).
+      orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -106,7 +108,9 @@ export default async function AdminPage() {
     }),
     prisma.event.findMany({
       where: { ownerId: session.user.id, trashedAt: null },
-      orderBy: { createdAt: "desc" },
+      // Newest wedding first — by the day it happened, not the day its row was
+      // created (a 2023 gallery uploaded this week must not top the list).
+      orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,

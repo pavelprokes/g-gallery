@@ -145,6 +145,14 @@ export function GalleryChapterPanel({
   timelineActive: boolean;
 }) {
   const fieldId = useId();
+  // Two chapters with one name are two identical tabs for the guests.
+  const seen = new Set<string>();
+  const duplicated = new Set<string>();
+  for (const chapter of chapters) {
+    const key = chapter.title.trim().toLocaleLowerCase("cs");
+    if (seen.has(key)) duplicated.add(key);
+    seen.add(key);
+  }
 
   return (
     <Card as="section">
@@ -184,6 +192,11 @@ export function GalleryChapterPanel({
                     id={`${fieldId}-${chapter.id}`}
                     defaultValue={chapter.title}
                   />
+                  {duplicated.has(chapter.title.trim().toLocaleLowerCase("cs")) && (
+                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                      Stejný název má i jiná kapitola — hosté uvidí dvě stejné záložky.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -210,7 +223,13 @@ export function GalleryChapterPanel({
                   <CopyButton
                     value={`${shareUrl}#${chapter.anchor}`}
                     label={`Kopírovat odkaz rovnou na kapitolu ${chapter.title}`}
-                    text={`Odkaz #${chapter.anchor}`}
+                    // A chapter from before slugs anchors on its id — frozen, but
+                    // not worth showing.
+                    text={
+                      chapter.anchor === chapter.id
+                        ? "Odkaz na kapitolu"
+                        : `Odkaz #${chapter.anchor}`
+                    }
                   />
                 )}
               </div>

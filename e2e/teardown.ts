@@ -19,6 +19,7 @@ async function main() {
   // galleries only cascades their placements — the cards themselves would
   // survive into the next run and accumulate.
   await prisma.promoCard.deleteMany({ where: { owner: { email: "e2e@example.com" } } });
+  await prisma.session.deleteMany({ where: { user: { email: "e2e@example.com" } } });
   fs.unlinkSync(seedPath);
 
   await prisma.$disconnect();
