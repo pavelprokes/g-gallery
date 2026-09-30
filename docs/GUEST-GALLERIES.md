@@ -295,7 +295,7 @@ shipped instead is the smallest thing that solves the real problem:
   (`/api/g/[token]/mine`). Every condition is checked server-side: the photo must be in this
   gallery, must be a guest upload, and must be attributed to _this_ `anonKey`. Nobody gains any
   power over anybody else's photo, which is precisely why this is not moderation.
-- **The photographer can delete any single photo** from the admin (`deletePhoto`). That is the
+- **The photographer can delete any single photo** from the admin (`deletePhotos`). That is the
   backstop for anything a guest will not remove themselves.
 
 No time window on the guest's own deletion. OnlineSvatba uses six hours; a window would mostly
@@ -440,7 +440,7 @@ own 30-day trash window on top, swept by the same daily cron.
 - **Refusals say what happened**: HEIC gets the Settings → Camera → Formats instruction, video gets
   "photos only", a full album says which ceiling was hit
   (`src/lib/upload-content-types.ts`, unit-tested).
-- **Per-photo delete** (`deletePhoto`) — new, and not only for guest photos: there was no way to
+- **Per-photo delete** (`deletePhotos`) — new, and not only for guest photos: there was no way to
   remove a single photo before, which §13.7 requires before guests can add any.
 - **Attribution**: `POST /api/g/[token]/identify` sets the volunteered name, asked once _after_ the
   first upload lands. A viewer who opted out gets no attribution and no name. _Superseded

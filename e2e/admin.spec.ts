@@ -98,7 +98,12 @@ test.describe("photo selection", () => {
     await page.goto(galleryUrl());
     const boxes = page.getByRole("checkbox", { name: /^Vybrat vyber_/ });
     await boxes.nth(0).click();
-    await boxes.nth(3).click({ modifiers: ["Shift"] });
+    // On the tile, not the box — the label path, which Firefox does not forward.
+    await page
+      .locator("label")
+      .filter({ has: page.locator(`input[name="photo"]`) })
+      .nth(3)
+      .click({ modifiers: ["Shift"] });
     const bar = page.getByRole("toolbar", { name: "Akce s vybranými fotkami" });
     await expect(bar).toContainText("Vybráno: 4 fotky");
     // Only a single photo can be the cover.

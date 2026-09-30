@@ -294,6 +294,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               objectKey={photo.objectKey}
               thumbObjectKey={photo.thumbObjectKey}
               alt={photo.fileName}
+              // Three columns on a phone, six on a desktop.
+              sizes="(max-width: 640px) 33vw, 200px"
             />
           </span>
           {/* Drawn inside the tile: content-visibility clips anything outside it. */}

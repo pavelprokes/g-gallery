@@ -4,14 +4,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
+import { idSchema } from "@/lib/id-schema";
 import { MAX_PINNED } from "@/lib/gallery-highlights";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3), and every write
 // is scoped by the gallery's `ownerId`. docs/HIGHLIGHTS.md is the authority
 // for what the highlights are.
-
-const idSchema = z.string().min(1).max(64);
 
 /** Pins a photo into the highlights (true), keeps it out (false), or hands it
  * back to the automatic fill (null). */

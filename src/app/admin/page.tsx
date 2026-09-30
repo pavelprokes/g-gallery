@@ -49,7 +49,8 @@ function daysUntilPurge(purgeAt: Date): number {
  *  phone the row has no room beside the title, see {@link ViewLine}. */
 function ViewStats({ series, max, label }: { series: ViewSeries; max: number; label: string }) {
   return (
-    <div className="hidden items-center gap-3 sm:flex">
+    // Above the row's stretched link, so the columns' day tooltips still show.
+    <div className="relative z-10 hidden items-center gap-3 sm:flex">
       <ViewSparkline series={series} max={max} label={label} />
       <div className="w-24 text-xs tabular-nums">
         <p className="font-semibold">{pluralize(series.unique, FORMS.viewer)}</p>

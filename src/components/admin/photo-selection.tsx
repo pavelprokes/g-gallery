@@ -49,7 +49,8 @@ export function PhotoSelection({
   children: ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const lastClicked = useRef<number | null>(null);
+  // The photo, not its position: a refresh (an upload finishing) reorders the grid.
+  const lastClicked = useRef<string | null>(null);
   const [picked, setPicked] = useState<Picked[]>([]);
   const [pending, startTransition] = useTransition();
 
@@ -59,6 +60,12 @@ export function PhotoSelection({
     lastClicked.current = null;
     setPicked([]);
   };
+
+  // New server-rendered tiles (a refresh) may carry new cover/pin state, or
+  // drop a selected photo: read the checkboxes again.
+  useEffect(() => {
+    if (rootRef.current) setPicked(readPicked(rootRef.current));
+  }, [children]);
 
   useEffect(() => {
     if (picked.length === 0) return;
@@ -83,21 +90,34 @@ export function PhotoSelection({
       data-selecting={picked.length > 0 ? "" : undefined}
       onChange={sync}
       onClick={(event) => {
-        // Shift-click checks everything between the last click and this one.
-        const input = event.target as HTMLElement;
-        if (!(input instanceof HTMLInputElement) || input.name !== "photo") return;
-        const boxes = boxesIn(rootRef.current!);
-        const index = boxes.indexOf(input);
-        if (event.shiftKey && lastClicked.current !== null) {
-          const [from, to] = [lastClicked.current, index].sort((a, b) => a - b);
-          for (const box of boxes.slice(from, to! + 1)) box.checked = input.checked;
-          sync();
+        const target = event.target as HTMLElement;
+        const input =
+          target instanceof HTMLInputElement && target.name === "photo"
+            ? target
+            : target.closest("label")?.querySelector<HTMLInputElement>('input[name="photo"]');
+        if (!input) return;
+        // A shift-click on the tile rather than the box: Firefox does not pass a
+        // modified click from a label to its checkbox, so toggle it here.
+        if (event.shiftKey && target !== input) {
+          event.preventDefault();
+          input.checked = !input.checked;
         }
-        lastClicked.current = index;
+        // Shift-click checks everything between the last click and this one.
+        const boxes = boxesIn(rootRef.current!);
+        const from = boxes.findIndex((box) => box.value === lastClicked.current);
+        if (event.shiftKey && from >= 0) {
+          const [start, end] = [from, boxes.indexOf(input)].sort((a, b) => a - b);
+          for (const box of boxes.slice(start, end! + 1)) box.checked = input.checked;
+        }
+        if (event.shiftKey) sync();
+        lastClicked.current = input.value;
       }}
-      className={picked.length > 0 ? "pb-28" : undefined}
+      // No text selection on a shift-click; `pb-28` keeps the last row above the bar.
+      className={`select-none ${picked.length > 0 ? "pb-28" : ""}`}
     >
-      {children}
+      {/* Inert while an action runs: a selection made now would be cleared
+          by it the moment it finishes. */}
+      <div inert={pending}>{children}</div>
 
       <p className="sr-only" aria-live="polite">
         {picked.length > 0 ? `Vybráno: ${pluralize(picked.length, FORMS.photo)}` : ""}
@@ -125,31 +145,36 @@ export function PhotoSelection({
                 {single.isCover ? "Zrušit titulní" : "Nastavit jako titulní"}
               </Button>
             )}
-            {single && (
-              // docs/HIGHLIGHTS.md — pinned always in, excluded never, else the pick decides.
-              <Button
-                variant="secondary"
-                size="lg"
-                disabled={pending || pinFull}
-                title={pinFull ? `Výběr je plný (${maxPinned} připnutých)` : undefined}
-                onClick={() =>
-                  run(() =>
-                    setHighlightPin(
-                      single.id,
-                      single.pin !== null ? null : single.inHighlights ? false : true,
-                    ),
-                  )
-                }
-              >
-                {single.pin === true
-                  ? "Odepnout z výběru"
-                  : single.pin === false
-                    ? "Vrátit do návrhu výběru"
-                    : single.inHighlights
-                      ? "Vyřadit z výběru"
-                      : "Připnout do výběru"}
-              </Button>
-            )}
+            {single &&
+              (pinFull ? (
+                // Said, not a greyed-out button: a tooltip never shows on a phone.
+                <p className="text-admin-muted text-xs">
+                  Výběr je plný ({maxPinned} připnutých) — nejdřív některou odepni.
+                </p>
+              ) : (
+                // docs/HIGHLIGHTS.md — pinned always in, excluded never, else the pick decides.
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  disabled={pending}
+                  onClick={() =>
+                    run(() =>
+                      setHighlightPin(
+                        single.id,
+                        single.pin !== null ? null : single.inHighlights ? false : true,
+                      ),
+                    )
+                  }
+                >
+                  {single.pin === true
+                    ? "Odepnout z výběru"
+                    : single.pin === false
+                      ? "Vrátit do návrhu výběru"
+                      : single.inHighlights
+                        ? "Vyřadit z výběru"
+                        : "Připnout do výběru"}
+                </Button>
+              ))}
             <Button
               variant="destructive"
               size="lg"

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
+import { idSchema } from "@/lib/id-schema";
 import type { Prisma } from "@/generated/prisma/client";
 import {
   readTranslationsFromForm,
@@ -17,7 +18,6 @@ import { chapterSlug, MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/galler
 // is scoped by the gallery's `ownerId` so a guessed id cannot reach another
 // owner's row. docs/CHAPTERS.md is the authority for what a chapter is.
 
-const idSchema = z.string().min(1).max(64);
 const titleSchema = z.string().trim().min(1).max(MAX_CHAPTER_TITLE);
 
 /**
