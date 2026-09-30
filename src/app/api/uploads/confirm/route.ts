@@ -142,6 +142,8 @@ export async function POST(request: Request) {
     );
   }
 
+  // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
+  const capturedAt = saneTakenAt(takenAt) ?? new Date();
   await prisma.photo.update({
     where: { id: photo.id },
     data: {
@@ -152,8 +154,11 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
-      // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
-      takenAt: saneTakenAt(takenAt) ?? new Date(),
+      takenAt: capturedAt,
+      // A provisional place in the woven order (docs/PHOTO-ORDER.md), for the
+      // same reason: the refresh below refines it, but a CONFIRMED photo must
+      // never sit on a NULL there either — the keyset cursor cannot reach one.
+      wovenAt: capturedAt,
       // Derived from the key we issued: the client only says which format it
       // managed, never where to write it.
       thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,

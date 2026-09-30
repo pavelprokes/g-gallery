@@ -3,7 +3,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
-import { ORDER_KEY_SELECT, afterPosition, orderKeyOf, photoOrderBy } from "@/lib/photo-order";
+import {
+  ORDER_KEY_SELECT,
+  PHOTO_ORDERS,
+  afterPosition,
+  orderKeyOf,
+  photoOrderBy,
+} from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +42,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
     // A well-formed cursor from the other order: the photographer switched
     // the order while this page was open. The client reloads rather than
     // splice two orders together (docs/PHOTO-ORDER.md).
-    const other = order === "FILE_NAME" ? "TAKEN_AT" : "FILE_NAME";
-    return decodeCursor(parsed.data.cursor, other)
+    const minted = PHOTO_ORDERS.some(
+      (other) => other !== order && decodeCursor(parsed.data.cursor!, other),
+    );
+    return minted
       ? NextResponse.json({ error: "order_changed" }, { status: 409 })
       : NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }

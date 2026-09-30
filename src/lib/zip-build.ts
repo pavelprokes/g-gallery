@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { compareTimeline } from "@/lib/gallery-chapters";
 import { ORDER_KEY_SELECT, positionOf } from "@/lib/photo-order";
+import { refreshWovenOrder } from "@/lib/woven-order-db";
 import { serverEnv } from "@/lib/env";
 import {
   signBuildManifest,
@@ -88,6 +89,18 @@ export async function markGalleryPhotosChanged(galleryId: string): Promise<void>
   if (superseded?.zipBuildId) {
     await deleteObject(`_zip-builds/${superseded.zipBuildId}.json`).catch(() => {});
   }
+
+  // Not a ZIP concern, but this is the one call every photo change goes
+  // through: in a gallery with guests woven in by time, any added, removed or
+  // re-timed photo can move its neighbours (docs/PHOTO-ORDER.md).
+  //
+  // A failure here must not fail the change that called it — a confirmed
+  // upload answering 500 would be retried as if it had not happened. The
+  // photo keeps its provisional woven time (its capture time) until the next
+  // change re-weaves the gallery.
+  await refreshWovenOrder(galleryId).catch((error: unknown) => {
+    console.error(`refreshWovenOrder(${galleryId}) failed`, error);
+  });
 }
 
 /** ASCII-safe: Content-Disposition filenames travel badly with diacritics — same rule as `zip/route.ts`'s live-download archive name. */

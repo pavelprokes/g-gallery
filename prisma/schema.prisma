@@ -128,6 +128,9 @@ enum PhotoStatus {
 enum PhotoOrder {
   TAKEN_AT
   FILE_NAME
+  /// The photographer's photos by file name, guests' photos woven in among
+  /// them by capture time (`Photo.wovenAt`). Opt-in only.
+  FILE_NAME_GUESTS_BY_TIME
 
   @@schema("g_gallery")
 }
@@ -357,6 +360,12 @@ model Photo {
   /// `fileName` (docs/PHOTO-ORDER.md), never written by the app. Only
   /// [0-9a-z], so the database and a plain JavaScript comparison agree.
   fileOrderKey       String      @default("")
+  /// Position in FILE_NAME_GUESTS_BY_TIME order (docs/PHOTO-ORDER.md): the
+  /// photographer's photos get a time that rises strictly in file-name order,
+  /// guests' photos their own capture time. Maintained by
+  /// `refreshWovenOrder` whenever the gallery's photos change — only while the
+  /// gallery uses that order; null everywhere else.
+  wovenAt            DateTime?
   /// The photographer's Lightroom marks, read from the export's XMP in the
   /// browser at upload (src/lib/xmp-picks.ts). Hints for the automatic
   /// highlights (docs/HIGHLIGHTS.md) and nothing else; null/false on photos
@@ -383,6 +392,8 @@ model Photo {
   @@index([galleryId, status, takenAt])
   /// The same, for galleries ordered by file name.
   @@index([galleryId, status, fileOrderKey])
+  /// The same, for file names with guests woven in by time.
+  @@index([galleryId, status, wovenAt])
   /// Drives the per-gallery guest quota count and the admin's "from guests" view.
   @@index([galleryId, source])
   @@index([uploadedByViewerId])
@@ -728,6 +739,9 @@ model GalleryChapter {
   /// if that photo is deleted. Filled in by a database trigger from
   /// `startPhotoId` (docs/PHOTO-ORDER.md); past every photo if it has none.
   startFileOrderKey String   @default("")
+  /// The start photo's `wovenAt`, kept for the same reason. Follows the photo
+  /// in `refreshWovenOrder`; null until the gallery first uses that order.
+  startWovenAt      DateTime?
   /// The link anchor (`…/g/{token}/{slug}#obrad`), from the Czech title and
   /// frozen at creation like `ShareLink.slug`: a rename never breaks a link
   /// already sent. Null only on rows from before it existed — the chapter's id

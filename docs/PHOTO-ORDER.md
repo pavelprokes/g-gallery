@@ -21,10 +21,11 @@ gallery can now be shown in that order instead.
 
 `Gallery.photoOrder`, per gallery, set in the admin (panel "Pořadí fotek"):
 
-| Order                 | Key                  | Use when                                             |
-| --------------------- | -------------------- | ---------------------------------------------------- |
-| `FILE_NAME` (default) | `Photo.fileOrderKey` | the export numbers the files in Lightroom's order    |
-| `TAKEN_AT`            | `Photo.takenAt`, ISO | guests' galleries; originals with their camera names |
+| Order                      | Key                  | Use when                                                    |
+| -------------------------- | -------------------- | ----------------------------------------------------------- |
+| `FILE_NAME` (default)      | `Photo.fileOrderKey` | the export numbers the files in Lightroom's order           |
+| `TAKEN_AT`                 | `Photo.takenAt`, ISO | guests' galleries; originals with their camera names        |
+| `FILE_NAME_GUESTS_BY_TIME` | `Photo.wovenAt`, ISO | a delivered gallery guests also add to (opt-in, 2026-09-29) |
 
 File-name order is the default since 2026-09-28 (Pavel: the photographer exports from Lightroom
 with a sequence "almost always"). A **guests' gallery** gets capture time instead, set where one is made as such: the wedding
@@ -98,3 +99,42 @@ A guest's phone names its files `IMG_4821.jpg`; in file-name order those sort am
 photographer's by name, which is to say not usefully. File-name order is for galleries the
 photographer delivers; a guests' gallery is given capture time when it is made (above), and the
 admin hint says so.
+
+## Guests woven in by time
+
+Adopted 2026-09-29, **opt-in only**: no gallery is switched to it by a migration or a default — the
+photographer picks it in "Pořadí fotek" for a delivered gallery that guests add to as well.
+
+The photographer's photos stay in file-name order; each guest's photo lands among them by when it
+was taken. Both have to sit on one axis for the keyset cursor, so each photo gets `Photo.wovenAt`
+(`src/lib/woven-order.ts`, pure and unit-tested):
+
+- **a guest's photo** — its own capture time;
+- **the photographer's** — the closest sequence to their capture times that rises in file-name
+  order: an isotonic regression under absolute error, so each pooled run takes its _median_ and one
+  wild clock cannot drag it. Where the clocks agree with the export nothing moves. A body whose clock
+  ran behind or ahead — one photo, a run, or the very first photo — is pooled with its neighbours
+  until the order holds, and only there: the error stays local instead of carrying every later photo
+  along. +1 ms steps then break the ties inside a pool, so the times rise strictly.
+
+Guests' photos are placed as well as the clocks allow: inside a pooled run the photographer's photos
+share one time, so a guest's photo from that stretch lands before or after the whole run.
+
+**Keeping it current.** A photographer's woven time depends on its neighbours, so any added, removed
+or re-timed photo can move others. `refreshWovenOrder` (`src/lib/woven-order-db.ts`) recomputes the
+whole gallery and writes only the rows that changed, in one statement, under a per-gallery advisory
+lock (a batch upload confirms in parallel). It runs from `markGalleryPhotosChanged` — the one call
+every photo change goes through — and only for galleries in this order; switching a gallery into it
+writes every row first and once more after the switch, for a photo confirmed in between.
+`pnpm backfill:taken-at` re-weaves such galleries after re-deriving capture times.
+
+A confirmed photo never has a null `wovenAt`: the upload confirm writes its capture time there as a
+provisional place (a null would be unreachable by the keyset cursor), and the refresh refines it. A
+refresh that fails — the lock queue of a big parallel batch — is logged and does not fail the
+confirm; the photo keeps its provisional place until the next change re-weaves the gallery.
+
+**Chapters** store `startWovenAt`, moved with the start photo by the same refresh and set from it
+when a chapter is created; a chapter that has never had one reads its capture time.
+
+The admin panel counts, for each order, how many photos it would move from the current one; the
+woven order is computed on the spot for that, so the number is right before the switch too.

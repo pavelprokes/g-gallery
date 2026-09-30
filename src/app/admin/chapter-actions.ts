@@ -59,7 +59,7 @@ export async function startChapter(galleryId: string, photoId: string, formData:
       status: "CONFIRMED",
       gallery: { ownerId: session.user.id },
     },
-    select: { id: true, takenAt: true, createdAt: true },
+    select: { id: true, takenAt: true, createdAt: true, wovenAt: true },
   });
   if (!photo) throw new Error("NOT_FOUND");
 
@@ -92,7 +92,9 @@ export async function startChapter(galleryId: string, photoId: string, formData:
       await prisma.galleryChapter.create({
         // `startFileOrderKey` is filled in by a database trigger from the
         // start photo (docs/PHOTO-ORDER.md), like the photo's own key.
-        data: { ...at, title: title.data, translations, slug },
+        // `startWovenAt` is the photo's current woven time (null unless the
+        // gallery uses that order); `refreshWovenOrder` moves it from here.
+        data: { ...at, startWovenAt: photo.wovenAt, title: title.data, translations, slug },
       });
       break;
     } catch (error) {
