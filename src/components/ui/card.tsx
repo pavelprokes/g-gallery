@@ -8,19 +8,28 @@ type ElementExtras = Pick<FormHTMLAttributes<HTMLFormElement>, "action" | "metho
   Pick<DetailsHTMLAttributes<HTMLDetailsElement>, "open">;
 
 const CARD_CLASSES =
-  "rounded-xl border border-admin-border bg-white p-4 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900";
+  "rounded-xl border border-admin-border bg-white dark:border-neutral-800 dark:bg-neutral-900";
+const CARD_PADDING = "p-4 sm:p-5";
 
 // Replaces the fourteen hand-typed "rounded-lg border p-4" panels across the
 // admin portal with one definition, and swaps the default gray border for the
 // brand's warm border tone. `as="section"` keeps the semantic element several
 // call sites already relied on.
+//
+// `flush` drops the padding, for a list whose rows pad themselves. A `p-0` in
+// `className` cannot do it: in the generated CSS `p-4` comes after `p-0` and
+// wins, which left every such list double-indented on a phone.
 export function Card({
   as: Tag = "div",
+  flush = false,
   className = "",
   ...props
 }: HTMLAttributes<HTMLElement> &
-  Partial<ElementExtras> & { as?: "div" | "section" | "form" | "ul" | "details" }) {
-  return <Tag className={`${CARD_CLASSES} ${className}`} {...props} />;
+  Partial<ElementExtras> & {
+    as?: "div" | "section" | "form" | "ul" | "details";
+    flush?: boolean;
+  }) {
+  return <Tag className={`${CARD_CLASSES} ${flush ? "" : CARD_PADDING} ${className}`} {...props} />;
 }
 
 /**
