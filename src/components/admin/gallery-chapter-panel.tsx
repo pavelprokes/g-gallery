@@ -10,6 +10,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
 import type { ContentTranslations } from "@/lib/content-translations";
+import { FORMS, pluralize } from "@/lib/czech-plural";
 import { CHAPTER_PRESETS, MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/gallery-chapters";
 
 export interface AdminChapter {
@@ -145,10 +146,12 @@ export function GalleryChapterPanel({
   timelineActive: boolean;
 }) {
   const fieldId = useId();
-  // Two chapters with one name are two identical tabs for the guests.
+  // Two chapters with one name are two identical tabs for the guests — an
+  // empty chapter shows no tab, so it does not count.
   const seen = new Set<string>();
   const duplicated = new Set<string>();
   for (const chapter of chapters) {
+    if (!chapter.firstPhoto) continue;
     const key = chapter.title.trim().toLocaleLowerCase("cs");
     if (seen.has(key)) duplicated.add(key);
     seen.add(key);
@@ -192,11 +195,12 @@ export function GalleryChapterPanel({
                     id={`${fieldId}-${chapter.id}`}
                     defaultValue={chapter.title}
                   />
-                  {duplicated.has(chapter.title.trim().toLocaleLowerCase("cs")) && (
-                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                      Stejný název má i jiná kapitola — hosté uvidí dvě stejné záložky.
-                    </p>
-                  )}
+                  {chapter.firstPhoto &&
+                    duplicated.has(chapter.title.trim().toLocaleLowerCase("cs")) && (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                        Stejný název má i jiná kapitola — hosté uvidí dvě stejné záložky.
+                      </p>
+                    )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -216,7 +220,7 @@ export function GalleryChapterPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-admin-muted text-xs dark:text-neutral-400">
                   {chapter.firstPhoto
-                    ? `${chapter.count} fotek · začíná fotkou ${chapter.firstPhoto.fileName}`
+                    ? `${pluralize(chapter.count, FORMS.photo)} · začíná fotkou ${chapter.firstPhoto.fileName}`
                     : "Prázdná — fotky, u kterých začínala, jsou smazané. Hostům se neukazuje."}
                 </p>
                 {shareUrl && chapter.firstPhoto && (

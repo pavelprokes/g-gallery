@@ -52,22 +52,17 @@ test("overview: newest wedding day first, and no broken-image icons", async ({ p
   // broken one is briefly still in the DOM.
   await expect.poll(() => missingImages(page)).toEqual([]);
 
-  const dates = await page
-    .locator("main li")
-    .allInnerTexts()
-    .then((rows) =>
-      rows
-        .map((row) => row.match(/(\d{1,2})\. (\d{1,2})\. (\d{4})/))
-        .filter((m) => m !== null)
-        .map(([, d, mo, y]) => Date.UTC(+y!, +mo! - 1, +d!)),
-    );
-  expect(dates.length).toBeGreaterThan(1);
-  // Weddings and galleries are two lists, each sorted on its own.
-  const sortedRuns = dates.reduce(
-    (breaks, date, i) => breaks + (i && date > dates[i - 1]! ? 1 : 0),
-    0,
-  );
-  expect(sortedRuns).toBeLessThanOrEqual(1);
+  // Weddings and galleries are two lists; each is sorted on its own.
+  const lists = page.locator("main ul").filter({ has: page.locator("a[href^='/admin/']") });
+  expect(await lists.count()).toBe(2);
+  for (const list of await lists.all()) {
+    const dates = (await list.locator(":scope > li").allInnerTexts())
+      .map((row) => row.match(/(\d{1,2})\. (\d{1,2})\. (\d{4})/))
+      .filter((m) => m !== null)
+      .map(([, d, mo, y]) => Date.UTC(+y!, +mo! - 1, +d!));
+    expect(dates.length).toBeGreaterThan(1);
+    expect(dates).toEqual(dates.toSorted((a, b) => b - a));
+  }
 });
 
 test("gallery page: status in Czech, never the raw enum", async ({ page }) => {

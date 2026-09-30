@@ -10,7 +10,11 @@ import { useState } from "react";
  * a thumbnail on the client's word, so a failed thumbnail PUT must not leave
  * the photographer looking at an empty square (same fallback as the guest grid).
  * If the original fails too, the image is dropped, so the tile shows whatever
- * sits behind it (placeholder colour) instead of a broken-image icon.
+ * sits behind it (placeholder colour) instead of a broken-image icon — still
+ * named, since the file name is often a tile's only label.
+ *
+ * The failure is remembered per pair of keys: the component stays mounted
+ * when a new cover or chapter start swaps them, and the new photo must load.
  */
 export function AdminPhotoImage({
   objectKey,
@@ -23,13 +27,15 @@ export function AdminPhotoImage({
   alt: string;
   sizes?: string;
 }) {
-  const [failed, setFailed] = useState<"none" | "thumb" | "all">("none");
+  const keys = `${thumbObjectKey}|${objectKey}`;
+  const [failure, setFailure] = useState({ keys, stage: "none" as "none" | "thumb" | "all" });
+  const failed = failure.keys === keys ? failure.stage : "none";
   const useThumb = !!thumbObjectKey && failed === "none";
-  if (failed === "all") return null;
+  if (failed === "all") return alt ? <span role="img" aria-label={alt} /> : null;
   return (
     <Image
       src={useThumb ? thumbObjectKey : objectKey}
-      onError={() => setFailed(useThumb ? "thumb" : "all")}
+      onError={() => setFailure({ keys, stage: useThumb ? "thumb" : "all" })}
       alt={alt}
       fill
       sizes={sizes}

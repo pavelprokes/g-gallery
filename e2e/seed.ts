@@ -773,7 +773,9 @@ async function makeAdminSession(userId: string) {
       id: `e2e-${token.slice(0, 12)}`,
       token,
       userId,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      // better-auth's default lifetime: anything shorter is "due for refresh"
+      // on the first request, which would try to set a cookie from an RSC.
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
   const signature = createHmac("sha256", secret).update(token).digest("base64");
