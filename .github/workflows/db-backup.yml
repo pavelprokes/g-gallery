@@ -54,7 +54,11 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-17
-          pg_dump --version
+          # The runner's preinstalled client stays installed, and Ubuntu's
+          # pg_wrapper on PATH picks it over 17 — call 17's binaries directly.
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version | grep -q ' 17\.' \
+            || { echo "::error::pg_dump 17 not installed"; exit 1; }
 
       - name: Dump
         env:
