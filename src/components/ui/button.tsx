@@ -27,8 +27,9 @@ const VARIANT_CLASSES = {
 } as const;
 
 const SIZE_CLASSES = {
-  sm: "gap-1.5 px-2.5 py-1 text-xs",
-  md: "gap-2 px-3.5 py-2 text-sm",
+  // Compact for a mouse; on a touch screen every size is the 44px minimum (Apple HIG, WCAG 2.5.5).
+  sm: "gap-1.5 px-2.5 py-1 text-xs pointer-coarse:min-h-11",
+  md: "gap-2 px-3.5 py-2 text-sm pointer-coarse:min-h-11",
   lg: "min-h-11 gap-2 px-5 text-sm",
 } as const;
 

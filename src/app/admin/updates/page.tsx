@@ -199,9 +199,9 @@ function describe(group: FeedGroup): string {
   }
 }
 
-/** "27. 9. 2026 9:14", or "9:08–9:14" for a run within one day. */
+/** "9:14", or "9:08–9:14" for a run — the day heading above already says which day. */
 function when(group: FeedGroup): string {
-  if (group.events === 1) return formatDateTime(group.latest, "cs");
+  if (group.events === 1) return formatTime(group.latest, "cs");
   const sameDay = formatDate(group.earliest, "cs") === formatDate(group.latest, "cs");
   return sameDay
     ? `${formatTime(group.earliest, "cs")}–${formatTime(group.latest, "cs")}`

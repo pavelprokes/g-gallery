@@ -153,3 +153,24 @@ test("activity: a malformed cursor falls back to the first page", async ({ page 
   await page.goto("/admin/updates?before=nonsense");
   await expect(page.getByText("Upozornění na návštěvu")).toBeVisible();
 });
+
+test("on a phone: thumb-sized targets, no drag-and-drop or chart talk", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "touch layout only");
+  await page.goto(`/admin/g/${seed.galleryId}`);
+  await expect(page.getByText("Přetáhni sem fotky nebo celou složku")).toBeHidden();
+  const small = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("main button, main nav a")]
+      .filter((el) => el.checkVisibility())
+      .map((el) => [el.innerText.trim(), Math.round(el.getBoundingClientRect().height)] as const)
+      .filter(([, height]) => height < 44),
+  );
+  expect(small).toEqual([]);
+
+  await page.goto("/admin");
+  for (const legend of await page.getByText("opakované návštěvy").all()) {
+    await expect(legend).toBeHidden();
+  }
+});

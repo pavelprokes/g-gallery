@@ -41,7 +41,7 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
                   <Link
                     href={item.href}
                     title={item.label}
-                    className="hover:text-brand-primary-dark max-w-[24ch] truncate hover:underline dark:hover:text-neutral-100"
+                    className="hover:text-brand-primary-dark max-w-[24ch] truncate hover:underline dark:hover:text-neutral-100 pointer-coarse:-my-3 pointer-coarse:py-3"
                   >
                     {item.label}
                   </Link>
