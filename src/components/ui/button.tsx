@@ -9,8 +9,10 @@ import type { ButtonHTMLAttributes } from "react";
 // photographer's main site — see svatebni-fotograf-cechy-2.0/components/Admin/ui.ts.
 // `inline-flex` is what makes `min-h-*` actually center the label rather than
 // just reserving height.
+// On a touch screen every size is at least 44x44 (Apple HIG, WCAG 2.5.5) — an
+// icon-only arrow included; a mouse keeps the compact sizes.
 const BASE =
-  "inline-flex items-center justify-center rounded-lg font-semibold whitespace-nowrap transition-colors";
+  "inline-flex items-center justify-center rounded-lg font-semibold whitespace-nowrap transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11";
 
 const VARIANT_CLASSES = {
   primary:
@@ -27,9 +29,8 @@ const VARIANT_CLASSES = {
 } as const;
 
 const SIZE_CLASSES = {
-  // Compact for a mouse; on a touch screen every size is the 44px minimum (Apple HIG, WCAG 2.5.5).
-  sm: "gap-1.5 px-2.5 py-1 text-xs pointer-coarse:min-h-11",
-  md: "gap-2 px-3.5 py-2 text-sm pointer-coarse:min-h-11",
+  sm: "gap-1.5 px-2.5 py-1 text-xs",
+  md: "gap-2 px-3.5 py-2 text-sm",
   lg: "min-h-11 gap-2 px-5 text-sm",
 } as const;
 

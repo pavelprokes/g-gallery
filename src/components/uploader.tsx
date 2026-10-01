@@ -305,7 +305,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               : "border-admin-border dark:border-neutral-700"
           }`}
         >
-          <p className="text-brand-ink font-medium dark:text-neutral-100 pointer-coarse:hidden">
+          <p className="text-brand-ink font-medium dark:text-neutral-100 max-sm:pointer-coarse:hidden">
             {dragging ? "Pusť — nahraju je" : "Přetáhni sem fotky nebo celou složku"}
           </p>
           <div className="flex flex-wrap justify-center gap-2">

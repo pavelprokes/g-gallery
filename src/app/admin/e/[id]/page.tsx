@@ -147,7 +147,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
             <CopyableLink href={eventUrl} />
             <Link
               href={`/admin/e/${event.id}/sign`}
-              className={`mt-2 inline-block ${buttonClasses("secondary", "sm")}`}
+              className={`mt-2 ${buttonClasses("secondary", "sm")}`}
             >
               Cedulka k tisku
             </Link>

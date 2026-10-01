@@ -12,6 +12,7 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   galleryId: string;
   photoCount: number;
   selectGalleryIds: Record<string, string>;
+  weddingId: string;
 };
 
 test.beforeEach(async ({ context, baseURL }) => {
@@ -159,18 +160,33 @@ test("on a phone: thumb-sized targets, no drag-and-drop or chart talk", async ({
   isMobile,
 }) => {
   test.skip(!isMobile, "touch layout only");
+  // Every visible button and breadcrumb, both ways — an arrow button can be
+  // 44px tall and still a 28px-wide miss.
+  const tooSmall = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("main button, main nav a")]
+        .filter((el) => el.checkVisibility())
+        .map((el) => {
+          const { width, height } = el.getBoundingClientRect();
+          return `${el.innerText.trim()} ${Math.round(width)}x${Math.round(height)}`;
+        })
+        .filter((target) => {
+          const [width, height] = target.split(" ").at(-1)!.split("x").map(Number);
+          return width! < 44 || height! < 44;
+        }),
+    );
+
   await page.goto(`/admin/g/${seed.galleryId}`);
   await expect(page.getByText("Přetáhni sem fotky nebo celou složku")).toBeHidden();
-  const small = await page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>("main button, main nav a")]
-      .filter((el) => el.checkVisibility())
-      .map((el) => [el.innerText.trim(), Math.round(el.getBoundingClientRect().height)] as const)
-      .filter(([, height]) => height < 44),
-  );
-  expect(small).toEqual([]);
+  expect(await tooSmall()).toEqual([]);
+
+  // The wedding page: three galleries, so the move-up/down arrows show.
+  await page.goto(`/admin/e/${seed.weddingId}`);
+  await expect(page.getByRole("button", { name: "Posunout dolů" }).first()).toBeVisible();
+  expect(await tooSmall()).toEqual([]);
 
   await page.goto("/admin");
-  for (const legend of await page.getByText("opakované návštěvy").all()) {
-    await expect(legend).toBeHidden();
-  }
+  const legends = page.getByText("opakované návštěvy", { exact: true });
+  await expect(legends).not.toHaveCount(0);
+  for (const legend of await legends.all()) await expect(legend).toBeHidden();
 });

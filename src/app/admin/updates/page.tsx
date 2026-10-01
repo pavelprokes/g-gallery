@@ -199,11 +199,14 @@ function describe(group: FeedGroup): string {
   }
 }
 
-/** "9:14", or "9:08–9:14" for a run — the day heading above already says which day. */
+/**
+ * "9:14", or "9:08–9:14" for a run — the day heading above already says which
+ * day. A run past midnight sits under its last day: "27. 9. 2026 23:50 – 0:10".
+ */
 function when(group: FeedGroup): string {
   if (group.events === 1) return formatTime(group.latest, "cs");
   const sameDay = formatDate(group.earliest, "cs") === formatDate(group.latest, "cs");
   return sameDay
     ? `${formatTime(group.earliest, "cs")}–${formatTime(group.latest, "cs")}`
-    : `${formatDateTime(group.earliest, "cs")} – ${formatDateTime(group.latest, "cs")}`;
+    : `${formatDateTime(group.earliest, "cs")} – ${formatTime(group.latest, "cs")}`;
 }

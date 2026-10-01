@@ -279,6 +279,7 @@ async function main() {
       uploadToken,
       uploadSlug,
       readOnlyToken,
+      weddingId: wedding.id,
       weddingToken: wedding.token,
       weddingSlug: wedding.slug,
       weddingGalleryIds: [guests, listed, hidden],
