@@ -256,11 +256,17 @@ async function main() {
   const highlights = await makeHighlightsGallery(user.id);
 
   const adminCookie = await makeAdminSession(user.id);
+  // One per browser project: they run side by side and this one is mutated.
+  const selectGalleryIds = {
+    chromium: await makeSelectGallery(user.id),
+    "mobile-safari": await makeSelectGallery(user.id),
+  };
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
       adminCookie,
+      selectGalleryIds,
       galleryId: gallery.id,
       token,
       slug,
@@ -780,4 +786,35 @@ async function makeAdminSession(userId: string) {
   });
   const signature = createHmac("sha256", secret).update(token).digest("base64");
   return { name: "better-auth.session_token", value: encodeURIComponent(`${token}.${signature}`) };
+}
+
+/** Six photos the admin selection spec may cover, pin and delete — its own
+ * gallery, so deleting never shifts another spec's counts. */
+async function makeSelectGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Výběr fotek",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-select-${Date.now()}`,
+    },
+  });
+  for (let n = 1; n <= 6; n += 1) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/select-${n}.jpg`,
+        fileName: `vyber_${n}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10, n)),
+      },
+    });
+  }
+  return gallery.id;
 }

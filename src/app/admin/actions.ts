@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
+import { idSchema } from "@/lib/id-schema";
 import {
   generateShareToken,
   generateStoragePrefix,
@@ -201,40 +202,55 @@ export async function revokeShareLink(shareLinkId: string) {
   revalidatePath(`/admin/g/${link.galleryId}`);
 }
 
+const deletePhotosSchema = z.array(idSchema).min(1).max(2000);
+
 /**
- * Removes a single photo, bytes and all.
+ * Removes the selected photos for good, bytes and all — one or a whole cull.
  *
- * This is the couple's veto (docs/GUEST-GALLERIES.md §7 / §13.7): once guests
- * can add photos, "get that one out of the album" has to be one click and take
- * effect immediately, not an email to support the way the Czech competitors
- * handle it. Applies to the photographer's own uploads too — there was no
- * per-photo delete before this.
+ * This is also the couple's veto (docs/GUEST-GALLERIES.md §7 / §13.7): once
+ * guests can add photos, "get that one out of the album" has to be one click
+ * and take effect immediately. Only photos in the owner's galleries are
+ * touched; any other id is ignored.
  *
  * Deliberately not reversible: a trash tier for individual photos would need
  * its own retention, purge job and UI, and the gallery-level trash already
  * covers the "I deleted the wrong thing entirely" case.
  */
-export async function deletePhoto(photoId: string) {
+export async function deletePhotos(photoIds: string[]) {
   const session = await requireAdmin();
 
-  const photo = await prisma.photo.findFirst({
-    where: { id: photoId, gallery: { ownerId: session.user.id } },
-    select: { id: true, objectKey: true, galleryId: true },
-  });
-  if (!photo) throw new Error("NOT_FOUND");
+  const parsed = deletePhotosSchema.safeParse(photoIds);
+  if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  // Row first: an orphaned object is swept up by the weekly reconcile job
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: parsed.data }, gallery: { ownerId: session.user.id } },
+    select: { id: true, objectKey: true, thumbObjectKey: true, galleryId: true },
+  });
+  if (photos.length === 0) throw new Error("NOT_FOUND");
+
+  // Rows first: an orphaned object is swept up by the weekly reconcile job
   // (src/lib/reconcile.ts), whereas an orphaned row would keep rendering a
   // tile whose bytes are gone.
-  await prisma.photo.delete({ where: { id: photo.id } });
-  await deleteObject(photo.objectKey);
+  await prisma.photo.deleteMany({ where: { id: { in: photos.map((photo) => photo.id) } } });
 
-  // Same staleness rule as a new upload: the pre-built archive no longer
-  // matches the gallery's contents, and a photographer part-way through a cull
-  // is exactly who the rebuild should wait for (docs/TODO.md §7).
-  await markGalleryPhotosChanged(photo.galleryId);
+  // Then the archive fence, before any byte is touched: the pre-built ZIP no
+  // longer matches the gallery, and a failed R2 delete below must not leave it
+  // marked current (docs/TODO.md §7).
+  const galleryIds = new Set(photos.map((photo) => photo.galleryId));
+  for (const galleryId of galleryIds) await markGalleryPhotosChanged(galleryId);
 
-  revalidatePath(`/admin/g/${photo.galleryId}`);
+  // ponytail: one DELETE per object, 10 at a time; S3 DeleteObjects if culls get slow.
+  // A failure only leaves an orphan for reconcile — the rows are already gone.
+  const keys = photos.flatMap((photo) =>
+    photo.thumbObjectKey ? [photo.objectKey, photo.thumbObjectKey] : [photo.objectKey],
+  );
+  for (let i = 0; i < keys.length; i += 10) {
+    await Promise.allSettled(keys.slice(i, i + 10).map((key) => deleteObject(key)));
+  }
+
+  for (const galleryId of galleryIds) {
+    revalidatePath(`/admin/g/${galleryId}`);
+  }
 }
 
 /** How long a trashed gallery is recoverable before the purge cron deletes it for good. */

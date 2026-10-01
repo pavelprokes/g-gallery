@@ -20,15 +20,20 @@ export function AdminTopBar({ userName, unread }: { userName: string; unread: nu
 
   return (
     <header className="border-admin-border sticky top-0 z-20 border-b bg-white print:hidden">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3 sm:px-5">
+      {/* One row on a phone too: the brand (same place as "Přehled") yields its
+          width there, and the nav scrolls rather than pushing "Odhlásit" down. */}
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2 sm:gap-4 sm:px-5 sm:py-3">
         <Link
           href="/admin"
-          className="text-brand-primary-dark hover:text-brand-primary text-sm font-bold tracking-wide uppercase"
+          className="text-brand-primary-dark hover:text-brand-primary hidden text-sm font-bold tracking-wide uppercase sm:inline"
         >
           Galerie
         </Link>
 
-        <nav aria-label="Hlavní navigace administrace" className="flex flex-wrap gap-1">
+        <nav
+          aria-label="Hlavní navigace administrace"
+          className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1"
+        >
           {NAV_ITEMS.map((item) => {
             const active = isNavActive(pathname, item.href, item.exact);
 
@@ -37,7 +42,7 @@ export function AdminTopBar({ userName, unread }: { userName: string; unread: nu
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className="hover:text-brand-primary-dark aria-[current=page]:bg-admin-accent-soft aria-[current=page]:text-brand-primary-dark text-admin-muted inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+                className="hover:text-brand-primary-dark aria-[current=page]:bg-admin-accent-soft aria-[current=page]:text-brand-primary-dark text-admin-muted inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors"
               >
                 {item.label}
                 {/* No count on the page you are already reading. */}
@@ -49,7 +54,7 @@ export function AdminTopBar({ userName, unread }: { userName: string; unread: nu
           })}
         </nav>
 
-        <div className="text-admin-muted ml-auto flex items-center gap-3 text-sm">
+        <div className="text-admin-muted ml-auto flex shrink-0 items-center gap-3 text-sm">
           <span className="hidden max-w-56 truncate sm:inline" title={userName}>
             {userName}
           </span>
