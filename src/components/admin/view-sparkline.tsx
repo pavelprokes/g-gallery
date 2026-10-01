@@ -124,11 +124,11 @@ export function ViewSparkline({
   );
 }
 
-/** The colour key. Sits once above a list, not on every row. */
+/** The colour key. Sits once above a list, not on every row — and like the charts, not on a phone. */
 export function ViewSparklineLegend({ className = "" }: { className?: string }) {
   return (
     <p
-      className={`text-admin-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${className}`}
+      className={`text-admin-muted hidden flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex ${className}`}
     >
       <span className="flex items-center gap-1.5">
         <span
