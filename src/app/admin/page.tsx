@@ -203,10 +203,7 @@ export default async function AdminPage() {
             <CardTitle className="mb-0">Svatby</CardTitle>
             <ViewSparklineLegend />
           </div>
-          <Card
-            as="ul"
-            className="divide-admin-border mt-3 divide-y p-0 sm:p-0 dark:divide-neutral-800"
-          >
+          <Card as="ul" flush className="divide-admin-border mt-3 divide-y dark:divide-neutral-800">
             {events.map((event) => {
               const token = decryptToken(event.tokenCipher);
               const cover = coverOf(
@@ -253,10 +250,7 @@ export default async function AdminPage() {
         <CardTitle className="mb-0">Galerie</CardTitle>
         {galleries.length > 0 && <ViewSparklineLegend />}
       </div>
-      <Card
-        as="ul"
-        className="divide-admin-border mt-3 divide-y p-0 sm:p-0 dark:divide-neutral-800"
-      >
+      <Card as="ul" flush className="divide-admin-border mt-3 divide-y dark:divide-neutral-800">
         {galleries.length === 0 && (
           <li className="text-admin-muted p-4 text-sm dark:text-neutral-400">
             Zatím žádná galerie.
@@ -295,7 +289,7 @@ export default async function AdminPage() {
       </Card>
 
       {trashedEvents.length > 0 && (
-        <Card as="details" className="mt-6 p-0 sm:p-0">
+        <Card as="details" flush className="mt-6">
           <summary className="text-admin-muted cursor-pointer p-4 text-sm font-semibold dark:text-neutral-400">
             Svatby v koši ({trashedEvents.length})
           </summary>
@@ -327,7 +321,7 @@ export default async function AdminPage() {
       )}
 
       {trashed.length > 0 && (
-        <Card as="details" className="mt-6 p-0 sm:p-0">
+        <Card as="details" flush className="mt-6">
           <summary className="text-admin-muted cursor-pointer p-4 text-sm font-semibold dark:text-neutral-400">
             Koš ({trashed.length})
           </summary>

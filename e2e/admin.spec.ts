@@ -131,3 +131,25 @@ test.describe("photo selection", () => {
     await expect(page.getByRole("checkbox", { name: "Vybrat vyber_5.jpg" })).toHaveCount(0);
   });
 });
+
+test("activity: a sitting of downloads is one row, older pages load by cursor", async ({
+  page,
+}) => {
+  await page.goto("/admin/updates");
+  // Eight archive downloads, 9:08–9:14 Prague time.
+  await expect(page.getByRole("link", { name: "Stažení z galerie · 8×" })).toBeVisible();
+  await expect(page.getByText("E2E Aktivita · 9:08–9:14")).toBeVisible();
+
+  // 110 favourites a day apart do not fit on one page.
+  await page.getByRole("link", { name: "Načíst starší" }).click();
+  await expect(page).toHaveURL(/\?before=/);
+  await expect(page.getByRole("link", { name: "Zpět na nejnovější" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1. 1. 2025", exact: true })).toBeVisible();
+  // The push settings belong to the first page only.
+  await expect(page.getByText("Upozornění na návštěvu")).toHaveCount(0);
+});
+
+test("activity: a malformed cursor falls back to the first page", async ({ page }) => {
+  await page.goto("/admin/updates?before=nonsense");
+  await expect(page.getByText("Upozornění na návštěvu")).toBeVisible();
+});

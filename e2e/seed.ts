@@ -256,6 +256,7 @@ async function main() {
   const highlights = await makeHighlightsGallery(user.id);
 
   const adminCookie = await makeAdminSession(user.id);
+  await makeActivity(user.id);
   // One per browser project: they run side by side and this one is mutated.
   const selectGalleryIds = {
     chromium: await makeSelectGallery(user.id),
@@ -817,4 +818,33 @@ async function makeSelectGallery(ownerId: string) {
     });
   }
   return gallery.id;
+}
+
+/**
+ * The admin Activity feed's fixtures, in a gallery of their own: eight archive
+ * downloads in one sitting (must read as one row; like production, they carry
+ * no viewer), and 110 favourites a
+ * day apart in 2025 — more than one page, so "Načíst starší" has work to do.
+ */
+async function makeActivity(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Aktivita",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-activity-${Date.now()}`,
+    },
+  });
+  const downloads = [8, 9, 9, 10, 11, 12, 13, 14].map((minute) => ({
+    galleryId: gallery.id,
+    type: "DOWNLOAD" as const,
+    createdAt: new Date(Date.UTC(2026, 8, 27, 7, minute)),
+  }));
+  const favorites = Array.from({ length: 110 }, (_, day) => ({
+    galleryId: gallery.id,
+    type: "FAVORITE" as const,
+    createdAt: new Date(Date.UTC(2025, 0, 1 + day, 12)),
+  }));
+  await prisma.activityEvent.createMany({ data: [...downloads, ...favorites] });
 }

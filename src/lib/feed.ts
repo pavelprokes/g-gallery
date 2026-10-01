@@ -8,8 +8,16 @@ import type { ActivityType } from "@/generated/prisma/enums";
  * new album; this is the in-app surface, with push and the digest layered on it.
  */
 
-/** Nobody reads a feed of heartbeats, so page size stays small and recent. */
-const DEFAULT_LIMIT = 40;
+/** Raw events per page — the page groups them (src/lib/feed-group.ts), so a
+ *  morning of downloads is one row, and 100 still makes a short page. */
+const DEFAULT_LIMIT = 100;
+
+/** Where the next page starts: strictly older than this event. `id` breaks
+ *  ties between events stored in the same millisecond. */
+export interface FeedCursor {
+  createdAt: Date;
+  id: string;
+}
 
 export interface FeedEntry {
   id: string;
@@ -19,6 +27,8 @@ export interface FeedEntry {
   galleryTitle: string;
   photoId: string | null;
   photoObjectKey: string | null;
+  /** Tells anonymous viewers apart when grouping; never shown. */
+  viewerId: string | null;
   /** Only ever a name the viewer typed in themselves. */
   viewerName: string | null;
 }
@@ -33,12 +43,29 @@ export interface FeedEntry {
  */
 const FEED_TYPES: ActivityType[] = ["REACTION", "FAVORITE", "DOWNLOAD", "VISITOR_IDENTIFIED"];
 
-/** Recent activity across every gallery this user owns. */
-export async function ownerFeed(ownerId: string, limit = DEFAULT_LIMIT): Promise<FeedEntry[]> {
+/**
+ * Recent activity across every gallery this user owns, newest first, one page
+ * at a time. `next` is the cursor for the page after this one, null at the end.
+ */
+export async function ownerFeed(
+  ownerId: string,
+  before?: FeedCursor,
+  limit = DEFAULT_LIMIT,
+): Promise<{ entries: FeedEntry[]; next: FeedCursor | null }> {
   const events = await prisma.activityEvent.findMany({
-    where: { type: { in: FEED_TYPES }, gallery: { ownerId } },
-    orderBy: { createdAt: "desc" },
-    take: limit,
+    where: {
+      type: { in: FEED_TYPES },
+      gallery: { ownerId },
+      ...(before && {
+        OR: [
+          { createdAt: { lt: before.createdAt } },
+          { createdAt: before.createdAt, id: { lt: before.id } },
+        ],
+      }),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    // One extra row says whether an older page exists.
+    take: limit + 1,
     select: {
       id: true,
       type: true,
@@ -47,11 +74,14 @@ export async function ownerFeed(ownerId: string, limit = DEFAULT_LIMIT): Promise
       gallery: { select: { title: true } },
       photoId: true,
       photo: { select: { objectKey: true } },
+      viewerId: true,
       viewer: { select: { displayName: true } },
     },
   });
 
-  return events.map((event) => ({
+  const page = events.slice(0, limit);
+  const last = page.at(-1);
+  const entries = page.map((event) => ({
     id: event.id,
     type: event.type,
     createdAt: event.createdAt,
@@ -59,8 +89,13 @@ export async function ownerFeed(ownerId: string, limit = DEFAULT_LIMIT): Promise
     galleryTitle: event.gallery.title,
     photoId: event.photoId,
     photoObjectKey: event.photo?.objectKey ?? null,
+    viewerId: event.viewerId,
     viewerName: event.viewer?.displayName ?? null,
   }));
+  return {
+    entries,
+    next: events.length > limit && last ? { createdAt: last.createdAt, id: last.id } : null,
+  };
 }
 
 /**
