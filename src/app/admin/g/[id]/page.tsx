@@ -48,6 +48,8 @@ import { CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { PageHeader } from "@/components/ui/page-header";
 import { galleryCrumbs } from "@/lib/admin-breadcrumbs";
+import { GALLERY_STATUS } from "@/lib/gallery-status";
+import { FORMS, pluralize } from "@/lib/czech-plural";
 
 export const dynamic = "force-dynamic";
 
@@ -375,7 +377,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       <PageHeader
         title={gallery.title}
         crumbs={galleryCrumbs(gallery)}
-        subtitle={`${gallery.status} · ${gallery.photos.length} fotek`}
+        subtitle={`${GALLERY_STATUS[gallery.status].label} · ${pluralize(gallery.photos.length, FORMS.photo)}`}
         actions={
           <>
             <GallerySettings

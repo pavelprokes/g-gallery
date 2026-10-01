@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 
 /**
  * The photo that tells one row from another.
@@ -13,7 +13,8 @@ import Image from "next/image";
  * served straight from the bucket, so a list of twenty rows costs zero billable
  * transformations (docs/GUEST-GALLERIES.md §9). Without one it falls back to
  * the 384px variant the grid already generates for the same photo, so it is
- * still not a new billable width.
+ * still not a new billable width — and to it when the thumbnail is missing
+ * (a failed thumbnail PUT still records its key).
  */
 
 export interface AdminCover {
@@ -30,13 +31,12 @@ export function CoverThumb({ cover }: { cover: AdminCover | null }) {
       style={cover?.placeholder ? { backgroundColor: cover.placeholder } : undefined}
     >
       {cover ? (
-        <Image
+        <AdminPhotoImage
           // Decorative: the row's title is right next to it and says the same thing.
           alt=""
-          src={cover.thumbObjectKey ?? cover.objectKey}
-          fill
+          objectKey={cover.objectKey}
+          thumbObjectKey={cover.thumbObjectKey}
           sizes="64px"
-          className="object-cover"
         />
       ) : (
         <svg

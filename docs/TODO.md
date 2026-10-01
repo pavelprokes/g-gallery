@@ -17,6 +17,12 @@ broken twice already — needs a signed-in session, and this repo has no test-au
 real Google OAuth test account or a documented bypass is a prerequisite before that flow can be
 covered; not attempted yet.
 
+**Admin session in E2E — done 2026-09-30.** `e2e/seed.ts` `makeAdminSession` inserts a `session`
+row for the E2E user and writes the cookie better-auth would have set (HMAC-SHA256 of the token
+with `BETTER_AUTH_SECRET`, as better-call signs it) to `.seed.json` as `adminCookie`. A spec adds
+it with `context.addCookies` and is signed in; nothing in the app changed. First user:
+`e2e/admin.spec.ts`. The upload flow above is now reachable — still not written.
+
 Added 2026-09-01: `e2e/promo-tile.spec.ts` (4 cases) covers the credit tile's inertness claims —
 it must not be openable, arrow-navigable, selectable or countable
 (`docs/PROMO-CARDS.md`). The seed places one at slot 5 in the _same_ gallery

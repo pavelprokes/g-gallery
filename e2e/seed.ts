@@ -10,6 +10,7 @@
  * of importing it directly, for the same reason.
  */
 import "dotenv/config";
+import { createHmac, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../src/lib/db";
@@ -254,9 +255,12 @@ async function main() {
   const wovenOrder = await makeWovenOrderGallery(user.id);
   const highlights = await makeHighlightsGallery(user.id);
 
+  const adminCookie = await makeAdminSession(user.id);
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
+      adminCookie,
       galleryId: gallery.id,
       token,
       slug,
@@ -751,4 +755,29 @@ async function makeHighlightsGallery(ownerId: string) {
     pinnedFile: `highlight_${pinned}.jpg`,
     excludedFile: `highlight_${excluded}.jpg`,
   };
+}
+
+/**
+ * A signed-in admin without Google OAuth: a `session` row for the E2E user
+ * plus the cookie better-auth would have set for it. The value is signed the
+ * way better-call signs it (HMAC-SHA256 with BETTER_AUTH_SECRET, standard
+ * base64, then URI-encoded), so `auth.api.getSession` accepts it unchanged —
+ * no bypass lives in the app. Deleted with the user's sessions on teardown.
+ */
+async function makeAdminSession(userId: string) {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret) throw new Error("BETTER_AUTH_SECRET missing — the admin specs need it");
+  const token = randomBytes(24).toString("base64url");
+  await prisma.session.create({
+    data: {
+      id: `e2e-${token.slice(0, 12)}`,
+      token,
+      userId,
+      // better-auth's default lifetime: anything shorter is "due for refresh"
+      // on the first request, which would try to set a cookie from an RSC.
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+  const signature = createHmac("sha256", secret).update(token).digest("base64");
+  return { name: "better-auth.session_token", value: encodeURIComponent(`${token}.${signature}`) };
 }

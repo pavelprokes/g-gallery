@@ -3,9 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 
 // The panel's module also exports the server-action forms; the field under
 // test uses none of them.
+// The custom image loader needs env the unit tests do not have.
+// eslint-disable-next-line @next/next/no-img-element -- a stand-in, never rendered for real
+vi.mock("next/image", () => ({ default: ({ alt }: { alt: string }) => <img alt={alt} /> }));
 vi.mock("@/app/admin/chapter-actions", () => ({ deleteChapter: vi.fn(), updateChapter: vi.fn() }));
 
-import { ChapterTitleField, StartChapterDetails } from "./gallery-chapter-panel";
+import {
+  ChapterTitleField,
+  GalleryChapterPanel,
+  StartChapterDetails,
+} from "./gallery-chapter-panel";
 
 describe("ChapterTitleField", () => {
   it("fills the title with a tapped preset, and says which one is chosen", () => {
@@ -45,5 +52,36 @@ describe("StartChapterDetails", () => {
 
     expect(screen.getByRole("textbox", { name: "Název kapitoly" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hostina" })).toBeInTheDocument();
+  });
+});
+
+describe("GalleryChapterPanel", () => {
+  const chapter = (id: string, title: string) => ({
+    id,
+    anchor: id,
+    title,
+    translations: {},
+    count: 3,
+    firstPhoto: { objectKey: `k/${id}.jpg`, thumbObjectKey: null, fileName: `${id}.jpg` },
+  });
+
+  it("warns on both chapters that share a name, and on no other", () => {
+    render(
+      <GalleryChapterPanel
+        chapters={[
+          chapter("a", "Večerní zábava"),
+          chapter("b", "Obřad"),
+          chapter("c", "večerní zábava "),
+        ]}
+        shareUrl="/g/t/slug"
+        timelineHref="?timeline=1"
+        timelineActive={false}
+      />,
+    );
+    expect(screen.getAllByText(/Stejný název má i jiná kapitola/)).toHaveLength(2);
+    // An id anchor (pre-slug chapter) is not shown as a cryptic #hash.
+    expect(
+      screen.getAllByRole("button", { name: /Kopírovat odkaz rovnou na kapitolu/ })[0],
+    ).toHaveTextContent("Odkaz na kapitolu");
   });
 });

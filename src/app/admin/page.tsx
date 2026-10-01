@@ -86,12 +86,15 @@ export default async function AdminPage() {
   const [galleries, trashed, events, trashedEvents, sessions] = await Promise.all([
     prisma.gallery.findMany({
       where: { ownerId: session.user.id, trashedAt: null },
+      // Sorted below: an undated gallery goes by its wedding's day.
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         title: true,
         status: true,
         eventDate: true,
+        createdAt: true,
+        event: { select: { eventDate: true } },
         coverPhoto: chosenCover,
         photos: newestPhoto,
         _count: {
@@ -106,7 +109,9 @@ export default async function AdminPage() {
     }),
     prisma.event.findMany({
       where: { ownerId: session.user.id, trashedAt: null },
-      orderBy: { createdAt: "desc" },
+      // Newest wedding first — by the day it happened, not the day its row was
+      // created (a 2023 gallery uploaded this week must not top the list).
+      orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -137,6 +142,13 @@ export default async function AdminPage() {
       select: { galleryId: true, viewerId: true, startedAt: true },
     }),
   ]);
+
+  // Newest wedding day first — not the day the row was created (a 2023
+  // gallery uploaded this week must not top the list). A gallery added to a
+  // wedding usually has no date of its own; it goes by the wedding's.
+  const dayOf = (gallery: (typeof galleries)[number]) =>
+    (gallery.eventDate ?? gallery.event?.eventDate ?? gallery.createdAt).getTime();
+  galleries.sort((a, b) => dayOf(b) - dayOf(a));
 
   // Rows carry the scale, so a gallery in the trash must not stretch it.
   const listed = new Set(galleries.map((gallery) => gallery.id));
