@@ -173,10 +173,6 @@
           "body": "Při prvním označení se galerie zeptá, jak se jmenuješ. Fotograf pak ví, čí výběr je čí. Klidně to můžeš i přeskočit."
         },
         {
-          "title": "Výběr si pamatuje tenhle telefon nebo prohlížeč.",
-          "body": "Chceš pokračovat na počítači? Úplně dole pod fotkami zvol „Pokračovat na jiném zařízení“ a dostaneš kód. Na druhém zařízení pak klepni na „Mám kód“, zadej ho a výběr se přenese."
-        },
-        {
           "title": "Bez signálu to nevadí.",
           "body": "Ve vlaku nebo na chalupě uvidíš upozornění, že změny čekají. Uloží se samy, jakmile budeš zase online."
         },
@@ -184,7 +180,37 @@
           "title": "Nevidíš tiskárnu vůbec?",
           "body": "Výběr k tisku fotograf u téhle galerie nezapnul. Napiš mu a domluvíte se."
         }
-      ]
+      ],
+      "visibility": {
+        "heading": "Kdo tvůj výběr uvidí",
+        "lead": "Výběr k tisku není soukromý zápisník – je to objednávka, kterou skládá i víc lidí najednou. Proto je dobré vědět, co kdo vidí.",
+        "photographerTerm": "Fotograf",
+        "photographerBody": "Vidí všechno: které fotky, kolik kusů a od koho, pokud vyplníš jméno.",
+        "sameLinkTerm": "Kdo má stejný odkaz jako ty",
+        "sameLinkBody": "Třeba partner nebo rodiče, kterým odkaz přepošlete. Vidí u fotky jen šedé číslo, kolik kusů chtějí ostatní, a celkový souhrn. Nevidí, kdo co vybral, ani tvoje jméno.",
+        "guestsTerm": "Hosté se svatební stránky",
+        "guestsBody": "Mají vlastní odkaz, takže tvůj výběr nevidí vůbec – a ty nevidíš ten jejich.",
+        "hint": "Odkaz na svou galerii proto posílej jen těm, se kterými chceš výběr skládat."
+      },
+      "devices": {
+        "heading": "Začínáš na telefonu, pokračuješ doma",
+        "lead": "Galerie si tvůj výběr pamatuje v prohlížeči, ve kterém ho děláš – bez účtu a hesla. Když chceš pokračovat na jiném zařízení, přeneseš ho krátkým kódem.",
+        "step1Title": "Na prvním zařízení si vyžádej kód",
+        "step1Body": "Sjeď úplně dolů pod fotky a klepni na „Pokračovat na jiném zařízení“. Ukáže se kód o osmi znacích, třeba K7P2-M9XQ.",
+        "step2Title": "Na druhém zařízení otevři stejnou galerii",
+        "step2Body": "Použij stejný odkaz jako předtím – třeba z e-mailu nebo zprávy od fotografa.",
+        "step3Title": "Zadej kód",
+        "step3Body": "Úplně dole klikni na „Mám kód“, opiš ho a potvrď tlačítkem „Přenést“. Stránka se obnoví a tvůj výběr je tam.",
+        "notes": [
+          "Kód platí 15 minut a dá se použít jen jednou. Když nestihneš, nech si vytvořit nový.",
+          "Na velkých a malých písmenech ani na pomlčce nezáleží.",
+          "Přenese se všechno: výběr k tisku, srdíčka, reakce i jméno.",
+          "Od té chvíle obě zařízení pracují s jedním výběrem. Co přidáš na počítači, uvidíš po obnovení stránky i v telefonu.",
+          "Kód zadej dřív, než na druhém zařízení začneš něco označovat. Co tam označíš předtím, se nepřenese.",
+          "Kód půjde vytvořit, až budeš mít v galerii něco označené."
+        ],
+        "togetherHint": "Vybíráte ve dvou? Nemusíte nic přenášet – každý může vybírat ze svého telefonu a výběry se sčítají. Kódem si naopak můžete udělat jeden společný výběr na obou telefonech."
+      }
     },
     "help": "Něco nejde, nebo si nevíš rady? <a>Napiš fotografovi</a>, rád pomůže."
   },
