@@ -34,8 +34,11 @@ export function GuideSection({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={id} className="mt-14 scroll-mt-6">
-      <h2 id={id} className="text-brand-ink text-2xl font-semibold dark:text-neutral-100">
+    <section aria-labelledby={id} className="mt-14">
+      <h2
+        id={id}
+        className="text-brand-ink scroll-mt-6 text-2xl font-semibold dark:text-neutral-100"
+      >
         {heading}
       </h2>
       {intro && <p className="mt-2 max-w-prose text-neutral-600 dark:text-neutral-400">{intro}</p>}
@@ -44,10 +47,21 @@ export function GuideSection({
   );
 }
 
-export function SubHeading({ children, lead }: { children: ReactNode; lead?: ReactNode }) {
+export function SubHeading({
+  id,
+  children,
+  lead,
+}: {
+  id?: string;
+  children: ReactNode;
+  lead?: ReactNode;
+}) {
   return (
     <>
-      <h3 className="text-brand-ink mt-10 text-xl font-semibold dark:text-neutral-100">
+      <h3
+        id={id}
+        className="text-brand-ink mt-10 scroll-mt-6 text-xl font-semibold dark:text-neutral-100"
+      >
         {children}
       </h3>
       {lead && (
@@ -81,9 +95,19 @@ export function StepList({ steps }: { steps: Step[] }) {
 }
 
 /** A tinted card holding a titled run of steps — one "way" of doing something. */
-export function StepCard({ title, lead, steps }: { title: string; lead?: string; steps: Step[] }) {
+export function StepCard({
+  title,
+  lead,
+  steps,
+  className = "",
+}: {
+  title: string;
+  lead?: string;
+  steps: Step[];
+  className?: string;
+}) {
   return (
-    <Card className="bg-brand-tint dark:bg-neutral-900">
+    <Card className={`bg-brand-tint dark:bg-neutral-900 ${className}`}>
       <h3 className="text-brand-ink font-semibold dark:text-neutral-100">{title}</h3>
       {lead && <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{lead}</p>}
       <StepList steps={steps} />

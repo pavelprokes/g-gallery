@@ -1,40 +1,72 @@
 import type { Metadata } from "next";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import Image from "next/image";
-import type { ReactNode } from "react";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { Card } from "@/components/ui/card";
 import {
-  CheckCircleIcon,
+  CheckIcon,
+  DownloadIcon,
   HeartIcon,
   MinusIcon,
   PlusIcon,
   PrinterIcon,
+  ProjectorIcon,
 } from "@/components/ui/icons";
 import type { Locale } from "@/i18n/locales";
 import { previewMetadata } from "@/lib/og-image";
 import cs from "../../../messages/cs.json";
+import guideCs from "./guide.cs.json";
+import {
+  CheckList,
+  GuideSection,
+  InlineGlyph,
+  Note,
+  StepCard,
+  StepList,
+  SubHeading,
+  TermList,
+} from "./guide-ui";
 
 /**
  * The client guide is written in Czech first and translated once the Czech is
- * settled, so until then it renders in Czech whatever the viewer's language —
- * en.json and fr.json hold a copy of the Czech `guide` only to keep the
- * catalogs' key sets equal (src/i18n/messages.test.ts). When they are
- * translated, drop this constant and the direct catalog import (use
- * `getTranslations` and the request locale like `/`), add the LocaleSwitcher
- * to the footer, index the page and list it in the sitemap.
+ * settled, so until then it renders in Czech whatever the viewer's language.
  *
- * `createTranslator` over the imported catalog rather than
- * `getTranslations({ locale })`: src/i18n/request.ts always loads the
- * request's own locale, so the latter returns English strings to a viewer
- * whose cookie or browser says English, whatever locale is asked for.
+ * Its copy lives next to the page (guide.cs.json), not in messages/*.json:
+ * the root layout hands the whole shared catalog to the client on every page,
+ * and this page's text is several times longer than anything a guest gallery
+ * needs. The gallery's own strings it quotes (the print summary, button
+ * names) still come from messages/cs.json, so they cannot drift apart. When
+ * translating, add guide.en.json / guide.fr.json beside it, pick one by the
+ * request locale (`getLocale()`), add the LocaleSwitcher to the footer, index
+ * the page and list it in the sitemap.
+ *
+ * `createTranslator` rather than `getTranslations({ locale })`:
+ * src/i18n/request.ts always loads the request's own locale, so the latter
+ * returns English strings to a viewer whose cookie or browser says English,
+ * whatever locale is asked for.
  */
 const GUIDE_LOCALE: Locale = "cs";
 
 const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
+/** Section anchors, in page order — the table of contents is built from this. */
+const SECTIONS = [
+  { id: "tisk", key: "print" },
+  { id: "prohlizeni", key: "browse" },
+  { id: "oblibene", key: "favorites" },
+  { id: "stahovani", key: "download" },
+  { id: "hoste", key: "guests" },
+  { id: "offline", key: "offline" },
+  { id: "soukromi", key: "privacy" },
+  { id: "problemy", key: "trouble" },
+] as const;
+
+const DEVICES_ANCHOR = "jine-zarizeni";
+
+const MESSAGES = { ...cs, guide: guideCs };
+
 export function generateMetadata(): Metadata {
-  const t = createTranslator({ locale: GUIDE_LOCALE, messages: cs, namespace: "guide" });
+  const t = createTranslator({ locale: GUIDE_LOCALE, messages: MESSAGES, namespace: "guide" });
   const title = t("pageTitle");
   const description = t("pageDescription");
 
@@ -55,57 +87,37 @@ export function generateMetadata(): Metadata {
   };
 }
 
-interface TipEntry {
+interface TitledEntry {
   title: string;
   body: string;
 }
 
-/** A control's glyph shown inline in a sentence, so the reader knows what to look for. */
-function InlineGlyph({ children, label }: { children: ReactNode; label?: string }) {
-  return (
-    <span
-      className="bg-brand-tint border-brand-border/70 text-brand-ink mx-0.5 inline-flex h-6 min-w-6 items-center justify-center gap-0.5 rounded-full border px-1 align-middle dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-      role={label ? "img" : undefined}
-      aria-label={label}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StepList({ steps }: { steps: { title: string; body: ReactNode }[] }) {
-  return (
-    <ol className="mt-4 space-y-4">
-      {steps.map(({ title, body }, index) => (
-        <li key={title} className="flex gap-3">
-          <span className="bg-brand-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white tabular-nums">
-            {index + 1}
-          </span>
-          <div className="text-sm">
-            <p className="text-brand-ink font-medium dark:text-neutral-100">{title}</p>
-            <div className="mt-1 space-y-1 text-neutral-600 dark:text-neutral-400">{body}</div>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
+interface TermEntry {
+  term: string;
+  body: string;
 }
 
 export default function GuidePage() {
-  const t = createTranslator({ locale: GUIDE_LOCALE, messages: cs, namespace: "guide" });
-  const tGallery = createTranslator({ locale: GUIDE_LOCALE, messages: cs, namespace: "gallery" });
+  const t = createTranslator({ locale: GUIDE_LOCALE, messages: MESSAGES, namespace: "guide" });
+  const tGallery = createTranslator({
+    locale: GUIDE_LOCALE,
+    messages: MESSAGES,
+    namespace: "gallery",
+  });
   const tMarketing = createTranslator({
     locale: GUIDE_LOCALE,
-    messages: cs,
+    messages: MESSAGES,
     namespace: "marketing",
   });
   const tFooter = createTranslator({
     locale: GUIDE_LOCALE,
-    messages: cs,
+    messages: MESSAGES,
     namespace: "siteFooter",
   });
-  const tips = t.raw("print.tips") as TipEntry[];
 
+  // The gallery's own controls, shown inline in the sentences that name them.
+  // Labelled with the gallery's own accessible names, so a screen reader hears
+  // the same words here as on the button itself.
   const glyphs = {
     printer: () => (
       <InlineGlyph label={tGallery("markForPrint")}>
@@ -118,6 +130,11 @@ export default function GuidePage() {
         <PrinterIcon className="size-3.5" />
       </InlineGlyph>
     ),
+    heart: () => (
+      <InlineGlyph label={tGallery("addToFavorites")}>
+        <HeartIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
     plus: () => (
       <InlineGlyph label={tGallery("increasePrintQuantity")}>
         <PlusIcon className="size-3.5" />
@@ -128,12 +145,25 @@ export default function GuidePage() {
         <MinusIcon className="size-3.5" />
       </InlineGlyph>
     ),
+    download: () => (
+      <InlineGlyph label={tGallery("downloadOriginal")}>
+        <DownloadIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
+    check: () => (
+      <InlineGlyph label={tGallery("select")}>
+        <CheckIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
+    projector: () => (
+      <InlineGlyph>
+        <ProjectorIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
   };
 
-  const summaryTerms = (["photos", "pieces", "everyone", "saved"] as const).map((key) => ({
-    term: t(`print.summary.${key}Term`),
-    body: t(`print.summary.${key}Body`),
-  }));
+  const linkClasses =
+    "text-brand-primary hover:text-brand-primary-dark font-medium underline underline-offset-4";
 
   return (
     <main lang={GUIDE_LOCALE} className="font-brand mx-auto max-w-3xl px-4 py-12 sm:py-16">
@@ -146,10 +176,7 @@ export default function GuidePage() {
             {t("heroTitle")}
           </h1>
           <p className="mt-4 max-w-prose text-neutral-600 dark:text-neutral-400">{t("heroLead")}</p>
-          <a
-            href={MAIN_SITE_URL}
-            className="text-brand-primary hover:text-brand-primary-dark mt-6 inline-block text-sm font-medium underline underline-offset-4"
-          >
+          <a href={MAIN_SITE_URL} className={`${linkClasses} mt-6 inline-block text-sm`}>
             {tMarketing("backToMainSite")}
           </a>
         </div>
@@ -171,78 +198,57 @@ export default function GuidePage() {
         <h2 id="obsah" className="text-brand-primary text-sm font-medium tracking-wide uppercase">
           {t("tocHeading")}
         </h2>
-        <ol className="mt-2 space-y-1 text-sm">
-          <li>
-            <a
-              href="#tisk"
-              className="text-brand-ink hover:text-brand-primary font-medium underline-offset-4 hover:underline dark:text-neutral-100"
-            >
-              {t("print.heading")}
-            </a>
-          </li>
+        <ol className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+          {SECTIONS.map(({ id, key }) => (
+            <li key={id}>
+              <a
+                href={`#${id}`}
+                className="text-brand-ink hover:text-brand-primary inline-block py-1 font-medium underline-offset-4 hover:underline dark:text-neutral-100"
+              >
+                {t(`${key}.heading`)}
+              </a>
+            </li>
+          ))}
         </ol>
       </nav>
 
-      <section aria-labelledby="tisk" className="mt-12 mb-12 scroll-mt-6">
-        <h2 id="tisk" className="text-brand-ink text-2xl font-semibold dark:text-neutral-100">
-          {t("print.heading")}
-        </h2>
-        <p className="mt-2 max-w-prose text-neutral-600 dark:text-neutral-400">
-          {t("print.intro")}
-        </p>
-
+      {/* 1 — Print */}
+      <GuideSection id="tisk" heading={t("print.heading")} intro={t("print.intro")}>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Card className="bg-brand-tint dark:bg-neutral-900">
-            <h3 className="text-brand-ink font-semibold dark:text-neutral-100">
-              {t("print.grid.title")}
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-              {t("print.grid.lead")}
-            </p>
-            <StepList
-              steps={[
-                {
-                  title: t("print.grid.showTitle"),
-                  body: (
-                    <>
-                      <p>{t.rich("print.grid.showPhone", glyphs)}</p>
-                      <p>{t("print.grid.showDesktop")}</p>
-                    </>
-                  ),
-                },
-                {
-                  title: t("print.grid.tapTitle"),
-                  body: <p>{t.rich("print.grid.tapBody", glyphs)}</p>,
-                },
-              ]}
-            />
-          </Card>
-          <Card className="bg-brand-tint dark:bg-neutral-900">
-            <h3 className="text-brand-ink font-semibold dark:text-neutral-100">
-              {t("print.detail.title")}
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-              {t("print.detail.lead")}
-            </p>
-            <StepList
-              steps={[
-                { title: t("print.detail.openTitle"), body: <p>{t("print.detail.openBody")}</p> },
-                {
-                  title: t("print.detail.tapTitle"),
-                  body: <p>{t.rich("print.detail.tapBody", glyphs)}</p>,
-                },
-                { title: t("print.detail.nextTitle"), body: <p>{t("print.detail.nextBody")}</p> },
-              ]}
-            />
-          </Card>
+          <StepCard
+            title={t("print.grid.title")}
+            lead={t("print.grid.lead")}
+            steps={[
+              {
+                title: t("print.grid.showTitle"),
+                body: (
+                  <>
+                    <p>{t.rich("print.grid.showPhone", glyphs)}</p>
+                    <p>{t("print.grid.showDesktop")}</p>
+                  </>
+                ),
+              },
+              {
+                title: t("print.grid.tapTitle"),
+                body: <p>{t.rich("print.grid.tapBody", glyphs)}</p>,
+              },
+            ]}
+          />
+          <StepCard
+            title={t("print.detail.title")}
+            lead={t("print.detail.lead")}
+            steps={[
+              { title: t("print.detail.openTitle"), body: <p>{t("print.detail.openBody")}</p> },
+              {
+                title: t("print.detail.tapTitle"),
+                body: <p>{t.rich("print.detail.tapBody", glyphs)}</p>,
+              },
+              { title: t("print.detail.nextTitle"), body: <p>{t("print.detail.nextBody")}</p> },
+            ]}
+          />
         </div>
 
-        <h3 className="text-brand-ink mt-10 text-xl font-semibold dark:text-neutral-100">
-          {t("print.quantity.heading")}
-        </h3>
-        <p className="mt-2 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-          {t("print.quantity.lead")}
-        </p>
+        <SubHeading lead={t("print.quantity.lead")}>{t("print.quantity.heading")}</SubHeading>
         <div className="mt-4 grid gap-6 sm:grid-cols-[1fr_1.4fr] sm:items-start">
           {/* A tile cropped out of the hero mockup with the gallery's own stepper
               drawn over it — the real control's look, not a screenshot, so it
@@ -257,7 +263,7 @@ export default function GuidePage() {
               alt=""
               width={1000}
               height={2073}
-              sizes="(max-width: 640px) 36rem, 36rem"
+              sizes="36rem"
               className="absolute top-[-23.9%] left-[-11.2%] h-auto w-[223.7%] max-w-none"
             />
             <div
@@ -274,27 +280,17 @@ export default function GuidePage() {
               </span>
             </div>
           </div>
-          <ul className="space-y-3">
-            {[
+          <CheckList
+            items={[
               t.rich("print.quantity.plus", glyphs),
               t.rich("print.quantity.minus", glyphs),
               t("print.quantity.max"),
               t("print.quantity.others"),
-            ].map((item, index) => (
-              <li key={index} className="flex gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                <CheckCircleIcon className="text-brand-primary mt-0.5 size-4 shrink-0" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+            ]}
+          />
         </div>
 
-        <h3 className="text-brand-ink mt-10 text-xl font-semibold dark:text-neutral-100">
-          {t("print.summary.heading")}
-        </h3>
-        <p className="mt-2 max-w-prose text-sm text-neutral-600 dark:text-neutral-400">
-          {t("print.summary.lead")}
-        </p>
+        <SubHeading lead={t("print.summary.lead")}>{t("print.summary.heading")}</SubHeading>
         {/* The gallery's sticky print summary (src/components/gallery-view.tsx),
             built from the same messages, over a dark strip standing in for photos. */}
         <div
@@ -313,41 +309,172 @@ export default function GuidePage() {
             </span>
           </p>
         </div>
-        <dl className="mt-4 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
-          {summaryTerms.map(({ term, body }) => (
-            <div key={term} className="contents">
-              <dt className="text-brand-ink font-medium dark:text-neutral-100">{term}</dt>
-              <dd className="mb-2 text-neutral-600 sm:mb-0 dark:text-neutral-400">{body}</dd>
-            </div>
-          ))}
-        </dl>
+        <TermList
+          terms={(["photos", "pieces", "everyone", "saved"] as const).map((key) => ({
+            term: t(`print.summary.${key}Term`),
+            body: t(`print.summary.${key}Body`),
+          }))}
+        />
 
-        <h3 className="text-brand-ink mt-10 text-xl font-semibold dark:text-neutral-100">
-          {t("print.tipsHeading")}
-        </h3>
-        <ul className="mt-4 space-y-3">
-          {tips.map(({ title, body }) => (
-            <li key={title} className="flex gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-              <CheckCircleIcon className="text-brand-primary mt-0.5 size-4 shrink-0" />
-              <span>
-                <strong className="text-brand-ink font-medium dark:text-neutral-100">
-                  {title}
-                </strong>{" "}
-                {body}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <SubHeading lead={t("print.visibility.lead")}>{t("print.visibility.heading")}</SubHeading>
+        <TermList
+          terms={(["photographer", "sameLink", "guests"] as const).map((key) => ({
+            term: t(`print.visibility.${key}Term`),
+            body: t(`print.visibility.${key}Body`),
+          }))}
+        />
+        <Note>{t("print.visibility.hint")}</Note>
 
-      <Card className="bg-brand-tint mb-12 dark:bg-neutral-900">
+        <SubHeading id={DEVICES_ANCHOR} lead={t("print.devices.lead")}>
+          {t("print.devices.heading")}
+        </SubHeading>
+        <StepList
+          steps={([1, 2, 3] as const).map((n) => ({
+            title: t(`print.devices.step${n}Title`),
+            body: <p>{t(`print.devices.step${n}Body`)}</p>,
+          }))}
+        />
+        <CheckList items={t.raw("print.devices.notes") as string[]} />
+        <Note>{t("print.devices.togetherHint")}</Note>
+
+        <SubHeading>{t("print.tipsHeading")}</SubHeading>
+        <CheckList items={t.raw("print.tips") as TitledEntry[]} />
+      </GuideSection>
+
+      {/* 2 — Browsing */}
+      <GuideSection id="prohlizeni" heading={t("browse.heading")} intro={t("browse.intro")}>
+        <SubHeading lead={t("browse.detailLead")}>{t("browse.detailHeading")}</SubHeading>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Card className="bg-brand-tint dark:bg-neutral-900">
+            <h4 className="text-brand-ink font-semibold dark:text-neutral-100">
+              {t("browse.phoneTerm")}
+            </h4>
+            <CheckList items={t.raw("browse.phone") as string[]} />
+          </Card>
+          <Card className="bg-brand-tint dark:bg-neutral-900">
+            <h4 className="text-brand-ink font-semibold dark:text-neutral-100">
+              {t("browse.desktopTerm")}
+            </h4>
+            <CheckList items={t.raw("browse.desktop") as string[]} />
+          </Card>
+        </div>
+
+        <SubHeading lead={t("browse.chaptersBody")}>{t("browse.chaptersHeading")}</SubHeading>
+        <SubHeading lead={t("browse.highlightsBody")}>{t("browse.highlightsHeading")}</SubHeading>
+        <SubHeading lead={t.rich("browse.slideshowBody", glyphs)}>
+          {t("browse.slideshowHeading")}
+        </SubHeading>
+        <Note>{t("browse.slideshowNote")}</Note>
+        <Note>{t("browse.newPhotos")}</Note>
+      </GuideSection>
+
+      {/* 3 — Favourites and reactions */}
+      <GuideSection id="oblibene" heading={t("favorites.heading")} intro={t("favorites.intro")}>
+        <SubHeading>{t("favorites.howHeading")}</SubHeading>
+        <CheckList items={[t.rich("favorites.phone", glyphs), t("favorites.desktop")]} />
+
+        <SubHeading lead={t("favorites.filterBody")}>{t("favorites.filterHeading")}</SubHeading>
+        <Note>{t("favorites.countBody")}</Note>
+
+        <SubHeading lead={t("favorites.reactionsBody")}>
+          {t("favorites.reactionsHeading")}
+        </SubHeading>
+
+        <Note>
+          {t.rich("favorites.devicesNote", {
+            a: (chunks) => (
+              <a href={`#${DEVICES_ANCHOR}`} className={linkClasses}>
+                {chunks}
+              </a>
+            ),
+          })}
+        </Note>
+        <Note>{t("favorites.missing")}</Note>
+      </GuideSection>
+
+      {/* 4 — Downloads */}
+      <GuideSection id="stahovani" heading={t("download.heading")} intro={t("download.intro")}>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <StepCard
+            title={t("download.oneTitle")}
+            steps={[
+              { title: t("download.oneOpenTitle"), body: <p>{t("download.oneOpenBody")}</p> },
+              {
+                title: t("download.oneTapTitle"),
+                body: <p>{t.rich("download.oneTapBody", glyphs)}</p>,
+              },
+            ]}
+          />
+          <StepCard
+            title={t("download.someTitle")}
+            steps={[
+              {
+                title: t("download.someSelectTitle"),
+                body: (
+                  <>
+                    <p>{t("download.someSelectPhone")}</p>
+                    <p>{t.rich("download.someSelectDesktop", glyphs)}</p>
+                  </>
+                ),
+              },
+              {
+                title: t("download.someDownloadTitle"),
+                body: <p>{t("download.someDownloadBody")}</p>,
+              },
+            ]}
+          />
+          <StepCard
+            className="sm:col-span-2"
+            title={t("download.allTitle")}
+            steps={[{ title: t("download.allTapTitle"), body: <p>{t("download.allTapBody")}</p> }]}
+          />
+        </div>
+        <SubHeading>{t("download.tipsHeading")}</SubHeading>
+        <CheckList items={t.raw("download.tips") as TitledEntry[]} />
+      </GuideSection>
+
+      {/* 5 — Guest uploads */}
+      <GuideSection id="hoste" heading={t("guests.heading")} intro={t("guests.intro")}>
+        <StepList
+          steps={(["add", "name", "wait"] as const).map((key) => ({
+            title: t(`guests.${key}Title`),
+            body: <p>{t(`guests.${key}Body`)}</p>,
+          }))}
+        />
+        <SubHeading>{t("guests.tipsHeading")}</SubHeading>
+        <CheckList items={t.raw("guests.tips") as TitledEntry[]} />
+        <SubHeading lead={t("guests.hubBody")}>{t("guests.hubHeading")}</SubHeading>
+      </GuideSection>
+
+      {/* 6 — Offline */}
+      <GuideSection id="offline" heading={t("offline.heading")} intro={t("offline.intro")}>
+        <StepList
+          steps={(["scroll", "tap", "save"] as const).map((key) => ({
+            title: t(`offline.${key}Title`),
+            body: <p>{t(`offline.${key}Body`)}</p>,
+          }))}
+        />
+        <CheckList items={t.raw("offline.tips") as string[]} />
+      </GuideSection>
+
+      {/* 7 — Name and privacy */}
+      <GuideSection id="soukromi" heading={t("privacy.heading")} intro={t("privacy.intro")}>
+        <TermList terms={t.raw("privacy.terms") as TermEntry[]} />
+        <Note>{t("privacy.countsNote")}</Note>
+        <SubHeading lead={t("privacy.optOutBody")}>{t("privacy.optOutHeading")}</SubHeading>
+        <Note>{t("privacy.optOutWarning")}</Note>
+      </GuideSection>
+
+      {/* 8 — Troubleshooting */}
+      <GuideSection id="problemy" heading={t("trouble.heading")}>
+        <CheckList items={t.raw("trouble.items") as TitledEntry[]} />
+      </GuideSection>
+
+      <Card className="bg-brand-tint mt-14 mb-12 dark:bg-neutral-900">
         <p className="text-brand-ink text-sm dark:text-neutral-100">
           {t.rich("help", {
             a: (chunks) => (
-              <a
-                href={`mailto:${tFooter("email")}`}
-                className="text-brand-primary hover:text-brand-primary-dark font-medium underline underline-offset-4"
-              >
+              <a href={`mailto:${tFooter("email")}`} className={linkClasses}>
                 {chunks}
               </a>
             ),
