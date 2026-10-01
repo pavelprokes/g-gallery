@@ -107,6 +107,87 @@
     "footerText": "This gallery is run by your photographer.",
     "footerLinkText": "Wedding Photographer Czechia →"
   },
+  "guide": {
+    "pageTitle": "Jak pracovat s galerií – návod pro klienty",
+    "pageDescription": "Krok za krokem: jak v galerii vybrat fotky k tisku, nastavit počet kusů a předat výběr fotografovi.",
+    "kicker": "Návod pro klienty",
+    "heroTitle": "Jak pracovat se svou galerií",
+    "heroLead": "Galerii zvládneš v telefonu i na počítači. Nic se neinstaluje a nikam se nepřihlašuješ – stačí odkaz, který ti fotograf poslal. Postupně tu najdeš všechno, co se ti při práci s ní může hodit.",
+    "tocHeading": "Obsah",
+    "print": {
+      "heading": "1. Výběr fotek k tisku",
+      "intro": "Fotky, které chceš mít na papíře, si označíš přímo v galerii. Nemusíš nic vypisovat ani posílat e-mailem – fotograf tvůj výběr uvidí u sebe. Označovat můžeš dvěma způsoby a klidně je střídat.",
+      "grid": {
+        "title": "V přehledu fotek",
+        "lead": "Rychlé, když procházíš celou galerii.",
+        "showTitle": "Zobraz si tiskárny",
+        "showPhone": "Na telefonu klepni nahoře vedle názvu galerie na tlačítko <marking></marking>. U každé fotky se pak vpravo nahoře objeví malá tiskárna.",
+        "showDesktop": "Na počítači stačí najet myší na fotku a tiskárna se ukáže sama.",
+        "tapTitle": "Klepni na tiskárnu",
+        "tapBody": "Klepni na <printer></printer> u fotky, kterou chceš vytisknout. Tím ji označíš k tisku v jednom kusu."
+      },
+      "detail": {
+        "title": "V detailu fotky",
+        "lead": "Když si fotku chceš nejdřív pořádně prohlédnout.",
+        "openTitle": "Klepni na fotku",
+        "openBody": "Otevře se přes celou obrazovku.",
+        "tapTitle": "Klepni na tiskárnu",
+        "tapBody": "Najdeš ji dole v liště: <printer></printer>. Tím fotku označíš k tisku v jednom kusu.",
+        "nextTitle": "Pokračuj další fotkou",
+        "nextBody": "Přejeď prstem do strany, nebo použij šipky, a označuj stejně dál."
+      },
+      "quantity": {
+        "heading": "Kolik kusů?",
+        "lead": "Po prvním klepnutí se tiskárna změní na počítadlo. Funguje stejně v přehledu i v detailu fotky.",
+        "plus": "<plus></plus> přidá další kopii téže fotky. Třeba tři kusy – pro vás, pro rodiče a pro babičku.",
+        "minus": "<minus></minus> jednu kopii ubere. Když ubereš i tu poslední, označení zmizí a vrátí se obyčejná tiskárna.",
+        "max": "Jednu fotku můžeš chtít až 99×.",
+        "others": "Když z galerie vybírá víc lidí, uvidíš vedle počítadla šedé číslo, třeba (+2). To jsou kusy, které k fotce chtějí ostatní. Tvůj počet se tím nemění.",
+        "demoLabel": "Ukázka: fotka označená k tisku ve třech kusech, ostatní k ní chtějí další dva."
+      },
+      "summary": {
+        "heading": "Souhrn nahoře",
+        "lead": "Při vybírání ti nahoře zůstává lišta, ze které hned poznáš, kolik toho máš.",
+        "demoLabel": "Ukázka souhrnu výběru k tisku",
+        "photosTerm": "Fotky",
+        "photosBody": "Kolik různých fotek máš vybraných.",
+        "piecesTerm": "Kusy (ks)",
+        "piecesBody": "Kolik výtisků to je dohromady – některé fotky můžeš chtít víckrát.",
+        "everyoneTerm": "Se všemi",
+        "everyoneBody": "Součet za všechny, kdo z galerie vybírají. Ukáže se, jen když vybírá víc lidí.",
+        "savedTerm": "Uloženo",
+        "savedBody": "Výběr je bezpečně uložený. Žádné tlačítko „Odeslat“ tu není a není ani potřeba."
+      },
+      "tipsHeading": "Dobré vědět",
+      "tips": [
+        {
+          "title": "Srdíčko není tisk.",
+          "body": "Srdíčkem si fotku uložíš mezi oblíbené. K tisku ji fotograf zařadí, jen když u ní klepneš na tiskárnu."
+        },
+        {
+          "title": "Až budeš mít vybráno, dej fotografovi vědět.",
+          "body": "Výběr vidí průběžně, ale nepozná, kdy je hotový. Stačí krátká zpráva."
+        },
+        {
+          "title": "Vyplň své jméno.",
+          "body": "Při prvním označení se galerie zeptá, jak se jmenuješ. Fotograf pak ví, čí výběr je čí. Klidně to můžeš i přeskočit."
+        },
+        {
+          "title": "Výběr si pamatuje tenhle telefon nebo prohlížeč.",
+          "body": "Chceš pokračovat na počítači? Úplně dole pod fotkami zvol „Pokračovat na jiném zařízení“ a dostaneš kód. Na druhém zařízení pak klepni na „Mám kód“, zadej ho a výběr se přenese."
+        },
+        {
+          "title": "Bez signálu to nevadí.",
+          "body": "Ve vlaku nebo na chalupě uvidíš upozornění, že změny čekají. Uloží se samy, jakmile budeš zase online."
+        },
+        {
+          "title": "Nevidíš tiskárnu vůbec?",
+          "body": "Výběr k tisku fotograf u téhle galerie nezapnul. Napiš mu a domluvíte se."
+        }
+      ]
+    },
+    "help": "Něco nejde, nebo si nevíš rady? <a>Napiš fotografovi</a>, rád pomůže."
+  },
   "errors": {
     "linkNotFoundTitle": "This link doesn't go anywhere",
     "linkNotFoundLead": "Chat apps often cut links in half when they're pasted — it happens all the time. Try opening it again straight from the original message, or scan the QR code if you've got it handy.",
