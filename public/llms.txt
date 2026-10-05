@@ -12,7 +12,7 @@ Gallery contents are private: every gallery is reached only through its own link
 
 - A gallery never expires on its own. A link stops working only if the photographer gives it a time limit or turns it off.
 - After five wrong password attempts the link locks for 15 minutes for everyone who has it. Only the photographer knows the password.
-- "Download all" gives the whole gallery as one ZIP, ready a few minutes after the photographer finishes uploading. Until then photos can be downloaded one by one.
+- "Download all" gives the whole gallery as one ZIP, usually ready within an hour of the last upload (it waits for uploads to settle, then builds in the background). Until then photos can be downloaded one by one.
 
 ## Photographer
 

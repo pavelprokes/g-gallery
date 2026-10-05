@@ -3,6 +3,7 @@ import cs from "../../messages/cs.json";
 import en from "../../messages/en.json";
 import fr from "../../messages/fr.json";
 import { UNLOCK_ATTEMPT_LIMIT, UNLOCK_LOCKOUT_MS } from "@/lib/share-access";
+import { QUIET_PERIOD_MS } from "@/lib/zip-build-policy";
 import { LOCALES, type Locale } from "./locales";
 
 const CATALOGS: Record<Locale, unknown> = { cs, en, fr };
@@ -133,5 +134,13 @@ describe("message catalogs", () => {
       const answer = faq.find((entry) => /\b(5|pěti|five|cinq)\b/.test(entry.a));
       expect(answer?.a, locale).toContain(`${minutes} min`);
     }
+  });
+
+  // "Usually within an hour of the last upload": the build waits out the quiet
+  // period, then the 15-minute cron (vercel.json) picks it up. A longer quiet
+  // period would make the landing FAQ's promise untrue.
+  it("keeps the ZIP quiet period short enough for the FAQ's 'within an hour'", () => {
+    const CRON_INTERVAL_MS = 15 * 60_000;
+    expect(QUIET_PERIOD_MS + CRON_INTERVAL_MS).toBeLessThanOrEqual(45 * 60_000);
   });
 });

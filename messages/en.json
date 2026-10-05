@@ -77,7 +77,7 @@
       },
       {
         "q": "How do I download every photo at once?",
-        "a": "The “Download all” button gets the whole gallery as one ZIP. It's ready a few minutes after the photographer finishes uploading — longer for bigger galleries. Until then, you can download photos one by one."
+        "a": "The “Download all” button gets the whole gallery as one ZIP. It builds itself, usually within an hour of the last photo being uploaded — longer for bigger galleries. Until then, you can download photos one by one."
       }
     ],
     "guestTipsHeading": "Tips and tricks for shooting as a guest",
