@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import cs from "../../messages/cs.json";
 import en from "../../messages/en.json";
 import fr from "../../messages/fr.json";
+import { UNLOCK_ATTEMPT_LIMIT, UNLOCK_LOCKOUT_MS } from "@/lib/share-access";
 import { LOCALES, type Locale } from "./locales";
 
 const CATALOGS: Record<Locale, unknown> = { cs, en, fr };
@@ -120,5 +121,17 @@ describe("message catalogs", () => {
       (l) => (CATALOGS[l] as { localeSwitcher: Record<string, string> }).localeSwitcher,
     );
     for (const names of endonyms) expect(names).toEqual(endonyms[0]);
+  });
+
+  // The landing FAQ states the lockout as a number, because that is what an
+  // answer engine quotes. If the constant changes, the copy has to follow.
+  it("states the real password lockout in the landing FAQ", () => {
+    const minutes = String(UNLOCK_LOCKOUT_MS / 60_000);
+    expect(UNLOCK_ATTEMPT_LIMIT).toBe(5); // the copy spells it out as a word
+    for (const locale of LOCALES) {
+      const faq = (CATALOGS[locale] as { marketing: { faq: { a: string }[] } }).marketing.faq;
+      const answer = faq.find((entry) => /\b(5|pěti|five|cinq)\b/.test(entry.a));
+      expect(answer?.a, locale).toContain(`${minutes} min`);
+    }
   });
 });
