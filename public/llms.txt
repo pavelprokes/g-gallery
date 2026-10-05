@@ -1,0 +1,20 @@
+# Svatební galerie – Pavel Prokeš
+
+> Private online wedding galleries by Pavel Prokeš, a wedding photographer based in Prague, Czech Republic. Couples and their guests open a gallery from a link or QR code, view and download the photos, and — when the couple allows it — add their own photos from the wedding. The only public page is a short help page, in Czech, English and French.
+
+Gallery contents are private: every gallery is reached only through its own link, sometimes with a password, and is not listed or indexed. Questions about booking, prices or the photographer's work belong to the main site.
+
+## Help
+
+- [Wedding gallery help](https://photos.svatebni-fotograf-cechy.cz/): where to get the gallery link or QR code, what to do without the password, why a link stops working, offline viewing and downloading everything at once.
+
+## Key facts
+
+- A gallery never expires on its own. A link stops working only if the photographer gives it a time limit or turns it off.
+- After five wrong password attempts the link locks for 15 minutes for everyone who has it. Only the photographer knows the password.
+- "Download all" gives the whole gallery as one ZIP, usually ready within an hour of the last upload (it waits for uploads to settle, then builds in the background). Until then photos can be downloaded one by one.
+
+## Photographer
+
+- [Pavel Prokeš – svatební fotograf](https://svatebni-fotograf-cechy.cz/): portfolio, prices, booking and contact.
+- [About Pavel Prokeš](https://svatebni-fotograf-cechy.cz/svatebni-fotograf-pavel-prokes)

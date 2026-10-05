@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import cs from "../../messages/cs.json";
 import en from "../../messages/en.json";
 import fr from "../../messages/fr.json";
+import { UNLOCK_ATTEMPT_LIMIT, UNLOCK_LOCKOUT_MS } from "@/lib/share-access";
+import { QUIET_PERIOD_MS } from "@/lib/zip-build-policy";
 import { LOCALES, type Locale } from "./locales";
 
 const CATALOGS: Record<Locale, unknown> = { cs, en, fr };
@@ -120,5 +122,25 @@ describe("message catalogs", () => {
       (l) => (CATALOGS[l] as { localeSwitcher: Record<string, string> }).localeSwitcher,
     );
     for (const names of endonyms) expect(names).toEqual(endonyms[0]);
+  });
+
+  // The landing FAQ states the lockout as a number, because that is what an
+  // answer engine quotes. If the constant changes, the copy has to follow.
+  it("states the real password lockout in the landing FAQ", () => {
+    const minutes = String(UNLOCK_LOCKOUT_MS / 60_000);
+    expect(UNLOCK_ATTEMPT_LIMIT).toBe(5); // the copy spells it out as a word
+    for (const locale of LOCALES) {
+      const faq = (CATALOGS[locale] as { marketing: { faq: { a: string }[] } }).marketing.faq;
+      const answer = faq.find((entry) => /\b(5|pěti|five|cinq)\b/.test(entry.a));
+      expect(answer?.a, locale).toContain(`${minutes} min`);
+    }
+  });
+
+  // "Usually within an hour of the last upload": the build waits out the quiet
+  // period, then the 15-minute cron (vercel.json) picks it up. A longer quiet
+  // period would make the landing FAQ's promise untrue.
+  it("keeps the ZIP quiet period short enough for the FAQ's 'within an hour'", () => {
+    const CRON_INTERVAL_MS = 15 * 60_000;
+    expect(QUIET_PERIOD_MS + CRON_INTERVAL_MS).toBeLessThanOrEqual(45 * 60_000);
   });
 });

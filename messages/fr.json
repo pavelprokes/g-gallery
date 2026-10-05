@@ -65,11 +65,11 @@
       },
       {
         "q": "Je ne connais pas le mot de passe, que faire ?",
-        "a": "Seul le photographe le connaît – c'est lui qui l'a défini, et personne d'autre ne peut le réinitialiser ni le contourner. Écrivez-lui pour qu'il vous le renvoie. N'essayez pas de le deviner : après cinq tentatives ratées, le lien se bloque un moment pour tous ceux qui l'ont."
+        "a": "Seul le photographe le connaît – c'est lui qui l'a défini, et personne d'autre ne peut le réinitialiser ni le contourner. Écrivez-lui pour qu'il vous le renvoie. N'essayez pas de le deviner : après cinq tentatives ratées, le lien se bloque pendant 15 minutes pour tous ceux qui l'ont."
       },
       {
         "q": "Le lien ne fonctionne pas, ou indique qu'il a expiré.",
-        "a": "Au bout d'un certain temps, une galerie cesse d'accepter les visites ou les envois de photos. Le photographe peut la rouvrir ou la prolonger à tout moment – il suffit de le contacter."
+        "a": "Une galerie n'expire jamais d'elle-même – elle reste accessible pour toujours. Un lien ne cesse de fonctionner que si le photographe lui fixe une durée limite ou le désactive. Demandez-lui simplement de le rouvrir ou de le prolonger."
       },
       {
         "q": "Ça marche aussi sans réseau ?",
@@ -77,7 +77,7 @@
       },
       {
         "q": "Comment télécharger toutes les photos d'un coup ?",
-        "a": "Le bouton « Tout télécharger » regroupe la galerie dans un ZIP. Pour les grandes galeries, cela prend un moment et se prépare en arrière-plan – revenez un peu plus tard."
+        "a": "Le bouton « Tout télécharger » récupère toute la galerie en un seul ZIP. Il se prépare tout seul, en général dans l'heure qui suit le dernier envoi de photos – plus longtemps pour les grandes galeries. En attendant, vous pouvez télécharger les photos une par une."
       }
     ],
     "guestTipsHeading": "Trucs et astuces pour photographier en tant qu'invité",
