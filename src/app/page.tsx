@@ -4,6 +4,7 @@ import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import type { Locale } from "@/i18n/locales";
+import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
@@ -64,11 +65,6 @@ const HIGHLIGHT_ICONS = {
   projector: ProjectorIcon,
 } as const;
 
-interface FaqEntry {
-  q: string;
-  a: string;
-}
-
 interface StepEntry {
   title: string;
   body: string;
@@ -82,22 +78,19 @@ export default async function Home() {
   const features = t.raw("features") as string[];
   const howItWorksSteps = t.raw("howItWorksSteps") as StepEntry[];
 
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map(({ q, a }) => ({
-      "@type": "Question",
-      name: q,
-      acceptedAnswer: { "@type": "Answer", text: a },
-    })),
-  };
+  const jsonLd = landingJsonLd({
+    locale,
+    title: t("pageTitle"),
+    description: t("pageDescription"),
+    faq,
+  });
 
   return (
     <main className="font-brand mx-auto max-w-3xl px-4 py-12 sm:py-16">
-      {/* Static FAQPage structured data — content is the FAQ array above, never user input. */}
+      {/* Static structured data — content comes from the message catalogs, never user input. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
       <header className="grid gap-8 sm:grid-cols-[1.2fr_1fr] sm:items-center">
