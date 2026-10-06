@@ -174,6 +174,10 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 | `SUPABASE_SERVICE_ROLE_KEY`         | runtime   | **Legacy JWT-style key**, not `sb_secret_…` — PostgREST needs a JWT                         |
 | **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing                                              |
 | **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** | Legacy JWT-style key, same reason                                                           |
+| **`NEXT_PUBLIC_UMAMI_URL`**         | **build** | No Umami tracker (self-hosted analytics; renders on Vercel production only)                 |
+| **`NEXT_PUBLIC_UMAMI_WEBSITE_ID`**  | **build** | Same                                                                                        |
+| **`NEXT_PUBLIC_UMAMI_SCRIPT`**      | **build** | Defaults to `stats.js` (Umami's own default is `script.js`)                                 |
+| `UMAMI_COLLECT_ENDPOINT`            | runtime   | Server events post to `/api/e` (Umami's own default is `/api/send`)                         |
 
 Shared Supabase project (`docs/SETUP.md` §6) — the service role only has access to the `g_gallery`
 schema, granted explicitly; it cannot read the marketing site's own data in `public`.
@@ -212,3 +216,8 @@ curl -sI "https://cdn.svatebni-fotograf-cechy.cz/cdn-cgi/image/width=640,quality
 ```
 
 Then walk `docs/SETUP.md` §11.
+
+Umami never sees a share token: the client script's `data-before-send` hook and
+`trackServerEvent` both redact `/g/<token>` and `/s/<token>` (and their `/api/g/…` form) through
+`src/lib/umami-scrub.ts`. Server events forward the visitor's IP and User-Agent to Umami, which
+hashes them; nothing is stored by this app.

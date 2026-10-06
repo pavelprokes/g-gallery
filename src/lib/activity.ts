@@ -34,6 +34,8 @@ export interface RecordResult {
   /** True only when a genuinely new ViewSession began — never for a heartbeat. */
   newSession: boolean;
   viewerName: string | null;
+  /** False when the viewer opted out and nothing was stored. */
+  recorded: boolean;
 }
 
 export async function recordActivity(input: RecordViewInput): Promise<RecordResult> {
@@ -52,7 +54,7 @@ export async function recordActivity(input: RecordViewInput): Promise<RecordResu
     select: { id: true, optedOut: true, displayName: true },
   });
 
-  if (viewer.optedOut) return { newSession: false, viewerName: null };
+  if (viewer.optedOut) return { newSession: false, viewerName: null, recorded: false };
 
   if (input.type === "GALLERY_VIEW") {
     const recent = await prisma.viewSession.findFirst({
@@ -70,7 +72,7 @@ export async function recordActivity(input: RecordViewInput): Promise<RecordResu
         where: { id: recent.id },
         data: { lastActivityAt: now },
       });
-      return { newSession: false, viewerName: viewer.displayName };
+      return { newSession: false, viewerName: viewer.displayName, recorded: true };
     }
 
     await prisma.viewSession.create({
@@ -88,7 +90,7 @@ export async function recordActivity(input: RecordViewInput): Promise<RecordResu
     },
   });
 
-  return { newSession, viewerName: viewer.displayName };
+  return { newSession, viewerName: viewer.displayName, recorded: true };
 }
 
 /** Gallery-level totals for the admin dashboard. */

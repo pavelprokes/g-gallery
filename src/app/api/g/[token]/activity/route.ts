@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { recordActivity } from "@/lib/activity";
 import { pushNewViewer } from "@/lib/push";
+import { trackServerEvent } from "@/lib/umami";
 import { resolveShareLink } from "@/lib/share-access";
 
 // Beacon target for the public gallery. Short-lived request/response only —
@@ -43,6 +44,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/a
     photoId: parsed.data.photoId,
     type: parsed.data.type,
   });
+
+  // The photographer's credit tile: the one click that is a lead, not a view.
+  if (parsed.data.type === "PROMO_CLICK" && result.recorded) {
+    trackServerEvent({ name: "promo-click", request });
+  }
 
   // Only a genuinely new session is news; the 5-minute heartbeat is not.
   // Awaited rather than fired-and-forgotten: a Vercel function can be frozen

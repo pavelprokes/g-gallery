@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
+import { trackServerEvent } from "@/lib/umami";
 import { clearOptedOutName } from "@/lib/viewer-opt-out";
 import { galleryReactions, toggleReaction } from "@/lib/reactions";
 import { isReactionKind, REACTION_KINDS } from "@/lib/reactions-shared";
@@ -96,6 +97,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/r
         type: "REACTION",
       },
     });
+    trackServerEvent({ name: "gallery-reaction", data: { kind }, request });
   }
 
   const grouped = await prisma.reaction.groupBy({

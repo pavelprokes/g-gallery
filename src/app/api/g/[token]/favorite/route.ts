@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
+import { trackServerEvent } from "@/lib/umami";
 import { clearOptedOutName } from "@/lib/viewer-opt-out";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/f
         type: "FAVORITE",
       },
     });
+    trackServerEvent({ name: "gallery-favorite", request });
   } else {
     await prisma.favorite.deleteMany({ where: { photoId: photo.id, viewerId: viewer.id } });
   }

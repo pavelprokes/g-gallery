@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { headObject } from "@/lib/r2";
+import { trackServerEvent } from "@/lib/umami";
 import { thumbKeyFor } from "@/lib/thumbnail";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
@@ -172,6 +173,9 @@ export async function POST(request: Request) {
   // no longer matches the gallery's contents, and restarts the clock the cron
   // waits out before rebuilding.
   await markGalleryPhotosChanged(photo.galleryId);
+
+  // Guest uploads only: the photographer's own uploads are not visitor behaviour.
+  if ("shareToken" in parsed.data) trackServerEvent({ name: "guest-photo-upload", request });
 
   return NextResponse.json({ ok: true });
 }
