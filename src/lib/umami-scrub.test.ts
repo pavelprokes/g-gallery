@@ -6,6 +6,9 @@ describe("scrubPath", () => {
     expect(scrubPath("/g/AbCdEfGhIjKlMnOpQrSt")).toBe("/g/[token]");
     expect(scrubPath("/s/AbCdEfGhIjKlMnOpQrSt/svatba-pavel")).toBe("/s/[token]/svatba-pavel");
   });
+  it("redacts the token in the API routes server events are sent from", () => {
+    expect(scrubPath("/api/g/AbCdEfGhIjKlMnOpQrSt/favorite")).toBe("/api/g/[token]/favorite");
+  });
   it("drops query and hash", () => {
     expect(scrubPath("/g/AbCdEfGhIjKlMnOpQrSt?pw=secret#x")).toBe("/g/[token]");
   });

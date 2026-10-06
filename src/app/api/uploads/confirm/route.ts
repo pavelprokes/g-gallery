@@ -175,7 +175,7 @@ export async function POST(request: Request) {
   await markGalleryPhotosChanged(photo.galleryId);
 
   // Guest uploads only: the photographer's own uploads are not visitor behaviour.
-  if ("shareToken" in parsed.data) trackServerEvent({ name: "guest-upload", request });
+  if ("shareToken" in parsed.data) trackServerEvent({ name: "guest-photo-upload", request });
 
   return NextResponse.json({ ok: true });
 }
