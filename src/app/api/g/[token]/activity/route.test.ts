@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const resolveShareLink = vi.hoisted(() => vi.fn());
 const recordActivity = vi.hoisted(() => vi.fn());
 const pushNewViewer = vi.hoisted(() => vi.fn());
+const trackServerEvent = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/share-access", () => ({ resolveShareLink }));
 vi.mock("@/lib/activity", () => ({ recordActivity }));
 vi.mock("@/lib/push", () => ({ pushNewViewer }));
+vi.mock("@/lib/umami", () => ({ trackServerEvent }));
 
 import { POST } from "./route";
 
@@ -28,10 +30,20 @@ beforeEach(() => {
     ok: true,
     shareLink: { id: "share_1", galleryId: "gal_1" },
   });
-  recordActivity.mockResolvedValue({ newSession: false, viewerName: null });
+  recordActivity.mockResolvedValue({ newSession: false, viewerName: null, recorded: true });
 });
 
 describe("POST /api/g/[token]/activity", () => {
+  it("sends a promo-click server event only when the click was recorded", async () => {
+    await POST(post({ anonKey: ANON_KEY, type: "PROMO_CLICK" }), ctx);
+    expect(trackServerEvent).toHaveBeenCalledWith(expect.objectContaining({ name: "promo-click" }));
+
+    trackServerEvent.mockClear();
+    recordActivity.mockResolvedValue({ newSession: false, viewerName: null, recorded: false });
+    await POST(post({ anonKey: ANON_KEY, type: "PROMO_CLICK" }), ctx);
+    expect(trackServerEvent).not.toHaveBeenCalled();
+  });
+
   it("records a promo click against the gallery, with no photo", async () => {
     const response = await POST(post({ anonKey: ANON_KEY, type: "PROMO_CLICK" }), ctx);
 
@@ -88,7 +100,7 @@ describe("POST /api/g/[token]/activity", () => {
 
   it("never notifies the owner about a promo click", async () => {
     // The push is for a new viewer session; a click inside one is not news.
-    recordActivity.mockResolvedValue({ newSession: false, viewerName: "Anna" });
+    recordActivity.mockResolvedValue({ newSession: false, viewerName: "Anna", recorded: true });
 
     await POST(post({ anonKey: ANON_KEY, type: "PROMO_CLICK" }), ctx);
 

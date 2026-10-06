@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { photoOrderBy } from "@/lib/photo-order";
+import { trackServerEvent } from "@/lib/umami";
 import { resolveShareLink } from "@/lib/share-access";
 import { MANIFEST_TTL_SECONDS, signManifest, uniqueNames, type Manifest } from "@/lib/zip-manifest";
 
@@ -85,6 +86,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
   // should read "stáhl 40 fotek", not scroll for a page.
   await prisma.activityEvent.create({
     data: { galleryId: access.shareLink.galleryId, type: "DOWNLOAD" },
+  });
+
+  trackServerEvent({
+    name: "gallery-download",
+    data: { photos: photos.length, partial: photoIds.length > 0 },
+    request,
   });
 
   return NextResponse.json({

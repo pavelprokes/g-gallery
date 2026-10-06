@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
+import { trackServerEvent } from "@/lib/umami";
 import { clearOptedOutName } from "@/lib/viewer-opt-out";
 import { othersPrintTotals, setPrintQuantity } from "@/lib/print-selections";
 
@@ -104,6 +105,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/p
         type: "PRINT_SELECT",
       },
     });
+    trackServerEvent({ name: "gallery-print-select", data: { quantity: resultQuantity }, request });
   }
 
   return NextResponse.json({ ok: true, quantity: resultQuantity, displayName: viewer.displayName });

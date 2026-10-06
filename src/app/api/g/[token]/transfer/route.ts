@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { trackServerEvent } from "@/lib/umami";
 import { resolveShareLink } from "@/lib/share-access";
 import {
   TRANSFER_CODE_TTL_MS,
@@ -119,6 +120,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/g/[token]/tr
   // One shot. A code that stayed valid for its full 15 minutes after being used
   // would be a standing invitation in anyone's message history.
   await prisma.viewerTransfer.delete({ where: { id: transfer.id } });
+  trackServerEvent({ name: "viewer-transfer-redeem", request });
 
   return NextResponse.json({
     anonKey: transfer.viewer.anonKey,
