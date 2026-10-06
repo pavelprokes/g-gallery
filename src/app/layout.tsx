@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { AppAnalytics } from "@/components/analytics";
 import { LocaleBootstrap } from "@/components/locale-bootstrap";
+import { UmamiScript } from "@/components/umami";
 import { LOCALE_COOKIE } from "@/i18n/locales";
 import { bitterFont } from "@/lib/fonts";
 import { installImageRetry } from "@/lib/image-retry";
@@ -81,6 +82,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <LocaleBootstrap locale={locale} persistedByCookie={persistedByCookie} />
           {children}
           <AppAnalytics />
+          <UmamiScript />
         </NextIntlClientProvider>
       </body>
     </html>
