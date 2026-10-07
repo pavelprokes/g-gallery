@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import cs from "../../messages/cs.json";
 import en from "../../messages/en.json";
 import fr from "../../messages/fr.json";
+import de from "../../messages/de.json";
+import es from "../../messages/es.json";
+import sk from "../../messages/sk.json";
+import pl from "../../messages/pl.json";
 import { UNLOCK_ATTEMPT_LIMIT, UNLOCK_LOCKOUT_MS } from "@/lib/share-access";
 import { QUIET_PERIOD_MS } from "@/lib/zip-build-policy";
 import { LOCALES, type Locale } from "./locales";
 
-const CATALOGS: Record<Locale, unknown> = { cs, en, fr };
+const CATALOGS: Record<Locale, unknown> = { cs, en, fr, de, es, sk, pl };
 
 function keyPaths(value: unknown, prefix = ""): string[] {
   if (Array.isArray(value)) {
@@ -131,7 +135,9 @@ describe("message catalogs", () => {
     expect(UNLOCK_ATTEMPT_LIMIT).toBe(5); // the copy spells it out as a word
     for (const locale of LOCALES) {
       const faq = (CATALOGS[locale] as { marketing: { faq: { a: string }[] } }).marketing.faq;
-      const answer = faq.find((entry) => /\b(5|pěti|five|cinq)\b/.test(entry.a));
+      const answer = faq.find((entry) =>
+        /\b(5|pěti|five|cinq|fünf|cinco|päť|pięć|pięciu|piatich)\b/.test(entry.a),
+      );
       expect(answer?.a, locale).toContain(`${minutes} min`);
     }
   });

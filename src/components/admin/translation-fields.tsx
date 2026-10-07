@@ -11,6 +11,10 @@ import {
 const LANGUAGE_NAMES: Record<TranslatedLocale, string> = {
   en: "Anglicky",
   fr: "Francouzsky",
+  de: "Německy",
+  es: "Španělsky",
+  sk: "Slovensky",
+  pl: "Polsky",
 };
 
 export interface TranslationFieldSpec<F extends string> {
@@ -57,8 +61,8 @@ export function TranslationFields<F extends string>({
         Překlady pro hosty ({TRANSLATED_LOCALES.map((l) => l.toUpperCase()).join(", ")})
       </summary>
       <Hint>
-        Uvidí je hosté, kterým se galerie zobrazí anglicky nebo francouzsky. Prázdné pole ukáže
-        češtinu, francouzskému hostovi nejdřív angličtinu.{note ? ` ${note}` : ""}
+        Uvidí je hosté, kterým se galerie zobrazí v jiném jazyce než česky. Prázdné pole ukáže
+        češtinu, hostovi v jiném jazyce nejdřív angličtinu.{note ? ` ${note}` : ""}
       </Hint>
       <div className="mt-3 grid gap-4 sm:grid-cols-2">
         {TRANSLATED_LOCALES.map((locale) => (

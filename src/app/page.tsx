@@ -49,7 +49,7 @@ const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 /**
  * The main site's sales page for the guest gallery — this page stays the guests' help
- * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so fr gets en.
+ * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so every other language gets en.
  */
 function guestGalleryPageUrl(locale: Locale): string {
   const url = new URL(

@@ -1,3 +1,4 @@
+import { TRANSLATED_LOCALES, type TranslatedLocale } from "@/lib/content-translations";
 import { slugify } from "@/lib/gallery-slug";
 
 /**
@@ -55,17 +56,97 @@ export const MAX_CHAPTER_TITLE = 60;
  * EN/FR fields on its own, so the common case needs no translating at all; a
  * typed title that is not a preset is translated by hand, like any other text.
  */
-export const CHAPTER_PRESETS: readonly { cs: string; en: string; fr: string }[] = [
-  { cs: "Přípravy", en: "Getting ready", fr: "Préparatifs" },
-  { cs: "Obřad", en: "Ceremony", fr: "Cérémonie" },
-  { cs: "Gratulace", en: "Congratulations", fr: "Félicitations" },
-  { cs: "Skupinové fotky", en: "Group photos", fr: "Photos de groupe" },
-  { cs: "Portréty", en: "Portraits", fr: "Portraits" },
-  { cs: "Hostina", en: "Wedding feast", fr: "Le repas" },
-  { cs: "Tradice", en: "Traditions", fr: "Traditions" },
-  { cs: "Krájení dortu", en: "Cutting the cake", fr: "La pièce montée" },
-  { cs: "První tanec", en: "First dance", fr: "Première danse" },
-  { cs: "Večerní zábava", en: "Evening party", fr: "La soirée" },
+export const CHAPTER_PRESETS: readonly ({ cs: string } & Record<TranslatedLocale, string>)[] = [
+  {
+    cs: "Přípravy",
+    en: "Getting ready",
+    fr: "Préparatifs",
+    de: "Vorbereitung",
+    es: "Preparativos",
+    sk: "Prípravy",
+    pl: "Przygotowania",
+  },
+  {
+    cs: "Obřad",
+    en: "Ceremony",
+    fr: "Cérémonie",
+    de: "Trauung",
+    es: "Ceremonia",
+    sk: "Obrad",
+    pl: "Ceremonia",
+  },
+  {
+    cs: "Gratulace",
+    en: "Congratulations",
+    fr: "Félicitations",
+    de: "Gratulation",
+    es: "Felicitaciones",
+    sk: "Gratulácie",
+    pl: "Życzenia",
+  },
+  {
+    cs: "Skupinové fotky",
+    en: "Group photos",
+    fr: "Photos de groupe",
+    de: "Gruppenfotos",
+    es: "Fotos de grupo",
+    sk: "Skupinové fotky",
+    pl: "Zdjęcia grupowe",
+  },
+  {
+    cs: "Portréty",
+    en: "Portraits",
+    fr: "Portraits",
+    de: "Porträts",
+    es: "Retratos",
+    sk: "Portréty",
+    pl: "Portrety",
+  },
+  {
+    cs: "Hostina",
+    en: "Wedding feast",
+    fr: "Le repas",
+    de: "Hochzeitsfeier",
+    es: "El banquete",
+    sk: "Hostina",
+    pl: "Wesele",
+  },
+  {
+    cs: "Tradice",
+    en: "Traditions",
+    fr: "Traditions",
+    de: "Bräuche",
+    es: "Tradiciones",
+    sk: "Tradície",
+    pl: "Tradycje",
+  },
+  {
+    cs: "Krájení dortu",
+    en: "Cutting the cake",
+    fr: "La pièce montée",
+    de: "Tortenanschnitt",
+    es: "Corte de la tarta",
+    sk: "Krájanie torty",
+    pl: "Krojenie tortu",
+  },
+  {
+    cs: "První tanec",
+    en: "First dance",
+    fr: "Première danse",
+    de: "Erster Tanz",
+    es: "Primer baile",
+    sk: "Prvý tanec",
+    pl: "Pierwszy taniec",
+  },
+  {
+    cs: "Večerní zábava",
+    en: "Evening party",
+    fr: "La soirée",
+    de: "Abendfeier",
+    es: "La fiesta",
+    sk: "Večerná zábava",
+    pl: "Zabawa wieczorna",
+  },
 ];
 
 /**
@@ -95,8 +176,12 @@ export function chapterAnchor(chapter: { id: string; slug: string | null }): str
 }
 
 /** The ready-made translations for a preset title, or null for a custom one. */
-export function presetTranslations(title: string): { en: string; fr: string } | null {
+export function presetTranslations(title: string): Record<TranslatedLocale, string> | null {
   const needle = title.trim().toLocaleLowerCase("cs");
   const preset = CHAPTER_PRESETS.find((p) => p.cs.toLocaleLowerCase("cs") === needle);
-  return preset ? { en: preset.en, fr: preset.fr } : null;
+  if (!preset) return null;
+  return Object.fromEntries(TRANSLATED_LOCALES.map((l) => [l, preset[l]])) as Record<
+    TranslatedLocale,
+    string
+  >;
 }

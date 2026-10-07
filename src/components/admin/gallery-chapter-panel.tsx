@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
-import type { ContentTranslations } from "@/lib/content-translations";
+import { TRANSLATED_LOCALES, type ContentTranslations } from "@/lib/content-translations";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { CHAPTER_PRESETS, MAX_CHAPTER_TITLE, presetTranslations } from "@/lib/gallery-chapters";
 
@@ -27,11 +27,7 @@ export interface AdminChapter {
 /** Translations exactly as the preset supplied them — nothing to review. */
 function isPresetOnly(chapter: AdminChapter): boolean {
   const preset = presetTranslations(chapter.title);
-  return (
-    !!preset &&
-    chapter.translations.en?.title === preset.en &&
-    chapter.translations.fr?.title === preset.fr
-  );
+  return !!preset && TRANSLATED_LOCALES.every((l) => chapter.translations[l]?.title === preset[l]);
 }
 
 /**

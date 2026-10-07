@@ -40,6 +40,38 @@ const UI_STRINGS: Record<
       "Astuce : les couleurs peuvent varier sur une imprimante à jet d'encre. Avant d'imprimer plusieurs exemplaires, faites d'abord un essai sur votre papier.",
     qrAlt: "QR code de la galerie {target}",
   },
+  de: {
+    print: "Drucken",
+    sharedGallery: "gemeinsame Galerie",
+    leadsTo: "Führt zu:",
+    printerTip:
+      "Tipp: Auf Tintenstrahldruckern können sich die Farben verschieben. Bevor Sie mehrere Exemplare drucken, machen Sie zuerst einen Probedruck auf Ihrem Papier.",
+    qrAlt: "QR-Code zur Galerie {target}",
+  },
+  es: {
+    print: "Imprimir",
+    sharedGallery: "galería compartida",
+    leadsTo: "Lleva a:",
+    printerTip:
+      "Consejo: los colores pueden variar en las impresoras de inyección de tinta. Antes de imprimir varias copias, prueba primero con una en tu papel.",
+    qrAlt: "Código QR de la galería {target}",
+  },
+  sk: {
+    print: "Vytlačiť",
+    sharedGallery: "zdieľaná galéria",
+    leadsTo: "Vedie na:",
+    printerTip:
+      "Tip: farby sa na atramentových tlačiarňach niekedy posúvajú. Pred tlačou viacerých kópií vyskúšajte najprv jednu na svojom papieri.",
+    qrAlt: "QR kód galérie {target}",
+  },
+  pl: {
+    print: "Drukuj",
+    sharedGallery: "wspólna galeria",
+    leadsTo: "Prowadzi do:",
+    printerTip:
+      "Wskazówka: kolory na drukarkach atramentowych bywają przesunięte. Zanim wydrukujesz więcej kopii, wypróbuj najpierw jedną na swoim papierze.",
+    qrAlt: "Kod QR do galerii {target}",
+  },
 };
 
 /**
@@ -109,6 +141,67 @@ const COPY: Record<
         "Les plus beaux moments de la soirée, on risque de les manquer. Ajoutez les vôtres à notre galerie.",
       cta: "Envoyez vos photos →",
       caption: "Sans appli, sans inscription — tout le monde peut participer avec un téléphone.",
+    },
+  },
+  // "Sie", like the French "vous": a printed card addresses a room of
+  // strangers of every age.
+  de: {
+    table: {
+      label: "Tischkarte (kürzer)",
+      headline: "Heute Abend fotografieren auch Sie — machen Sie bei der Galerie mit.",
+      cta: "Fotos hochladen →",
+      caption: null,
+    },
+    corner: {
+      label: "Fotoecke (länger)",
+      headline:
+        "Die schönsten Momente des Abends verpassen wir vielleicht. Laden Sie Ihre in unsere Galerie hoch.",
+      cta: "Fotos hochladen →",
+      caption: "Ohne App, ohne Anmeldung — jeder mit einem Handy kann Fotos hinzufügen.",
+    },
+  },
+  es: {
+    table: {
+      label: "Tarjeta de mesa (corta)",
+      headline: "Esta noche tú también eres fotógrafo — únete a la galería.",
+      cta: "Sube tus fotos →",
+      caption: null,
+    },
+    corner: {
+      label: "Rincón de fotos (larga)",
+      headline:
+        "Puede que nos perdamos los mejores momentos de la noche. Sube los tuyos a nuestra galería.",
+      cta: "Sube tus fotos →",
+      caption: "Sin app, sin registro — cualquiera con un móvil puede añadir fotos.",
+    },
+  },
+  // "Vy" (vykanie), as in the Slovak catalog.
+  sk: {
+    table: {
+      label: "Na stôl (kratšia)",
+      headline: "Dnes fotíte aj vy — pridajte sa do galérie.",
+      cta: "Nahrajte fotky →",
+      caption: null,
+    },
+    corner: {
+      label: "Do fotokútika (dlhšia)",
+      headline: "Najkrajšie momenty večera možno neuvidíme. Nahrajte svoje do našej galérie.",
+      cta: "Nahrajte fotky →",
+      caption: "Bez aplikácie, bez prihlasovania — pridať môže ktokoľvek s telefónom.",
+    },
+  },
+  pl: {
+    table: {
+      label: "Na stół (krótsza)",
+      headline: "Dziś fotografujesz też Ty — dołącz do galerii.",
+      cta: "Dodaj zdjęcia →",
+      caption: null,
+    },
+    corner: {
+      label: "Do fotobudki (dłuższa)",
+      headline: "Najpiękniejsze chwile wieczoru mogą nam umknąć. Dodaj swoje do naszej galerii.",
+      cta: "Dodaj zdjęcia →",
+      caption: "Bez aplikacji, bez logowania — dodać może każdy, kto ma telefon.",
     },
   },
 };
@@ -191,7 +284,11 @@ export function PrintableSign({
         ))}
         {/* The sign's own language — independent of the photographer's admin
             locale, since what matters is what the guests will read. */}
-        <div role="group" aria-label="Sign language / Jazyk cedulky" className="flex gap-1">
+        <div
+          role="group"
+          aria-label="Sign language / Jazyk cedulky"
+          className="flex flex-wrap gap-1"
+        >
           {LOCALES.map((code) => (
             <button
               key={code}

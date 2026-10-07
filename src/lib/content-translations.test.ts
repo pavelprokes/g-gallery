@@ -20,7 +20,7 @@ describe("parseTranslations", () => {
       parseTranslations(
         {
           cs: { title: "Obřad" }, // the original lives in the column, not here
-          de: { title: "Zeremonie" }, // a language the app does not speak
+          ja: { title: "式" }, // a language the app does not speak
           en: { title: "   ", venue: 42, extra: "x" },
           fr: "Cérémonie",
         },

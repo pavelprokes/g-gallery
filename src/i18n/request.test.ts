@@ -16,7 +16,14 @@ describe("negotiateLocale", () => {
   });
 
   it("falls back to en for an unsupported language", () => {
-    expect(negotiateLocale("de-DE,de;q=0.9")).toBe("en");
+    expect(negotiateLocale("ja-JP,ja;q=0.9")).toBe("en");
+  });
+
+  it("picks de, es, sk and pl, whichever region", () => {
+    expect(negotiateLocale("de-AT,de;q=0.9")).toBe("de");
+    expect(negotiateLocale("es-MX,es;q=0.9")).toBe("es");
+    expect(negotiateLocale("sk-SK,sk;q=0.9,cs;q=0.8")).toBe("sk");
+    expect(negotiateLocale("pl-PL,pl;q=0.9")).toBe("pl");
   });
 
   it("picks fr when the browser prefers French, whichever French", () => {
@@ -32,7 +39,7 @@ describe("negotiateLocale", () => {
     expect(negotiateLocale("en-US,fr;q=0.9")).toBe("en");
     expect(negotiateLocale("fr;q=0.9,en;q=0.8")).toBe("fr");
     // A German speaker whose second language is French gets French, not the default.
-    expect(negotiateLocale("de-DE,fr;q=0.8,en;q=0.7")).toBe("fr");
+    expect(negotiateLocale("ja-JP,fr;q=0.8,en;q=0.7")).toBe("fr");
   });
 });
 

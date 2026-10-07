@@ -8,7 +8,7 @@
 // (src/components/printable-sign.tsx). Everything else — negotiation,
 // `<html lang>`, the switcher, date formatting — reads this list.
 // See docs/I18N.md.
-export const LOCALES = ["cs", "en", "fr"] as const;
+export const LOCALES = ["cs", "en", "fr", "de", "es", "sk", "pl"] as const;
 export type Locale = (typeof LOCALES)[number];
 /**
  * English, not Czech (Pavel, 2026-09-23): the default only ever applies to a
@@ -29,6 +29,10 @@ export const LOCALE_TAGS: Record<Locale, string> = {
   cs: "cs-CZ",
   en: "en-US",
   fr: "fr-FR",
+  de: "de-DE",
+  es: "es-ES",
+  sk: "sk-SK",
+  pl: "pl-PL",
 };
 
 /** The same, in the underscore form Open Graph (`og:locale`) insists on. */
@@ -36,6 +40,10 @@ export const OG_LOCALES: Record<Locale, string> = {
   cs: "cs_CZ",
   en: "en_US",
   fr: "fr_FR",
+  de: "de_DE",
+  es: "es_ES",
+  sk: "sk_SK",
+  pl: "pl_PL",
 };
 
 export function isLocale(value: unknown): value is Locale {

@@ -23,7 +23,14 @@ describe("chapterSlug", () => {
 
 describe("presetTranslations", () => {
   it("matches a preset regardless of case and spacing", () => {
-    expect(presetTranslations("  obřad ")).toEqual({ en: "Ceremony", fr: "Cérémonie" });
+    expect(presetTranslations("  obřad ")).toEqual({
+      en: "Ceremony",
+      fr: "Cérémonie",
+      de: "Trauung",
+      es: "Ceremonia",
+      sk: "Obrad",
+      pl: "Ceremonia",
+    });
   });
 
   it("is null for a custom title", () => {
