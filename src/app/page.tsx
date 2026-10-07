@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
-import type { Locale } from "@/i18n/locales";
+import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
 import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
 import { Card } from "@/components/ui/card";
@@ -53,7 +53,9 @@ const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
  */
 function guestGalleryPageUrl(locale: Locale): string {
   const url = new URL(
-    locale === "cs" || locale === "sk" ? "/galerie-pro-hosty" : "/en/galerie-pro-hosty",
+    locale === "cs" || CZECH_READING_LOCALES.includes(locale)
+      ? "/galerie-pro-hosty"
+      : "/en/galerie-pro-hosty",
     MAIN_SITE_URL,
   );
   url.search = "utm_source=galerie&utm_medium=napoveda";

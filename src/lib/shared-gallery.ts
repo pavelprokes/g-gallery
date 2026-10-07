@@ -29,7 +29,12 @@ import {
   type SignedImageGrant,
 } from "@/lib/image-signing";
 import { isSafePromoUrl, type GalleryPromo } from "@/lib/promo-card";
-import { chapterAnchor, type GalleryChapter, type TimelinePosition } from "@/lib/gallery-chapters";
+import {
+  chapterAnchor,
+  withPresetFallback,
+  type GalleryChapter,
+  type TimelinePosition,
+} from "@/lib/gallery-chapters";
 import {
   HIGHLIGHT_CANDIDATE_SELECT,
   pickHighlights,
@@ -221,7 +226,10 @@ export async function loadGalleryViewData(
         id: chapter.id,
         title: localizeField(
           chapter.title,
-          parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+          withPresetFallback(
+            chapter.title,
+            parseTranslations(chapter.translations, CHAPTER_TRANSLATED_FIELDS),
+          ),
           "title",
           locale,
         ),

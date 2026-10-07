@@ -1,4 +1,8 @@
-import { TRANSLATED_LOCALES, type TranslatedLocale } from "@/lib/content-translations";
+import {
+  TRANSLATED_LOCALES,
+  type ContentTranslations,
+  type TranslatedLocale,
+} from "@/lib/content-translations";
 import { slugify } from "@/lib/gallery-slug";
 
 /**
@@ -184,4 +188,22 @@ export function presetTranslations(title: string): Record<TranslatedLocale, stri
     TranslatedLocale,
     string
   >;
+}
+
+/**
+ * A chapter's stored translations with its preset's filled in underneath, so a
+ * chapter saved before a language was added still reads in that language.
+ * What the photographer typed always wins.
+ */
+export function withPresetFallback(
+  title: string,
+  stored: ContentTranslations<"title">,
+): ContentTranslations<"title"> {
+  const preset = presetTranslations(title);
+  if (!preset) return stored;
+  const result = { ...stored };
+  for (const locale of TRANSLATED_LOCALES) {
+    if (!result[locale]?.title) result[locale] = { title: preset[locale] };
+  }
+  return result;
 }

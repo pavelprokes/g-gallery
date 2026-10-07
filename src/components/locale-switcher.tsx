@@ -39,7 +39,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       value={locale}
       onChange={(event) => choose(event.target.value as Locale)}
       // h-11: the 44 px hit region Apple HIG asks for.
-      className={`hover:bg-brand-tint hover:text-brand-ink h-11 shrink-0 cursor-pointer rounded-full border border-neutral-300 bg-transparent px-4 text-sm font-semibold text-neutral-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className ?? ""}`}
+      className={`hover:bg-brand-tint hover:text-brand-ink h-11 shrink-0 cursor-pointer rounded-full border border-neutral-300 bg-transparent px-4 text-sm font-semibold text-neutral-600 transition-colors dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className ?? ""}`}
     >
       {LOCALES.map((code) => (
         <option key={code} value={code} lang={code}>

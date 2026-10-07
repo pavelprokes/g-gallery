@@ -46,6 +46,9 @@ export const OG_LOCALES: Record<Locale, string> = {
   pl: "pl_PL",
 };
 
+/** Languages whose speakers read the Czech original more easily than English. */
+export const CZECH_READING_LOCALES: readonly Locale[] = ["sk"];
+
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
 }

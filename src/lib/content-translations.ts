@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/i18n/locales";
+import { CZECH_READING_LOCALES, DEFAULT_LOCALE, LOCALES, type Locale } from "@/i18n/locales";
 
 /**
  * Translations of the text the photographer types into the admin — wedding
@@ -90,7 +90,11 @@ export function localizeOptionalField<F extends string>(
   if (locale === CONTENT_BASE_LOCALE) return base;
   const chain: TranslatedLocale[] = [locale];
   // Slovak reads the Czech original more easily than English.
-  if (locale !== "sk" && DEFAULT_LOCALE !== locale && DEFAULT_LOCALE !== CONTENT_BASE_LOCALE) {
+  if (
+    !CZECH_READING_LOCALES.includes(locale) &&
+    DEFAULT_LOCALE !== locale &&
+    DEFAULT_LOCALE !== CONTENT_BASE_LOCALE
+  ) {
     chain.push(DEFAULT_LOCALE);
   }
   for (const candidate of chain) {

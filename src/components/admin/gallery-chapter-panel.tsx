@@ -29,6 +29,7 @@ function isPresetOnly(chapter: AdminChapter): boolean {
   const preset = presetTranslations(chapter.title);
   return (
     !!preset &&
+    TRANSLATED_LOCALES.some((l) => chapter.translations[l]?.title) &&
     TRANSLATED_LOCALES.every(
       (l) => !chapter.translations[l]?.title || chapter.translations[l]?.title === preset[l],
     )
