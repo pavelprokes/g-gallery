@@ -65,11 +65,11 @@
     "faq": [
       {
         "q": "¿Dónde consigo el código QR o el enlace de la galería?",
-        "a": "En el fotógrafo o directamente en la pareja: ambos pueden compartir el enlace o el código QR, ya sea reenviado en un chat familiar o impreso en una tarjeta en la mesa de las fotos. Si no lo tienes, pídeselo a uno de ellos."
+        "a": "Te lo da el fotógrafo o directamente la pareja: ambos pueden compartir el enlace o el código QR, ya sea reenviado en un chat familiar o impreso en una tarjeta en la mesa de las fotos. Si no lo tienes, pídeselo a uno de ellos."
       },
       {
         "q": "No sé la contraseña, ¿qué hago?",
-        "a": "Solo la sabe el fotógrafo: es quien la ha puesto y nadie más puede restablecerla ni saltársela. Escríbele y pídesela de nuevo. No intentes adivinarla: tras 5 intentos fallidos, el enlace se bloquea 15 min para todas las personas que lo tengan."
+        "a": "Solo la conoce el fotógrafo: es quien la ha puesto y nadie más puede restablecerla ni saltársela. Escríbele y pídesela de nuevo. No intentes adivinarla: tras 5 intentos fallidos, el enlace se bloquea 15 min para todas las personas que lo tengan."
       },
       {
         "q": "El enlace no funciona o dice que ha caducado.",
@@ -280,7 +280,7 @@
     "uploadingProgress": "Subiendo {done} de {total} · con la pantalla encendida. Si se interrumpe, se retomará cuando vuelvas.",
     "resumingProgress": "Terminando tu subida: {done} de {total} · con la pantalla encendida. Si se interrumpe, se retomará cuando vuelvas.",
     "discardRest": "Descartar el resto",
-    "doneSome": "Subidas. Todos los de la boda las verán.",
+    "doneSome": "Subidas. Todos los que estén en la boda las verán.",
     "doneNone": "No se ha subido nada. Elige las fotos otra vez; funciona mejor en tandas pequeñas.",
     "failedSuffix": "{count, plural, one {# foto no se ha subido} other {# fotos no se han subido}}",
     "skippedNote": "(Hemos omitido {count, plural, one {# archivo} other {# archivos}}; el resto se sigue subiendo.)",
@@ -317,9 +317,9 @@
     }
   },
   "presence": {
-    "someone": "Alguien la está viendo ahora mismo",
-    "count": "{count, plural, one {# persona la está viendo ahora mismo} other {# personas la están viendo ahora mismo}}",
-    "named": "{names} {count, plural, one {la está viendo} other {la están viendo}}"
+    "someone": "Alguien está viendo la galería ahora mismo",
+    "count": "{count, plural, one {# persona está viendo la galería ahora mismo} other {# personas están viendo la galería ahora mismo}}",
+    "named": "{names} {count, plural, one {está viendo la galería} other {están viendo la galería}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · fotógrafo de bodas",

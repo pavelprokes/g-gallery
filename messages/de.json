@@ -69,7 +69,7 @@
       },
       {
         "q": "Ich kenne das Passwort nicht – was nun?",
-        "a": "Das Passwort kennt nur der Fotograf – er hat es als Einziger festgelegt, und niemand sonst kann es zurücksetzen oder umgehen. Schreiben Sie ihm und bitten Sie ihn, es noch einmal zu schicken. Versuchen Sie nicht, es zu erraten: Nach fünf falschen Eingaben wird der Link für 15 min für alle gesperrt, die ihn haben."
+        "a": "Das Passwort kennt nur der Fotograf – er hat es als Einziger festgelegt, und niemand sonst kann es zurücksetzen oder umgehen. Schreiben Sie ihm und bitten Sie ihn, es noch einmal zu schicken. Versuchen Sie nicht, es zu erraten: Nach fünf falschen Eingaben wird der Link für alle, die ihn haben, 15 min lang gesperrt."
       },
       {
         "q": "Der Link funktioniert nicht oder ist angeblich abgelaufen.",
@@ -89,7 +89,7 @@
     "guestTipsImageAlt": "Eine Tischkarte mit QR-Code auf dem Hochzeitstisch, zwischen Kerzen und Gedecken",
     "guestTips": [
       "Nichts zu installieren. Sie brauchen nur den Link oder QR-Code vom Fotografen oder Brautpaar, den Button „Fotos hinzufügen“ und die normale Dateiauswahl oder Kamera Ihres Handys.",
-      "Sie können das Handy während des Uploads ruhig sperren – er läuft im Hintergrund weiter und macht dort weiter, wo er aufgehört hat, sobald Sie zurück sind.",
+      "Sie können das Handy während des Uploads ruhig sperren – er läuft im Hintergrund weiter und macht nach Ihrer Rückkehr dort weiter, wo er aufgehört hat.",
       "Geben Sie Ihren Namen an, wenn die Galerie danach fragt – so sieht das Brautpaar später, von wem das Foto stammt.",
       "Aus Versehen etwas hochgeladen? Löschen Sie es einfach selbst direkt in der Galerie – Sie müssen niemandem schreiben.",
       "iPhone-Fotos funktionieren problemlos – sie werden automatisch in einem Standardformat an den Browser gesendet. Die einzige Ausnahme: Ist unter Einstellungen → Fotos → Auf Mac oder PC übertragen „Originale behalten“ aktiviert (bei den meisten nicht der Fall), kann ein Upload gelegentlich fehlschlagen – stellen Sie auf „Automatisch“ um und versuchen Sie es erneut."
@@ -106,14 +106,14 @@
       "Benachrichtigungen, wenn der Fotograf neue Fotos hinzufügt.",
       "Fotos von Gästen – Gäste laden ihre eigenen Hochzeitsfotos direkt in die Galerie hoch, ohne App, ohne Konto.",
       "Live-Diashow – neue Gästefotos erscheinen nach etwa einer halben Minute auf dem Bildschirm.",
-      "Mehrere Galerien unter einem wachsenden Link – eine ausgewählte Auswahl, das komplette Set und die Gästegalerie, ohne dass ein neuer Link verschickt werden muss."
+      "Mehrere Galerien unter einem wachsenden Link – die Auswahl des Fotografen, das komplette Set und die Gästegalerie, ohne dass ein neuer Link verschickt werden muss."
     ],
     "footerText": "Diese Galerie wird von Ihrem Fotografen betrieben.",
     "footerLinkText": "Hochzeitsfotograf Tschechien →"
   },
   "errors": {
     "linkNotFoundTitle": "Dieser Link führt ins Leere",
-    "linkNotFoundLead": "Chat-Apps schneiden Links beim Einfügen oft in der Mitte ab – das passiert ständig. Öffnen Sie ihn noch einmal direkt aus der ursprünglichen Nachricht oder scannen Sie den QR-Code, falls Sie ihn zur Hand haben.",
+    "linkNotFoundLead": "Chat-Apps schneiden Links beim Einfügen oft in der Mitte ab – das kommt ständig vor. Öffnen Sie ihn noch einmal direkt aus der ursprünglichen Nachricht oder scannen Sie den QR-Code, falls Sie ihn zur Hand haben.",
     "linkNotFoundHint": "Klappt es immer noch nicht? Schreiben Sie der Person, die Ihnen den Link geschickt hat – sie hat ihn noch.",
     "genericNotFoundTitle": "Hier ist nichts",
     "genericNotFoundLead": "Diese Adresse führt nirgendwohin.",
@@ -149,16 +149,16 @@
     "showFavoritesOnlyTitle": "Nur Ihre Favoriten anzeigen",
     "showFavoritesOnlySr": "Nur Favoriten anzeigen",
     "slideshowButtonLabel": "Diashow",
-    "slideshowButtonTitle": "Fotos auf der großen Leinwand – wechseln von selbst, neue erscheinen live",
+    "slideshowButtonTitle": "Fotos auf der großen Leinwand – sie wechseln von selbst, neue erscheinen live",
     "downloadAllLabel": "Alle herunterladen",
     "downloadAllTitle": "Alle herunterladen (ZIP)",
     "downloadOneLabel": "Herunterladen",
     "downloadOneTitle": "Foto herunterladen",
     "downloadPromptTitle": "Sie laden gleich die gesamte Galerie herunter",
     "downloadPromptSize": "{count, plural, one {# Foto} other {# Fotos}} in voller Auflösung, {size}.",
-    "downloadPromptAdvice": "Bei langsamer Verbindung dauert das eine Weile. Am besten per WLAN und auf einem Computer mit genügend Speicherplatz – für mobile Daten ist es sehr viel.",
-    "downloadPromptResume": "Wird der Download unterbrochen, können die meisten Browser ihn fortsetzen. Sie fangen nicht von vorn an.",
-    "downloadPromptAlternative": "Können Sie nicht herunterladen oder haben keinen Platz dafür? <a>Schreiben Sie mir</a>, dann bekommen Sie die Fotos auf anderem Weg – per Dateiübertragung oder USB-Stick.",
+    "downloadPromptAdvice": "Bei langsamer Verbindung dauert das eine Weile. Am besten per WLAN und auf einem Computer mit genügend Speicherplatz – für mobile Daten ist das sehr viel.",
+    "downloadPromptResume": "Wird der Download unterbrochen, können die meisten Browser ihn fortsetzen. Sie müssen nicht von vorn beginnen.",
+    "downloadPromptAlternative": "Können Sie nicht herunterladen oder fehlt Ihnen der Platz dafür? <a>Schreiben Sie mir</a>, dann bekommen Sie die Fotos auf anderem Weg – per Dateiübertragung oder USB-Stick.",
     "downloadPromptConfirm": "Herunterladen",
     "downloadPromptCancel": "Abbrechen",
     "downloadPromptEmailSubject": "Galerie-Download: {title}",
@@ -227,10 +227,10 @@
       "notEnoughSpace": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}.",
       "notEnoughSpaceWithFree": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}, frei sind {free}.",
       "tryAgain": "Erneut versuchen",
-      "downloading": "Wird auf das Gerät geladen … {percent}%",
-      "downloadingWithBytes": "Wird auf das Gerät geladen … {percent}% · {bytes}",
+      "downloading": "Wird auf das Gerät geladen … {percent} %",
+      "downloadingWithBytes": "Wird auf das Gerät geladen … {percent} % · {bytes}",
       "downloadingAriaLabel": "Galerie wird für den Offline-Zugriff heruntergeladen",
-      "downloadStarted": "Download gestartet, {percent}%.",
+      "downloadStarted": "Download gestartet, {percent} %.",
       "availableOffline": "✓ Galerie ist offline verfügbar",
       "availableOfflineWithBytes": "✓ Galerie ist offline verfügbar ({bytes})",
       "availableOfflineNote": "Gespeicherte Fotos sind auf diesen Bildschirm zugeschnitten, nicht die Originale. Der Browser kann sie nach einer Weile von selbst wieder freigeben – auf dem iPhone etwa nach einer Woche ohne Öffnen der Galerie. Laden Sie sie dann einfach erneut herunter.",
@@ -260,7 +260,7 @@
       "startTitle": "Auf einem anderen Gerät fortfahren",
       "haveCode": "Ich habe einen Code",
       "codeTitle": "Geben Sie diesen Code auf dem anderen Gerät ein",
-      "codeHint": "Der Code ist 15 Minuten gültig und nur einmal verwendbar. Er überträgt Ihre Favoriten, Reaktionen und die Druckauswahl.",
+      "codeHint": "Der Code ist 15 Minuten gültig und nur einmal verwendbar. Er überträgt Ihre Favoriten, Reaktionen und die Druckauswahl.",
       "enterTitle": "Code vom ersten Gerät",
       "enterHint": "Acht Zeichen. Groß- und Kleinschreibung sowie der Bindestrich spielen keine Rolle.",
       "submit": "Übertragen",

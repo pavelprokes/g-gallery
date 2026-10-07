@@ -36,6 +36,13 @@ describe("parseTranslations", () => {
   });
 });
 
+describe("localizeField (Slovak)", () => {
+  it("falls back to the Czech original, not English", () => {
+    expect(localizeField("Obřad", { en: { title: "Ceremony" } }, "title", "sk")).toBe("Obřad");
+    expect(localizeField("Obřad", { sk: { title: "Obrad" } }, "title", "sk")).toBe("Obrad");
+  });
+});
+
 describe("localizeField", () => {
   const translations = { en: { title: "Ceremony" }, fr: { title: "Cérémonie" } };
 

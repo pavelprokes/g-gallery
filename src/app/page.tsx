@@ -49,11 +49,11 @@ const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 /**
  * The main site's sales page for the guest gallery — this page stays the guests' help
- * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so every other language gets en.
+ * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so Slovak (which reads Czech) gets cs and every other language en.
  */
 function guestGalleryPageUrl(locale: Locale): string {
   const url = new URL(
-    locale === "cs" ? "/galerie-pro-hosty" : "/en/galerie-pro-hosty",
+    locale === "cs" || locale === "sk" ? "/galerie-pro-hosty" : "/en/galerie-pro-hosty",
     MAIN_SITE_URL,
   );
   url.search = "utm_source=galerie&utm_medium=napoveda";

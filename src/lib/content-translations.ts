@@ -8,7 +8,7 @@ import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/i18n/locales";
  *
  * The model's own columns hold the original, written in Czech in a Czech
  * admin; each row carries one `translations` JSON object for the other
- * languages: `{ "en": { "title": "Ceremony" }, "fr": { "title": "Cérémonie" } }`.
+ * languages: `{ "en": { "title": "Ceremony" }, "fr": { "title": "Cérémonie" }, … }`.
  *
  * Client-safe on purpose (no server-only imports): the admin forms render the
  * same locale list and field names the server actions read back.
@@ -65,7 +65,7 @@ export function parseTranslations<F extends string>(
 /**
  * What a guest reading `locale` sees for one field.
  *
- * The chain is: their language → English → the Czech original. English sits in
+ * The chain is: their language → English → the Czech original (Slovak skips English). English sits in
  * the middle because it is the app's own fallback language (DEFAULT_LOCALE): a
  * French guest at a wedding where the photographer only wrote English
  * translations reads "Ceremony" far more easily than "Obřad". A Czech guest
@@ -89,7 +89,8 @@ export function localizeOptionalField<F extends string>(
 ): string | null {
   if (locale === CONTENT_BASE_LOCALE) return base;
   const chain: TranslatedLocale[] = [locale];
-  if (DEFAULT_LOCALE !== locale && DEFAULT_LOCALE !== CONTENT_BASE_LOCALE) {
+  // Slovak reads the Czech original more easily than English.
+  if (locale !== "sk" && DEFAULT_LOCALE !== locale && DEFAULT_LOCALE !== CONTENT_BASE_LOCALE) {
     chain.push(DEFAULT_LOCALE);
   }
   for (const candidate of chain) {

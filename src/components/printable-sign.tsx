@@ -163,7 +163,7 @@ const COPY: Record<
   es: {
     table: {
       label: "Tarjeta de mesa (corta)",
-      headline: "Esta noche tú también eres fotógrafo — únete a la galería.",
+      headline: "Esta noche las fotos también son cosa tuya — únete a la galería.",
       cta: "Sube tus fotos →",
       caption: null,
     },

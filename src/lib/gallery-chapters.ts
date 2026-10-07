@@ -145,7 +145,7 @@ export const CHAPTER_PRESETS: readonly ({ cs: string } & Record<TranslatedLocale
     de: "Abendfeier",
     es: "La fiesta",
     sk: "Večerná zábava",
-    pl: "Zabawa wieczorna",
+    pl: "Wieczorna zabawa",
   },
 ];
 

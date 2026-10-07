@@ -128,6 +128,7 @@ test.describe("root page link to the main site's guest-gallery page", () => {
     ["en-US", "/en/galerie-pro-hosty"],
     ["fr-FR", "/en/galerie-pro-hosty"],
     ["pl-PL", "/en/galerie-pro-hosty"],
+    ["sk-SK", "/galerie-pro-hosty"],
   ] as const) {
     test(`${locale} links to ${path}`, async ({ browser }) => {
       const context = await browser.newContext({ locale });

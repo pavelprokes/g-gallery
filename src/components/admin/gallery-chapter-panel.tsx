@@ -27,7 +27,12 @@ export interface AdminChapter {
 /** Translations exactly as the preset supplied them — nothing to review. */
 function isPresetOnly(chapter: AdminChapter): boolean {
   const preset = presetTranslations(chapter.title);
-  return !!preset && TRANSLATED_LOCALES.every((l) => chapter.translations[l]?.title === preset[l]);
+  return (
+    !!preset &&
+    TRANSLATED_LOCALES.every(
+      (l) => !chapter.translations[l]?.title || chapter.translations[l]?.title === preset[l],
+    )
+  );
 }
 
 /**

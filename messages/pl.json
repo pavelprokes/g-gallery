@@ -33,7 +33,7 @@
     "twoWaysHeading": "Dwa sposoby, w jakie możesz dostać galerię",
     "fromPhotographerTitle": "Galeria od fotografa",
     "fromPhotographerBody": "Po sesji fotograf wysyła Ci link do gotowych zdjęć w wysokiej rozdzielczości. Galeria jest dostępna jeszcze długo po ślubie, pobiera się jednym kliknięciem i nie wymaga konta.",
-    "fromGuestsTitle": "Bonus do sesji: galeria od gości",
+    "fromGuestsTitle": "Bonus: galeria od gości",
     "fromGuestsBody": "W cenie pakietu fotografii ślubnej. Goście skanują kod QR na stole i dodają własne zdjęcia ze ślubu prosto do wspólnej galerii — bez aplikacji i bez rejestracji.",
     "howItWorksHeading": "Jak to działa",
     "howItWorksSteps": [
@@ -69,7 +69,7 @@
       },
       {
         "q": "Nie znam hasła — co teraz?",
-        "a": "Zna je tylko fotograf — tylko on je ustawił i nikt inny nie może go zresetować ani obejść. Napisz do niego i poproś o hasło jeszcze raz. Nie zgaduj: po pięciu błędnych próbach link blokuje się na 15 min dla wszystkich, którzy go mają."
+        "a": "Zna je tylko fotograf — nikt inny nie może go zresetować ani obejść. Napisz do niego i poproś o hasło jeszcze raz. Nie zgaduj: po pięciu błędnych próbach link blokuje się na 15 min dla wszystkich, którzy go mają."
       },
       {
         "q": "Link nie działa albo pokazuje, że wygasł.",
@@ -84,14 +84,14 @@
         "a": "Przycisk „Pobierz wszystko” pobiera całą galerię jako jeden plik ZIP. Przygotowuje się sam, zwykle w ciągu godziny od wgrania ostatniego zdjęcia — dłużej przy większych galeriach. Do tego czasu możesz pobierać zdjęcia pojedynczo."
       }
     ],
-    "guestTipsHeading": "Wskazówki dla gości, którzy fotografują",
+    "guestTipsHeading": "Wskazówki dla gości, którzy robią zdjęcia",
     "guestTipsIntro": "Jeśli fotograf lub Młodzi włączyli w tej galerii wgrywanie zdjęć, każdy na weselu może dodać własne zdjęcia — obok zdjęć fotografa.",
     "guestTipsImageAlt": "Kartka z kodem QR na stole weselnym, wśród świec i nakryć",
     "guestTips": [
       "Nic nie trzeba instalować. Wystarczy link lub kod QR od fotografa albo Młodych, przycisk „Dodaj zdjęcia” oraz zwykły wybór plików lub aparat w telefonie.",
       "Spokojnie możesz zablokować telefon w trakcie wgrywania — wgrywanie trwa w tle i wznowi się, gdy wrócisz.",
       "Podaj swoje imię, jeśli galeria o to poprosi — dzięki temu Młodzi będą później wiedzieć, czyje to zdjęcie.",
-      "Wgrane przez pomyłkę? Usuń zdjęcie samodzielnie w galerii — nie musisz do nikogo pisać.",
+      "Dodane przez pomyłkę? Usuń zdjęcie samodzielnie w galerii — nie musisz do nikogo pisać.",
       "Zdjęcia z iPhone’a działają bez problemu — do przeglądarki trafiają automatycznie w standardowym formacie. Jedyny wyjątek: jeśli w Ustawienia → Zdjęcia → Przenoszenie na Maca lub PC masz włączone „Zachowaj oryginały” (większość osób tak nie ma), wgrywanie może czasem się nie udać — przełącz na „Automatycznie” i spróbuj ponownie."
     ],
     "featuresHeading": "Wszystko, co potrafi galeria",
@@ -109,7 +109,7 @@
       "Kilka galerii pod jednym rosnącym linkiem — wybór najlepszych ujęć, pełny zestaw i galeria gości, bez wysyłania nowego linku."
     ],
     "footerText": "Tę galerię prowadzi Twój fotograf.",
-    "footerLinkText": "Fotograf ślubny Czechy →"
+    "footerLinkText": "Fotograf ślubny w Czechach →"
   },
   "errors": {
     "linkNotFoundTitle": "Ten link donikąd nie prowadzi",
@@ -158,7 +158,7 @@
     "downloadPromptSize": "{count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}} w pełnej rozdzielczości, {size}.",
     "downloadPromptAdvice": "Przy wolnym łączu to chwilę potrwa. Najlepiej przez Wi-Fi i na komputerze z wolnym miejscem — dla danych mobilnych to bardzo dużo.",
     "downloadPromptResume": "Jeśli pobieranie się przerwie, większość przeglądarek potrafi je wznowić. Nie zaczniesz od nowa.",
-    "downloadPromptAlternative": "Nie możesz pobrać albo nie masz gdzie zapisać? <a>Napisz do mnie</a>, a prześlę Ci zdjęcia inaczej — przez wymianę plików albo na pendrivie.",
+    "downloadPromptAlternative": "Nie możesz pobrać albo nie masz gdzie zapisać? <a>Napisz do mnie</a>, a prześlę Ci zdjęcia inaczej — przez serwis do wymiany plików albo na pendrivie.",
     "downloadPromptConfirm": "Pobierz",
     "downloadPromptCancel": "Anuluj",
     "downloadPromptEmailSubject": "Pobieranie galerii: {title}",
@@ -210,7 +210,7 @@
     "printSyncSaved": "Zapisano",
     "printSyncOffline": "Brak połączenia – {count, plural, one {# zmiana czeka i zapisze się} few {# zmiany czekają i zapiszą się} many {# zmian czeka i zapisze się} other {# zmian czeka i zapisze się}} automatycznie po powrocie online.",
     "viewerChipsAriaLabel": "Kto oglądał tę galerię",
-    "namePromptTitle": "Kogo podpisać jako autora?",
+    "namePromptTitle": "Jak podpisać Twoje zdjęcia?",
     "namePromptHint": "Inni zobaczą to imię przy Twoich ulubionych zdjęciach i przy zdjęciach, które dodasz. Możesz je pominąć.",
     "namePromptPlaceholder": "Np. Ewa",
     "namePromptSkip": "Pomiń",
@@ -239,9 +239,9 @@
       "downloadFailed": "Nie udało się dokończyć pobierania.",
       "downloadFailedAnnounce": "Pobieranie się nie powiodło.",
       "saveOffline": "Zapisz na tym urządzeniu {count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}} i przeglądaj je bez zasięgu.",
-      "estimatedSize": "Zajmie około {size}. Zapisuje rozmiar dopasowany do ekranu, nie oryginały.",
+      "estimatedSize": "Zajmie około {size}. Zdjęcia zapiszą się w rozmiarze dopasowanym do ekranu, nie jako oryginały.",
       "onlyEngagedOption": "Tylko zdjęcia z moją reakcją, oznaczone do wydruku lub zaznaczone ({count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}})",
-      "makeAvailable": "Udostępnij offline",
+      "makeAvailable": "Zapisz do użytku offline",
       "iconLabel": "Offline",
       "iconTitle": "Zapisz zdjęcia na tym urządzeniu, by oglądać je bez zasięgu",
       "panelTitle": "Dostęp offline"
@@ -278,7 +278,7 @@
     "takePhoto": "Zrób zdjęcie",
     "preparing": "{count, plural, one {Przygotowuję zdjęcie…} few {Przygotowuję # zdjęcia…} many {Przygotowuję # zdjęć…} other {Przygotowuję # zdjęć…}}",
     "uploadingProgress": "Wgrywanie: {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
-    "resumingProgress": "Kończę Twoje wgrywanie — {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
+    "resumingProgress": "Dokańczam wgrywanie — {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
     "discardRest": "Odrzuć resztę",
     "doneSome": "Wgrano. Wszyscy na weselu to zobaczą.",
     "doneNone": "Nic nie zostało wgrane. Wybierz zdjęcia jeszcze raz — najlepiej działają mniejsze partie.",
@@ -303,7 +303,7 @@
     "changeName": "Zmień",
     "addName": "Dodaj swoje imię",
     "rejection": {
-      "unsupportedHeic": "Tego formatu (HEIC) jeszcze nie obsługujemy. W Ustawienia → Aparat → Formaty wybierz „Najbardziej zgodne” i spróbuj ponownie.",
+      "unsupportedHeic": "Tego formatu (HEIC) jeszcze nie obsługujemy. W Ustawieniach → Aparat → Formaty wybierz „Najbardziej kompatybilne” i spróbuj ponownie.",
       "unsupportedVideo": "Filmów jeszcze nie przyjmujemy, tylko zdjęcia.",
       "unsupportedGeneric": "Nie obsługujemy tego typu pliku. Spróbuj innego zdjęcia.",
       "fileTooLarge": "To zdjęcie jest za duże.",
@@ -330,7 +330,7 @@
     "verifying": "Sprawdzam…",
     "submit": "Zobacz galerię",
     "missingPassword": "Wpisz hasło.",
-    "wrongPassword": "Błędne hasło. Sprawdź wielkie litery i spróbuj ponownie później albo poproś fotografa o ponowne wysłanie."
+    "wrongPassword": "Błędne hasło. Sprawdź wielkie litery i spróbuj ponownie później albo poproś fotografa o ponowne wysłanie hasła."
   },
   "promo": {
     "cardAriaLabel": "{headline} — otwiera {cta} w nowym oknie"

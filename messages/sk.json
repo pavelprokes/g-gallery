@@ -65,14 +65,14 @@
     "faq": [
       {
         "q": "Kde zoženiem QR kód alebo odkaz na galériu?",
-        "a": "Buď od fotografa, alebo priamo od snúbencov či novomanželov – obe strany môžu odkaz aj QR kód zdieľať ďalej, napríklad preposlaný v rodinnom chate alebo na kartičke položenej na stole pri fotokútiku. Ak odkaz nemáte, stačí napísať jednému z nich."
+        "a": "Buď od fotografa, alebo priamo od snúbencov či novomanželov – obe strany môžu odkaz aj QR kód zdieľať ďalej, napríklad preposlaný v rodinnej skupine alebo na kartičke položenej na stole pri fotokútiku. Ak odkaz nemáte, stačí napísať jednému z nich."
       },
       {
         "q": "Neviem heslo, čo teraz?",
         "a": "Heslo pozná iba fotograf – je jediný, kto ho nastavil, a nikto iný ho nemôže obnoviť ani obísť. Napíšte mu, nech vám ho pošle znova. Nepokúšajte sa ho hádať: po piatich nesprávnych pokusoch sa odkaz na 15 min úplne zamkne pre všetkých, ktorí ho majú."
       },
       {
-        "q": "Odkaz nefunguje, alebo píše, že vypršal.",
+        "q": "Odkaz nefunguje, alebo hlási, že vypršal.",
         "a": "Galéria sama nevyprší – zostáva dostupná natrvalo. Odkaz prestane fungovať, iba keď mu fotograf nastaví časový limit alebo ho zruší. Potom stačí napísať fotografovi, nech ho znova sprístupní alebo predĺži."
       },
       {
@@ -113,7 +113,7 @@
   },
   "errors": {
     "linkNotFoundTitle": "Tento odkaz nikam nevedie",
-    "linkNotFoundLead": "Zrejme sa z chatu skopírovala len časť adresy – stáva sa to často. Skúste ju otvoriť znova priamo z pôvodnej správy, alebo naskenujte QR kód, ak ho máte po ruke.",
+    "linkNotFoundLead": "Zrejme sa zo správy skopírovala len časť adresy – stáva sa to často. Skúste ju otvoriť znova priamo z pôvodnej správy, alebo naskenujte QR kód, ak ho máte po ruke.",
     "linkNotFoundHint": "Ak to nepomôže, napíšte tomu, kto vám odkaz poslal. Má ho u seba.",
     "genericNotFoundTitle": "Tu nič nie je",
     "genericNotFoundLead": "Táto adresa nikam nevedie.",
@@ -158,7 +158,7 @@
     "downloadPromptSize": "{count, plural, one {# fotka} few {# fotky} other {# fotiek}} v plnom rozlíšení, {size}.",
     "downloadPromptAdvice": "Na pomalom pripojení to chvíľu potrvá. Najlepšie cez Wi-Fi a na počítači, kde máte dosť miesta – na mobilné dáta je to veľa.",
     "downloadPromptResume": "Keď sa sťahovanie preruší, väčšina prehliadačov ho vie obnoviť. Nezačínate od začiatku.",
-    "downloadPromptAlternative": "Nedá sa to stiahnuť, alebo nemáte kam? <a>Napíšte mi</a> a pošlem vám ich inou cestou – napríklad cez úložisko alebo na flashke.",
+    "downloadPromptAlternative": "Nedá sa to stiahnuť, alebo nemáte kam? <a>Napíšte mi</a> a pošlem vám ich inou cestou – napríklad cez úložisko alebo na USB kľúči.",
     "downloadPromptConfirm": "Stiahnuť",
     "downloadPromptCancel": "Zrušiť",
     "downloadPromptEmailSubject": "Stiahnutie galérie: {title}",
@@ -179,7 +179,7 @@
     "deleting": "Mažem…",
     "deleteMyPhoto": "Zmazať moju fotku",
     "uploaderLabel": "Autor fotky",
-    "deleteConfirm": "Zmazať túto fotku z galérie? Toto sa už nedá vziať späť.",
+    "deleteConfirm": "Zmazať túto fotku z galérie? Nedá sa to vrátiť späť.",
     "selected": "Vybrané",
     "select": "Vybrať",
     "preparingDownload": "Pripravujem stiahnutie",
