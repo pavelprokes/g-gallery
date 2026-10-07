@@ -14,10 +14,14 @@ describe("formatDate", () => {
     const date = new Date("2026-08-14T22:00:00Z");
     expect(formatDate(date, "en")).toBe("8/15/2026");
     expect(formatDate(date, "fr")).toBe("15/08/2026");
+    expect(formatDate(date, "de")).toBe("15.8.2026");
+    expect(formatDate(date, "es")).toBe("15/8/2026");
+    expect(formatDate(date, "sk")).toBe("15. 8. 2026");
+    expect(formatDate(date, "pl")).toBe("15.08.2026");
   });
 
   it("falls back to the default language for a locale the app does not speak", () => {
-    expect(formatDate(new Date("2026-08-14T22:00:00Z"), "de")).toBe("8/15/2026");
+    expect(formatDate(new Date("2026-08-14T22:00:00Z"), "ja")).toBe("8/15/2026");
   });
 });
 

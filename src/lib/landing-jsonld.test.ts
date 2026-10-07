@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { BUSINESS_ID, PERSON_ID, landingJsonLd } from "./landing-jsonld";
+import type { Locale } from "@/i18n/locales";
 
 const faq = [{ q: "Where do I get the link?", a: "From the photographer." }];
 
-function graph(locale: "cs" | "en" | "fr" = "cs") {
+function graph(locale: Locale = "cs") {
   return landingJsonLd({ locale, title: "Title", description: "Description", faq })["@graph"];
 }
 
@@ -23,10 +24,10 @@ describe("landingJsonLd", () => {
   });
 
   it("states the page's language as a full tag", () => {
-    const page = (locale: "cs" | "fr") =>
+    const page = (locale: "cs" | "pl") =>
       graph(locale).find((n) => n["@type"] === "FAQPage") as Record<string, unknown>;
     expect(page("cs").inLanguage).toBe("cs-CZ");
-    expect(page("fr").inLanguage).toBe("fr-FR");
+    expect(page("pl").inLanguage).toBe("pl-PL");
   });
 
   // The main site owns these ids; a typo here would quietly create a second,

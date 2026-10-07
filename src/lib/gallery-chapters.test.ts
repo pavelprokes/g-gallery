@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { chapterSlug, compareTimeline, presetTranslations } from "@/lib/gallery-chapters";
+import {
+  chapterSlug,
+  compareTimeline,
+  presetTranslations,
+  withPresetFallback,
+} from "@/lib/gallery-chapters";
 
 describe("chapterSlug", () => {
   it("uses a preset's English name, whatever language the link is opened in", () => {
@@ -23,11 +28,30 @@ describe("chapterSlug", () => {
 
 describe("presetTranslations", () => {
   it("matches a preset regardless of case and spacing", () => {
-    expect(presetTranslations("  obřad ")).toEqual({ en: "Ceremony", fr: "Cérémonie" });
+    expect(presetTranslations("  obřad ")).toEqual({
+      en: "Ceremony",
+      fr: "Cérémonie",
+      de: "Trauung",
+      es: "Ceremonia",
+      sk: "Obrad",
+      pl: "Ceremonia",
+    });
   });
 
   it("is null for a custom title", () => {
     expect(presetTranslations("Rozbíjení talíře")).toBeNull();
+  });
+});
+
+describe("withPresetFallback", () => {
+  it("fills languages a pre-existing preset chapter lacks, keeping typed ones", () => {
+    const result = withPresetFallback("Obřad", { en: { title: "Vows" } });
+    expect(result.en?.title).toBe("Vows");
+    expect(result.de?.title).toBe("Trauung");
+  });
+
+  it("leaves a custom title alone", () => {
+    expect(withPresetFallback("Rozbíjení talíře", {})).toEqual({});
   });
 });
 

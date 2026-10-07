@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * The CS/EN/FR locale switcher (src/i18n/request.ts, src/components/locale-switcher.tsx):
+ * The locale switcher (src/i18n/request.ts, src/components/locale-switcher.tsx):
  * autodetected from Accept-Language on first visit, then pinned by a cookie
  * so every later request — including the very next one — renders
  * consistently without renegotiating or flashing the wrong language.
@@ -62,6 +62,23 @@ test.describe("locale switching", () => {
     await context.close();
   });
 
+  test("a browser set to German, Spanish, Slovak or Polish is autodetected", async ({
+    browser,
+  }) => {
+    for (const [locale, lang] of [
+      ["de-AT", "de"],
+      ["es-MX", "es"],
+      ["sk-SK", "sk"],
+      ["pl-PL", "pl"],
+    ] as const) {
+      const context = await browser.newContext({ locale });
+      const page = await context.newPage();
+      await page.goto(`/g/${seed.token}/${seed.slug}`);
+      await expect(page.locator("html")).toHaveAttribute("lang", lang);
+      await context.close();
+    }
+  });
+
   test("switching locale updates the cookie, localStorage, visible text and <html lang>, without changing the URL", async ({
     page,
   }) => {
@@ -73,9 +90,10 @@ test.describe("locale switching", () => {
 
     const urlBefore = page.url();
     await page
-      .getByRole("group", { name: "Čeština / English / Français" })
-      .getByRole("button", { name: "EN" })
-      .click();
+      .getByRole("combobox", {
+        name: "Čeština / English / Français / Deutsch / Español / Slovenčina / Polski",
+      })
+      .selectOption("en");
 
     await expect(page.getByRole("list", { name: "Photos in the gallery" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -109,6 +127,8 @@ test.describe("root page link to the main site's guest-gallery page", () => {
     ["cs-CZ", "/galerie-pro-hosty"],
     ["en-US", "/en/galerie-pro-hosty"],
     ["fr-FR", "/en/galerie-pro-hosty"],
+    ["pl-PL", "/en/galerie-pro-hosty"],
+    ["sk-SK", "/galerie-pro-hosty"],
   ] as const) {
     test(`${locale} links to ${path}`, async ({ browser }) => {
       const context = await browser.newContext({ locale });

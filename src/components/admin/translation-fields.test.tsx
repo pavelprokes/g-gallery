@@ -41,8 +41,10 @@ describe("TranslationFields", () => {
 
   it("shows the Czech original as the placeholder, and marks each group's language", () => {
     const { container } = render(<TranslationFields fields={fields} />);
-    expect(screen.getAllByPlaceholderText("Obřad")).toHaveLength(2);
+    expect(screen.getAllByPlaceholderText("Obřad")).toHaveLength(6);
     expect(container.querySelector('fieldset[lang="en"]')).not.toBeNull();
-    expect(container.querySelector('fieldset[lang="fr"]')).not.toBeNull();
+    for (const lang of ["fr", "de", "es", "sk", "pl"]) {
+      expect(container.querySelector(`fieldset[lang="${lang}"]`)).not.toBeNull();
+    }
   });
 });

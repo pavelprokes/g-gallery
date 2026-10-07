@@ -20,7 +20,7 @@ describe("parseTranslations", () => {
       parseTranslations(
         {
           cs: { title: "Obřad" }, // the original lives in the column, not here
-          de: { title: "Zeremonie" }, // a language the app does not speak
+          ja: { title: "式" }, // a language the app does not speak
           en: { title: "   ", venue: 42, extra: "x" },
           fr: "Cérémonie",
         },
@@ -33,6 +33,13 @@ describe("parseTranslations", () => {
     for (const raw of [null, undefined, "x", 1, [], true]) {
       expect(parseTranslations(raw, ["title"])).toEqual({});
     }
+  });
+});
+
+describe("localizeField (Slovak)", () => {
+  it("falls back to the Czech original, not English", () => {
+    expect(localizeField("Obřad", { en: { title: "Ceremony" } }, "title", "sk")).toBe("Obřad");
+    expect(localizeField("Obřad", { sk: { title: "Obrad" } }, "title", "sk")).toBe("Obrad");
   });
 });
 

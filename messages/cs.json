@@ -2,7 +2,11 @@
   "localeSwitcher": {
     "cs": "Čeština",
     "en": "English",
-    "fr": "Français"
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "sk": "Slovenčina",
+    "pl": "Polski"
   },
   "siteFooter": {
     "role": "svatební fotograf",

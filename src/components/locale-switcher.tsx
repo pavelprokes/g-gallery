@@ -11,7 +11,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
   const locale = useLocale();
   const t = useTranslations("localeSwitcher");
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   function choose(next: Locale) {
     if (next === locale) return;
@@ -27,39 +27,25 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     });
   }
 
-  // `className` is layout only (margin, alignment) — the pill itself never
-  // changes between the footers it sits in.
+  // A native <select>: seven languages are past what a segmented pill fits on
+  // a phone (docs/I18N.md §The switcher), and the platform picker is the
+  // accessible, thumb-sized menu every guest already knows. `className` is
+  // layout only (margin, alignment).
   return (
-    <div
-      role="group"
-      // Every language by its own name — "Čeština / English / Français" —
-      // so a screen reader user who speaks only one of them still recognises
-      // theirs.
+    <select
+      // Every language by its own name — "Čeština / English / …" — so a screen
+      // reader user who speaks only one of them still recognises theirs.
       aria-label={LOCALES.map((code) => t(code)).join(" / ")}
-      // The outer pill is un-padded — padding here would shrink each segment
-      // below the button below its own 44px, since the two segments share
-      // this box's height. `gap-0.5` alone keeps the segments visually separated.
-      className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border border-neutral-300 dark:border-neutral-700 ${className ?? ""}`}
+      value={locale}
+      onChange={(event) => choose(event.target.value as Locale)}
+      // h-11: the 44 px hit region Apple HIG asks for.
+      className={`hover:bg-brand-tint hover:text-brand-ink h-11 shrink-0 cursor-pointer rounded-full border border-neutral-300 bg-transparent px-4 text-sm font-semibold text-neutral-600 transition-colors dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className ?? ""}`}
     >
       {LOCALES.map((code) => (
-        <button
-          key={code}
-          type="button"
-          disabled={pending}
-          onClick={() => choose(code)}
-          aria-pressed={locale === code}
-          // Apple HIG (Buttons): "a button needs a hit region of at least
-          // 44x44 pt ... as a general rule" — h-11/min-w-11 here, not on the
-          // wrapper, is what actually guarantees it per segment.
-          className={`flex h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            locale === code
-              ? "bg-brand-primary text-white"
-              : "hover:bg-brand-tint hover:text-brand-ink text-neutral-500 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-          }`}
-        >
-          {code.toUpperCase()}
-        </button>
+        <option key={code} value={code} lang={code}>
+          {t(code)}
+        </option>
       ))}
-    </div>
+    </select>
   );
 }

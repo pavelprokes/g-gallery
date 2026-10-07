@@ -36,7 +36,7 @@ import {
  * and this page's text is several times longer than anything a guest gallery
  * needs. The gallery's own strings it quotes (the print summary, button
  * names) still come from messages/cs.json, so they cannot drift apart. When
- * translating, add guide.en.json / guide.fr.json beside it, pick one by the
+ * translating, add one guide.<code>.json per language in `LOCALES` beside it, pick one by the
  * request locale (`getLocale()`), add the LocaleSwitcher to the footer, index
  * the page and list it in the sitemap.
  *
