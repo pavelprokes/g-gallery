@@ -1,6 +1,8 @@
+import { VIDEO_CONTENT_TYPE } from "@/lib/media";
+
 /**
- * The image types we accept on the upload path, and the extension each one
- * gets in its R2 object key.
+ * The types we accept on the upload path, and the extension each one gets in
+ * its R2 object key.
  *
  * The key's extension is derived from the content type, never from the
  * user-supplied filename — a filename must not reach the object key
@@ -30,20 +32,34 @@ export const KNOWN_UNSUPPORTED_TYPES = new Set([
   "image/heif-sequence",
 ]);
 
-export type ContentTypeVerdict =
-  { ok: true; extension: string } | { ok: false; reason: "heic" | "video" | "unsupported" };
+/**
+ * Who is uploading. Only the photographer may add video (docs/VIDEO.md §1);
+ * the two callers share everything else, so this is the one place they differ.
+ */
+export type UploadCaller = "owner" | "guest";
 
-export function classifyContentType(contentType: string): ContentTypeVerdict {
+export type ContentTypeVerdict =
+  | { ok: true; extension: string; kind: "PHOTO" | "VIDEO" }
+  | { ok: false; reason: "heic" | "video" | "video_format" | "unsupported" };
+
+export function classifyContentType(contentType: string, caller: UploadCaller): ContentTypeVerdict {
   const normalized = contentType.toLowerCase().split(";")[0]?.trim() ?? "";
 
   const extension = UPLOAD_EXTENSIONS[normalized];
-  if (extension) return { ok: true, extension };
+  if (extension) return { ok: true, extension, kind: "PHOTO" };
 
   if (KNOWN_UNSUPPORTED_TYPES.has(normalized)) return { ok: false, reason: "heic" };
-  // Video is deferred deliberately (docs/GUEST-GALLERIES.md §14) and guests do
-  // not distinguish it from a photo when picking from the camera roll, so it
-  // gets its own refusal rather than being lumped in with garbage input.
-  if (normalized.startsWith("video/")) return { ok: false, reason: "video" };
+
+  if (normalized.startsWith("video/")) {
+    // Guests do not distinguish a video from a photo when picking from the
+    // camera roll, so theirs gets its own refusal rather than being lumped in
+    // with garbage input (docs/GUEST-GALLERIES.md §14).
+    if (caller === "guest") return { ok: false, reason: "video" };
+    // The photographer's MP4 is the one container every browser plays; a
+    // .mov, .mkv or .avi gets a sentence saying to export H.264 MP4 instead.
+    if (normalized === VIDEO_CONTENT_TYPE) return { ok: true, extension: ".mp4", kind: "VIDEO" };
+    return { ok: false, reason: "video_format" };
+  }
 
   return { ok: false, reason: "unsupported" };
 }

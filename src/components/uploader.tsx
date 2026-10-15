@@ -315,13 +315,14 @@ export function Uploader({ galleryId }: { galleryId: string }) {
             </Button>
           </div>
           <p className="text-admin-muted text-xs dark:text-neutral-400">
-            JPEG, PNG, WebP · složky i s podsložkami, ostatní soubory se přeskočí
+            JPEG, PNG, WebP · video jako MP4 (H.264) do 2 GB · složky i s podsložkami, ostatní
+            soubory se přeskočí
           </p>
           <input
             ref={filesRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,video/mp4"
             className="sr-only"
             tabIndex={-1}
             aria-hidden
@@ -447,10 +448,20 @@ export function Uploader({ galleryId }: { galleryId: string }) {
 /** Owner-side wording for a refusal the server named. */
 function ownerRejectionMessage(rejection: UploadRejection): string {
   switch (rejection.code) {
-    case "unsupported_type":
-      return rejection.detail.reason === "heic"
-        ? `${rejection.detail.fileName ?? "Soubor"}: HEIC zatím neumíme. Exportuj jako JPEG.`
-        : `${rejection.detail.fileName ?? "Soubor"}: nepodporovaný formát.`;
+    case "unsupported_type": {
+      const name = rejection.detail.fileName ?? "Soubor";
+      switch (rejection.detail.reason) {
+        case "heic":
+          return `${name}: HEIC zatím neumíme. Exportuj jako JPEG.`;
+        // docs/VIDEO.md §1 — the one export every browser plays.
+        case "video_format":
+          return `${name}: video nahraj jako MP4 (H.264). Ve střihu stačí export „H.264“ / „YouTube 1080p“.`;
+        case "video_unplayable":
+          return `${name}: tenhle prohlížeč video neumí přehrát, takže by ho neviděli ani hosté. Exportuj ho jako H.264 MP4 (ne HEVC/H.265, ne 10bit).`;
+        default:
+          return `${name}: nepodporovaný formát.`;
+      }
+    }
     case "unauthorized":
       return "Přihlášení vypršelo. Načti stránku znovu.";
     case "upload_denied":
@@ -458,7 +469,9 @@ function ownerRejectionMessage(rejection: UploadRejection): string {
     case "quota_exceeded":
       return "Galerie je plná.";
     case "file_too_large":
-      return `${rejection.detail.fileName ?? "Soubor"} je příliš velký.`;
+      return rejection.detail.maxBytes
+        ? `${rejection.detail.fileName ?? "Soubor"} je příliš velký (max. ${formatBytes(rejection.detail.maxBytes)}).`
+        : `${rejection.detail.fileName ?? "Soubor"} je příliš velký.`;
     default:
       return "Nahrávání selhalo. Zkus to prosím znovu.";
   }

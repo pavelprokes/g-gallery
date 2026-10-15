@@ -39,6 +39,17 @@ describe("classifyKey", () => {
     expect(classifyKey(`${PREFIX}/${UUID_A}.thumb.jpg`).owner).toBe(`${PREFIX}/${UUID_A}`);
   });
 
+  it("resolves a video and its poster to the same stem (docs/VIDEO.md)", () => {
+    expect(classifyKey(`${PREFIX}/${UUID_A}.mp4`)).toEqual({
+      kind: "original",
+      owner: `${PREFIX}/${UUID_A}`,
+    });
+    expect(classifyKey(`${PREFIX}/${UUID_A}.poster.jpg`)).toEqual({
+      kind: "thumbnail",
+      owner: `${PREFIX}/${UUID_A}`,
+    });
+  });
+
   it("resolves an archive to the gallery prefix that owns it", () => {
     expect(classifyKey(`${PREFIX}/_archive.zip`)).toEqual({ kind: "archive", owner: PREFIX });
   });

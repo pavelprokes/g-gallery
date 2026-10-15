@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { deleteObject, listObjects, type StoredObject } from "@/lib/r2";
 import { isThumbKey } from "@/lib/thumbnail";
+import { isPosterKey, posterOwnerStem } from "@/lib/media";
 
 // Presigned-PUT flows can leave two kinds of debris (docs/PLAN.md §5):
 //   - ghost rows: a Photo row was created, the upload never confirmed
@@ -241,6 +242,12 @@ export function classifyKey(key: string): KeyClassification {
     // extension is not recoverable from `.thumb.webp`, which is exactly why the
     // live set is keyed on stems rather than on whole keys.
     return { kind: "thumbnail", owner: key.slice(0, key.lastIndexOf(".thumb.")) };
+  }
+
+  if (isPosterKey(key)) {
+    // A video's poster frame (docs/VIDEO.md §2) is derived exactly like a
+    // thumbnail: live while the video beside it is, by the same stem.
+    return { kind: "thumbnail", owner: posterOwnerStem(key) };
   }
 
   if (ORIGINAL_NAME.test(name)) {

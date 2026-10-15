@@ -73,13 +73,22 @@ export class UploadRejection extends Error {
 // truncated PUT is exactly what a retry fixes.
 const FATAL_CODES = new Set(["quota_exceeded", "upload_denied", "unauthorized", "rate_limited"]);
 
+interface SignedTarget {
+  url: string;
+  headers: Record<string, string>;
+}
+
 export interface PresignedUpload {
   photoId: string;
   objectKey: string;
   url: string;
   headers: Record<string, string>;
+  /** What the server made the row; absent from servers older than video. */
+  kind?: "PHOTO" | "VIDEO";
   /** Where a grid thumbnail may go, one signed target per format. */
-  thumbTargets?: Partial<Record<"webp" | "jpeg", { url: string; headers: Record<string, string> }>>;
+  thumbTargets?: Partial<Record<"webp" | "jpeg", SignedTarget>>;
+  /** A video's poster frame — required before confirm (docs/VIDEO.md §3). */
+  posterTarget?: SignedTarget;
 }
 
 function credentialFields(credentials: UploadCredentials): Record<string, unknown> {
@@ -256,6 +265,8 @@ async function uploadOne(
   signal: AbortSignal | undefined,
   onBytes: (sent: number) => void,
 ): Promise<void> {
+  if (target.kind === "VIDEO") return uploadVideo(file, target, credentials, signal, onBytes);
+
   // GPS strip, capture time, CRC32, dimensions and placeholder colour — off
   // the main thread where a worker can run (src/lib/upload-prepare-client.ts).
   const { body, crc32, takenAt, width, height, placeholder, picks } =
@@ -333,6 +344,81 @@ async function uploadOne(
   throw lastError instanceof Error ? lastError : new Error("upload failed");
 }
 
+/**
+ * The photographer's film (docs/VIDEO.md §3): poster first — it is small, it
+ * is required, and confirm refuses the video without it — then the video with
+ * byte progress, then the grid thumbnail made from the poster, then confirm.
+ * The same retry loop as a photo; a retry PUTs the poster again too.
+ */
+async function uploadVideo(
+  file: File,
+  target: PresignedUpload,
+  credentials: UploadCredentials,
+  signal: AbortSignal | undefined,
+  onBytes: (sent: number) => void,
+): Promise<void> {
+  const { prepareVideo } = await import("@/lib/video-prepare");
+  const video = await prepareVideo(file);
+  const thumbnail = target.thumbTargets ? await makeThumbnail(video.poster, "owner") : null;
+  if (signal?.aborted) throw abortError();
+  if (!target.posterTarget) throw new Error("no poster target");
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (signal?.aborted) throw abortError();
+    try {
+      onBytes(0);
+      const posterPut = await fetch(target.posterTarget.url, {
+        method: "PUT",
+        headers: target.posterTarget.headers,
+        body: video.poster,
+        signal,
+      });
+      if (posterPut.status === 403) throw new SignatureExpired();
+      if (!posterPut.ok) throw new Error(`R2 poster PUT failed (${posterPut.status})`);
+
+      const etag = await putWithProgress(target.url, target.headers, video.body, signal, onBytes);
+
+      let thumbStored: "webp" | "jpeg" | null = null;
+      const thumbTarget = thumbnail && target.thumbTargets?.[thumbnail.format];
+      if (thumbnail && thumbTarget) {
+        const thumbPut = await fetch(thumbTarget.url, {
+          method: "PUT",
+          headers: thumbTarget.headers,
+          body: thumbnail.blob,
+        }).catch(() => null);
+        if (thumbPut?.ok) thumbStored = thumbnail.format;
+      }
+
+      const confirm = await fetch("/api/uploads/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...credentialFields(credentials),
+          photoId: target.photoId,
+          etag: etag ?? "unknown",
+          crc32: video.crc32,
+          sizeBytes: video.body.size,
+          width: video.width,
+          height: video.height,
+          placeholder: video.placeholder,
+          thumb: thumbStored,
+          takenAt: video.takenAt?.toISOString(),
+          durationMs: video.durationMs > 0 ? video.durationMs : undefined,
+        }),
+      });
+      if (!confirm.ok) throw await rejectionFrom(confirm);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (isAbort(error) || error instanceof SignatureExpired) throw error;
+      if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) throw error;
+      await sleep(2 ** attempt * 500, signal);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("upload failed");
+}
+
 /** Error string for a file stopped by `signal` — lets the UI offer it for retry. */
 export const CANCELLED = "cancelled";
 
@@ -381,20 +467,34 @@ export async function runUploads({
   let firstSkip: UploadRejection | null = null;
   let skipped = 0;
 
-  files.forEach((file, index) => {
-    const verdict = classifyContentType(file.type || "image/jpeg");
-    if (verdict.ok) {
-      queue.push(index);
-      return;
-    }
+  const skip = (index: number, reason: string) => {
     skipped += 1;
     const rejection = new UploadRejection("unsupported_type", {
-      reason: verdict.reason,
-      fileName: file.name,
+      reason,
+      fileName: files[index]!.name,
     });
     firstSkip ??= rejection;
-    onItem(index, { state: "error", error: `unsupported_type:${verdict.reason}` });
-  });
+    onItem(index, { state: "error", error: `unsupported_type:${reason}` });
+  };
+
+  for (const [index, file] of files.entries()) {
+    const verdict = classifyContentType(file.type || "image/jpeg", credentials.kind);
+    if (!verdict.ok) {
+      skip(index, verdict.reason);
+      continue;
+    }
+    // A film this browser cannot decode would not play for viewers either
+    // (docs/VIDEO.md §3). Asked before presign, so no row is ever created for
+    // it — only metadata and one frame are read, never the whole file.
+    if (verdict.kind === "VIDEO") {
+      const { probeVideo } = await import("@/lib/video-prepare");
+      if (!(await probeVideo(file))) {
+        skip(index, "video_unplayable");
+        continue;
+      }
+    }
+    queue.push(index);
+  }
 
   if (firstSkip) onSkipped?.(firstSkip, skipped);
   if (queue.length === 0) return;

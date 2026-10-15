@@ -25,6 +25,10 @@ const TYPE_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
   heic: "image/heic",
   heif: "image/heif",
+  // The photographer's films (docs/VIDEO.md). A .mov is listed so it is
+  // refused out loud ("export it as MP4") rather than skipped as noise.
+  mp4: "video/mp4",
+  mov: "video/quicktime",
 };
 
 export function photoType(file: Pick<File, "name" | "type">): string | null {
@@ -35,15 +39,19 @@ export function photoType(file: Pick<File, "name" | "type">): string | null {
 
 /**
  * True for a file we can store — or one we must refuse out loud (HEIC, so the
- * photographer learns to export JPEG). Everything else — RAW, TIFF, GIF, XMP,
- * `.DS_Store`, AppleDouble shadows — is noise, skipped with a quiet notice.
+ * photographer learns to export JPEG; a .mov, so they learn to export MP4).
+ * Everything else — RAW, TIFF, GIF, XMP, `.DS_Store`, AppleDouble shadows — is
+ * noise, skipped with a quiet notice.
+ *
+ * The photographer's uploader is the only caller, hence "owner": this is where
+ * a film is allowed in (docs/VIDEO.md).
  */
 export function isCandidatePhoto(file: Pick<File, "name" | "type">): boolean {
   if (file.name.startsWith(".")) return false;
   const type = photoType(file);
   if (!type) return false;
-  const verdict = classifyContentType(type);
-  return verdict.ok || verdict.reason === "heic";
+  const verdict = classifyContentType(type, "owner");
+  return verdict.ok || verdict.reason === "heic" || verdict.reason === "video_format";
 }
 
 /**

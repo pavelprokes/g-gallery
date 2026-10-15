@@ -142,6 +142,15 @@ enum PhotoSource {
   @@schema("g_gallery")
 }
 
+/// What a gallery item is (docs/VIDEO.md). Every row before 2026-10-15 is a
+/// photo; a VIDEO is the photographer's H.264 MP4, shown through its poster.
+enum MediaKind {
+  PHOTO
+  VIDEO
+
+  @@schema("g_gallery")
+}
+
 enum StorageTier {
   STANDARD
   INFREQUENT_ACCESS
@@ -279,6 +288,11 @@ model Gallery {
   /// order even where a camera's clock was off — or capture time, which a
   /// guests' gallery gets (phones name their files, not the day).
   photoOrder        PhotoOrder @default(FILE_NAME)
+  /// The film shown as the large card above the highlights (docs/VIDEO.md §4).
+  /// Only a confirmed VIDEO of this gallery is ever written here; SetNull, like
+  /// the cover, so deleting the film leaves the gallery alone.
+  featuredVideoId   String?
+  featuredVideo     Photo?     @relation("GalleryFeaturedVideo", fields: [featuredVideoId], references: [id], onDelete: SetNull)
 
   /// Which wedding page lists this gallery, if any. Nullable by design:
   /// a standalone gallery with no wedding page around it stays legal.
@@ -377,6 +391,14 @@ model Photo {
   /// The photographer's hand in the highlights: true pinned in, false kept
   /// out, null left to the automatic fill.
   highlightPin       Boolean?
+  /// PHOTO or VIDEO (docs/VIDEO.md). For a VIDEO, `objectKey` is the MP4 and
+  /// every image surface shows `posterObjectKey` instead.
+  kind               MediaKind   @default(PHOTO)
+  /// Length of a video, read in the browser at upload. Null for photos.
+  durationMs         Int?
+  /// A still frame of a video ("<uuid>.poster.jpg"), stored beside it. Derived
+  /// from `objectKey` on the server, never client-supplied. Null for photos.
+  posterObjectKey    String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -386,6 +408,8 @@ model Photo {
   activityEvents  ActivityEvent[]
   /// Galleries using this photo as their cover — at most one in practice.
   coverOf         Gallery[]        @relation("GalleryCover")
+  /// Galleries featuring this video above their highlights — at most one.
+  featuredIn      Gallery[]        @relation("GalleryFeaturedVideo")
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.

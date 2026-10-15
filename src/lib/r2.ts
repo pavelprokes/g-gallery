@@ -9,6 +9,14 @@ export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 /** Presigned URLs are bearer tokens — keep the window short. */
 const PRESIGN_EXPIRY_SECONDS = 900;
 
+/**
+ * A video PUT gets longer (docs/VIDEO.md §3): 2 GB over a 10 Mbit/s uplink is
+ * ~27 minutes, and whether R2 checks expiry only when the request starts is
+ * unverified — a signature that lapses mid-transfer would throw the whole file
+ * away. Still a bearer token, still bound to one key and one content type.
+ */
+export const VIDEO_PRESIGN_EXPIRY_SECONDS = 3 * 60 * 60;
+
 let cachedClient: AwsClient | undefined;
 
 function r2Client(): AwsClient {
@@ -36,15 +44,20 @@ function objectUrl(key: string): string {
 
 /**
  * Presign a single-object PUT. 12MB JPEGs are far below R2's 5 GiB single-PUT
- * limit, so multipart is never needed.
+ * limit, and a video is capped under 2 GiB (docs/VIDEO.md §1), so multipart
+ * is never needed.
  *
  * `Content-Type` and `Cache-Control` are signed into the URL, which means the
  * browser MUST send byte-identical values or R2 rejects the request with 403.
  * The bucket CORS policy must allow both headers.
  */
-export async function presignPut(key: string, contentType: string): Promise<string> {
+export async function presignPut(
+  key: string,
+  contentType: string,
+  expiresInSeconds = PRESIGN_EXPIRY_SECONDS,
+): Promise<string> {
   const url = new URL(objectUrl(key));
-  url.searchParams.set("X-Amz-Expires", String(PRESIGN_EXPIRY_SECONDS));
+  url.searchParams.set("X-Amz-Expires", String(expiresInSeconds));
 
   const signed = await r2Client().sign(
     new Request(url, {

@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { PhotoStatus } from "@/generated/prisma/enums";
-import { presignPut, presignedPutHeaders } from "@/lib/r2";
+import { VIDEO_PRESIGN_EXPIRY_SECONDS, presignPut, presignedPutHeaders } from "@/lib/r2";
 import { requireAdmin } from "@/lib/auth-guard";
-import { classifyContentType } from "@/lib/upload-content-types";
+import { classifyContentType, type UploadCaller } from "@/lib/upload-content-types";
+import { MAX_VIDEO_BYTES, POSTER_CONTENT_TYPE, posterKeyFor } from "@/lib/media";
 import {
   GUEST_MAX_FILE_BYTES,
   GUEST_RATE_LIMIT_WINDOW_MS,
@@ -30,7 +31,10 @@ const fileSchema = z.object({
   // below: a guest picking a HEIC off an iPhone deserves a refusal that says
   // so, which a schema-level regex can only express as "invalid_body".
   contentType: z.string().min(1).max(128),
-  sizeBytes: z.number().int().positive().max(MAX_FILE_BYTES),
+  // The ceiling here is the largest anything may be — a video (docs/VIDEO.md
+  // §1). Each caller's real limit per kind is checked below, where a refusal
+  // can name the file and the limit instead of failing the schema.
+  sizeBytes: z.number().int().positive().max(MAX_VIDEO_BYTES),
   // Resuming an interrupted upload: re-presign this existing PENDING row
   // instead of creating another one (see /api/uploads/pending).
   resumePhotoId: z.string().min(1).max(64).optional(),
@@ -80,16 +84,25 @@ export async function POST(request: Request) {
   }
 
   const { files } = parsed.data;
+  const caller: UploadCaller = "galleryId" in parsed.data ? "owner" : "guest";
 
   // Content types are checked before anything is written, so a batch with one
   // HEIC in it fails as a whole with a reason the client can render, rather
-  // than half-creating rows.
+  // than half-creating rows. Only the photographer may add video
+  // (docs/VIDEO.md §1) — the caller decides that, never the declared type.
   for (const file of files) {
-    const verdict = classifyContentType(file.contentType);
+    const verdict = classifyContentType(file.contentType, caller);
     if (!verdict.ok) {
       return NextResponse.json(
         { error: "unsupported_type", reason: verdict.reason, fileName: file.fileName },
         { status: 415 },
+      );
+    }
+    const limit = verdict.kind === "VIDEO" ? MAX_VIDEO_BYTES : MAX_FILE_BYTES;
+    if (file.sizeBytes > limit) {
+      return NextResponse.json(
+        { error: "file_too_large", fileName: file.fileName, maxBytes: limit },
+        { status: 413 },
       );
     }
   }
@@ -217,6 +230,10 @@ export async function POST(request: Request) {
 
   const uploads = await Promise.all(
     files.map(async (file) => {
+      // Checked above, so always ok here; the fallback only satisfies the type.
+      const verdict = classifyContentType(file.contentType, caller);
+      const kind = verdict.ok ? verdict.kind : "PHOTO";
+
       const resumedKey = file.resumePhotoId ? resumable.get(file.resumePhotoId) : undefined;
       if (file.resumePhotoId && resumedKey) {
         // The object key is reused verbatim, so a partial PUT is simply
@@ -224,9 +241,7 @@ export async function POST(request: Request) {
         return {
           photoId: file.resumePhotoId,
           objectKey: resumedKey,
-          url: await presignPut(resumedKey, file.contentType),
-          headers: presignedPutHeaders(file.contentType),
-          ...(await thumbTarget(resumedKey)),
+          ...(await signedTargets(resumedKey, file.contentType, kind)),
         };
       }
 
@@ -234,7 +249,6 @@ export async function POST(request: Request) {
       // row can be inserted with its final objectKey in a single statement.
       // Inserting a placeholder key and patching it afterwards raced on the
       // unique index — every file in a batch collided on the same placeholder.
-      const verdict = classifyContentType(file.contentType);
       const extension = verdict.ok ? verdict.extension : ".jpg";
       const objectKey = `${target.storagePrefix}/${randomUUID()}${extension}`;
 
@@ -248,6 +262,7 @@ export async function POST(request: Request) {
           fileName: file.fileName,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
+          kind,
           source: target.isGuest ? "GUEST" : "OWNER",
           uploadedByViewerId: target.viewerId,
         },
@@ -257,14 +272,40 @@ export async function POST(request: Request) {
       return {
         photoId: photo.id,
         objectKey,
-        url: await presignPut(objectKey, file.contentType),
-        headers: presignedPutHeaders(file.contentType),
-        ...(await thumbTarget(objectKey)),
+        ...(await signedTargets(objectKey, file.contentType, kind)),
       };
     }),
   );
 
   return NextResponse.json({ uploads });
+}
+
+/**
+ * Every PUT one file needs: the original, the grid thumbnail, and for a video
+ * its poster (docs/VIDEO.md §3). A video's original gets the longer signature
+ * — 2 GB on a home uplink can outlast the photo window.
+ */
+async function signedTargets(objectKey: string, contentType: string, kind: "PHOTO" | "VIDEO") {
+  const [url, thumbs, poster] = await Promise.all([
+    presignPut(objectKey, contentType, kind === "VIDEO" ? VIDEO_PRESIGN_EXPIRY_SECONDS : undefined),
+    thumbTarget(objectKey),
+    kind === "VIDEO" ? posterTarget(objectKey) : Promise.resolve({}),
+  ]);
+  return { url, headers: presignedPutHeaders(contentType), kind, ...thumbs, ...poster };
+}
+
+/**
+ * Where a video's poster frame goes. Derived from the video's key — the client
+ * only ever learns where, never chooses it — and required: confirm refuses a
+ * video whose poster is not in the bucket.
+ */
+async function posterTarget(objectKey: string) {
+  return {
+    posterTarget: {
+      url: await presignPut(posterKeyFor(objectKey), POSTER_CONTENT_TYPE),
+      headers: presignedPutHeaders(POSTER_CONTENT_TYPE),
+    },
+  };
 }
 
 /**

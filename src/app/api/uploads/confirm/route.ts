@@ -6,6 +6,8 @@ import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { headObject } from "@/lib/r2";
 import { trackServerEvent } from "@/lib/umami";
 import { thumbKeyFor } from "@/lib/thumbnail";
+import { posterKeyFor } from "@/lib/media";
+import type { MediaKind } from "@/generated/prisma/enums";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,13 @@ const commonSchema = {
   xmpRating: z.number().int().min(-1).max(5).nullish(),
   xmpLabel: z.string().trim().min(1).max(32).nullish(),
   xmpHighlight: z.boolean().nullish(),
+  /** A video's length, read by the browser's own decoder (docs/VIDEO.md §3). */
+  durationMs: z
+    .number()
+    .int()
+    .positive()
+    .max(24 * 60 * 60 * 1000)
+    .nullish(),
 };
 
 /**
@@ -86,9 +95,10 @@ export async function POST(request: Request) {
     xmpRating,
     xmpLabel,
     xmpHighlight,
+    durationMs,
   } = parsed.data;
 
-  let photo: { id: string; galleryId: string; objectKey: string } | null;
+  let photo: { id: string; galleryId: string; objectKey: string; kind: MediaKind } | null;
 
   if ("shareToken" in parsed.data) {
     const access = await resolveGuestUpload(parsed.data.shareToken, parsed.data.anonKey ?? null);
@@ -112,7 +122,7 @@ export async function POST(request: Request) {
         status: "PENDING",
         uploadedByViewerId: access.context.viewerId,
       },
-      select: { id: true, galleryId: true, objectKey: true },
+      select: { id: true, galleryId: true, objectKey: true, kind: true },
     });
   } else {
     let session;
@@ -124,7 +134,7 @@ export async function POST(request: Request) {
 
     photo = await prisma.photo.findFirst({
       where: { id: photoId, gallery: { ownerId: session.user.id } },
-      select: { id: true, galleryId: true, objectKey: true },
+      select: { id: true, galleryId: true, objectKey: true, kind: true },
     });
   }
 
@@ -141,6 +151,16 @@ export async function POST(request: Request) {
       { error: "size_mismatch", expected: sizeBytes, actual: stored?.sizeBytes ?? null },
       { status: 409 },
     );
+  }
+
+  // A video is only ever shown through its poster (docs/VIDEO.md §2), so one
+  // without a poster in the bucket must not become visible: every tile and
+  // preview of it would be a broken image. The browser makes the poster only
+  // when it could decode the file, so this is also the "playable" check. Not
+  // retried by the client — a missing poster will still be missing.
+  const posterObjectKey = photo.kind === "VIDEO" ? posterKeyFor(photo.objectKey) : null;
+  if (posterObjectKey && !(await headObject(posterObjectKey))) {
+    return NextResponse.json({ error: "poster_missing" }, { status: 422 });
   }
 
   // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
@@ -166,6 +186,8 @@ export async function POST(request: Request) {
       xmpRating: xmpRating ?? null,
       xmpLabel: xmpLabel ?? null,
       xmpHighlight: xmpHighlight ?? false,
+      posterObjectKey,
+      durationMs: photo.kind === "VIDEO" ? (durationMs ?? null) : null,
     },
   });
 

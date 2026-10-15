@@ -21,6 +21,15 @@ describe("selectPhotos", () => {
     expect(photos.map((p) => p.type)).toEqual(["image/heic", "image/jpeg"]);
   });
 
+  it("keeps the photographer's MP4, and a .mov so the run can ask for MP4 (docs/VIDEO.md)", () => {
+    expect(isCandidatePhoto(file("film.mp4", "video/mp4"))).toBe(true);
+    expect(isCandidatePhoto(file("FILM.MP4", ""))).toBe(true);
+    expect(isCandidatePhoto(file("IMG_0412.MOV", "video/quicktime"))).toBe(true);
+    expect(isCandidatePhoto(file("C0001.MXF", ""))).toBe(false);
+    const { photos } = selectPhotos([file("FILM.MP4", ""), file("IMG_0412.mov", "")]);
+    expect(photos.map((p) => p.type)).toEqual(["video/mp4", "video/quicktime"]);
+  });
+
   it("skips RAW and TIFF even when the browser types them as images", () => {
     expect(isCandidatePhoto(file("IMG_1.CR2", "image/x-canon-cr2"))).toBe(false);
     expect(isCandidatePhoto(file("IMG_1.dng", "image/x-adobe-dng"))).toBe(false);
