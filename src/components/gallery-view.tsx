@@ -2883,7 +2883,6 @@ function GalleryViewInner({
               key={active.id}
               video={active.video}
               posterSrc={srcFor(active.objectKey, imageGrant)}
-              placeholder={active.placeholder}
               videoRef={videoRef}
               onDownload={allowDownload ? () => void downloadZip([active.id]) : null}
               onSwipe={move}
@@ -3076,7 +3075,6 @@ function GalleryViewInner({
           <LightboxVideo
             video={featuredVideo.video}
             posterSrc={srcFor(featuredVideo.objectKey, imageGrant)}
-            placeholder={featuredVideo.placeholder}
             videoRef={videoRef}
             onDownload={allowDownload ? () => void downloadZip([featuredVideo.id]) : null}
             onSwipe={() => {}}

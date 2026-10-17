@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { durationParts, formatDuration, type GalleryVideo } from "@/lib/media";
 import { formatBytes } from "@/lib/offline";
 import { placeholderStyle } from "@/lib/placeholder";
+import imageLoader from "@/lib/image-loader";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { CloseIcon } from "@/components/ui/icons";
 
@@ -61,7 +62,6 @@ export function VideoBadge({ durationMs }: { durationMs: number | null }) {
 interface LightboxVideoProps {
   video: GalleryVideo;
   posterSrc: string;
-  placeholder: string | null;
   /** Lets the gallery's Space/K shortcut reach the element. */
   videoRef: RefObject<HTMLVideoElement | null>;
   /** Shown in the "can't play here" state; null when downloads are off. */
@@ -84,7 +84,6 @@ interface LightboxVideoProps {
 export function LightboxVideo({
   video,
   posterSrc,
-  placeholder,
   videoRef,
   onDownload,
   onSwipe,
@@ -92,6 +91,10 @@ export function LightboxVideo({
   onTap,
 }: LightboxVideoProps) {
   const t = useTranslations("gallery");
+  // `posterSrc` is the image loader's input (an object key plus any signed
+  // grant), which `<Image>` resolves by itself; a `<video poster>` needs the
+  // finished URL, so it goes through the same loader here.
+  const posterUrl = imageLoader({ src: posterSrc, width: 1920, quality: 82 });
   const [failed, setFailed] = useState(false);
   const loadedRef = useRef(false);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -111,7 +114,9 @@ export function LightboxVideo({
 
   return (
     <div
-      className="relative flex h-full w-full touch-pan-y items-center justify-center bg-black select-none"
+      // The padding keeps the native controls clear of the lightbox's own top
+      // and bottom bars — a scrubber under the reaction bar cannot be used.
+      className="relative flex h-full w-full touch-pan-y items-center justify-center bg-black pt-20 pb-24 select-none"
       onClick={(event) => {
         event.stopPropagation();
         if (event.target === event.currentTarget) onTap();
@@ -135,14 +140,7 @@ export function LightboxVideo({
     >
       {failed ? (
         <div className="relative flex h-full w-full items-center justify-center">
-          <Image
-            alt=""
-            src={posterSrc}
-            fill
-            sizes="100vw"
-            className="object-contain opacity-60"
-            style={{ backgroundColor: placeholderStyle(placeholder) }}
-          />
+          <Image alt="" src={posterSrc} fill sizes="100vw" className="object-contain opacity-60" />
           <div
             role="status"
             className="relative mx-4 flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-black/75 px-5 py-4 text-center text-white"
@@ -169,7 +167,7 @@ export function LightboxVideo({
           ref={videoRef}
           // The poster goes through the image loader like any photo; the MP4
           // is the bucket object itself, Range requests and all.
-          poster={posterSrc}
+          poster={posterUrl}
           src={video.url}
           controls
           playsInline
@@ -184,7 +182,10 @@ export function LightboxVideo({
             loadedRef.current = true;
           }}
           onError={() => setFailed(true)}
-          className="max-h-full max-w-full"
+          // Fills the frame and letterboxes: until the metadata arrives an
+          // element sized by its content collapses to its control bar, which
+          // is what a vertical phone clip showed on a phone.
+          className="h-full w-full object-contain"
         />
       )}
     </div>
