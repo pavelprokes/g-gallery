@@ -71,69 +71,64 @@ export async function resolveEvent(
 ): Promise<ResolvedEvent | null> {
   if (!eventToken || eventToken.length > 128) return null;
 
-  const event = await prisma.event.findUnique({
-    // A trashed wedding is on its way to permanent deletion; its page stops
-    // resolving immediately rather than showing cards that are about to vanish.
-    where: { tokenHash: hashShareToken(eventToken), trashedAt: null },
-    select: {
-      id: true,
-      title: true,
-      eventDate: true,
-      venue: true,
-      translations: true,
-      slug: true,
-      galleries: {
-        select: {
-          id: true,
-          title: true,
-          translations: true,
-          eventKey: true,
-          position: true,
-          listedOnEvent: true,
-          status: true,
-          trashedAt: true,
-          storagePrefix: true,
-          eventLink: { select: { revokedAt: true, expiresAt: true, allowUpload: true } },
-          _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
-          // The photographer's pick, when there is one ({@link pickCover}).
-          coverPhoto: {
-            select: { objectKey: true, placeholder: true, status: true, loopObjectKey: true },
-          },
-          // Still fetched even with a cover chosen: `latestPhotoAt` is the
-          // card's "last updated" line, which is a different question.
-          photos: {
-            where: { status: "CONFIRMED" },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            take: 1,
-            select: {
-              objectKey: true,
-              placeholder: true,
-              status: true,
-              createdAt: true,
-              loopObjectKey: true,
+  const where = { tokenHash: hashShareToken(eventToken), trashedAt: null };
+  const [event, videoRows] = await Promise.all([
+    prisma.event.findUnique({
+      // A trashed wedding is on its way to permanent deletion; its page stops
+      // resolving immediately rather than showing cards that are about to vanish.
+      where,
+      select: {
+        id: true,
+        title: true,
+        eventDate: true,
+        venue: true,
+        translations: true,
+        slug: true,
+        galleries: {
+          select: {
+            id: true,
+            title: true,
+            translations: true,
+            eventKey: true,
+            position: true,
+            listedOnEvent: true,
+            status: true,
+            trashedAt: true,
+            storagePrefix: true,
+            eventLink: { select: { revokedAt: true, expiresAt: true, allowUpload: true } },
+            _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
+            // The photographer's pick, when there is one ({@link pickCover}).
+            coverPhoto: {
+              select: { objectKey: true, placeholder: true, status: true, loopObjectKey: true },
+            },
+            // Still fetched even with a cover chosen: `latestPhotoAt` is the
+            // card's "last updated" line, which is a different question.
+            photos: {
+              where: { status: "CONFIRMED" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1,
+              select: {
+                objectKey: true,
+                placeholder: true,
+                status: true,
+                createdAt: true,
+                loopObjectKey: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    }),
+    // Films are counted apart on the card ("2 videa", not "2 fotky"), in the
+    // same round trip: `_count` cannot count one relation under two filters.
+    prisma.photo.groupBy({
+      by: ["galleryId"],
+      where: { gallery: { event: where }, status: "CONFIRMED", videoObjectKey: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
   if (!event) return null;
-
-  // Films are counted apart on the card ("2 videa", not "2 fotky"). One query
-  // for every gallery: `_count` cannot count one relation under two filters.
-  const videoCounts = new Map(
-    (
-      await prisma.photo.groupBy({
-        by: ["galleryId"],
-        where: {
-          galleryId: { in: event.galleries.map((gallery) => gallery.id) },
-          status: "CONFIRMED",
-          videoObjectKey: { not: null },
-        },
-        _count: { _all: true },
-      })
-    ).map((row) => [row.galleryId, row._count._all]),
-  );
+  const videoCounts = new Map(videoRows.map((row) => [row.galleryId, row._count._all]));
 
   const cardTitles = new Map(
     event.galleries.map((gallery) => [

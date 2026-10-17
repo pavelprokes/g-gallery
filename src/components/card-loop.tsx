@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from "react";
  * is actually playing.
  *
  * Not started for a viewer who asked for reduced motion or less data; iOS in
- * Low Power Mode refuses on its own, and the poster simply stays.
+ * Low Power Mode refuses on its own, and the poster simply stays. Loaded only
+ * near the viewport and paused off it.
  */
 export function CardLoop({ src }: { src: string }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -22,8 +23,20 @@ export function CardLoop({ src }: { src: string }) {
     const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
       ?.saveData;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || saveData) return;
-    video.src = src;
-    video.play().catch(() => {});
+    // Fetched once the card is near the screen, and only decoding while on it.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          if (!video.src) video.src = src;
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(video);
+    return () => observer.disconnect();
   }, [src]);
 
   return (

@@ -272,6 +272,8 @@ export function classifyKey(key: string): KeyClassification {
 export interface LiveIndex {
   photoStems: ReadonlySet<string>;
   galleryPrefixes: ReadonlySet<string>;
+  /** Spared by exact key, not stem: a video's MP4 (docs/VIDEO.md). */
+  keys: ReadonlySet<string>;
 }
 
 export function liveIndex(
@@ -279,11 +281,13 @@ export function liveIndex(
   galleries: { storagePrefix: string | null }[],
 ): LiveIndex {
   const photoStems = new Set<string>();
+  const keys = new Set<string>();
   for (const photo of photos) {
     if (photo.objectKey) photoStems.add(objectStem(photo.objectKey));
     // An MP4 shares its poster's stem only until the photographer picks
-    // another poster (docs/VIDEO.md), so it is kept alive by its own column.
-    if (photo.videoObjectKey) photoStems.add(objectStem(photo.videoObjectKey));
+    // another poster (docs/VIDEO.md), so it is kept alive by its own column —
+    // by exact key, so the replaced poster on its stem is still reclaimed.
+    if (photo.videoObjectKey) keys.add(photo.videoObjectKey);
   }
 
   const galleryPrefixes = new Set<string>();
@@ -291,7 +295,7 @@ export function liveIndex(
     if (gallery.storagePrefix) galleryPrefixes.add(gallery.storagePrefix);
   }
 
-  return { photoStems, galleryPrefixes };
+  return { photoStems, galleryPrefixes, keys };
 }
 
 export interface OrphanSelection {
@@ -317,6 +321,7 @@ export function selectOrphans(
   let skippedUnknown = 0;
 
   for (const object of objects) {
+    if (live.keys.has(object.key)) continue;
     const { kind, owner } = classifyKey(object.key);
 
     if (kind === "unknown" || !owner) {

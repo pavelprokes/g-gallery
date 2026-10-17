@@ -108,6 +108,9 @@ describe("selectOrphans", () => {
     const mp4 = obj(`${PREFIX}/${UUID_A}.mp4`, 500, 300 * 1024 * 1024);
     const loop = obj(`${PREFIX}/${UUID_B}.loop.mp4`, 500);
     expect(selectOrphans([mp4, loop], reposted, cutoff).orphans).toEqual([]);
+    // The upload's own poster, left on the MP4's stem, is debris again.
+    const oldPoster = obj(`${PREFIX}/${UUID_A}.jpg`, 500);
+    expect(selectOrphans([oldPoster], reposted, cutoff).orphans).toEqual([oldPoster]);
     expect(selectOrphans([loop], empty, cutoff).orphans).toEqual([loop]);
   });
 

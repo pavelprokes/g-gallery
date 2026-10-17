@@ -96,8 +96,10 @@ export async function commitVideoPoster(
 
   // Only what actually landed is recorded — a row pointing at a missing
   // poster would be an empty tile on every surface.
-  const [poster, loopStored] = await Promise.all([
+  const thumbKey = thumb ? thumbKeyFor(keys.poster, thumb) : null;
+  const [poster, thumbStored, loopStored] = await Promise.all([
     headObject(keys.poster),
+    thumbKey ? headObject(thumbKey) : null,
     loop ? headObject(keys.loop) : null,
   ]);
   if (!poster) throw new Error("POSTER_MISSING");
@@ -106,7 +108,7 @@ export async function commitVideoPoster(
     where: { id: photo.id },
     data: {
       objectKey: keys.poster,
-      thumbObjectKey: thumb ? thumbKeyFor(keys.poster, thumb) : null,
+      thumbObjectKey: thumbStored ? thumbKey : null,
       loopObjectKey: loopStored ? keys.loop : null,
       placeholder: placeholder ?? undefined,
     },
@@ -114,8 +116,10 @@ export async function commitVideoPoster(
 
   // The old poster shares the MP4's stem after the first pick, so the orphan
   // sweep would keep it forever; it goes here. A failure only leaves debris.
+  // Never one the row now points at: a replayed `name` makes them equal.
+  const current = new Set([keys.poster, thumbKey, keys.loop]);
   const stale = [photo.objectKey, photo.thumbObjectKey, photo.loopObjectKey].filter(
-    (key): key is string => key !== null,
+    (key): key is string => key !== null && !current.has(key),
   );
   await Promise.allSettled(stale.map((key) => deleteObject(key)));
 

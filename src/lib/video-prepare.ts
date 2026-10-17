@@ -247,13 +247,15 @@ export async function recordLoop(
   recorder.start();
   try {
     await video.play();
-  } catch (error) {
-    recorder.stop();
-    throw error;
+    frame = requestAnimationFrame(pump);
+    await withTimeout(stopped, (seconds + 30) * 1000, "loop recording");
+  } finally {
+    // Also on a timeout — a paused or stalled video never reaches the end, and
+    // a recorder left running keeps drawing and buffering until the page goes.
+    cancelAnimationFrame(frame);
+    video.pause();
+    if (recorder.state !== "inactive") recorder.stop();
   }
-  frame = requestAnimationFrame(pump);
-  await withTimeout(stopped, (seconds + 30) * 1000, "loop recording");
-  cancelAnimationFrame(frame);
   return new Blob(chunks, { type: "video/mp4" });
 }
 

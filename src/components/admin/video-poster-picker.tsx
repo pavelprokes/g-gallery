@@ -38,6 +38,7 @@ export function VideoPosterPicker({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   return (
     <>
       <Button
@@ -54,6 +55,14 @@ export function VideoPosterPicker({
       <dialog
         ref={dialogRef}
         onClose={() => setOpen(false)}
+        // Esc mid-save would unmount the player under a running recording.
+        onCancel={(event) => {
+          if (busy) event.preventDefault();
+        }}
+        // …and must not reach the page's own Escape (it clears the selection).
+        onKeyDown={(event) => {
+          if (event.key === "Escape") event.stopPropagation();
+        }}
         aria-label={`Náhled videa ${fileName}`}
         className="m-auto max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] overflow-y-auto rounded-xl bg-white p-0 backdrop:bg-black/60 dark:bg-neutral-900 dark:text-neutral-100"
       >
@@ -64,6 +73,8 @@ export function VideoPosterPicker({
             photoId={photoId}
             fileName={fileName}
             videoUrl={videoUrl}
+            busy={busy}
+            setBusy={setBusy}
             onDone={() => dialogRef.current?.close()}
           />
         )}
@@ -76,11 +87,15 @@ function PickerBody({
   photoId,
   fileName,
   videoUrl,
+  busy,
+  setBusy,
   onDone,
 }: {
   photoId: string;
   fileName: string;
   videoUrl: string | null;
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -93,9 +108,20 @@ function PickerBody({
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [picked, setPicked] = useState<number | null>(null);
   const [withLoop, setWithLoop] = useState(() => loopRecorderType() !== null);
-  const [status, setStatus] = useState<string | null>("Načítám video…");
-  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(videoUrl ? "Načítám video…" : null);
+  const [seeking, setSeeking] = useState(false);
   const canLoop = loopRecorderType() !== null;
+  // Seeks this component makes itself; any other one is the photographer
+  // scrubbing, and then no candidate is the frame that will be saved.
+  const ownSeeks = useRef(0);
+  const seekOwn = async (video: HTMLVideoElement, seconds: number) => {
+    ownSeeks.current += 1;
+    try {
+      await seekTo(video, seconds);
+    } finally {
+      ownSeeks.current -= 1;
+    }
+  };
 
   useEffect(() => {
     if (!source || source.remote) return;
@@ -115,13 +141,13 @@ function PickerBody({
       const frames: Candidate[] = [];
       for (const at of CANDIDATES_AT) {
         const seconds = video.duration * at;
-        await seekTo(video, seconds);
+        await seekOwn(video, seconds);
         const blob = await drawPoster(video, CANDIDATE_PX, 0.8);
         frames.push({ seconds, url: URL.createObjectURL(blob) });
       }
       setCandidates(frames);
+      await seekOwn(video, frames[0]!.seconds);
       setPicked(0);
-      await seekTo(video, frames[0]!.seconds);
       setStatus(null);
     } catch (error) {
       // A tainted canvas: the video played but may not be read back.
@@ -156,7 +182,7 @@ function PickerBody({
           maxPx: LOOP_MAX_PX,
           bitsPerSecond: LOOP_BITS_PER_SECOND,
         }).catch(() => null);
-        await seekTo(video, at);
+        await seekOwn(video, at);
       }
 
       setStatus("Ukládám…");
@@ -228,6 +254,9 @@ function PickerBody({
           playsInline
           preload="auto"
           onLoadedMetadata={() => void onLoaded()}
+          onSeeking={() => {
+            if (ownSeeks.current === 0) setPicked(null);
+          }}
           onError={() => (source.remote ? fallBackToFile() : setStatus("Video nejde přehrát."))}
           className="max-h-[50vh] w-full rounded-lg bg-black"
         />
@@ -243,8 +272,14 @@ function PickerBody({
                   disabled={busy}
                   aria-pressed={picked === index}
                   onClick={() => {
+                    const video = videoRef.current;
+                    if (!video) return;
                     setPicked(index);
-                    if (videoRef.current) void seekTo(videoRef.current, candidate.seconds);
+                    // Save waits for the frame: it draws whatever is decoded.
+                    setSeeking(true);
+                    seekOwn(video, candidate.seconds)
+                      .catch(() => setPicked(null))
+                      .finally(() => setSeeking(false));
                   }}
                   className={`block w-full overflow-hidden rounded-lg ring-offset-2 ${
                     picked === index ? "ring-brand-primary ring-4" : "ring-1 ring-black/10"
@@ -282,7 +317,7 @@ function PickerBody({
             </span>
           </label>
           <div className="flex justify-end">
-            <Button type="button" onClick={() => void save()} disabled={busy}>
+            <Button type="button" onClick={() => void save()} disabled={busy || seeking}>
               Použít tento snímek
             </Button>
           </div>
