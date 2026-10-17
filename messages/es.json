@@ -274,7 +274,9 @@
       "errorExpired": "El código ha caducado. Genera uno nuevo en el primer dispositivo.",
       "errorNoIdentity": "Tu navegador no nos ha dejado guardar nada. Comprueba si los datos del sitio están bloqueados para esta página.",
       "errorGeneric": "El traslado no ha funcionado esta vez. Inténtalo de nuevo en un momento."
-    }
+    },
+    "featuredFilm": "Película de la boda",
+    "playFeaturedFilm": "Reproducir la película de la boda {duration, select, none {} other {({duration})}}"
   },
   "guestUpload": {
     "addPhotos": "Añadir fotos",

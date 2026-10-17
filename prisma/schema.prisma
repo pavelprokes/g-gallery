@@ -219,6 +219,11 @@ model Gallery {
   /// which is also why the dangling-id case cannot happen at all.
   coverPhotoId      String?
   coverPhoto        Photo?        @relation("GalleryCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
+  /// The film shown as a large card above the highlights (docs/VIDEO.md
+  /// §Featured film). Only a CONFIRMED video row of this gallery is ever set;
+  /// SetNull for the same reason as the cover — deleting the film drops the card.
+  featuredVideoId   String?
+  featuredVideo     Photo?        @relation("GalleryFeaturedVideo", fields: [featuredVideoId], references: [id], onDelete: SetNull)
   /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
   storagePrefix     String        @unique
   publishedAt       DateTime?
@@ -395,6 +400,7 @@ model Photo {
   activityEvents  ActivityEvent[]
   /// Galleries using this photo as their cover — at most one in practice.
   coverOf         Gallery[]        @relation("GalleryCover")
+  featuredIn      Gallery[]        @relation("GalleryFeaturedVideo")
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.

@@ -105,6 +105,22 @@ The browser's native `<video controls playsInline preload="none" poster>` — no
 The MP4's URL is `NEXT_PUBLIC_MEDIA_BASE_URL` (local MinIO) or else the image host, which in
 production _is_ the bucket's custom domain (`videoSrc`).
 
+## Featured film
+
+One film per gallery can lead it: a large poster card with a play button, "Svatební film" and the
+length, above the highlights (`Gallery.featuredVideoId`, added 2026-10-18). The photographer sets it
+from the admin grid with "Nastavit jako hlavní film" under a video tile (`setFeaturedVideo`); pressing
+it again clears it.
+
+- Only a CONFIRMED row with a `videoObjectKey` of the same gallery can be set, and `featuredFilmOf`
+  re-checks that on every page load, so a stale pointer draws no card. `SetNull` on delete, like the
+  cover.
+- The card opens the player directly — a deliberate exception to the highlights' "jump into the
+  grid" rule (`docs/HIGHLIGHTS.md`): a film is watched, not looked for. When the film's page is
+  loaded it opens in the lightbox at its own place, with next/previous and the heart; otherwise the
+  same `LightboxVideo` plays in a standalone dialog rather than fetching every page before it.
+- The film keeps its own place in the grid too.
+
 ## Ordering
 
 A delivered gallery is ordered by file name (`docs/PHOTO-ORDER.md`), so a film is placed by naming

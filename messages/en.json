@@ -274,7 +274,9 @@
       "errorExpired": "The code has expired. Generate a new one on the first device.",
       "errorNoIdentity": "Your browser wouldn't let us store anything. Check whether site data is blocked for this page.",
       "errorGeneric": "The transfer didn't work just now. Please try again shortly."
-    }
+    },
+    "featuredFilm": "Wedding film",
+    "playFeaturedFilm": "Play the wedding film {duration, select, none {} other {({duration})}}"
   },
   "guestUpload": {
     "addPhotos": "Add photos",

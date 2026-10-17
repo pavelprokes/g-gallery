@@ -113,3 +113,46 @@ export function videoSrc(key: string): string | null {
   if (!base) return null;
   return `${base.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
+
+/** The featured film card's data (docs/VIDEO.md §Featured film). */
+export interface FeaturedFilm {
+  /** The row's id — the lightbox opens at it when its page is loaded. */
+  id: string;
+  /** The poster, through the image loader like any photo. */
+  objectKey: string;
+  placeholder: string | null;
+  width: number | null;
+  height: number | null;
+  video: GalleryVideo;
+}
+
+/**
+ * The film a gallery leads with, or null. The admin only ever sets a
+ * confirmed video, but a pointer outlives that check — a status change or a
+ * row turned back into a photo — so it is re-checked on the way out rather
+ * than drawing a card that plays nothing.
+ */
+export function featuredFilmOf(
+  row: {
+    id: string;
+    status: string;
+    objectKey: string;
+    placeholder: string | null;
+    width: number | null;
+    height: number | null;
+    videoObjectKey: string | null;
+    durationMs: number | null;
+  } | null,
+): FeaturedFilm | null {
+  if (!row || row.status !== "CONFIRMED") return null;
+  const video = videoOf(row);
+  if (!video) return null;
+  return {
+    id: row.id,
+    objectKey: row.objectKey,
+    placeholder: row.placeholder,
+    width: row.width,
+    height: row.height,
+    video,
+  };
+}

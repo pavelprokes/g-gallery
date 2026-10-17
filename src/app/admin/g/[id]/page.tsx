@@ -24,7 +24,7 @@ import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
 import { GalleryChapterPanel, StartChapterDetails } from "@/components/admin/gallery-chapter-panel";
-import { publishGallery, restoreGallery } from "../../actions";
+import { publishGallery, restoreGallery, setFeaturedVideo } from "../../actions";
 import { startChapter } from "../../chapter-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
@@ -75,6 +75,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       trashedAt: true,
       eventId: true,
       coverPhotoId: true,
+      featuredVideoId: true,
       highlightsEnabled: true,
       photoOrder: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
@@ -267,6 +268,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       : [];
   });
 
+  /** The film above the highlights (docs/VIDEO.md §Featured film); pressing the current one clears it. */
+  const featuredId = gallery.featuredVideoId;
+  async function toggleFeaturedVideo(photoId: string) {
+    "use server";
+    await setFeaturedVideo(id, featuredId === photoId ? null : photoId);
+  }
+
   async function publish() {
     "use server";
     await publishGallery(id);
@@ -340,6 +348,21 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             </span>
           )}
         </label>
+        {photo.videoObjectKey && (
+          <form action={toggleFeaturedVideo.bind(null, photo.id)}>
+            <button
+              type="submit"
+              aria-pressed={featuredId === photo.id}
+              className={`text-caption min-h-8 w-full rounded-full px-2 font-semibold ${
+                featuredId === photo.id
+                  ? "bg-brand-primary text-white"
+                  : "border-brand-border text-brand-ink dark:text-brand-tint border"
+              }`}
+            >
+              {featuredId === photo.id ? "✓ Hlavní film" : "Nastavit jako hlavní film"}
+            </button>
+          </form>
+        )}
         {photo.source === "GUEST" && (
           <p className="truncate text-xs text-emerald-700 dark:text-emerald-400">
             Od hostů

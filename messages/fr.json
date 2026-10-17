@@ -274,7 +274,9 @@
       "errorExpired": "Le code a expiré. Générez-en un nouveau sur le premier appareil.",
       "errorNoIdentity": "Votre navigateur n'a pas autorisé l'enregistrement des données. Vérifiez que le stockage n'est pas bloqué pour cette page.",
       "errorGeneric": "Le transfert n'a pas fonctionné pour le moment. Veuillez réessayer dans un instant."
-    }
+    },
+    "featuredFilm": "Film du mariage",
+    "playFeaturedFilm": "Lire le film du mariage {duration, select, none {} other {({duration})}}"
   },
   "guestUpload": {
     "addPhotos": "Ajouter des photos",

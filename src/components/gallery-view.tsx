@@ -112,7 +112,8 @@ import {
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import type { GalleryArchive } from "@/lib/shared-gallery";
-import { formatDuration, videoSrc, type GalleryVideo } from "@/lib/video";
+import { formatDuration, videoSrc, type FeaturedFilm, type GalleryVideo } from "@/lib/video";
+import { FeaturedFilmCard, FilmDialog } from "@/components/featured-film";
 import { formatBytes } from "@/lib/offline";
 import {
   REACTION_EMOJI,
@@ -994,6 +995,8 @@ interface GalleryViewProps {
   chapters: GalleryChapter[];
   /** The "best of the day" above the grid (docs/HIGHLIGHTS.md); may be empty. */
   highlights: GalleryHighlight[];
+  /** The film shown above the highlights (docs/VIDEO.md §Featured film), or null. */
+  featuredFilm?: FeaturedFilm | null;
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -1027,6 +1030,7 @@ function GalleryViewInner({
   promos,
   chapters,
   highlights,
+  featuredFilm = null,
   allowDownload,
   allowReactions,
   allowUpload,
@@ -2170,6 +2174,19 @@ function GalleryViewInner({
   );
 
   /**
+   * The featured film opens in the lightbox at its own place in the grid when
+   * that page is loaded — next/previous, the heart and the download all work as
+   * on any item. A film past the pages fetched so far plays on its own instead.
+   */
+  const [filmOnItsOwn, setFilmOnItsOwn] = useState(false);
+  const openFeaturedFilm = useCallback(() => {
+    if (!featuredFilm) return;
+    const index = photos.findIndex((photo) => photo.id === featuredFilm.id);
+    if (index >= 0) openPhoto(index);
+    else setFilmOnItsOwn(true);
+  }, [featuredFilm, openPhoto, photos]);
+
+  /**
    * `photos` is only the pages TanStack Query has fetched so far — the grid's
    * own scroll-triggered fetch (below) never fires while the lightbox is the
    * only thing visible. Wrapping modulo `photos.length` here would silently
@@ -2690,6 +2707,17 @@ function GalleryViewInner({
         </div>
       </header>
 
+      {featuredFilm && (
+        <FeaturedFilmCard
+          posterSrc={srcFor(featuredFilm.objectKey, imageGrant)}
+          placeholder={featuredFilm.placeholder}
+          width={featuredFilm.width}
+          height={featuredFilm.height}
+          durationMs={featuredFilm.video.durationMs}
+          onOpen={openFeaturedFilm}
+        />
+      )}
+
       {showHighlights && (
         <GalleryHighlights
           highlights={highlights}
@@ -3135,6 +3163,22 @@ function GalleryViewInner({
             )}
           </div>
         </div>
+      )}
+
+      {filmOnItsOwn && featuredFilm && (
+        <FilmDialog label={t("featuredFilm")} onClose={() => setFilmOnItsOwn(false)}>
+          <LightboxVideo
+            video={featuredFilm.video}
+            allowDownload={allowDownload}
+            poster={imageLoader({
+              src: srcFor(featuredFilm.objectKey, imageGrant),
+              width: 1920,
+              quality: QUALITY,
+            })}
+            // Nothing to move to: the film is the whole dialog.
+            onSwipe={() => {}}
+          />
+        </FilmDialog>
       )}
 
       {confirmingDownload && archive.url && (

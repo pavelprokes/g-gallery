@@ -143,6 +143,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       promos={data.promos}
       chapters={data.chapters}
       highlights={data.highlights}
+      featuredFilm={data.featuredFilm}
       allowDownload={access.shareLink.allowDownload}
       allowReactions={access.shareLink.allowReactions}
       allowUpload={access.shareLink.allowUpload}
