@@ -224,7 +224,13 @@ export async function deletePhotos(photoIds: string[]) {
 
   const photos = await prisma.photo.findMany({
     where: { id: { in: parsed.data }, gallery: { ownerId: session.user.id } },
-    select: { id: true, objectKey: true, thumbObjectKey: true, galleryId: true },
+    select: {
+      id: true,
+      objectKey: true,
+      thumbObjectKey: true,
+      videoObjectKey: true,
+      galleryId: true,
+    },
   });
   if (photos.length === 0) throw new Error("NOT_FOUND");
 
@@ -242,7 +248,9 @@ export async function deletePhotos(photoIds: string[]) {
   // ponytail: one DELETE per object, 10 at a time; S3 DeleteObjects if culls get slow.
   // A failure only leaves an orphan for reconcile — the rows are already gone.
   const keys = photos.flatMap((photo) =>
-    photo.thumbObjectKey ? [photo.objectKey, photo.thumbObjectKey] : [photo.objectKey],
+    [photo.objectKey, photo.thumbObjectKey, photo.videoObjectKey].filter(
+      (key): key is string => key !== null,
+    ),
   );
   for (let i = 0; i < keys.length; i += 10) {
     await Promise.allSettled(keys.slice(i, i + 10).map((key) => deleteObject(key)));

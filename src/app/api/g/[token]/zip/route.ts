@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { downloadKeyOf } from "@/lib/video";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { photoOrderBy } from "@/lib/photo-order";
@@ -55,7 +56,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
     // The order the gallery shows (src/lib/photo-order.ts), so the archive
     // unpacks the way the guest has been looking at it.
     orderBy: photoOrderBy(access.shareLink.photoOrder),
-    select: { id: true, objectKey: true, fileName: true, sizeBytes: true, crc32: true },
+    select: {
+      id: true,
+      objectKey: true,
+      videoObjectKey: true,
+      fileName: true,
+      sizeBytes: true,
+      crc32: true,
+    },
   });
 
   if (photos.length === 0) {
@@ -74,7 +82,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
     // unused — the entry's own name becomes the download name.
     archiveName: archiveNameFor(gallery?.title ?? "galerie", photos.length, photoIds.length > 0),
     entries: photos.map((photo, index) => ({
-      key: photo.objectKey,
+      // The MP4 for a video — its size and CRC are the MP4's (docs/VIDEO.md).
+      key: downloadKeyOf(photo),
       name: names[index]!,
       size: photo.sizeBytes ?? 0,
       crc32: photo.crc32,

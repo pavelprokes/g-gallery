@@ -1,4 +1,5 @@
 import "server-only";
+import { downloadKeyOf } from "@/lib/video";
 import { prisma } from "@/lib/db";
 import { compareTimeline } from "@/lib/gallery-chapters";
 import { ORDER_KEY_SELECT, positionOf } from "@/lib/photo-order";
@@ -196,6 +197,7 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
         select: {
           id: true,
           objectKey: true,
+          videoObjectKey: true,
           fileName: true,
           sizeBytes: true,
           crc32: true,
@@ -222,7 +224,8 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
 
   const names = uniqueNames(gallery.photos.map((p) => p.fileName));
   const entries = gallery.photos.map((photo, i) => ({
-    key: photo.objectKey,
+    // The MP4 for a video — its size and CRC are the MP4's (docs/VIDEO.md).
+    key: downloadKeyOf(photo),
     name: names[i]!,
     size: photo.sizeBytes!,
     crc32: photo.crc32!,

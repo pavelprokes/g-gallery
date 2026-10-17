@@ -107,6 +107,7 @@ describe("a long press on a tile", () => {
     id: "photo_1",
     objectKey: "g/1/a.jpg",
     thumbObjectKey: null,
+    video: null,
     fileName: "DSC_1234.jpg",
     width: 3000,
     height: 2000,

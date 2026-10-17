@@ -47,7 +47,7 @@ import {
   toggleOne,
 } from "@/lib/selection";
 import imageLoader from "@/lib/image-loader";
-import { fullWidthSrcSet } from "@/lib/image-sizes";
+import { QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
@@ -105,12 +105,14 @@ import {
   DownloadIcon,
   HeartIcon,
   MinusIcon,
+  PlayIcon,
   PlusIcon,
   PrinterIcon,
   ProjectorIcon,
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import type { GalleryArchive } from "@/lib/shared-gallery";
+import { formatDuration, videoSrc, type GalleryVideo } from "@/lib/video";
 import { formatBytes } from "@/lib/offline";
 import {
   REACTION_EMOJI,
@@ -149,6 +151,9 @@ export interface GalleryPhoto {
   objectKey: string;
   /** Browser-made 512 px WebP, when the uploading device could produce one. */
   thumbObjectKey: string | null;
+  /** Set on the photographer's videos (docs/VIDEO.md); `objectKey` is then
+   * the poster, which is all the grid ever needs. */
+  video: GalleryVideo | null;
   fileName: string;
   width: number | null;
   height: number | null;
@@ -752,6 +757,103 @@ function LightboxPhoto({
   );
 }
 
+interface LightboxVideoProps {
+  video: GalleryVideo;
+  /** The poster at lightbox size — the row's `objectKey` through the loader. */
+  poster: string;
+  onSwipe: (delta: 1 | -1) => void;
+}
+
+/** Touches that start this close to the bottom of the video are on its scrubber. */
+const VIDEO_CONTROLS_PX = 64;
+
+/**
+ * A video in the lightbox (docs/VIDEO.md): the browser's own `<video>` with its
+ * native controls, streaming the MP4 straight from the bucket with HTTP Range.
+ *
+ * Keyed by photo id in the parent, unlike `LightboxPhoto`: leaving a video must
+ * stop it, and unmounting is the one way that is certain on every engine. It
+ * gets none of the photo's zoom and pan gestures — `touch-none` would swallow
+ * the scrubber — only a passive horizontal swipe that never starts on the
+ * controls. The box stops short of the top and bottom bars so the native
+ * controls are never underneath them.
+ *
+ * Nothing plays by itself: swiping onto a film must not start it with the sound
+ * on, and autoplay with sound is refused by Safari anyway. `preload="none"`
+ * spends no bytes until the viewer asks; the poster stands in until then.
+ */
+function LightboxVideo({ video, poster, onSwipe }: LightboxVideoProps) {
+  const t = useTranslations("gallery");
+  const src = videoSrc(video.key);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const [started, setStarted] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div
+      className="absolute inset-x-0 top-[calc(max(1rem,env(safe-area-inset-top))+3.75rem)] bottom-[calc(max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))+4rem)] flex items-center justify-center px-2 sm:px-16"
+      onClick={(event) => event.stopPropagation()}
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        const box = videoRef.current?.getBoundingClientRect();
+        touchStart.current =
+          touch && !(box && touch.clientY > box.bottom - VIDEO_CONTROLS_PX)
+            ? { x: touch.clientX, y: touch.clientY }
+            : null;
+      }}
+      onTouchEnd={(event) => {
+        const start = touchStart.current;
+        const touch = event.changedTouches[0];
+        touchStart.current = null;
+        if (!start || !touch) return;
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dy) < SWIPE_MAX_VERTICAL_PX) {
+          onSwipe(dx < 0 ? 1 : -1);
+        }
+      }}
+    >
+      {src && !failed ? (
+        <>
+          <video
+            ref={videoRef}
+            src={src}
+            poster={poster}
+            controls
+            playsInline
+            preload="none"
+            onPlay={() => setStarted(true)}
+            onError={() => setFailed(true)}
+            className="max-h-full max-w-full bg-black"
+          />
+          {/* Desktop Chrome and Firefox draw no play button over a paused
+              video, only a small one in the control bar; the poster then
+              reads as a photo. One big button until the first play. */}
+          {!started && (
+            <button
+              type="button"
+              onClick={() => void videoRef.current?.play()}
+              aria-label={t("playVideo")}
+              className="on-media absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+            >
+              <PlayIcon className="ms-1 h-8 w-8" />
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="flex max-h-full flex-col items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- already a loader URL */}
+          <img alt="" src={poster} className="max-h-[70vh] max-w-full object-contain" />
+          <p role="status" className="rounded-full bg-black/55 px-3 py-1.5 text-sm text-white">
+            {t("videoUnavailable")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface PhotosPage {
   /** The order the items' `orderKey`s are in — absent on the seeded first page. */
   order?: PhotoOrder;
@@ -1136,6 +1238,9 @@ function GalleryViewInner({
    * `photos` below, which is this list narrowed by the favourites filter;
    * anything that means "the gallery as a whole" wants this one. */
   const allPhotos = useMemo(() => data.pages.flatMap((page) => page.items), [data]);
+  // The party projection shows stills: a film's poster crossfading by on a
+  // timer, silent, is neither the photo nor the film (docs/VIDEO.md).
+  const projectable = useMemo(() => allPhotos.filter((photo) => !photo.video), [allPhotos]);
 
   /**
    * What the grid and the lightbox actually show. The favourites filter can
@@ -2291,6 +2396,9 @@ function GalleryViewInner({
       ) {
         return;
       }
+      // A focused video owns Space (play/pause) and the arrows (seek), as it
+      // does everywhere else on the web; Escape still closes the lightbox.
+      if (target instanceof HTMLMediaElement && event.key !== "Escape") return;
 
       if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowRight") move(1);
@@ -2781,7 +2889,8 @@ function GalleryViewInner({
                     selected={selection.ids.has(photo.id)}
                     allowDownload={allowDownload}
                     allowReactions={allowReactions}
-                    allowPrintSelection={allowPrintSelection}
+                    // A film cannot be printed (docs/VIDEO.md).
+                    allowPrintSelection={allowPrintSelection && !photo.video}
                     markingMode={markingMode}
                     isFavorite={favorites.has(photo.id)}
                     favoritePulse={savedPulseId === photo.id}
@@ -2824,18 +2933,31 @@ function GalleryViewInner({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
           onClick={closeLightbox}
         >
-          <LightboxPhoto
-            photo={active}
-            src={srcFor(active.objectKey, imageGrant)}
-            preview={preview}
-            loaded={loadedPhotoId === active.id}
-            selected={activeSelected}
-            onLoad={() => setLoadedPhotoId(active.id)}
-            onSwipe={move}
-            onDismiss={closeLightbox}
-            onTap={toggleChrome}
-            onZoomChange={setZoomed}
-          />
+          {active.video ? (
+            <LightboxVideo
+              key={active.id}
+              video={active.video}
+              poster={imageLoader({
+                src: srcFor(active.objectKey, imageGrant),
+                width: 1920,
+                quality: QUALITY,
+              })}
+              onSwipe={move}
+            />
+          ) : (
+            <LightboxPhoto
+              photo={active}
+              src={srcFor(active.objectKey, imageGrant)}
+              preview={preview}
+              loaded={loadedPhotoId === active.id}
+              selected={activeSelected}
+              onLoad={() => setLoadedPhotoId(active.id)}
+              onSwipe={move}
+              onDismiss={closeLightbox}
+              onTap={toggleChrome}
+              onZoomChange={setZoomed}
+            />
+          )}
 
           <NavButton
             onClick={(event) => {
@@ -2972,7 +3094,7 @@ function GalleryViewInner({
                 />
               </>
             )}
-            {allowPrintSelection && (
+            {allowPrintSelection && !active.video && (
               <PrinterButton
                 quantity={printSelections.get(active.id) ?? 0}
                 others={printOthers.get(active.id) ?? 0}
@@ -3126,7 +3248,7 @@ function GalleryViewInner({
 
       {projecting && (
         <Slideshow
-          photos={allPhotos}
+          photos={projectable}
           imageGrant={imageGrant}
           onClose={() => setProjecting(false)}
           onRefresh={() => {
@@ -3334,7 +3456,14 @@ export const PhotoTile = memo(function PhotoTile({
         aria-label={
           selectionActive
             ? t("selectPhoto", { fileName: photo.fileName })
-            : t("openPhoto", { fileName: photo.fileName })
+            : photo.video
+              ? t("openVideo", {
+                  fileName: photo.fileName,
+                  duration: photo.video.durationMs
+                    ? formatDuration(photo.video.durationMs)
+                    : "none",
+                })
+              : t("openPhoto", { fileName: photo.fileName })
         }
       >
         <span className="absolute inset-0 block overflow-hidden">
@@ -3356,6 +3485,17 @@ export const PhotoTile = memo(function PhotoTile({
             }`}
           />
         </span>
+        {photo.video && (
+          // Top right is free on a video tile: it never carries the printer.
+          // State, not an affordance — the whole tile is the button.
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/55 py-1 ps-1.5 pe-2 text-xs font-medium text-white tabular-nums"
+          >
+            <PlayIcon className="h-3.5 w-3.5" />
+            {photo.video.durationMs ? formatDuration(photo.video.durationMs) : null}
+          </span>
+        )}
       </button>
       {allowDownload && (
         <SelectCheck

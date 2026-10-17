@@ -90,6 +90,14 @@ describe("selectOrphans", () => {
     expect(orphans).toEqual([]);
   });
 
+  it("spares a video's MP4 through its poster's row, and reclaims it once the row is gone", () => {
+    // docs/VIDEO.md: the row names only the poster; the MP4 shares its stem,
+    // so the sweep needs no knowledge of `videoObjectKey` (src/lib/video.ts).
+    const mp4 = obj(`${PREFIX}/${UUID_A}.mp4`, 500, 300 * 1024 * 1024);
+    expect(selectOrphans([mp4], live, cutoff).orphans).toEqual([]);
+    expect(selectOrphans([mp4], empty, cutoff).orphans).toEqual([mp4]);
+  });
+
   it("selects an old original whose row is gone", () => {
     const { orphans } = selectOrphans([obj(`${PREFIX}/${UUID_B}.jpg`, 48)], live, cutoff);
     expect(orphans.map((o) => o.key)).toEqual([`${PREFIX}/${UUID_B}.jpg`]);

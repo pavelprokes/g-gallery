@@ -59,12 +59,15 @@ export async function reconcileGhostUploads(olderThanMs = GHOST_AGE_MS): Promise
 export async function deleteGalleryWithObjects(galleryId: string, ownerId: string): Promise<void> {
   const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, ownerId },
-    select: { id: true, photos: { select: { objectKey: true } } },
+    select: { id: true, photos: { select: { objectKey: true, videoObjectKey: true } } },
   });
   if (!gallery) throw new Error("NOT_FOUND");
 
+  // The MP4 is the biggest object a gallery holds; thumbnails are left to the
+  // weekly sweep, which finds them stemless once the rows are gone.
   for (const photo of gallery.photos) {
     if (photo.objectKey) await deleteObject(photo.objectKey);
+    if (photo.videoObjectKey) await deleteObject(photo.videoObjectKey);
   }
 
   await prisma.gallery.delete({ where: { id: gallery.id } });
