@@ -75,7 +75,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
           // Its cover — the newest confirmed photo, same rule as the wedding
           // page and the overview (src/components/admin/cover-thumb.tsx).
           photos: {
-            where: { status: "CONFIRMED" },
+            where: { status: "CONFIRMED", kind: "PHOTO" },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
             select: { objectKey: true, thumbObjectKey: true, placeholder: true },

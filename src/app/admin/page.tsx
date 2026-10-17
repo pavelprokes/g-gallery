@@ -97,7 +97,7 @@ export default async function AdminPage() {
   // back to. Both are fetched because a gallery is usually missing the first.
   const chosenCover = { select: coverFields } satisfies Prisma.Gallery$coverPhotoArgs;
   const newestPhoto = {
-    where: { status: "CONFIRMED" },
+    where: { status: "CONFIRMED", kind: "PHOTO" },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 1,
     select: coverFields,

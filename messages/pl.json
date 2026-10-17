@@ -271,7 +271,14 @@
       "errorExpired": "Kod wygasł. Wygeneruj nowy na pierwszym urządzeniu.",
       "errorNoIdentity": "Przeglądarka nie pozwoliła nam nic zapisać. Sprawdź, czy dane witryn nie są zablokowane dla tej strony.",
       "errorGeneric": "Przeniesienie właśnie się nie udało. Spróbuj ponownie za chwilę."
-    }
+    },
+    "playVideo": "Odtwórz film {fileName}, {duration}",
+    "videoDurationSpoken": "{minutes, plural, =0 {} one {# minuta} few {# minuty} other {# minut}} {seconds, plural, =0 {} one {# sekunda} few {# sekundy} other {# sekund}}",
+    "videoCannotPlay": "Ta przeglądarka nie potrafi odtworzyć tego filmu.",
+    "videoDownload": "Pobierz film",
+    "videoDownloadSized": "Pobierz film ({size})",
+    "featuredFilm": "Film ze ślubu",
+    "playFeaturedFilm": "Odtwórz film ze ślubu, {duration}"
   },
   "guestUpload": {
     "addPhotos": "Dodaj zdjęcia",

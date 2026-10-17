@@ -50,7 +50,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
     where: {
       galleryId: access.shareLink.galleryId,
       status: "CONFIRMED",
-      ...(photoIds.length > 0 ? { id: { in: photoIds } } : {}),
+      // "Everything" means every photo; a film is downloaded on its own. An
+      // explicit selection is the viewer's choice and keeps any film in it
+      // (docs/VIDEO.md §5).
+      ...(photoIds.length > 0 ? { id: { in: photoIds } } : { kind: "PHOTO" as const }),
     },
     // The order the gallery shows (src/lib/photo-order.ts), so the archive
     // unpacks the way the guest has been looking at it.

@@ -22,7 +22,8 @@ async function galleryPreview(galleryId: string) {
   // trip of latency beats one query of work.
   const firstIn = (order: PhotoOrder) =>
     prisma.photo.findFirst({
-      where: { galleryId, status: "CONFIRMED" },
+      // A film is never the share preview (docs/VIDEO.md §5).
+      where: { galleryId, status: "CONFIRMED", kind: "PHOTO" },
       orderBy: photoOrderBy(order),
       select: { objectKey: true, status: true },
     });

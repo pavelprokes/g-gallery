@@ -3,14 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { resolveShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
-import {
-  ORDER_KEY_SELECT,
-  PHOTO_ORDERS,
-  afterPosition,
-  orderKeyOf,
-  photoOrderBy,
-} from "@/lib/photo-order";
-import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
+import { PHOTO_ORDERS, afterPosition, orderKeyOf, photoOrderBy } from "@/lib/photo-order";
+import { GALLERY_ITEM_SELECT, galleryItemOf } from "@/lib/gallery-item";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -64,18 +58,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       },
       orderBy: photoOrderBy(order),
       take: PHOTOS_PAGE_SIZE + 1,
-      select: {
-        id: true,
-        objectKey: true,
-        thumbObjectKey: true,
-        fileName: true,
-        width: true,
-        height: true,
-        placeholder: true,
-        ...ORDER_KEY_SELECT,
-        _count: { select: { favorites: true } },
-        ...UPLOADER_SELECT,
-      },
+      select: GALLERY_ITEM_SELECT,
     }),
     cursor
       ? undefined
@@ -91,18 +74,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   return NextResponse.json({
     // Which order `orderKey` is in — a page open across a switch notices here.
     order,
-    items: page.map((photo) => ({
-      id: photo.id,
-      objectKey: photo.objectKey,
-      thumbObjectKey: photo.thumbObjectKey,
-      fileName: photo.fileName,
-      width: photo.width,
-      height: photo.height,
-      placeholder: photo.placeholder,
-      favoriteCount: photo._count.favorites,
-      uploaderName: uploaderNameOf(photo),
-      orderKey: orderKeyOf(order, photo),
-    })),
+    items: page.map((photo) => galleryItemOf(order, photo)),
     ...(total !== undefined ? { total } : {}),
     nextCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,

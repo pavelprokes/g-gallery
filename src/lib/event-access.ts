@@ -97,7 +97,8 @@ export async function resolveEvent(
           // Still fetched even with a cover chosen: `latestPhotoAt` is the
           // card's "last updated" line, which is a different question.
           photos: {
-            where: { status: "CONFIRMED" },
+            // A film is uploaded last as a rule — it must not become the cover.
+            where: { status: "CONFIRMED", kind: "PHOTO" },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
             select: { objectKey: true, placeholder: true, status: true, createdAt: true },

@@ -1,4 +1,5 @@
 import "server-only";
+import { displayKeyOf } from "@/lib/media";
 import { prisma } from "@/lib/db";
 import type { ActivityType } from "@/generated/prisma/enums";
 
@@ -73,7 +74,7 @@ export async function ownerFeed(
       galleryId: true,
       gallery: { select: { title: true } },
       photoId: true,
-      photo: { select: { objectKey: true } },
+      photo: { select: { kind: true, objectKey: true, posterObjectKey: true } },
       viewerId: true,
       viewer: { select: { displayName: true } },
     },
@@ -88,7 +89,8 @@ export async function ownerFeed(
     galleryId: event.galleryId,
     galleryTitle: event.gallery.title,
     photoId: event.photoId,
-    photoObjectKey: event.photo?.objectKey ?? null,
+    // A film is drawn as its poster here too (docs/VIDEO.md §2).
+    photoObjectKey: event.photo ? displayKeyOf(event.photo) : null,
     viewerId: event.viewerId,
     viewerName: event.viewer?.displayName ?? null,
   }));

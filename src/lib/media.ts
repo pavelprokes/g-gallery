@@ -65,22 +65,34 @@ export function displayKeyOf(row: MediaRow): string {
   return row.posterObjectKey ?? posterKeyFor(row.objectKey);
 }
 
-/** What the player and the download need; travels beside the display key. */
-export interface VideoInfo {
-  /** The MP4's object key — never handed to the image loader. */
-  key: string;
+/** What the player needs; travels beside the display key, never instead of it. */
+export interface GalleryVideo {
+  /** The MP4 straight from the bucket — never through the image loader. */
+  url: string;
   durationMs: number | null;
   sizeBytes: number | null;
 }
 
-export function videoInfoOf(
-  row: MediaRow & { durationMs: number | null; sizeBytes: number | null },
-): VideoInfo | null {
-  if (row.kind !== "VIDEO") return null;
-  return { key: row.objectKey, durationMs: row.durationMs, sizeBytes: row.sizeBytes };
+/**
+ * The public URL a video plays from: the delivery host the image loader also
+ * uses, without any `/cdn-cgi/image` transform (docs/VIDEO.md §1 — the MP4 is
+ * served as uploaded, Range requests and all). Each path segment is encoded,
+ * the same as the archive link.
+ */
+export function videoUrlFor(objectKey: string): string {
+  const path = objectKey.split("/").map(encodeURIComponent).join("/");
+  const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL?.replace(/\/$/, "");
+  return base ? `${base}/${path}` : `/${path}`;
 }
 
-/** Columns `displayKeyOf` + `videoInfoOf` read — spread into a Prisma `select`. */
+export function galleryVideoOf(
+  row: MediaRow & { durationMs: number | null; sizeBytes: number | null },
+): GalleryVideo | null {
+  if (row.kind !== "VIDEO") return null;
+  return { url: videoUrlFor(row.objectKey), durationMs: row.durationMs, sizeBytes: row.sizeBytes };
+}
+
+/** Columns `displayKeyOf` + `galleryVideoOf` read — spread into a Prisma `select`. */
 export const MEDIA_SELECT = {
   kind: true,
   objectKey: true,

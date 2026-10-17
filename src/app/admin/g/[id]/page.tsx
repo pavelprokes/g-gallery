@@ -23,7 +23,8 @@ import { UnpublishGalleryButton } from "@/components/unpublish-gallery-button";
 import { GallerySettings } from "@/components/gallery-settings";
 import { GalleryPromoPanel } from "@/components/admin/gallery-promo-panel";
 import { GalleryChapterPanel, StartChapterDetails } from "@/components/admin/gallery-chapter-panel";
-import { publishGallery, restoreGallery } from "../../actions";
+import { publishGallery, restoreGallery, setFeaturedVideo } from "../../actions";
+import { MEDIA_SELECT, displayKeyOf, formatDuration } from "@/lib/media";
 import { startChapter } from "../../chapter-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
@@ -74,6 +75,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       trashedAt: true,
       eventId: true,
       coverPhotoId: true,
+      featuredVideoId: true,
       highlightsEnabled: true,
       photoOrder: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
@@ -83,7 +85,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         // Sorted below, once the gallery's order is known.
         select: {
           id: true,
-          objectKey: true,
           // Every tile below prefers the upload-time thumbnail: served straight
           // from the bucket, it cannot fail the way transforming a 14 MB
           // original on first view occasionally does, and it is not billed.
@@ -92,6 +93,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           fileName: true,
           width: true,
           height: true,
+          // Photo or film (docs/VIDEO.md): a film's tile shows its poster.
+          ...MEDIA_SELECT,
           _count: { select: { favorites: true } },
           source: true,
           uploadedBy: { select: { displayName: true } },
@@ -228,7 +231,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       count: chapterPhotos.length,
       firstPhoto: first
         ? {
-            objectKey: first.objectKey,
+            objectKey: displayKeyOf(first),
             thumbObjectKey: first.thumbObjectKey,
             fileName: first.fileName,
           }
@@ -239,7 +242,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // The highlights exactly as a guest's page picks them (src/lib/shared-gallery.ts),
   // shown whether or not they are switched on, so they can be reviewed first.
   const highlightPicks = pickHighlights(
-    gallery.photos.map((photo) => toHighlightCandidate(order, photo)),
+    gallery.photos
+      .filter((photo) => photo.kind === "PHOTO")
+      .map((photo) => toHighlightCandidate(order, photo)),
     gallery.chapters.map((chapter) => chapterStartOf(order, chapter)),
   );
   const pickedPinned = new Map(highlightPicks.map((pick) => [pick.id, pick.pinned]));
@@ -251,7 +256,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       ? [
           {
             id: photo.id,
-            objectKey: photo.objectKey,
+            objectKey: displayKeyOf(photo),
             thumbObjectKey: photo.thumbObjectKey,
             fileName: photo.fileName,
             pinned: pick.pinned,
@@ -263,6 +268,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   async function publish() {
     "use server";
     await publishGallery(id);
+  }
+
+  /** The film above the highlights (docs/VIDEO.md §4); pressing the current one clears it. */
+  const featuredId = gallery.featuredVideoId;
+  async function toggleFeaturedVideo(photoId: string) {
+    "use server";
+    await setFeaturedVideo(id, featuredId === photoId ? null : photoId);
   }
 
   /** One photo's admin tile. `startsChapter` is set in the timeline view on
@@ -291,7 +303,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             }
           >
             <AdminPhotoImage
-              objectKey={photo.objectKey}
+              objectKey={displayKeyOf(photo)}
               thumbObjectKey={photo.thumbObjectKey}
               alt={photo.fileName}
               // Three columns on a phone, six on a desktop.
@@ -327,7 +339,27 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               ★ Výběr
             </span>
           )}
+          {photo.kind === "VIDEO" && (
+            <span className="text-caption absolute right-1 bottom-1 rounded-full bg-black/60 px-2 py-0.5 font-semibold text-white tabular-nums">
+              ▶ {photo.durationMs !== null ? formatDuration(photo.durationMs) : "Video"}
+            </span>
+          )}
         </label>
+        {photo.kind === "VIDEO" && (
+          <form action={toggleFeaturedVideo.bind(null, photo.id)}>
+            <button
+              type="submit"
+              aria-pressed={gallery.featuredVideoId === photo.id}
+              className={`text-caption min-h-8 w-full rounded-full px-2 font-semibold ${
+                gallery.featuredVideoId === photo.id
+                  ? "bg-brand-primary text-white"
+                  : "border-brand-border text-brand-ink dark:text-brand-tint border"
+              }`}
+            >
+              {gallery.featuredVideoId === photo.id ? "✓ Hlavní film" : "Nastavit jako hlavní film"}
+            </button>
+          </form>
+        )}
         {photo.source === "GUEST" && (
           <p className="truncate text-xs text-emerald-700 dark:text-emerald-400">
             Od hostů

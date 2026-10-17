@@ -271,7 +271,14 @@
       "errorExpired": "Platnost kódu vypršela. Nech si na prvním zařízení vygenerovat nový.",
       "errorNoIdentity": "Prohlížeč nedovolil uložit data. Zkontroluj, jestli nemáš zakázané ukládání pro tuhle stránku.",
       "errorGeneric": "Přenos se teď nepovedl. Zkus to prosím za chvíli znovu."
-    }
+    },
+    "playVideo": "Přehrát video {fileName}, {duration}",
+    "videoDurationSpoken": "{minutes, plural, =0 {} one {# minuta} few {# minuty} other {# minut}} {seconds, plural, =0 {} one {# sekunda} few {# sekundy} other {# sekund}}",
+    "videoCannotPlay": "Tohle video tento prohlížeč neumí přehrát.",
+    "videoDownload": "Stáhnout video",
+    "videoDownloadSized": "Stáhnout video ({size})",
+    "featuredFilm": "Svatební film",
+    "playFeaturedFilm": "Přehrát svatební film, {duration}"
   },
   "guestUpload": {
     "addPhotos": "Přidat fotky",

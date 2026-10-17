@@ -130,7 +130,9 @@ async function loadCandidates(): Promise<ZipBuildCandidate[]> {
       // FAILED is in here now. It is not a terminal state any more — the retry
       // backoff and attempt cap live in zip-build-policy.ts.
       zipStatus: { in: ["NONE", "PENDING", "FAILED"] },
-      photos: { some: { status: "CONFIRMED" } },
+      // The pre-built archive holds photos only; a film is its own download
+      // (docs/VIDEO.md §5), so a gallery of nothing but films has nothing to build.
+      photos: { some: { status: "CONFIRMED", kind: "PHOTO" } },
     },
     orderBy: { updatedAt: "asc" },
     take: ZIP_BUILD_CANDIDATE_LIMIT,
@@ -143,12 +145,16 @@ async function loadCandidates(): Promise<ZipBuildCandidate[]> {
       _count: {
         select: {
           photos: {
-            where: { status: "CONFIRMED", OR: [{ crc32: null }, { sizeBytes: null }] },
+            where: {
+              status: "CONFIRMED",
+              kind: "PHOTO",
+              OR: [{ crc32: null }, { sizeBytes: null }],
+            },
           },
         },
       },
       photos: {
-        where: { status: "CONFIRMED" },
+        where: { status: "CONFIRMED", kind: "PHOTO" },
         orderBy: { createdAt: "desc" },
         take: 1,
         select: { createdAt: true },
@@ -192,7 +198,7 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
       storagePrefix: true,
       photoOrder: true,
       photos: {
-        where: { status: "CONFIRMED" },
+        where: { status: "CONFIRMED", kind: "PHOTO" },
         select: {
           id: true,
           objectKey: true,

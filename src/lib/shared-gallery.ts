@@ -12,9 +12,9 @@ import {
 } from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
+import { GALLERY_ITEM_SELECT, galleryItemOf, type GalleryItemData } from "@/lib/gallery-item";
 import {
   CHAPTER_START_SELECT,
-  ORDER_KEY_SELECT,
   beforePosition,
   chapterStartOf,
   compareChapterStarts,
@@ -22,7 +22,6 @@ import {
   photoOrderBy,
   type PhotoOrder,
 } from "@/lib/photo-order";
-import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 import {
   IMAGE_GRANT_TTL_SECONDS,
   signImageAccess,
@@ -63,20 +62,8 @@ export interface GalleryViewData {
   /** Every confirmed photo, not just the first page — the header states how
    * big the gallery is before any of it has scrolled into view. */
   photoCount: number;
-  initialPhotos: {
-    id: string;
-    objectKey: string;
-    thumbObjectKey: string | null;
-    fileName: string;
-    width: number | null;
-    height: number | null;
-    placeholder: string | null;
-    favoriteCount: number;
-    /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
-    uploaderName: string | null;
-    /** Key in the gallery's order — places chapter headers (docs/CHAPTERS.md). */
-    orderKey: string;
-  }[];
+  /** Photos and videos (docs/VIDEO.md); a video arrives as its poster plus `video`. */
+  initialPhotos: GalleryItemData[];
   initialCursor: string | null;
   /** The order `initialPhotos` and every `orderKey` are in (src/lib/photo-order.ts). */
   photoOrder: PhotoOrder;
@@ -93,6 +80,9 @@ export interface GalleryViewData {
   /** The "best of the day" shown above the grid (docs/HIGHLIGHTS.md), in
    * timeline order; empty when switched off or the gallery is too small. */
   highlights: GalleryHighlight[];
+  /** The film shown above the highlights, or null (docs/VIDEO.md §4). It also
+   * keeps its own place in the grid; this is the same item, pulled forward. */
+  featuredVideo: GalleryItemData | null;
   archive: GalleryArchive;
 }
 
@@ -137,6 +127,8 @@ export async function loadGalleryViewData(
       zipSizeBytes: true,
       zipBuiltAt: true,
       highlightsEnabled: true,
+      // The film shown as the large card above the highlights (docs/VIDEO.md §4).
+      featuredVideo: { select: { status: true, ...GALLERY_ITEM_SELECT } },
       // One filtered aggregate rides along with the row we are already
       // fetching, so the header's "56 fotek" costs no extra round trip.
       _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
@@ -152,18 +144,7 @@ export async function loadGalleryViewData(
         // viewer already saw.
         orderBy: photoOrderBy(order),
         take: PHOTOS_PAGE_SIZE + 1,
-        select: {
-          id: true,
-          objectKey: true,
-          thumbObjectKey: true,
-          fileName: true,
-          width: true,
-          height: true,
-          placeholder: true,
-          ...ORDER_KEY_SELECT,
-          _count: { select: { favorites: true } },
-          ...UPLOADER_SELECT,
-        },
+        select: GALLERY_ITEM_SELECT,
       },
       viewers: {
         where: { displayName: { not: null }, optedOut: false },
@@ -259,18 +240,7 @@ export async function loadGalleryViewData(
           )
         : null,
     photoCount: gallery._count.photos,
-    initialPhotos: page.map((photo) => ({
-      id: photo.id,
-      objectKey: photo.objectKey,
-      thumbObjectKey: photo.thumbObjectKey,
-      fileName: photo.fileName,
-      width: photo.width,
-      height: photo.height,
-      placeholder: photo.placeholder,
-      favoriteCount: photo._count.favorites,
-      uploaderName: uploaderNameOf(photo),
-      orderKey: orderKeyOf(order, photo),
-    })),
+    initialPhotos: page.map((photo) => galleryItemOf(order, photo)),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
     photoOrder: order,
@@ -297,6 +267,7 @@ export async function loadGalleryViewData(
       }),
     chapters,
     highlights,
+    featuredVideo: featuredVideoOf(order, gallery.featuredVideo),
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,
@@ -349,8 +320,9 @@ async function loadHighlights(
   order: PhotoOrder,
   chapterStarts: TimelinePosition[],
 ): Promise<GalleryHighlight[]> {
+  // The featured film is the video's place at the top; highlights stay photos.
   const candidates = await prisma.photo.findMany({
-    where: { galleryId, status: "CONFIRMED" },
+    where: { galleryId, status: "CONFIRMED", kind: "PHOTO" },
     select: HIGHLIGHT_CANDIDATE_SELECT,
   });
   const picks = pickHighlights(
@@ -373,6 +345,19 @@ async function loadHighlights(
   });
   const byId = new Map(photos.map((photo) => [photo.id, photo]));
   return picks.flatMap((pick) => byId.get(pick.id) ?? []);
+}
+
+/**
+ * Only a confirmed video can be featured. The admin action checks both on
+ * write; a later delete or a status change is caught here, so a stale pointer
+ * never renders a card that opens nothing.
+ */
+function featuredVideoOf(
+  order: PhotoOrder,
+  row: (Parameters<typeof galleryItemOf>[1] & { status: string }) | null,
+): GalleryItemData | null {
+  if (!row || row.status !== "CONFIRMED" || row.kind !== "VIDEO") return null;
+  return galleryItemOf(order, row);
 }
 
 /**

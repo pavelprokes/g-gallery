@@ -24,7 +24,8 @@ export async function setHighlightPin(photoId: string, pin: boolean | null) {
   if (!input.success) throw new Error("INVALID_INPUT");
 
   const photo = await prisma.photo.findFirst({
-    where: { id: input.data.photoId, gallery: { ownerId: session.user.id } },
+    // Highlights are photos; a film's place is the featured card (docs/VIDEO.md §5).
+    where: { id: input.data.photoId, kind: "PHOTO", gallery: { ownerId: session.user.id } },
     select: { id: true, galleryId: true },
   });
   if (!photo) throw new Error("NOT_FOUND");

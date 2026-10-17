@@ -70,7 +70,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/p
   // The photo must belong to this gallery — otherwise a share link could be
   // used to mark photos in someone else's gallery.
   const photo = await prisma.photo.findFirst({
-    where: { id: photoId, galleryId: access.shareLink.galleryId, status: "CONFIRMED" },
+    // A film is not printed (docs/VIDEO.md §5) — refused here, not just hidden.
+    where: {
+      id: photoId,
+      galleryId: access.shareLink.galleryId,
+      status: "CONFIRMED",
+      kind: "PHOTO",
+    },
     select: { id: true },
   });
   if (!photo) return NextResponse.json({ error: "photo_not_found" }, { status: 404 });

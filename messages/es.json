@@ -271,7 +271,14 @@
       "errorExpired": "El código ha caducado. Genera uno nuevo en el primer dispositivo.",
       "errorNoIdentity": "Tu navegador no nos ha dejado guardar nada. Comprueba si los datos del sitio están bloqueados para esta página.",
       "errorGeneric": "El traslado no ha funcionado esta vez. Inténtalo de nuevo en un momento."
-    }
+    },
+    "playVideo": "Reproducir vídeo {fileName}, {duration}",
+    "videoDurationSpoken": "{minutes, plural, =0 {} one {# minuto} other {# minutos}} {seconds, plural, =0 {} one {# segundo} other {# segundos}}",
+    "videoCannotPlay": "Este navegador no puede reproducir el vídeo.",
+    "videoDownload": "Descargar vídeo",
+    "videoDownloadSized": "Descargar vídeo ({size})",
+    "featuredFilm": "Película de la boda",
+    "playFeaturedFilm": "Reproducir la película de la boda, {duration}"
   },
   "guestUpload": {
     "addPhotos": "Añadir fotos",

@@ -76,6 +76,14 @@ import {
   zoomAround,
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
+import type { GalleryVideo } from "@/lib/media";
+import {
+  FeaturedFilm,
+  FilmDialog,
+  LightboxVideo,
+  VideoBadge,
+  useSpokenDuration,
+} from "@/components/gallery-video";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { NameSheet, Sheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -159,6 +167,8 @@ export interface GalleryPhoto {
   /** Its key in the gallery's order (src/lib/photo-order.ts) — capture time
    * or file name — which is what chapters start at (docs/CHAPTERS.md). */
   orderKey: string;
+  /** Set only for a video. `objectKey` is then its poster (docs/VIDEO.md §2). */
+  video: GalleryVideo | null;
 }
 
 export interface GalleryViewer {
@@ -882,6 +892,8 @@ interface GalleryViewProps {
   chapters: GalleryChapter[];
   /** The "best of the day" above the grid (docs/HIGHLIGHTS.md); may be empty. */
   highlights: GalleryHighlight[];
+  /** The film shown above the highlights (docs/VIDEO.md §4), or null. */
+  featuredVideo?: GalleryPhoto | null;
   allowDownload: boolean;
   allowReactions: boolean;
   /** Share link lets whoever holds it add photos (docs/GUEST-GALLERIES.md §6). */
@@ -915,6 +927,7 @@ function GalleryViewInner({
   promos,
   chapters,
   highlights,
+  featuredVideo = null,
   allowDownload,
   allowReactions,
   allowUpload,
@@ -1136,6 +1149,7 @@ function GalleryViewInner({
    * `photos` below, which is this list narrowed by the favourites filter;
    * anything that means "the gallery as a whole" wants this one. */
   const allPhotos = useMemo(() => data.pages.flatMap((page) => page.items), [data]);
+  const slideshowPhotos = useMemo(() => allPhotos.filter((photo) => !photo.video), [allPhotos]);
 
   /**
    * What the grid and the lightbox actually show. The favourites filter can
@@ -2055,6 +2069,20 @@ function GalleryViewInner({
   );
 
   /**
+   * The featured film opens in the lightbox at its own place in the grid when
+   * that page is loaded — so next/previous, the heart and the download all
+   * work as on any item. A film further down than the pages fetched so far
+   * plays in a standalone player instead of loading every page before it.
+   */
+  const [filmOnItsOwn, setFilmOnItsOwn] = useState(false);
+  const openFeaturedFilm = useCallback(() => {
+    if (!featuredVideo) return;
+    const index = photos.findIndex((photo) => photo.id === featuredVideo.id);
+    if (index >= 0) openPhoto(index);
+    else setFilmOnItsOwn(true);
+  }, [featuredVideo, openPhoto, photos]);
+
+  /**
    * `photos` is only the pages TanStack Query has fetched so far — the grid's
    * own scroll-triggered fetch (below) never fires while the lightbox is the
    * only thing visible. Wrapping modulo `photos.length` here would silently
@@ -2124,6 +2152,8 @@ function GalleryViewInner({
   }, [active, imageGrant, tileWidths]);
   const activeSelected = active ? selection.ids.has(active.id) : false;
   const lightboxRef = useRef<HTMLDivElement>(null);
+  /** The lightbox's `<video>`, when the open item is a film — Space/K reach it. */
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const isLightboxOpen = lightboxIndex !== null;
   // Close is the one control that is always present and always enabled, so it
   // is the only stable landing spot for focus when the lightbox opens.
@@ -2295,6 +2325,19 @@ function GalleryViewInner({
       if (event.key === "Escape") closeLightbox();
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
+
+      // On a film, Space and K are play/pause (docs/VIDEO.md §4) — the
+      // keys every video player answers to. S still selects it. A key press
+      // that started on the native controls is theirs already.
+      const film = videoRef.current;
+      const onFilm = lightboxIndex !== null && photos[lightboxIndex]?.video;
+      if (onFilm && film && (event.key === " " || event.key.toLowerCase() === "k")) {
+        if (event.target === film) return;
+        event.preventDefault();
+        if (film.paused) void film.play();
+        else film.pause();
+        return;
+      }
 
       // Space and S both toggle. Space is the reflex; S is there because Space
       // is also "scroll" muscle memory and some keyboards make it awkward.
@@ -2567,6 +2610,17 @@ function GalleryViewInner({
         </div>
       </header>
 
+      {featuredVideo?.video && (
+        <FeaturedFilm
+          posterSrc={srcFor(featuredVideo.objectKey, imageGrant)}
+          placeholder={featuredVideo.placeholder}
+          width={featuredVideo.width}
+          height={featuredVideo.height}
+          durationMs={featuredVideo.video.durationMs}
+          onOpen={openFeaturedFilm}
+        />
+      )}
+
       {showHighlights && (
         <GalleryHighlights
           highlights={highlights}
@@ -2824,18 +2878,32 @@ function GalleryViewInner({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
           onClick={closeLightbox}
         >
-          <LightboxPhoto
-            photo={active}
-            src={srcFor(active.objectKey, imageGrant)}
-            preview={preview}
-            loaded={loadedPhotoId === active.id}
-            selected={activeSelected}
-            onLoad={() => setLoadedPhotoId(active.id)}
-            onSwipe={move}
-            onDismiss={closeLightbox}
-            onTap={toggleChrome}
-            onZoomChange={setZoomed}
-          />
+          {active.video ? (
+            <LightboxVideo
+              key={active.id}
+              video={active.video}
+              posterSrc={srcFor(active.objectKey, imageGrant)}
+              placeholder={active.placeholder}
+              videoRef={videoRef}
+              onDownload={allowDownload ? () => void downloadZip([active.id]) : null}
+              onSwipe={move}
+              onDismiss={closeLightbox}
+              onTap={toggleChrome}
+            />
+          ) : (
+            <LightboxPhoto
+              photo={active}
+              src={srcFor(active.objectKey, imageGrant)}
+              preview={preview}
+              loaded={loadedPhotoId === active.id}
+              selected={activeSelected}
+              onLoad={() => setLoadedPhotoId(active.id)}
+              onSwipe={move}
+              onDismiss={closeLightbox}
+              onTap={toggleChrome}
+              onZoomChange={setZoomed}
+            />
+          )}
 
           <NavButton
             onClick={(event) => {
@@ -2972,7 +3040,7 @@ function GalleryViewInner({
                 />
               </>
             )}
-            {allowPrintSelection && (
+            {allowPrintSelection && !active.video && (
               <PrinterButton
                 quantity={printSelections.get(active.id) ?? 0}
                 others={printOthers.get(active.id) ?? 0}
@@ -2988,7 +3056,11 @@ function GalleryViewInner({
                 disabled={zipState === "preparing"}
                 onClick={() => void downloadZip([active.id])}
                 aria-label={
-                  zipState === "preparing" ? t("preparingDownload") : t("downloadOriginal")
+                  zipState === "preparing"
+                    ? t("preparingDownload")
+                    : active.video
+                      ? t("videoDownload")
+                      : t("downloadOriginal")
                 }
                 className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 disabled:opacity-50"
               >
@@ -2997,6 +3069,21 @@ function GalleryViewInner({
             )}
           </div>
         </div>
+      )}
+
+      {filmOnItsOwn && featuredVideo?.video && (
+        <FilmDialog onClose={() => setFilmOnItsOwn(false)} label={t("featuredFilm")}>
+          <LightboxVideo
+            video={featuredVideo.video}
+            posterSrc={srcFor(featuredVideo.objectKey, imageGrant)}
+            placeholder={featuredVideo.placeholder}
+            videoRef={videoRef}
+            onDownload={allowDownload ? () => void downloadZip([featuredVideo.id]) : null}
+            onSwipe={() => {}}
+            onDismiss={() => setFilmOnItsOwn(false)}
+            onTap={() => {}}
+          />
+        </FilmDialog>
       )}
 
       {confirmingDownload && archive.url && (
@@ -3126,7 +3213,9 @@ function GalleryViewInner({
 
       {projecting && (
         <Slideshow
-          photos={allPhotos}
+          // An unattended projector at the venue: films are skipped, sound and
+          // all (docs/VIDEO.md §5).
+          photos={slideshowPhotos}
           imageGrant={imageGrant}
           onClose={() => setProjecting(false)}
           onRefresh={() => {
@@ -3224,6 +3313,7 @@ export const PhotoTile = memo(function PhotoTile({
   registerTileRef,
 }: PhotoTileProps) {
   const t = useTranslations("gallery");
+  const spokenDuration = useSpokenDuration();
   // Kept alongside the parent's registration so the long press below can ask
   // whether a touch actually landed on the photo — see `onTouchStart`.
   const tileButton = useRef<HTMLButtonElement | null>(null);
@@ -3334,7 +3424,12 @@ export const PhotoTile = memo(function PhotoTile({
         aria-label={
           selectionActive
             ? t("selectPhoto", { fileName: photo.fileName })
-            : t("openPhoto", { fileName: photo.fileName })
+            : photo.video
+              ? t("playVideo", {
+                  fileName: photo.fileName,
+                  duration: spokenDuration(photo.video.durationMs),
+                })
+              : t("openPhoto", { fileName: photo.fileName })
         }
       >
         <span className="absolute inset-0 block overflow-hidden">
@@ -3356,6 +3451,7 @@ export const PhotoTile = memo(function PhotoTile({
             }`}
           />
         </span>
+        {photo.video && <VideoBadge durationMs={photo.video.durationMs} />}
       </button>
       {allowDownload && (
         <SelectCheck
@@ -3365,7 +3461,8 @@ export const PhotoTile = memo(function PhotoTile({
           fileName={photo.fileName}
         />
       )}
-      {allowPrintSelection && (
+      {/* A film is not printed (docs/VIDEO.md §5). */}
+      {allowPrintSelection && !photo.video && (
         <PrinterButton
           quantity={printQuantity}
           others={printOthers}

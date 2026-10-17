@@ -271,7 +271,14 @@
       "errorExpired": "Der Code ist abgelaufen. Erzeugen Sie auf dem ersten Gerät einen neuen.",
       "errorNoIdentity": "Ihr Browser hat uns nichts speichern lassen. Prüfen Sie, ob Websitedaten für diese Seite blockiert sind.",
       "errorGeneric": "Die Übertragung hat gerade nicht geklappt. Bitte versuchen Sie es in Kürze erneut."
-    }
+    },
+    "playVideo": "Video {fileName} abspielen, {duration}",
+    "videoDurationSpoken": "{minutes, plural, =0 {} one {# Minute} other {# Minuten}} {seconds, plural, =0 {} one {# Sekunde} other {# Sekunden}}",
+    "videoCannotPlay": "Dieser Browser kann das Video nicht abspielen.",
+    "videoDownload": "Video herunterladen",
+    "videoDownloadSized": "Video herunterladen ({size})",
+    "featuredFilm": "Hochzeitsfilm",
+    "playFeaturedFilm": "Hochzeitsfilm abspielen, {duration}"
   },
   "guestUpload": {
     "addPhotos": "Fotos hinzufügen",

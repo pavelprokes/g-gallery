@@ -271,7 +271,14 @@
       "errorExpired": "The code has expired. Generate a new one on the first device.",
       "errorNoIdentity": "Your browser wouldn't let us store anything. Check whether site data is blocked for this page.",
       "errorGeneric": "The transfer didn't work just now. Please try again shortly."
-    }
+    },
+    "playVideo": "Play video {fileName}, {duration}",
+    "videoDurationSpoken": "{minutes, plural, =0 {} one {# minute} other {# minutes}} {seconds, plural, =0 {} one {# second} other {# seconds}}",
+    "videoCannotPlay": "This browser can't play this video.",
+    "videoDownload": "Download video",
+    "videoDownloadSized": "Download video ({size})",
+    "featuredFilm": "Wedding film",
+    "playFeaturedFilm": "Play the wedding film, {duration}"
   },
   "guestUpload": {
     "addPhotos": "Add photos",
