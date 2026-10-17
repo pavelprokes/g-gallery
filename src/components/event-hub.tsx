@@ -11,6 +11,8 @@ import type { SignedImageGrant } from "@/lib/image-signing";
 import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
 import { PhotographerCredit } from "@/components/photographer-credit";
+import { CardLoop } from "@/components/card-loop";
+import { mediaCounts, videoSrc } from "@/lib/video";
 
 /**
  * The wedding page's rozcestník (docs/GUEST-GALLERIES.md §2).
@@ -60,7 +62,9 @@ export async function EventHub({
     `/s/${encodeURIComponent(eventToken)}/${event.slug}/${card.eventKey}`;
   const metaFor = (card: EventCard) =>
     [
-      card.photoCount > 0 ? t("photoCount", { count: card.photoCount }) : t("emptyCard"),
+      card.photoCount > 0
+        ? mediaCounts(t, card.photoCount, card.videoCount).join(" · ")
+        : t("emptyCard"),
       card.latestPhotoAt ? formatDate(card.latestPhotoAt, locale) : null,
     ]
       .filter(Boolean)
@@ -114,6 +118,9 @@ export async function EventHub({
                           }
                           className="duration-toggle ease-standard object-cover transition-transform group-hover:scale-[1.02]"
                         />
+                      )}
+                      {card.cover?.loopObjectKey && videoSrc(card.cover.loopObjectKey) && (
+                        <CardLoop src={videoSrc(card.cover.loopObjectKey)!} />
                       )}
                       {/* Scrim under the caption. Brand ink rather than black so
                           the photo keeps its warmth where the gradient bites. */}

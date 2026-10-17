@@ -3,6 +3,7 @@ import {
   downloadKeyOf,
   featuredFilmOf,
   formatDuration,
+  mediaCounts,
   videoKeyFor,
   videoOf,
   videoSrc,
@@ -95,5 +96,17 @@ describe("featuredFilmOf", () => {
     expect(featuredFilmOf(null)).toBeNull();
     expect(featuredFilmOf({ ...row, status: "PENDING" })).toBeNull();
     expect(featuredFilmOf({ ...row, videoObjectKey: null })).toBeNull();
+  });
+});
+
+describe("mediaCounts", () => {
+  const t = (key: "photoCount" | "videoCount", { count }: { count: number }) =>
+    `${count} ${key === "photoCount" ? "photos" : "videos"}`;
+
+  it("counts films apart, so a films-only gallery never says 'photo'", () => {
+    expect(mediaCounts(t, 1, 1)).toEqual(["1 videos"]);
+    expect(mediaCounts(t, 122, 2)).toEqual(["120 photos", "2 videos"]);
+    expect(mediaCounts(t, 56, 0)).toEqual(["56 photos"]);
+    expect(mediaCounts(t, 0, 0)).toEqual([]);
   });
 });

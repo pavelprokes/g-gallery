@@ -112,7 +112,13 @@ import {
 } from "@/components/ui/icons";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import type { GalleryArchive } from "@/lib/shared-gallery";
-import { formatDuration, videoSrc, type FeaturedFilm, type GalleryVideo } from "@/lib/video";
+import {
+  formatDuration,
+  mediaCounts,
+  videoSrc,
+  type FeaturedFilm,
+  type GalleryVideo,
+} from "@/lib/video";
 import { FeaturedFilmCard, FilmDialog } from "@/components/featured-film";
 import { formatBytes } from "@/lib/offline";
 import {
@@ -980,6 +986,10 @@ interface GalleryViewProps {
   /** Every confirmed photo in the gallery, not just the loaded pages — the
    * header says how big it is before the viewer has scrolled anywhere. */
   photoCount: number;
+  /** How many of `photoCount` are videos — counted apart, and everything only
+   * a still can use (print, projection, offline) stays away from a films-only
+   * gallery (docs/VIDEO.md). */
+  videoCount: number;
   initialPhotos: GalleryPhoto[];
   initialCursor: string | null;
   /** The order `initialPhotos` came in; a page fetched in another one reloads. */
@@ -1022,6 +1032,7 @@ function GalleryViewInner({
   eventDate,
   venue,
   photoCount,
+  videoCount,
   initialPhotos,
   initialCursor,
   photoOrder,
@@ -1034,7 +1045,7 @@ function GalleryViewInner({
   allowDownload,
   allowReactions,
   allowUpload,
-  allowPrintSelection,
+  allowPrintSelection: printSelectionAllowed,
   archive,
   backHref,
   backLabel,
@@ -1247,6 +1258,9 @@ function GalleryViewInner({
    * who adds or deletes a photo sees the header and the lightbox counter follow.
    */
   const liveCount = data.pages[0]?.total ?? photoCount;
+  // Guests only ever add stills, so the videos are a fixed part of the total.
+  const stillCount = liveCount - videoCount;
+  const allowPrintSelection = printSelectionAllowed && stillCount > 0;
 
   /** Every photo fetched so far. The grid and the lightbox both work off
    * `photos` below, which is this list narrowed by the favourites filter;
@@ -2343,7 +2357,7 @@ function GalleryViewInner({
   const toggleChrome = useCallback(() => setChromeHidden((hidden) => !hidden), []);
 
   /** "15. 8. 2026 · Zámek Liblice · 56 fotek", with any part omitted if it isn't known. */
-  const subtitle = [eventDate, venue, liveCount > 0 ? t("photoCount", { count: liveCount }) : null]
+  const subtitle = [eventDate, venue, ...mediaCounts(t, liveCount, videoCount)]
     .filter(Boolean)
     .join(" · ");
 
@@ -2629,7 +2643,7 @@ function GalleryViewInner({
               <HeartIcon className="h-5 w-5" active={favoritesOnly} />
             </IconButton>
           )}
-          {allPhotos.length > 0 && (
+          {projectable.length > 0 && (
             <IconButton
               onClick={() => setProjecting(true)}
               label={t("slideshowButtonLabel")}
@@ -2655,7 +2669,7 @@ function GalleryViewInner({
                 disabled={zipState === "preparing"}
                 onClick={() => void downloadZip([])}
                 label={t("downloadOneLabel")}
-                title={t("downloadOneTitle")}
+                title={allPhotos[0]?.video ? t("downloadOneVideoTitle") : t("downloadOneTitle")}
               >
                 <DownloadIcon />
               </IconButton>
@@ -2695,7 +2709,7 @@ function GalleryViewInner({
                 </IconButton>
               )
             ))}
-          {allPhotos.length > 0 && (
+          {stillCount > 0 && (
             <OfflineIconButton
               token={token}
               objectKeys={allPhotos.map((photo) => photo.objectKey)}
@@ -3185,7 +3199,7 @@ function GalleryViewInner({
         <DownloadAllPrompt
           href={archive.url}
           sizeBytes={archive.sizeBytes}
-          photoCount={photoCount}
+          items={mediaCounts(t, liveCount, videoCount).join(", ")}
           galleryTitle={title}
           onClose={() => setConfirmingDownload(false)}
         />
@@ -3946,13 +3960,14 @@ function ViewerChips({ viewers }: { viewers: GalleryViewer[] }) {
 function DownloadAllPrompt({
   href,
   sizeBytes,
-  photoCount,
+  items,
   galleryTitle,
   onClose,
 }: {
   href: string;
   sizeBytes: number | null;
-  photoCount: number;
+  /** "120 photos, 2 videos" — what the archive holds. */
+  items: string;
   /** Goes into the mailto subject, so the photographer knows which wedding is
    * asking without having to work it out from the sender. */
   galleryTitle: string;
@@ -3988,7 +4003,7 @@ function DownloadAllPrompt({
         </h2>
         <p className="text-body">
           {t("downloadPromptSize", {
-            count: photoCount,
+            items,
             size: sizeBytes ? formatBytes(sizeBytes) : "",
           })}
         </p>
