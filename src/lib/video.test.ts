@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadKeyOf, formatDuration, videoKeyFor, videoOf, videoSrc } from "./video";
+import {
+  downloadKeyOf,
+  formatDuration,
+  mediaCounts,
+  videoKeyFor,
+  videoOf,
+  videoSrc,
+} from "./video";
 import { thumbKeyFor } from "./thumbnail";
 
 const POSTER = "galleries/abc/2956e1cf-4a03-4017-af00-6f81ddc28418.jpg";
@@ -58,5 +65,17 @@ describe("videoSrc", () => {
     vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "imgproxy");
     vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "http://localhost:8080");
     expect(videoSrc("galleries/a/x.mp4")).toBeNull();
+  });
+});
+
+describe("mediaCounts", () => {
+  const t = (key: "photoCount" | "videoCount", { count }: { count: number }) =>
+    `${count} ${key === "photoCount" ? "photos" : "videos"}`;
+
+  it("counts films apart, so a films-only gallery never says 'photo'", () => {
+    expect(mediaCounts(t, 1, 1)).toEqual(["1 videos"]);
+    expect(mediaCounts(t, 122, 2)).toEqual(["120 photos", "2 videos"]);
+    expect(mediaCounts(t, 56, 0)).toEqual(["56 photos"]);
+    expect(mediaCounts(t, 0, 0)).toEqual([]);
   });
 });

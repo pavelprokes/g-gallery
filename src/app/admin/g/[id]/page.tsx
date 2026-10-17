@@ -3,7 +3,8 @@ import {
   GALLERY_TRANSLATED_FIELDS,
   parseTranslations,
 } from "@/lib/content-translations";
-import { formatDuration } from "@/lib/video";
+import { formatDuration, videoSrc } from "@/lib/video";
+import { VideoPosterPicker } from "@/components/admin/video-poster-picker";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -362,6 +363,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           )}
         </p>
         {printQuantity > 0 && <CopyButton value={photo.fileName} label="Kopírovat název souboru" />}
+        {photo.videoObjectKey && (
+          <VideoPosterPicker
+            photoId={photo.id}
+            fileName={photo.fileName}
+            videoUrl={videoSrc(photo.videoObjectKey)}
+          />
+        )}
         {timelineView && (
           <StartChapterDetails
             summary={startsChapter ? "Přejmenovat kapitolu" : "Tady začíná kapitola"}

@@ -57,6 +57,22 @@ export function videoKeyFor(posterKey: string): string {
 }
 
 /**
+ * The muted loop beside a poster, on the poster's stem — so the orphan sweep
+ * keeps it exactly as long as that poster is the row's `objectKey`, the way it
+ * keeps a thumbnail (src/lib/reconcile.ts `classifyKey`).
+ */
+export function loopKeyFor(posterKey: string): string {
+  return `${objectStem(posterKey)}${LOOP_SUFFIX}`;
+}
+
+export const LOOP_SUFFIX = ".loop.mp4";
+
+/** What the loop is recorded as: long enough to read as "this moves", short enough to stay ~2 MB. */
+export const LOOP_SECONDS = 4;
+export const LOOP_MAX_PX = 1280;
+export const LOOP_BITS_PER_SECOND = 3_000_000;
+
+/**
  * The object a download delivers: the MP4 for a video, the photo otherwise.
  * The one place the ZIP manifests and the single-file download pick a key —
  * forgetting it would zip the poster in place of the film, silently.
@@ -79,6 +95,23 @@ export function videoOf(photo: {
   durationMs: number | null;
 }): GalleryVideo | null {
   return photo.videoObjectKey ? { key: photo.videoObjectKey, durationMs: photo.durationMs } : null;
+}
+
+/**
+ * "120 photos", "2 videos", or both — a gallery's size as a guest reads it.
+ * A video is a photo row, so `total` includes `videos`; a gallery of films
+ * must not announce itself as "1 photo". Empty when there is nothing.
+ */
+export function mediaCounts(
+  t: (key: "photoCount" | "videoCount", values: { count: number }) => string,
+  total: number,
+  videos: number,
+): string[] {
+  const photos = total - videos;
+  return [
+    photos > 0 ? t("photoCount", { count: photos }) : null,
+    videos > 0 ? t("videoCount", { count: videos }) : null,
+  ].filter((part): part is string => part !== null);
 }
 
 /** "0:42", "2:49", "1:02:03" — the badge on a video tile. */
