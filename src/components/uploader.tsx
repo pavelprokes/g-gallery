@@ -317,11 +317,51 @@ export function Uploader({ galleryId }: { galleryId: string }) {
           <p className="text-admin-muted text-xs dark:text-neutral-400">
             JPEG, PNG, WebP · složky i s podsložkami, ostatní soubory se přeskočí
           </p>
+          {/* The export spec lives here, at the point of upload, because nothing
+              downstream converts the file (docs/VIDEO.md): what is picked is
+              exactly what the couple streams and downloads. */}
+          <details className="text-admin-muted w-full max-w-md text-left text-xs dark:text-neutral-400">
+            <summary className="cursor-pointer text-center">
+              I video · MP4 (H.264), nejvýš 4K — jak ho exportovat
+            </summary>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              <dt className="font-medium">Formát</dt>
+              <dd>MP4 (.mp4). MOV a HEVC (H.265) neprojdou.</dd>
+              <dt className="font-medium">Video</dt>
+              <dd>
+                H.264, nejvýš 4K (4096 px na delší straně, na šířku i na výšku). Doporučeno 1080p —
+                na telefonu v sále se rozjede rychleji. Snímková frekvence jako ve střihu.
+              </dd>
+              <dt className="font-medium">Datový tok</dt>
+              <dd>1080p 8–10 Mbit/s (3 min ≈ 200 MB) · 4K 35–45 Mbit/s (3 min ≈ 900 MB)</dd>
+              <dt className="font-medium">Zvuk</dt>
+              <dd>AAC, 48 kHz, stereo, 192–320 kbit/s</dd>
+              <dt className="font-medium">Limit</dt>
+              <dd>
+                Rozlišení do 4K. Velikost souboru hlídá jen technický strop 2 GB (≈ 6 min 4K při 45
+                Mbit/s, 30 min 1080p). Bez metadat o poloze.
+              </dd>
+              <dt className="font-medium">Resolve</dt>
+              <dd>
+                Deliver → Format MP4, Codec H.264, Quality 8–10 000 kb/s (4K: 35–45 000); „Network
+                Optimization“ zapnout, pokud ji verze nabízí (video se rozjede dřív)
+              </dd>
+              <dt className="font-medium">Pořadí</dt>
+              <dd>
+                Podle názvu souboru. Pojmenuj video číslem fotky, za kterou má stát, např.{" "}
+                <code>svatba_0412_tanec.mp4</code>
+              </dd>
+            </dl>
+            <p className="mt-2">
+              Nic se nepřevádí: hosté přehrávají i stahují přesně tenhle soubor. Náhledový snímek
+              (čtvrtina délky) udělá prohlížeč sám při nahrání.
+            </p>
+          </details>
           <input
             ref={filesRef}
             type="file"
             multiple
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,video/mp4"
             className="sr-only"
             tabIndex={-1}
             aria-hidden
@@ -433,7 +473,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
                 .filter(({ item }) => item.state === "error" && item.error !== CANCELLED)
                 .map(({ item, index }) => (
                   <li key={index}>
-                    {item.file.name}: {item.error ?? "nenahráno"}
+                    {item.file.name}: {itemErrorMessage(item.error)}
                   </li>
                 ))}
             </ul>
@@ -444,13 +484,41 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   );
 }
 
+/** Why a file was refused by type, in the photographer's words (docs/VIDEO.md for video). */
+function unsupportedReason(reason: string | undefined): string {
+  switch (reason) {
+    case "heic":
+      return "HEIC zatím neumíme. Exportuj jako JPEG.";
+    case "video":
+      return "video jen jako MP4 (H.264). Exportuj ho znovu jako MP4.";
+    case "video_codec":
+      return "video musí být H.264 — tohle je jiný kodek (nejspíš HEVC z telefonu), řada prohlížečů by ho nepřehrála. Exportuj ho znovu jako H.264.";
+    case "video_too_large":
+      return "video je větší než 2 GB — to je technický strop jednoho souboru. Exportuj ho s nižším datovým tokem (4K kolem 35 Mbit/s, 1080p 8–10).";
+    case "video_unreadable":
+      return "soubor se nedá přečíst jako MP4. Exportuj ho znovu jako MP4 (H.264).";
+    case "video_resolution":
+      return "video má vyšší rozlišení než 4K. Exportuj ho nejvýš ve 4K (4096 px na delší straně), ideálně v 1080p.";
+    case "video_location":
+      return "video obsahuje polohu, kde vzniklo. Exportuj ho znovu bez metadat o poloze.";
+    default:
+      return "nepodporovaný formát.";
+  }
+}
+
+/** A failed item's line: `unsupported_type:<reason>` gets its sentence, the rest stays as is. */
+function itemErrorMessage(error: string | undefined): string {
+  if (!error) return "nenahráno";
+  if (error.startsWith("unsupported_type")) return unsupportedReason(error.split(":")[1]);
+  if (error === "file_too_large") return "soubor je příliš velký.";
+  return error;
+}
+
 /** Owner-side wording for a refusal the server named. */
 function ownerRejectionMessage(rejection: UploadRejection): string {
   switch (rejection.code) {
     case "unsupported_type":
-      return rejection.detail.reason === "heic"
-        ? `${rejection.detail.fileName ?? "Soubor"}: HEIC zatím neumíme. Exportuj jako JPEG.`
-        : `${rejection.detail.fileName ?? "Soubor"}: nepodporovaný formát.`;
+      return `${rejection.detail.fileName ?? "Soubor"}: ${unsupportedReason(rejection.detail.reason)}`;
     case "unauthorized":
       return "Přihlášení vypršelo. Načti stránku znovu.";
     case "upload_denied":
@@ -458,7 +526,9 @@ function ownerRejectionMessage(rejection: UploadRejection): string {
     case "quota_exceeded":
       return "Galerie je plná.";
     case "file_too_large":
-      return `${rejection.detail.fileName ?? "Soubor"} je příliš velký.`;
+      return rejection.detail.maxBytes
+        ? `${rejection.detail.fileName ?? "Soubor"} je příliš velký (nejvýš ${formatBytes(rejection.detail.maxBytes)}).`
+        : `${rejection.detail.fileName ?? "Soubor"} je příliš velký.`;
     default:
       return "Nahrávání selhalo. Zkus to prosím znovu.";
   }

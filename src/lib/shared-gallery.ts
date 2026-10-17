@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { VIDEO_SELECT, videoOf, type GalleryVideo } from "@/lib/video";
 import type { Locale } from "@/i18n/locales";
 import {
   CHAPTER_TRANSLATED_FIELDS,
@@ -67,6 +68,7 @@ export interface GalleryViewData {
     id: string;
     objectKey: string;
     thumbObjectKey: string | null;
+    video: GalleryVideo | null;
     fileName: string;
     width: number | null;
     height: number | null;
@@ -156,6 +158,7 @@ export async function loadGalleryViewData(
           id: true,
           objectKey: true,
           thumbObjectKey: true,
+          ...VIDEO_SELECT,
           fileName: true,
           width: true,
           height: true,
@@ -263,6 +266,7 @@ export async function loadGalleryViewData(
       id: photo.id,
       objectKey: photo.objectKey,
       thumbObjectKey: photo.thumbObjectKey,
+      video: videoOf(photo),
       fileName: photo.fileName,
       width: photo.width,
       height: photo.height,
@@ -350,7 +354,9 @@ async function loadHighlights(
   chapterStarts: TimelinePosition[],
 ): Promise<GalleryHighlight[]> {
   const candidates = await prisma.photo.findMany({
-    where: { galleryId, status: "CONFIRMED" },
+    // Photos only: a film's poster in the strip would open as something else
+    // than it looks like (docs/VIDEO.md).
+    where: { galleryId, status: "CONFIRMED", videoObjectKey: null },
     select: HIGHLIGHT_CANDIDATE_SELECT,
   });
   const picks = pickHighlights(

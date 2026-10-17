@@ -342,6 +342,15 @@ model Photo {
   /// — the grid then falls back to a Cloudflare transformation, exactly as
   /// before this existed. Derived from `objectKey`, never client-supplied.
   thumbObjectKey     String?
+  /// Set only on a video (docs/VIDEO.md): the MP4 itself, "<stem>.mp4" next to
+  /// `objectKey`, which on a video row is its poster frame (a JPEG). Every
+  /// surface that only knows `objectKey` therefore shows the poster; the ones
+  /// that play or hand out the file read this. `fileName`, `sizeBytes`,
+  /// `crc32` and `mimeType` describe the MP4 — the thing a download delivers.
+  /// Derived from `objectKey` on the server, never client-supplied.
+  videoObjectKey     String?
+  /// A video's length, read in the browser at upload. Null on photos.
+  durationMs         Int?
   /// OWNER unless a guest uploaded it through a share link with allowUpload.
   source             PhotoSource @default(OWNER)
   /// Which viewer added it, for attribution and for the per-guest quota.

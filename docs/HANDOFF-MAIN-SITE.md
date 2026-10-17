@@ -15,7 +15,7 @@ rozhodnuté, je v §13 jako otázka pro Pavla, ne jako fakt.
    (`style/theme.ts`), fonty (`lib/fonts.ts`, Bitter) a jazykové mutace. Všechno nové staví na
    stávajícím designu. Nic nevymýšlej od nuly.
 2. Implementuj §6 v pořadí, v jakém je napsaný. Texty ber z §7. Jsou to hotové návrhy, ne popisy.
-3. Tvrzení o funkcích ber jen z §4. Nic tam neuvedeného galerii nepřisuzuj, a hlavně ne video (§11).
+3. Tvrzení o funkcích ber jen z §4. Nic tam neuvedeného galerii nepřisuzuj, a hlavně ne video od hostů (§11).
 4. Než cokoli pustíš ven, projdi s Pavlem otázky z §13. Týkají se ceny a slibů vůči klientům.
 
 ## 1. Co se prodává, jednou větou
@@ -94,7 +94,8 @@ Všechno níže je v kódu a v produkci. Řazeno podle toho, co pár zajímá ne
 
 ### Co galerie **neumí** (nikde to nenaznačovat)
 
-- **Video.** Jen fotky, videa hosté nahrát nemohou.
+- **Video od hostů.** Hosté nahrávají jen fotky. (Fotograf může do předávací galerie přidat svůj
+  krátký sestřih, `docs/VIDEO.md` — to je jeho služba, ne funkce pro hosty.)
 - **Hledání podle obličeje** („najdi se“).
 - **Schvalování fotek předem.** Fotky od hostů jsou vidět hned. Nevhodnou fotku smaže fotograf.
 - **Tisk a objednávka fotek.** Galerie umí jen výběr k tisku.
@@ -218,7 +219,7 @@ Doplňující věta: _Odkaz ani QR kód se nemění. Co si hosté uložili na sv
   přeposlat. Galerii ode mě můžu zamknout heslem.
 - **Kolik fotek můžou hosté nahrát?** Až 150 fotek na hosta a do 25 MB na fotku. Na běžnou svatbu to
   stačí s velkou rezervou.
-- **Jde nahrát i video?** Zatím ne. Galerie je jen na fotky.
+- **Jde nahrát i video?** Hosté zatím ne, galerie od hostů je jen na fotky.
 - **Může mi někdo nahrát nevhodnou fotku?** Fotky od hostů jsou vidět hned. Když se objeví něco, co tam
   být nemá, napište mi a smažu to. Host může svoje fotky smazat sám.
 - **Co když host nemá signál?** Nahrávání pokračuje, jakmile se připojí a vrátí na stránku.
@@ -284,7 +285,7 @@ theme. Nic nekopíruj z `g-gallery`.
 ## 11. Pravidla a zákazy
 
 - **Nezačínat slovem „QR kód“.** Nejdřív říct, co pár získá. QR je až způsob.
-- **Neslibovat video**, hledání obličejů, schvalování fotek předem ani tisk.
+- **Neslibovat video od hostů**, hledání obličejů, schvalování fotek předem ani tisk.
 - **Nepsat „soukromá galerie“.** Správně je „neveřejná“, „nedá se najít“, „vidí ji ten, kdo má odkaz“.
 - **Nepsat „v reálném čase“ ani „okamžitě“** u projekce. Správně „zhruba do půl minuty“.
 - **Nezveřejňovat ceny ze §5** kromě „součást celodenního focení“, dokud je Pavel nepotvrdí.

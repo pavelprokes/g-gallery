@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { VIDEO_SELECT, videoOf } from "@/lib/video";
 import { resolveShareLink } from "@/lib/share-access";
 import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
 import {
@@ -68,6 +69,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
         id: true,
         objectKey: true,
         thumbObjectKey: true,
+        ...VIDEO_SELECT,
         fileName: true,
         width: true,
         height: true,
@@ -95,6 +97,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       id: photo.id,
       objectKey: photo.objectKey,
       thumbObjectKey: photo.thumbObjectKey,
+      video: videoOf(photo),
       fileName: photo.fileName,
       width: photo.width,
       height: photo.height,

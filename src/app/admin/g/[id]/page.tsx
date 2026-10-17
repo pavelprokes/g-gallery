@@ -3,6 +3,7 @@ import {
   GALLERY_TRANSLATED_FIELDS,
   parseTranslations,
 } from "@/lib/content-translations";
+import { formatDuration } from "@/lib/video";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth-guard";
@@ -88,6 +89,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           // from the bucket, it cannot fail the way transforming a 14 MB
           // original on first view occasionally does, and it is not billed.
           thumbObjectKey: true,
+          // docs/VIDEO.md — a video tile shows its poster plus a badge.
+          videoObjectKey: true,
+          durationMs: true,
           placeholder: true,
           fileName: true,
           width: true,
@@ -239,7 +243,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // The highlights exactly as a guest's page picks them (src/lib/shared-gallery.ts),
   // shown whether or not they are switched on, so they can be reviewed first.
   const highlightPicks = pickHighlights(
-    gallery.photos.map((photo) => toHighlightCandidate(order, photo)),
+    // Photos only, exactly as the guests' strip (src/lib/shared-gallery.ts).
+    gallery.photos
+      .filter((photo) => !photo.videoObjectKey)
+      .map((photo) => toHighlightCandidate(order, photo)),
     gallery.chapters.map((chapter) => chapterStartOf(order, chapter)),
   );
   const pickedPinned = new Map(highlightPicks.map((pick) => [pick.id, pick.pinned]));
@@ -320,6 +327,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           {isCover && (
             <span className="bg-brand-primary text-caption absolute bottom-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
               Titulní
+            </span>
+          )}
+          {photo.videoObjectKey && (
+            <span className="text-caption absolute right-1 bottom-1 rounded-full bg-black/60 px-2 py-0.5 font-semibold text-white tabular-nums">
+              ▶ Video{photo.durationMs ? ` · ${formatDuration(photo.durationMs)}` : ""}
             </span>
           )}
           {inHighlights && (

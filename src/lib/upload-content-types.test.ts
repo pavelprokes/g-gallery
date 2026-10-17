@@ -27,6 +27,27 @@ describe("classifyContentType", () => {
     expect(classifyContentType("video/mp4")).toEqual({ ok: false, reason: "video" });
   });
 
+  it("accepts MP4 for the photographer only, and nothing else that is video", () => {
+    expect(classifyContentType("video/mp4", { allowVideo: true })).toEqual({
+      ok: true,
+      extension: ".mp4",
+      video: true,
+    });
+    expect(classifyContentType("VIDEO/MP4; codecs=avc1", { allowVideo: true })).toMatchObject({
+      ok: true,
+      video: true,
+    });
+    expect(classifyContentType("video/quicktime", { allowVideo: true })).toEqual({
+      ok: false,
+      reason: "video",
+    });
+    // Photos are unaffected by the option.
+    expect(classifyContentType("image/jpeg", { allowVideo: true })).toEqual({
+      ok: true,
+      extension: ".jpg",
+    });
+  });
+
   it("falls back to unsupported for anything else", () => {
     expect(classifyContentType("application/pdf")).toEqual({ ok: false, reason: "unsupported" });
     expect(classifyContentType("")).toEqual({ ok: false, reason: "unsupported" });
