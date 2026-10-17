@@ -32,7 +32,7 @@ describe("formatDuration", () => {
   it("reads like a player's clock", () => {
     expect(formatDuration(0)).toBe("0:00");
     expect(formatDuration(42_400)).toBe("0:42");
-    expect(formatDuration(169_748)).toBe("2:50");
+    expect(formatDuration(169_748)).toBe("2:49");
     expect(formatDuration(3_723_000)).toBe("1:02:03");
   });
 });

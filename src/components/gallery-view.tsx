@@ -791,65 +791,69 @@ function LightboxVideo({ video, poster, onSwipe }: LightboxVideoProps) {
   const [failed, setFailed] = useState(false);
 
   return (
-    <div
-      className="absolute inset-x-0 top-[calc(max(1rem,env(safe-area-inset-top))+3.75rem)] bottom-[calc(max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))+4rem)] flex items-center justify-center px-2 sm:px-16"
-      onClick={(event) => event.stopPropagation()}
-      onTouchStart={(event) => {
-        const touch = event.touches[0];
-        const box = videoRef.current?.getBoundingClientRect();
-        touchStart.current =
-          touch && !(box && touch.clientY > box.bottom - VIDEO_CONTROLS_PX)
-            ? { x: touch.clientX, y: touch.clientY }
-            : null;
-      }}
-      onTouchEnd={(event) => {
-        const start = touchStart.current;
-        const touch = event.changedTouches[0];
-        touchStart.current = null;
-        if (!start || !touch) return;
-        const dx = touch.clientX - start.x;
-        const dy = touch.clientY - start.y;
-        if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dy) < SWIPE_MAX_VERTICAL_PX) {
-          onSwipe(dx < 0 ? 1 : -1);
-        }
-      }}
-    >
-      {src && !failed ? (
-        <>
-          <video
-            ref={videoRef}
-            src={src}
-            poster={poster}
-            controls
-            playsInline
-            preload="none"
-            onPlay={() => setStarted(true)}
-            onError={() => setFailed(true)}
-            className="max-h-full max-w-full bg-black"
-          />
-          {/* Desktop Chrome and Firefox draw no play button over a paused
+    // Opaque like the photo's frame: the dialog's own backdrop is 90 % black,
+    // and the gallery showing through around a film reads as a glitch.
+    <div className="absolute inset-0 bg-black" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="absolute inset-x-0 top-[calc(max(1rem,env(safe-area-inset-top))+3.75rem)] bottom-[calc(max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))+4rem)] flex items-center justify-center px-2 sm:px-16"
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          const box = videoRef.current?.getBoundingClientRect();
+          touchStart.current =
+            touch && !(box && touch.clientY > box.bottom - VIDEO_CONTROLS_PX)
+              ? { x: touch.clientX, y: touch.clientY }
+              : null;
+        }}
+        onTouchEnd={(event) => {
+          const start = touchStart.current;
+          const touch = event.changedTouches[0];
+          touchStart.current = null;
+          if (!start || !touch) return;
+          const dx = touch.clientX - start.x;
+          const dy = touch.clientY - start.y;
+          if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dy) < SWIPE_MAX_VERTICAL_PX) {
+            onSwipe(dx < 0 ? 1 : -1);
+          }
+        }}
+      >
+        {src && !failed ? (
+          <>
+            <video
+              ref={videoRef}
+              src={src}
+              poster={poster}
+              controls
+              playsInline
+              preload="none"
+              onPlay={() => setStarted(true)}
+              onError={() => setFailed(true)}
+              className="max-h-full max-w-full bg-black"
+            />
+            {/* Desktop Chrome and Firefox draw no play button over a paused
               video, only a small one in the control bar; the poster then
               reads as a photo. One big button until the first play. */}
-          {!started && (
-            <button
-              type="button"
-              onClick={() => void videoRef.current?.play()}
-              aria-label={t("playVideo")}
-              className="on-media absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-            >
-              <PlayIcon className="ms-1 h-8 w-8" />
-            </button>
-          )}
-        </>
-      ) : (
-        <div className="flex max-h-full flex-col items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- already a loader URL */}
-          <img alt="" src={poster} className="max-h-[70vh] max-w-full object-contain" />
-          <p role="status" className="rounded-full bg-black/55 px-3 py-1.5 text-sm text-white">
-            {t("videoUnavailable")}
-          </p>
-        </div>
-      )}
+            {!started && (
+              <button
+                type="button"
+                onClick={() => void videoRef.current?.play()}
+                aria-label={t("playVideo")}
+                // The ring keeps it visible on a black poster (a fade-in frame).
+                className="on-media absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-2 ring-white/80 backdrop-blur-sm transition-colors hover:bg-black/70"
+              >
+                <PlayIcon className="ms-1 h-8 w-8" />
+              </button>
+            )}
+          </>
+        ) : (
+          <div className="flex max-h-full flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- already a loader URL */}
+            <img alt="" src={poster} className="max-h-[70vh] max-w-full object-contain" />
+            <p role="status" className="rounded-full bg-black/55 px-3 py-1.5 text-sm text-white">
+              {t("videoUnavailable")}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

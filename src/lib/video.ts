@@ -66,7 +66,9 @@ export function videoOf(photo: {
 
 /** "0:42", "2:49", "1:02:03" — the badge on a video tile. */
 export function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
+  // Floored, as every player's own clock is — the badge must not say 2:50
+  // over a player that ends at 2:49.
+  const total = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = String(total % 60).padStart(2, "0");
