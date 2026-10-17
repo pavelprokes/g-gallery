@@ -32,6 +32,13 @@ const commonSchema = {
   xmpRating: z.number().int().min(-1).max(5).nullish(),
   xmpLabel: z.string().trim().min(1).max(32).nullish(),
   xmpHighlight: z.boolean().nullish(),
+  /** A video's length, read in the browser (docs/VIDEO.md). Ignored on photos. */
+  durationMs: z
+    .number()
+    .int()
+    .positive()
+    .max(24 * 60 * 60 * 1000)
+    .nullish(),
 };
 
 /**
@@ -86,9 +93,15 @@ export async function POST(request: Request) {
     xmpRating,
     xmpLabel,
     xmpHighlight,
+    durationMs,
   } = parsed.data;
 
-  let photo: { id: string; galleryId: string; objectKey: string } | null;
+  let photo: {
+    id: string;
+    galleryId: string;
+    objectKey: string;
+    videoObjectKey: string | null;
+  } | null;
 
   if ("shareToken" in parsed.data) {
     const access = await resolveGuestUpload(parsed.data.shareToken, parsed.data.anonKey ?? null);
@@ -112,7 +125,7 @@ export async function POST(request: Request) {
         status: "PENDING",
         uploadedByViewerId: access.context.viewerId,
       },
-      select: { id: true, galleryId: true, objectKey: true },
+      select: { id: true, galleryId: true, objectKey: true, videoObjectKey: true },
     });
   } else {
     let session;
@@ -124,7 +137,7 @@ export async function POST(request: Request) {
 
     photo = await prisma.photo.findFirst({
       where: { id: photoId, gallery: { ownerId: session.user.id } },
-      select: { id: true, galleryId: true, objectKey: true },
+      select: { id: true, galleryId: true, objectKey: true, videoObjectKey: true },
     });
   }
 
@@ -135,12 +148,24 @@ export async function POST(request: Request) {
   // into storage (docs/GUEST-GALLERIES.md §15). A stalled or truncated PUT
   // leaves an object smaller than what was promised, which is why this is
   // retried on the client rather than treated as a permanent rejection.
-  const stored = await headObject(photo.objectKey);
+  //
+  // On a video the declared size is the MP4's, and the poster must be there
+  // too: it is what the grid, the cover and the link preview show, so a row
+  // without one would be a tile with nothing in it (docs/VIDEO.md).
+  const [stored, poster] = await Promise.all([
+    headObject(photo.videoObjectKey ?? photo.objectKey),
+    photo.videoObjectKey ? headObject(photo.objectKey) : null,
+  ]);
   if (!stored || stored.sizeBytes !== sizeBytes) {
     return NextResponse.json(
       { error: "size_mismatch", expected: sizeBytes, actual: stored?.sizeBytes ?? null },
       { status: 409 },
     );
+  }
+  if (photo.videoObjectKey && !poster) {
+    // Same retryable shape as a truncated PUT: the client sends the poster
+    // again on its next attempt.
+    return NextResponse.json({ error: "size_mismatch", poster: "missing" }, { status: 409 });
   }
 
   // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
@@ -166,6 +191,7 @@ export async function POST(request: Request) {
       xmpRating: xmpRating ?? null,
       xmpLabel: xmpLabel ?? null,
       xmpHighlight: xmpHighlight ?? false,
+      durationMs: photo.videoObjectKey ? (durationMs ?? null) : null,
     },
   });
 

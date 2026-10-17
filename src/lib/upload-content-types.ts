@@ -6,6 +6,9 @@
  * user-supplied filename — a filename must not reach the object key
  * (`src/app/api/uploads/presign/route.ts`).
  */
+/** The one video type the photographer may upload (docs/VIDEO.md). */
+export const VIDEO_CONTENT_TYPE = "video/mp4";
+
 export const UPLOAD_EXTENSIONS: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -31,18 +34,38 @@ export const KNOWN_UNSUPPORTED_TYPES = new Set([
 ]);
 
 export type ContentTypeVerdict =
-  { ok: true; extension: string } | { ok: false; reason: "heic" | "video" | "unsupported" };
+  | { ok: true; extension: string; video?: true }
+  | { ok: false; reason: "heic" | "video" | "unsupported" };
 
-export function classifyContentType(contentType: string): ContentTypeVerdict {
+export interface ClassifyOptions {
+  /**
+   * The photographer's own upload, which may carry an MP4 (docs/VIDEO.md).
+   * Guests never get this: guest video stays out of scope
+   * (docs/GUEST-GALLERIES.md §14).
+   */
+  allowVideo?: boolean;
+}
+
+export function classifyContentType(
+  contentType: string,
+  { allowVideo = false }: ClassifyOptions = {},
+): ContentTypeVerdict {
   const normalized = contentType.toLowerCase().split(";")[0]?.trim() ?? "";
 
   const extension = UPLOAD_EXTENSIONS[normalized];
   if (extension) return { ok: true, extension };
 
   if (KNOWN_UNSUPPORTED_TYPES.has(normalized)) return { ok: false, reason: "heic" };
-  // Video is deferred deliberately (docs/GUEST-GALLERIES.md §14) and guests do
-  // not distinguish it from a photo when picking from the camera roll, so it
-  // gets its own refusal rather than being lumped in with garbage input.
+  // One container only: H.264 in MP4 is the one combination every browser
+  // plays, and the photographer exports it on purpose. A `.mov` straight off
+  // an iPhone is usually HEVC, which desktop Chrome and Firefox often cannot
+  // play — so it is refused by name rather than stored as a black box.
+  if (allowVideo && normalized === VIDEO_CONTENT_TYPE) {
+    return { ok: true, extension: ".mp4", video: true };
+  }
+  // Guests do not distinguish a video from a photo when picking from the
+  // camera roll, so it gets its own refusal rather than being lumped in with
+  // garbage input.
   if (normalized.startsWith("video/")) return { ok: false, reason: "video" };
 
   return { ok: false, reason: "unsupported" };

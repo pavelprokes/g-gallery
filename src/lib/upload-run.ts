@@ -3,6 +3,8 @@
 import { classifyContentType } from "@/lib/upload-content-types";
 import { makeThumbnail } from "@/lib/thumbnail";
 import { prepareUploadOffMainThread } from "@/lib/upload-prepare-client";
+import { VIDEO_MAX_BYTES } from "@/lib/video";
+import { prepareVideoUpload, VideoNotUsable, videoProblem } from "@/lib/video-prepare";
 
 /**
  * The browser half of the upload pipeline, shared by the photographer's
@@ -78,6 +80,11 @@ export interface PresignedUpload {
   objectKey: string;
   url: string;
   headers: Record<string, string>;
+  /**
+   * Present only for a video (docs/VIDEO.md): `url` above is then the MP4,
+   * and this is where its poster frame must go — required, not best-effort.
+   */
+  posterTarget?: { url: string; headers: Record<string, string> };
   /** Where a grid thumbnail may go, one signed target per format. */
   thumbTargets?: Partial<Record<"webp" | "jpeg", { url: string; headers: Record<string, string> }>>;
 }
@@ -256,10 +263,16 @@ async function uploadOne(
   signal: AbortSignal | undefined,
   onBytes: (sent: number) => void,
 ): Promise<void> {
-  // GPS strip, capture time, CRC32, dimensions and placeholder colour — off
-  // the main thread where a worker can run (src/lib/upload-prepare-client.ts).
-  const { body, crc32, takenAt, width, height, placeholder, picks } =
-    await prepareUploadOffMainThread(file);
+  // The server decides what this file is: a target with a poster slot is a
+  // video row. A video is stored as picked; its checks and poster come from
+  // src/lib/video-prepare.ts. A photo gets GPS strip, capture time, CRC32,
+  // dimensions and placeholder colour — off the main thread where a worker
+  // can run (src/lib/upload-prepare-client.ts).
+  const video = target.posterTarget ? await prepareVideoOrRefuse(file) : null;
+  const photo = video ? null : await prepareUploadOffMainThread(file);
+  const body = photo?.body ?? file;
+  const { crc32, takenAt, width, height, placeholder } = (video ?? photo)!;
+  const picks = photo?.picks ?? null;
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
   //
@@ -268,7 +281,9 @@ async function uploadOne(
   // the thumbnail profile rides on it rather than on a second flag that could
   // disagree with it. Owner uploads land in a desktop grid and get a bigger,
   // slightly less compressed tile; guest uploads are unchanged.
-  const thumbnail = target.thumbTargets ? await makeThumbnail(body, credentials.kind) : null;
+  const thumbnail = target.thumbTargets
+    ? await makeThumbnail(video?.poster ?? body, credentials.kind)
+    : null;
   if (signal?.aborted) throw abortError();
 
   let lastError: unknown;
@@ -279,6 +294,18 @@ async function uploadOne(
       // failed attempt's bytes twice.
       onBytes(0);
       const etag = await putWithProgress(target.url, target.headers, body, signal, onBytes);
+
+      // Required, unlike the thumbnail below: the poster is the row's
+      // `objectKey`, what every image surface shows, and confirm refuses a
+      // video without one. A failure here is retried with the rest.
+      if (video && target.posterTarget) {
+        const posterPut = await fetch(target.posterTarget.url, {
+          method: "PUT",
+          headers: target.posterTarget.headers,
+          body: video.poster,
+        });
+        if (!posterPut.ok) throw new Error(`poster PUT failed (${posterPut.status})`);
+      }
 
       // Best-effort and deliberately after the original: the photo is what
       // matters, and a failed thumbnail must never cost someone their upload.
@@ -318,6 +345,7 @@ async function uploadOne(
           xmpRating: picks?.rating,
           xmpLabel: picks?.label ?? undefined,
           xmpHighlight: picks?.tagged || undefined,
+          durationMs: video?.durationMs,
         }),
       });
       if (!confirm.ok) throw await rejectionFrom(confirm);
@@ -331,6 +359,21 @@ async function uploadOne(
     }
   }
   throw lastError instanceof Error ? lastError : new Error("upload failed");
+}
+
+/**
+ * A video that cannot go up says why, in the same shape as a type the server
+ * refused, so the uploader renders it as a refusal and never offers a retry.
+ */
+async function prepareVideoOrRefuse(file: File) {
+  try {
+    return await prepareVideoUpload(file);
+  } catch (error) {
+    if (error instanceof VideoNotUsable) {
+      throw new UploadRejection("unsupported_type", { reason: error.reason, fileName: file.name });
+    }
+    throw error;
+  }
 }
 
 /** Error string for a file stopped by `signal` — lets the UI offer it for retry. */
@@ -381,20 +424,40 @@ export async function runUploads({
   let firstSkip: UploadRejection | null = null;
   let skipped = 0;
 
-  files.forEach((file, index) => {
-    const verdict = classifyContentType(file.type || "image/jpeg");
-    if (verdict.ok) {
-      queue.push(index);
-      return;
-    }
+  const skip = (index: number, reason: string) => {
     skipped += 1;
     const rejection = new UploadRejection("unsupported_type", {
-      reason: verdict.reason,
-      fileName: file.name,
+      reason,
+      fileName: files[index]!.name,
     });
     firstSkip ??= rejection;
-    onItem(index, { state: "error", error: `unsupported_type:${verdict.reason}` });
-  });
+    onItem(index, { state: "error", error: `unsupported_type:${reason}` });
+  };
+
+  for (const [index, file] of files.entries()) {
+    const verdict = classifyContentType(file.type || "image/jpeg", {
+      allowVideo: credentials.kind === "owner",
+    });
+    if (!verdict.ok) {
+      skip(index, verdict.reason);
+      continue;
+    }
+    // A video's own problems (location, codec) are in its header, so they are
+    // caught here too, before presign creates a row that would then sit
+    // PENDING in the admin asking for the same file to be picked again.
+    // Size too: the server validates a presign batch as a whole, so one
+    // oversized film would otherwise fail the photos signed alongside it.
+    const problem = !verdict.video
+      ? null
+      : file.size > VIDEO_MAX_BYTES
+        ? "video_too_large"
+        : await videoProblem(file);
+    if (problem) {
+      skip(index, problem);
+      continue;
+    }
+    queue.push(index);
+  }
 
   if (firstSkip) onSkipped?.(firstSkip, skipped);
   if (queue.length === 0) return;
@@ -489,7 +552,11 @@ export async function runUploads({
           error: isAbort(error)
             ? CANCELLED
             : error instanceof UploadRejection
-              ? error.code
+              ? // `unsupported_type:<reason>`, the same form the pre-run skip
+                // uses, so a refused video reads as what it is.
+                error.code === "unsupported_type" && error.detail.reason
+                ? `${error.code}:${error.detail.reason}`
+                : error.code
               : (error as Error).message,
         });
       }

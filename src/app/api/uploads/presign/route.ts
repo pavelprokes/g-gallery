@@ -14,6 +14,7 @@ import {
 } from "@/lib/guest-quota";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { THUMB_CONTENT_TYPES, thumbKeyFor } from "@/lib/thumbnail";
+import { POSTER_CONTENT_TYPE, POSTER_EXTENSION, VIDEO_MAX_BYTES, videoKeyFor } from "@/lib/video";
 
 // A Route Handler, not a Server Action: the uploader presigns files
 // just-in-time in parallel batches, and Server Actions are queued
@@ -30,7 +31,9 @@ const fileSchema = z.object({
   // below: a guest picking a HEIC off an iPhone deserves a refusal that says
   // so, which a schema-level regex can only express as "invalid_body".
   contentType: z.string().min(1).max(128),
-  sizeBytes: z.number().int().positive().max(MAX_FILE_BYTES),
+  // The per-type ceilings (photo, video, guest) are checked below, where a
+  // refusal can name the file and its limit instead of "invalid_body".
+  sizeBytes: z.number().int().positive().max(VIDEO_MAX_BYTES),
   // Resuming an interrupted upload: re-presign this existing PENDING row
   // instead of creating another one (see /api/uploads/pending).
   resumePhotoId: z.string().min(1).max(64).optional(),
@@ -80,16 +83,26 @@ export async function POST(request: Request) {
   }
 
   const { files } = parsed.data;
+  // Only the photographer may upload a video (docs/VIDEO.md); a guest's MP4
+  // gets the same refusal it always had.
+  const allowVideo = "galleryId" in parsed.data;
 
   // Content types are checked before anything is written, so a batch with one
   // HEIC in it fails as a whole with a reason the client can render, rather
   // than half-creating rows.
   for (const file of files) {
-    const verdict = classifyContentType(file.contentType);
+    const verdict = classifyContentType(file.contentType, { allowVideo });
     if (!verdict.ok) {
       return NextResponse.json(
         { error: "unsupported_type", reason: verdict.reason, fileName: file.fileName },
         { status: 415 },
+      );
+    }
+    const maxBytes = verdict.video ? VIDEO_MAX_BYTES : MAX_FILE_BYTES;
+    if (file.sizeBytes > maxBytes) {
+      return NextResponse.json(
+        { error: "file_too_large", fileName: file.fileName, maxBytes },
+        { status: 413 },
       );
     }
   }
@@ -210,23 +223,28 @@ export async function POST(request: Request) {
                 ? { source: "GUEST" as const, uploadedByViewerId: target.viewerId }
                 : {}),
             },
-            select: { id: true, objectKey: true },
+            select: { id: true, objectKey: true, videoObjectKey: true },
           })
-        ).map((photo) => [photo.id, photo.objectKey] as const),
+        ).map((photo) => [photo.id, photo] as const),
   );
 
   const uploads = await Promise.all(
     files.map(async (file) => {
-      const resumedKey = file.resumePhotoId ? resumable.get(file.resumePhotoId) : undefined;
-      if (file.resumePhotoId && resumedKey) {
+      const verdict = classifyContentType(file.contentType, { allowVideo });
+      const isVideo = verdict.ok && verdict.video === true;
+
+      const resumed = file.resumePhotoId ? resumable.get(file.resumePhotoId) : undefined;
+      // A row is only resumed by the same kind of file: name and size matched
+      // it, but a photo row has no MP4 key to re-sign and a video row's
+      // `objectKey` is a poster, not the place for a photo's bytes.
+      if (file.resumePhotoId && resumed && Boolean(resumed.videoObjectKey) === isVideo) {
         // The object key is reused verbatim, so a partial PUT is simply
         // overwritten rather than leaving a second copy behind.
         return {
           photoId: file.resumePhotoId,
-          objectKey: resumedKey,
-          url: await presignPut(resumedKey, file.contentType),
-          headers: presignedPutHeaders(file.contentType),
-          ...(await thumbTarget(resumedKey)),
+          objectKey: resumed.objectKey,
+          ...(await bytesTarget(resumed.objectKey, resumed.videoObjectKey, file.contentType)),
+          ...(await thumbTarget(resumed.objectKey)),
         };
       }
 
@@ -234,9 +252,12 @@ export async function POST(request: Request) {
       // row can be inserted with its final objectKey in a single statement.
       // Inserting a placeholder key and patching it afterwards raced on the
       // unique index — every file in a batch collided on the same placeholder.
-      const verdict = classifyContentType(file.contentType);
-      const extension = verdict.ok ? verdict.extension : ".jpg";
+      //
+      // A video's `objectKey` is its poster frame and the MP4 sits beside it on
+      // the same stem (docs/VIDEO.md, src/lib/video.ts).
+      const extension = isVideo ? POSTER_EXTENSION : verdict.ok ? verdict.extension : ".jpg";
       const objectKey = `${target.storagePrefix}/${randomUUID()}${extension}`;
+      const videoObjectKey = isVideo ? videoKeyFor(objectKey) : null;
 
       // Rows are created PENDING and only become visible once the client
       // checks the ETag back in — this is what makes orphan reconciliation
@@ -245,6 +266,7 @@ export async function POST(request: Request) {
         data: {
           galleryId: target.galleryId,
           objectKey,
+          videoObjectKey,
           fileName: file.fileName,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
@@ -257,14 +279,37 @@ export async function POST(request: Request) {
       return {
         photoId: photo.id,
         objectKey,
-        url: await presignPut(objectKey, file.contentType),
-        headers: presignedPutHeaders(file.contentType),
+        ...(await bytesTarget(objectKey, videoObjectKey, file.contentType)),
         ...(await thumbTarget(objectKey)),
       };
     }),
   );
 
   return NextResponse.json({ uploads });
+}
+
+/**
+ * Where the file itself goes. For a photo that is `objectKey`; for a video it
+ * is the MP4, with a second, **required** PUT for the poster frame the browser
+ * draws — the row is not confirmed without it (`api/uploads/confirm`), since
+ * the poster is what every image surface shows.
+ */
+async function bytesTarget(objectKey: string, videoObjectKey: string | null, contentType: string) {
+  if (!videoObjectKey) {
+    return {
+      url: await presignPut(objectKey, contentType),
+      headers: presignedPutHeaders(contentType),
+    };
+  }
+  const [video, poster] = await Promise.all([
+    presignPut(videoObjectKey, contentType),
+    presignPut(objectKey, POSTER_CONTENT_TYPE),
+  ]);
+  return {
+    url: video,
+    headers: presignedPutHeaders(contentType),
+    posterTarget: { url: poster, headers: presignedPutHeaders(POSTER_CONTENT_TYPE) },
+  };
 }
 
 /**

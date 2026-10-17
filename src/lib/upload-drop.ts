@@ -25,6 +25,10 @@ const TYPE_BY_EXTENSION: Record<string, string> = {
   avif: "image/avif",
   heic: "image/heic",
   heif: "image/heif",
+  // The photographer's videos (docs/VIDEO.md): MP4 is stored, MOV is refused
+  // by name so the photographer learns to export MP4.
+  mp4: "video/mp4",
+  mov: "video/quicktime",
 };
 
 export function photoType(file: Pick<File, "name" | "type">): string | null {
@@ -34,16 +38,17 @@ export function photoType(file: Pick<File, "name" | "type">): string | null {
 }
 
 /**
- * True for a file we can store — or one we must refuse out loud (HEIC, so the
- * photographer learns to export JPEG). Everything else — RAW, TIFF, GIF, XMP,
- * `.DS_Store`, AppleDouble shadows — is noise, skipped with a quiet notice.
+ * True for a file we can store — a photo or an MP4 — or one we must refuse
+ * out loud (HEIC so the photographer learns to export JPEG, another video
+ * container so they learn to export MP4). Everything else — RAW, TIFF, GIF,
+ * XMP, `.DS_Store`, AppleDouble shadows — is noise, skipped with a quiet notice.
  */
 export function isCandidatePhoto(file: Pick<File, "name" | "type">): boolean {
   if (file.name.startsWith(".")) return false;
   const type = photoType(file);
   if (!type) return false;
-  const verdict = classifyContentType(type);
-  return verdict.ok || verdict.reason === "heic";
+  const verdict = classifyContentType(type, { allowVideo: true });
+  return verdict.ok || verdict.reason === "heic" || verdict.reason === "video";
 }
 
 /**
