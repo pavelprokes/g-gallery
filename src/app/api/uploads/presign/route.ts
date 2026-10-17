@@ -14,7 +14,13 @@ import {
 } from "@/lib/guest-quota";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
 import { THUMB_CONTENT_TYPES, thumbKeyFor } from "@/lib/thumbnail";
-import { POSTER_CONTENT_TYPE, POSTER_EXTENSION, VIDEO_MAX_BYTES, videoKeyFor } from "@/lib/video";
+import {
+  POSTER_CONTENT_TYPE,
+  POSTER_EXTENSION,
+  VIDEO_MAX_BYTES,
+  VIDEO_PUT_EXPIRY_SECONDS,
+  videoKeyFor,
+} from "@/lib/video";
 
 // A Route Handler, not a Server Action: the uploader presigns files
 // just-in-time in parallel batches, and Server Actions are queued
@@ -302,7 +308,10 @@ async function bytesTarget(objectKey: string, videoObjectKey: string | null, con
     };
   }
   const [video, poster] = await Promise.all([
-    presignPut(videoObjectKey, contentType),
+    // Long enough for a multi-GB film on a slow uplink to finish under one
+    // signature, whether R2 checks expiry at the start of a PUT or the end
+    // (docs/VIDEO.md). Owner-only, and bound to this one key and type.
+    presignPut(videoObjectKey, contentType, VIDEO_PUT_EXPIRY_SECONDS),
     presignPut(objectKey, POSTER_CONTENT_TYPE),
   ]);
   return {

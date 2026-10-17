@@ -445,8 +445,9 @@ export async function runUploads({
     // A video's own problems (location, codec) are in its header, so they are
     // caught here too, before presign creates a row that would then sit
     // PENDING in the admin asking for the same file to be picked again.
-    // Size too: the server validates a presign batch as a whole, so one
-    // oversized film would otherwise fail the photos signed alongside it.
+    // The size ceiling too (one R2 PUT, ~5 GB — not a policy): the server
+    // validates a presign batch as a whole, so one file over it would
+    // otherwise fail the photos signed alongside it.
     const problem = !verdict.video
       ? null
       : file.size > VIDEO_MAX_BYTES

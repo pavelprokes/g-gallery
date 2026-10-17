@@ -38,6 +38,15 @@ test("a video with a location in it is refused before anything is uploaded", asy
   await expect(page.getByText("0/1 nahráno")).toBeVisible();
 });
 
+test("a video above 4K is refused by resolution, whatever its size", async ({ page }) => {
+  // 5120 × 2880 in 5 kB: the limit is the picture, never the file (docs/VIDEO.md).
+  await page.goto(`/admin/g/${galleryFor(test.info().project.name).galleryId}`);
+  await page
+    .locator('input[type="file"][accept*="video/mp4"]')
+    .setInputFiles(path.join(__dirname, "media/nad-4k.mp4"));
+  await expect(page.getByText(/vyšší rozlišení než 4K/).first()).toBeVisible();
+});
+
 test.describe("upload and playback", () => {
   test.describe.configure({ mode: "serial" });
 

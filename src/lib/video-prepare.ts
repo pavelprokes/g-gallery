@@ -3,7 +3,7 @@
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { inspectMp4, isH264, type Mp4Facts } from "@/lib/mp4-inspect";
 import { averageColorOf } from "@/lib/placeholder";
-import { POSTER_CONTENT_TYPE } from "@/lib/video";
+import { POSTER_CONTENT_TYPE, withinVideoResolution } from "@/lib/video";
 import { withTimeout } from "@/lib/with-timeout";
 
 /**
@@ -28,7 +28,7 @@ export interface PreparedVideo {
 }
 
 /** Why a picked MP4 cannot go up — each one has its own sentence in the uploader. */
-export type VideoProblem = "video_location" | "video_codec";
+export type VideoProblem = "video_location" | "video_codec" | "video_resolution";
 
 export class VideoNotUsable extends Error {
   constructor(readonly reason: VideoProblem) {
@@ -57,7 +57,8 @@ export async function videoProblem(file: File): Promise<VideoProblem | null> {
   return problemIn(await inspectMp4(file));
 }
 
-function problemIn(facts: Mp4Facts | null): VideoProblem | null {
+/** Pure, for tests: the verdict on what the header says. */
+export function problemIn(facts: Mp4Facts | null): VideoProblem | null {
   // Invariant 2: no location leaves the browser. A photo's GPS is stripped in
   // place; a video is refused instead — an export from an editor never has
   // it, a clip off a phone does, and re-exporting is the honest fix.
@@ -66,6 +67,10 @@ function problemIn(facts: Mp4Facts | null): VideoProblem | null {
   // browser decodes it: Safari decodes HEVC and would let through a video
   // that Chrome on Windows then cannot play.
   if (facts && facts.videoCodec !== null && !isH264(facts.videoCodec)) return "video_codec";
+  // The limit is resolution, not file size (src/lib/video.ts).
+  if (facts?.videoWidth && facts.videoHeight) {
+    if (!withinVideoResolution(facts.videoWidth, facts.videoHeight)) return "video_resolution";
+  }
   return null;
 }
 
@@ -111,6 +116,10 @@ async function posterFrame(
     await withTimeout(once(video, "loadedmetadata"), FRAME_TIMEOUT_MS, "video metadata");
     if (!video.videoWidth || !video.videoHeight || !Number.isFinite(video.duration)) {
       throw new VideoNotUsable("video_codec");
+    }
+    // Again on the decoded size, for a header the inspector could not read.
+    if (!withinVideoResolution(video.videoWidth, video.videoHeight)) {
+      throw new VideoNotUsable("video_resolution");
     }
 
     video.currentTime = Math.min(video.duration * POSTER_AT, Math.max(0, video.duration - 0.1));

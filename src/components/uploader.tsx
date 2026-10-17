@@ -322,23 +322,29 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               exactly what the couple streams and downloads. */}
           <details className="text-admin-muted w-full max-w-md text-left text-xs dark:text-neutral-400">
             <summary className="cursor-pointer text-center">
-              I video · MP4 (H.264), do 500 MB — jak ho exportovat
+              I video · MP4 (H.264), nejvýš 4K — jak ho exportovat
             </summary>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
               <dt className="font-medium">Formát</dt>
               <dd>MP4 (.mp4). MOV a HEVC (H.265) neprojdou.</dd>
               <dt className="font-medium">Video</dt>
-              <dd>H.264, 1920 × 1080, snímková frekvence jako ve střihu</dd>
+              <dd>
+                H.264, nejvýš 4K (4096 px na delší straně, na šířku i na výšku). Doporučeno 1080p —
+                na telefonu v sále se rozjede rychleji. Snímková frekvence jako ve střihu.
+              </dd>
               <dt className="font-medium">Datový tok</dt>
-              <dd>8–10 Mbit/s, tedy 3 minuty ≈ 200 MB</dd>
+              <dd>1080p 8–10 Mbit/s (3 min ≈ 200 MB) · 4K 35–45 Mbit/s (3 min ≈ 900 MB)</dd>
               <dt className="font-medium">Zvuk</dt>
               <dd>AAC, 48 kHz, stereo, 192–320 kbit/s</dd>
               <dt className="font-medium">Limit</dt>
-              <dd>500 MB na soubor, bez metadat o poloze</dd>
+              <dd>
+                Rozlišení do 4K, velikost souboru neomezujeme (technický strop jednoho nahrání je
+                4,9 GB). Bez metadat o poloze.
+              </dd>
               <dt className="font-medium">Resolve</dt>
               <dd>
-                Deliver → Format MP4, Codec H.264, Quality 8–10 000 kb/s; „Network Optimization“
-                zapnout, pokud ji verze nabízí (video se rozjede dřív)
+                Deliver → Format MP4, Codec H.264, Quality 8–10 000 kb/s (4K: 35–45 000); „Network
+                Optimization“ zapnout, pokud ji verze nabízí (video se rozjede dřív)
               </dd>
               <dt className="font-medium">Pořadí</dt>
               <dd>
@@ -488,7 +494,9 @@ function unsupportedReason(reason: string | undefined): string {
     case "video_codec":
       return "video musí být H.264 — tohle je jiný kodek (nejspíš HEVC z telefonu), řada prohlížečů by ho nepřehrála. Exportuj ho znovu jako H.264.";
     case "video_too_large":
-      return "video je větší než 500 MB. Exportuj ho s nižším datovým tokem (1080p, 8–10 Mbit/s).";
+      return "video je větší než 4,9 GB — víc úložiště jedním nahráním nepřijme. Exportuj ho s nižším datovým tokem.";
+    case "video_resolution":
+      return "video má vyšší rozlišení než 4K. Exportuj ho nejvýš ve 4K (4096 px na delší straně), ideálně v 1080p.";
     case "video_location":
       return "video obsahuje polohu, kde vzniklo. Exportuj ho znovu bez metadat o poloze.";
     default:

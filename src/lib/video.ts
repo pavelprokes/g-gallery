@@ -13,12 +13,29 @@
  */
 
 /**
- * Cloudflare caches nothing over 512 MB on our plan, and "requesting a small
- * range does not bypass this limit" — an uncached video is served from R2
- * range by range for every viewer. A web export (1080p H.264, 8–10 Mbit/s)
- * of a few minutes is a fraction of this.
+ * The limit is resolution, not size (Pavel, 2026-10-17): a long film at a
+ * good bitrate must not be refused for being long. 4K on the long edge —
+ * portrait or landscape, UHD 3840 and cinema 4096 alike — is the most any
+ * screen a guest owns can show, and the top of H.264's level 5.1 that phones
+ * decode in hardware.
  */
-export const VIDEO_MAX_BYTES = 500 * 1024 * 1024;
+export const VIDEO_MAX_LONG_EDGE_PX = 4096;
+
+/**
+ * Not a policy, a ceiling: R2 takes at most 4.995 GiB in one PUT, and the
+ * upload is one presigned PUT. Past Cloudflare's 512 MB cache limit a video
+ * still plays — it is served from R2 range by range, egress-free — it is just
+ * not held at the edge.
+ */
+export const VIDEO_MAX_BYTES = Math.floor(4.9 * 1024 ** 3);
+
+/** How long the MP4's presigned PUT stays valid — six hours, against R2's seven-day maximum. */
+export const VIDEO_PUT_EXPIRY_SECONDS = 6 * 60 * 60;
+
+/** True when a video's coded size fits `VIDEO_MAX_LONG_EDGE_PX`. */
+export function withinVideoResolution(width: number, height: number): boolean {
+  return Math.max(width, height) <= VIDEO_MAX_LONG_EDGE_PX;
+}
 
 /** The poster is a JPEG the uploading browser draws from the video. */
 export const POSTER_CONTENT_TYPE = "image/jpeg";

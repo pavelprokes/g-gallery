@@ -97,10 +97,13 @@ describe("inspectMoov", () => {
 });
 
 /** moov/trak/mdia/minf/stbl/stsd with one sample entry of `codec`. */
-function trackWith(codec: string): Bytes {
+function trackWith(codec: string, width = 1920, height = 1080): Bytes {
   const stsdBody = new Uint8Array(8);
   new DataView(stsdBody.buffer).setUint32(4, 1);
-  const stsd = box("stsd", stsdBody, box(codec, new Uint8Array(78)));
+  const entry = new Uint8Array(78);
+  new DataView(entry.buffer).setUint16(24, width);
+  new DataView(entry.buffer).setUint16(26, height);
+  const stsd = box("stsd", stsdBody, box(codec, entry));
   return box("trak", box("mdia", box("minf", box("stbl", stsd))));
 }
 
@@ -109,6 +112,12 @@ describe("video codec", () => {
     const moov = box("moov", mvhd(1), trackWith("mp4a"), trackWith("avc1"));
     expect(inspectMoov(moov).videoCodec).toBe("avc1");
     expect(inspectMoov(box("moov", mvhd(1), trackWith("hvc1"))).videoCodec).toBe("hvc1");
+  });
+
+  it("reads the coded size from the sample entry", () => {
+    const moov = box("moov", mvhd(1), trackWith("mp4a"), trackWith("avc1", 3840, 2160));
+    const facts = inspectMoov(moov);
+    expect([facts.videoWidth, facts.videoHeight]).toEqual([3840, 2160]);
   });
 
   it("is null without a video track", () => {

@@ -25,6 +25,9 @@ export interface Mp4Facts {
    * Windows cannot play it for the couple afterwards.
    */
   videoCodec: string | null;
+  /** The video track's coded size, from its sample entry. Null without one. */
+  videoWidth: number | null;
+  videoHeight: number | null;
 }
 
 /** Sample-entry types that mean "this track is video". */
@@ -90,10 +93,13 @@ export async function inspectMp4(blob: Blob): Promise<Mp4Facts | null> {
 
 /** `moov` including its own header. Exported for tests. */
 export function inspectMoov(moov: Uint8Array): Mp4Facts {
+  const entry = findVideoEntry(moov, 0, moov.length);
   return {
     createdAt: readCreationTime(moov),
     hasLocation: hasLocation(moov),
-    videoCodec: findVideoCodec(moov, 0, moov.length),
+    videoCodec: entry?.codec ?? null,
+    videoWidth: entry?.width ?? null,
+    videoHeight: entry?.height ?? null,
   };
 }
 
@@ -148,20 +154,34 @@ function readCreationTime(moov: Uint8Array): Date | null {
   return null;
 }
 
+interface VideoEntry {
+  codec: string;
+  width: number;
+  height: number;
+}
+
 /** Depth-first through the containers to each `stsd`'s first sample entry. */
-function findVideoCodec(bytes: Uint8Array, start: number, end: number): string | null {
+function findVideoEntry(bytes: Uint8Array, start: number, end: number): VideoEntry | null {
   for (let offset = start; offset < end;) {
     const box = readBoxHeader(bytes, offset, end - offset);
     if (!box) return null;
     const body = offset + box.headerSize;
     if (CONTAINERS.has(box.type)) {
-      const found = findVideoCodec(bytes, body, offset + box.size);
+      const found = findVideoEntry(bytes, body, offset + box.size);
       if (found) return found;
     } else if (box.type === "stsd") {
       // Full box (4 bytes version/flags), then a 4-byte entry count, then the
       // sample entries, each a box whose type is the codec.
-      const entry = readBoxHeader(bytes, body + 8, offset + box.size - (body + 8));
-      if (entry && VIDEO_SAMPLE_ENTRIES.has(entry.type)) return entry.type;
+      const entryAt = body + 8;
+      const entry = readBoxHeader(bytes, entryAt, offset + box.size - entryAt);
+      if (entry && VIDEO_SAMPLE_ENTRIES.has(entry.type)) {
+        // VisualSampleEntry: 6 reserved + 2 data-reference index, 16 bytes of
+        // pre_defined/reserved, then width and height as 16-bit integers.
+        const at = entryAt + entry.headerSize + 24;
+        if (at + 4 > bytes.length) return { codec: entry.type, width: 0, height: 0 };
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        return { codec: entry.type, width: view.getUint16(at), height: view.getUint16(at + 2) };
+      }
     }
     offset += box.size;
   }

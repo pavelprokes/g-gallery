@@ -42,9 +42,13 @@ function objectUrl(key: string): string {
  * browser MUST send byte-identical values or R2 rejects the request with 403.
  * The bucket CORS policy must allow both headers.
  */
-export async function presignPut(key: string, contentType: string): Promise<string> {
+export async function presignPut(
+  key: string,
+  contentType: string,
+  expirySeconds = PRESIGN_EXPIRY_SECONDS,
+): Promise<string> {
   const url = new URL(objectUrl(key));
-  url.searchParams.set("X-Amz-Expires", String(PRESIGN_EXPIRY_SECONDS));
+  url.searchParams.set("X-Amz-Expires", String(expirySeconds));
 
   const signed = await r2Client().sign(
     new Request(url, {
