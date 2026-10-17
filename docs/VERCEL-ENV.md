@@ -155,29 +155,30 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 
 ## Optional — the feature degrades cleanly if unset
 
-| Variable                            | Scope     | Unset means                                                                                 |
-| ----------------------------------- | --------- | ------------------------------------------------------------------------------------------- |
-| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503 (live Worker, not deployed — docs/SETUP.md §9)        |
-| `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte                                            |
-| `ZIP_BUILDER_WORKER_URL`            | runtime   | `/api/cron/zip-build` no-ops; galleries never get a pre-built archive (docs/SETUP.md §10)   |
-| `ZIP_BUILD_SIGNING_SECRET`          | runtime   | Same. Must match the builder Worker's secret of the same name                               |
-| `ZIP_BUILD_CALLBACK_SECRET`         | runtime   | Same — also gates `/api/internal/zip-callback`, so the builder can't report a status either |
-| `IMAGE_SIGNING_SECRET`              | runtime   | Image URLs stay unsigned (today's behaviour); must match the Worker secret of the same name |
-| **`NEXT_PUBLIC_SIGNED_IMAGES_URL`** | **build** | Same — the loader never routes through the signing Worker without it                        |
-| `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends                                 |
-| `VAPID_PRIVATE_KEY`                 | runtime   |                                                                                             |
-| `VAPID_SUBJECT`                     | runtime   | `mailto:...`                                                                                |
-| `SMTP_URL`                          | runtime   | Digest is logged and skipped rather than failing the cron                                   |
-| `MAIL_FROM`                         | runtime   | Falls back to a Resend sandbox sender                                                       |
-| `NOTIFY_EMAIL_TO`                   | runtime   |                                                                                             |
-| `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write                                               |
-| `SUPABASE_SERVICE_ROLE_KEY`         | runtime   | **Legacy JWT-style key**, not `sb_secret_…` — PostgREST needs a JWT                         |
-| **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing                                              |
-| **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** | Legacy JWT-style key, same reason                                                           |
-| **`NEXT_PUBLIC_UMAMI_URL`**         | **build** | No Umami tracker (self-hosted analytics; renders on Vercel production only)                 |
-| **`NEXT_PUBLIC_UMAMI_WEBSITE_ID`**  | **build** | Same                                                                                        |
-| **`NEXT_PUBLIC_UMAMI_SCRIPT`**      | **build** | Defaults to `stats.js` (Umami's own default is `script.js`)                                 |
-| `UMAMI_COLLECT_ENDPOINT`            | runtime   | Server events post to `/api/e` (Umami's own default is `/api/send`)                         |
+| Variable                            | Scope     | Unset means                                                                                            |
+| ----------------------------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `ZIP_WORKER_URL`                    | runtime   | Download buttons return a visible 503 (live Worker, not deployed — docs/SETUP.md §9)                   |
+| `ZIP_SIGNING_SECRET`                | runtime   | Same. Must match the Worker secret byte for byte                                                       |
+| `ZIP_BUILDER_WORKER_URL`            | runtime   | `/api/cron/zip-build` no-ops; galleries never get a pre-built archive (docs/SETUP.md §10)              |
+| `ZIP_BUILD_SIGNING_SECRET`          | runtime   | Same. Must match the builder Worker's secret of the same name                                          |
+| `ZIP_BUILD_CALLBACK_SECRET`         | runtime   | Same — also gates `/api/internal/zip-callback`, so the builder can't report a status either            |
+| `IMAGE_SIGNING_SECRET`              | runtime   | Image URLs stay unsigned (today's behaviour); must match the Worker secret of the same name            |
+| **`NEXT_PUBLIC_SIGNED_IMAGES_URL`** | **build** | Same — the loader never routes through the signing Worker without it                                   |
+| `NEXT_PUBLIC_MEDIA_BASE_URL`        | build     | Videos stream from `NEXT_PUBLIC_PHOTOS_BASE_URL` — right in production, leave it unset (docs/VIDEO.md) |
+| `VAPID_PUBLIC_KEY`                  | runtime   | Push toggle explains it is unconfigured; digest still sends                                            |
+| `VAPID_PRIVATE_KEY`                 | runtime   |                                                                                                        |
+| `VAPID_SUBJECT`                     | runtime   | `mailto:...`                                                                                           |
+| `SMTP_URL`                          | runtime   | Digest is logged and skipped rather than failing the cron                                              |
+| `MAIL_FROM`                         | runtime   | Falls back to a Resend sandbox sender                                                                  |
+| `NOTIFY_EMAIL_TO`                   | runtime   |                                                                                                        |
+| `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write                                                          |
+| `SUPABASE_SERVICE_ROLE_KEY`         | runtime   | **Legacy JWT-style key**, not `sb_secret_…` — PostgREST needs a JWT                                    |
+| **`NEXT_PUBLIC_SUPABASE_URL`**      | **build** | "Someone is viewing now" silently does nothing                                                         |
+| **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | **build** | Legacy JWT-style key, same reason                                                                      |
+| **`NEXT_PUBLIC_UMAMI_URL`**         | **build** | No Umami tracker (self-hosted analytics; renders on Vercel production only)                            |
+| **`NEXT_PUBLIC_UMAMI_WEBSITE_ID`**  | **build** | Same                                                                                                   |
+| **`NEXT_PUBLIC_UMAMI_SCRIPT`**      | **build** | Defaults to `stats.js` (Umami's own default is `script.js`)                                            |
+| `UMAMI_COLLECT_ENDPOINT`            | runtime   | Server events post to `/api/e` (Umami's own default is `/api/send`)                                    |
 
 Shared Supabase project (`docs/SETUP.md` §6) — the service role only has access to the `g_gallery`
 schema, granted explicitly; it cannot read the marketing site's own data in `public`.

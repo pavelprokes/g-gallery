@@ -263,10 +263,18 @@ async function main() {
     "mobile-safari": await makeSelectGallery(user.id),
   };
 
+  // docs/VIDEO.md: the spec uploads a real MP4 through the admin, so each
+  // browser project gets an empty gallery of its own to put it in.
+  const videoGalleries = {
+    chromium: await makeVideoGallery(user.id, "chromium"),
+    "mobile-safari": await makeVideoGallery(user.id, "mobile-safari"),
+  };
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
       adminCookie,
+      videoGalleries,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -819,6 +827,45 @@ async function makeSelectGallery(ownerId: string) {
     });
   }
   return gallery.id;
+}
+
+/**
+ * An empty, published gallery with a share link that allows everything — the
+ * video spec fills it through the admin uploader. Two seeded photos around
+ * where the video lands, so the lightbox has neighbours to swipe to.
+ */
+async function makeVideoGallery(ownerId: string, project: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: `E2E Video ${project}`,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-video-${project}-${Date.now()}`,
+    },
+  });
+  for (const name of ["svatba_0001.jpg", "svatba_0003.jpg"]) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${name}`,
+        fileName: name,
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        crc32: "00000000",
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10)),
+      },
+    });
+  }
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+  return { galleryId: gallery.id, token, slug };
 }
 
 /**

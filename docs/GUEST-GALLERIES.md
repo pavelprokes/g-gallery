@@ -637,7 +637,9 @@ Written down because none of it is caught by unit tests:
 
 - **Video.** Every competitor has it and every guest expects it, but it means a player, poster
   frames, transcoding and transfer volume — its own project. Until then the UI must say so
-  _before_ the file picker opens, not after a two-minute upload.
+  _before_ the file picker opens, not after a two-minute upload. (The _photographer's_ own videos
+  shipped 2026-10-17 — `docs/VIDEO.md`; guest video is still out, and the guest presign still
+  refuses an MP4.)
 - **Mixing guest and photographer photos in one grid.** The earlier draft of this plan did that and
   separated them with a filter. The hub makes the separation structural, which is simpler and
   leaves nobody wondering whose photo they are looking at. `Photo.source` survives for attribution
