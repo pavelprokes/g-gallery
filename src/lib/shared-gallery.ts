@@ -64,6 +64,8 @@ export interface GalleryViewData {
   /** Every confirmed photo, not just the first page — the header states how
    * big the gallery is before any of it has scrolled into view. */
   photoCount: number;
+  /** How many of `photoCount` are videos (docs/VIDEO.md) — the header counts them apart. */
+  videoCount: number;
   initialPhotos: {
     id: string;
     objectKey: string;
@@ -219,7 +221,7 @@ export async function loadGalleryViewData(
   const chapterRows = gallery.chapters.toSorted(compareChapterStarts(order));
 
   // Independent of each other, so none of them waits on another's round trip.
-  const [imageGrant, chapters, highlights] = await Promise.all([
+  const [imageGrant, chapters, highlights, videoCount] = await Promise.all([
     mintImageGrant(gallery.storagePrefix),
     chaptersWithCounts(
       gallery.id,
@@ -247,6 +249,9 @@ export async function loadGalleryViewData(
           chapterRows.map((chapter) => chapterStartOf(order, chapter)),
         )
       : Promise.resolve([]),
+    prisma.photo.count({
+      where: { galleryId: gallery.id, status: "CONFIRMED", videoObjectKey: { not: null } },
+    }),
   ]);
 
   return {
@@ -262,6 +267,7 @@ export async function loadGalleryViewData(
           )
         : null,
     photoCount: gallery._count.photos,
+    videoCount,
     initialPhotos: page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,

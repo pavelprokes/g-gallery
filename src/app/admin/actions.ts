@@ -229,6 +229,7 @@ export async function deletePhotos(photoIds: string[]) {
       objectKey: true,
       thumbObjectKey: true,
       videoObjectKey: true,
+      loopObjectKey: true,
       galleryId: true,
     },
   });
@@ -248,7 +249,7 @@ export async function deletePhotos(photoIds: string[]) {
   // ponytail: one DELETE per object, 10 at a time; S3 DeleteObjects if culls get slow.
   // A failure only leaves an orphan for reconcile — the rows are already gone.
   const keys = photos.flatMap((photo) =>
-    [photo.objectKey, photo.thumbObjectKey, photo.videoObjectKey].filter(
+    [photo.objectKey, photo.thumbObjectKey, photo.videoObjectKey, photo.loopObjectKey].filter(
       (key): key is string => key !== null,
     ),
   );

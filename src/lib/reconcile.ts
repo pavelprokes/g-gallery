@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { deleteObject, listObjects, type StoredObject } from "@/lib/r2";
 import { isThumbKey, objectStem } from "@/lib/thumbnail";
+import { LOOP_SUFFIX } from "@/lib/video";
 
 // Presigned-PUT flows can leave two kinds of debris (docs/PLAN.md §5):
 //   - ghost rows: a Photo row was created, the upload never confirmed
@@ -248,6 +249,11 @@ export function classifyKey(key: string): KeyClassification {
     return { kind: "thumbnail", owner: key.slice(0, key.lastIndexOf(".thumb.")) };
   }
 
+  if (name.endsWith(LOOP_SUFFIX)) {
+    // A video's card loop: derived from the poster, live exactly as long as it.
+    return { kind: "thumbnail", owner: key.slice(0, -LOOP_SUFFIX.length) };
+  }
+
   if (ORIGINAL_NAME.test(name)) {
     return { kind: "original", owner: key.slice(0, key.lastIndexOf(".")) };
   }
@@ -269,13 +275,15 @@ export interface LiveIndex {
 }
 
 export function liveIndex(
-  photos: { objectKey: string | null }[],
+  photos: { objectKey: string | null; videoObjectKey?: string | null }[],
   galleries: { storagePrefix: string | null }[],
 ): LiveIndex {
   const photoStems = new Set<string>();
   for (const photo of photos) {
-    if (!photo.objectKey) continue;
-    photoStems.add(objectStem(photo.objectKey));
+    if (photo.objectKey) photoStems.add(objectStem(photo.objectKey));
+    // An MP4 shares its poster's stem only until the photographer picks
+    // another poster (docs/VIDEO.md), so it is kept alive by its own column.
+    if (photo.videoObjectKey) photoStems.add(objectStem(photo.videoObjectKey));
   }
 
   const galleryPrefixes = new Set<string>();
@@ -382,7 +390,7 @@ export async function sweepOrphanObjects({
   // between the two calls would appear in the listing but not in the live set,
   // and be deleted as an orphan.
   const [photos, galleries] = await Promise.all([
-    prisma.photo.findMany({ select: { objectKey: true } }),
+    prisma.photo.findMany({ select: { objectKey: true, videoObjectKey: true } }),
     prisma.gallery.findMany({ select: { storagePrefix: true } }),
   ]);
 

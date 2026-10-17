@@ -862,10 +862,32 @@ async function makeVideoGallery(ownerId: string, project: string) {
   }
   const token = generateShareToken();
   const slug = gallerySlug(gallery.title, null);
-  await prisma.shareLink.create({
+  const link = await prisma.shareLink.create({
     data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+    select: { id: true },
   });
-  return { galleryId: gallery.id, token, slug };
+
+  // On a wedding page beside a photo gallery, so the hub renders cards (one
+  // listed gallery would render inline) — where the video's loop plays.
+  const wedding = await makeWedding(ownerId, `E2E Video svatba ${project}`, "Mlýn");
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: {
+      eventId: wedding.id,
+      eventKey: `video-${project}`,
+      listedOnEvent: true,
+      eventLinkId: link.id,
+    },
+  });
+  await makeEventGallery(ownerId, wedding.id, "Fotky", `fotky-${project}`, true, 2);
+
+  return {
+    galleryId: gallery.id,
+    token,
+    slug,
+    weddingToken: wedding.token,
+    weddingSlug: wedding.slug,
+  };
 }
 
 /**

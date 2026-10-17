@@ -40,8 +40,8 @@ export class VideoNotUsable extends Error {
 
 /**
  * A quarter of the way in: the first frame of an edited film is a fade from
- * black far more often than not, and the photographer has no other way to
- * choose (yet — docs/VIDEO.md).
+ * black far more often than not. Only the default — the admin picks another
+ * (src/components/admin/video-poster-picker.tsx).
  */
 const POSTER_AT = 0.25;
 /** Long edge; a 4K export keeps its full width, nothing bigger is useful. */
@@ -126,28 +126,8 @@ async function posterFrame(
       throw new VideoNotUsable("video_resolution");
     }
 
-    video.currentTime = Math.min(video.duration * POSTER_AT, Math.max(0, video.duration - 0.1));
-    await withTimeout(once(video, "seeked"), FRAME_TIMEOUT_MS, "video seek");
-    // HAVE_CURRENT_DATA: a frame is there to draw. Some engines report the
-    // seek before decoding it. `canplay`, not `loadeddata`: that one fires
-    // once per load and may already be behind us; `canplay` fires again
-    // whenever data arrives after a seek.
-    if (video.readyState < 2) {
-      await withTimeout(once(video, "canplay"), FRAME_TIMEOUT_MS, "video frame");
-    }
-
-    const scale = Math.min(1, POSTER_MAX_PX / Math.max(video.videoWidth, video.videoHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
-    const context = canvas.getContext("2d");
-    if (!context) throw new VideoNotUsable("video_codec");
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const poster = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, POSTER_CONTENT_TYPE, POSTER_QUALITY),
-    );
-    if (!poster) throw new VideoNotUsable("video_codec");
+    await seekTo(video, Math.min(video.duration * POSTER_AT, Math.max(0, video.duration - 0.1)));
+    const poster = await drawPoster(video);
 
     return {
       poster,
@@ -165,6 +145,116 @@ async function posterFrame(
     video.load();
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * Seeks and waits until the frame there can be drawn. HAVE_CURRENT_DATA after
+ * `seeked`, because some engines report the seek before decoding it — and
+ * `canplay`, not `loadeddata`: that one fires once per load and may already be
+ * behind us; `canplay` fires again whenever data arrives after a seek.
+ */
+export async function seekTo(video: HTMLVideoElement, seconds: number): Promise<void> {
+  const seeked = once(video, "seeked");
+  video.currentTime = seconds;
+  await withTimeout(seeked, FRAME_TIMEOUT_MS, "video seek");
+  if (video.readyState < 2) {
+    await withTimeout(once(video, "canplay"), FRAME_TIMEOUT_MS, "video frame");
+  }
+}
+
+/** The frame on screen as a JPEG, at most `maxPx` on the long edge. */
+export async function drawPoster(
+  video: HTMLVideoElement,
+  maxPx = POSTER_MAX_PX,
+  quality = POSTER_QUALITY,
+): Promise<Blob> {
+  const scale = Math.min(1, maxPx / Math.max(video.videoWidth, video.videoHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new VideoNotUsable("video_codec");
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  // Throws a SecurityError on a cross-origin video the bucket sent no CORS
+  // header for — the caller decides what that means.
+  const poster = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, POSTER_CONTENT_TYPE, quality),
+  );
+  if (!poster) throw new VideoNotUsable("video_codec");
+  return poster;
+}
+
+/**
+ * The container MediaRecorder can write that every guest's browser plays:
+ * H.264 in MP4 (Safari, Chrome 126+). Null elsewhere — Firefox records only
+ * WebM, which older iPhones do not play — and then there is simply no loop.
+ */
+export function loopRecorderType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  return (
+    ["video/mp4;codecs=avc1", "video/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) ??
+    null
+  );
+}
+
+/**
+ * Records `seconds` of the video from `start`, muted, downscaled to `maxPx`,
+ * by playing it into a canvas — real time, so it takes as long as it lasts.
+ */
+export async function recordLoop(
+  video: HTMLVideoElement,
+  start: number,
+  { seconds, maxPx, bitsPerSecond }: { seconds: number; maxPx: number; bitsPerSecond: number },
+): Promise<Blob> {
+  const mimeType = loopRecorderType();
+  if (!mimeType) throw new Error("no MP4 recorder");
+
+  const scale = Math.min(1, maxPx / Math.max(video.videoWidth, video.videoHeight));
+  const canvas = document.createElement("canvas");
+  // Even sizes: H.264 encoders refuse odd ones.
+  canvas.width = Math.round((video.videoWidth * scale) / 2) * 2;
+  canvas.height = Math.round((video.videoHeight * scale) / 2) * 2;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("no 2d context");
+
+  const begin = Math.max(0, Math.min(start, video.duration - seconds));
+  await seekTo(video, begin);
+  const draw = () => context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  draw();
+
+  const recorder = new MediaRecorder(canvas.captureStream(30), {
+    mimeType,
+    videoBitsPerSecond: bitsPerSecond,
+  });
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  };
+  const stopped = new Promise<void>((resolve) => (recorder.onstop = () => resolve()));
+
+  let frame = 0;
+  const pump = () => {
+    draw();
+    if (video.currentTime - begin >= seconds || video.ended) {
+      video.pause();
+      if (recorder.state === "recording") recorder.stop();
+      return;
+    }
+    frame = requestAnimationFrame(pump);
+  };
+
+  video.muted = true;
+  recorder.start();
+  try {
+    await video.play();
+  } catch (error) {
+    recorder.stop();
+    throw error;
+  }
+  frame = requestAnimationFrame(pump);
+  await withTimeout(stopped, (seconds + 30) * 1000, "loop recording");
+  cancelAnimationFrame(frame);
+  return new Blob(chunks, { type: "video/mp4" });
 }
 
 function once(target: HTMLVideoElement, event: string): Promise<void> {

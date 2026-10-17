@@ -62,7 +62,34 @@ The trick is which key means what:
 So every surface that only knows `objectKey` shows the poster and needed no change: the grid
 image, the cover, the link preview, the wedding page, offline. **Forgetting about video somewhere
 degrades to a still image, never to a broken one.** The orphan sweep (`src/lib/reconcile.ts`) spares
-the MP4 because its stem belongs to a live row — no change there either (pinned by a test).
+the MP4 by its own column's stem: after a poster pick (below) the two no longer share one.
+
+## Choosing the poster, and the card's loop (2026-10-17)
+
+The upload takes its poster blindly at 25 % — on Pavel's first real film that was mid-crossfade.
+In the admin every video tile has **„Vybrat náhled“** (`src/components/admin/video-poster-picker.tsx`):
+four candidate frames (15/35/55/75 %), or any frame scrubbed to in the player, drawn by the browser.
+
+The same dialog records **a 4-second muted loop** from that frame (`recordLoop`, MediaRecorder →
+H.264 MP4, ≤ 1280 px, 3 Mbit/s, ~1.5 MB) that plays over the cover on the wedding page's card —
+a Live Photo, so the card says "video" before anyone opens it (`src/components/card-loop.tsx`).
+Not started under `prefers-reduced-motion` or Save-Data; the poster stays underneath as first paint
+and fallback. Chrome 126+ and Safari record MP4; Firefox cannot, and then there is no loop.
+
+- Every pick writes **new keys** — `<new uuid>.jpg`, its thumbnail, `<new uuid>.loop.mp4`
+  (`Photo.loopObjectKey`) — because objects are served `immutable`; the old ones are deleted by
+  `commitVideoPoster` (`src/app/admin/video-actions.ts`). The sweep treats `.loop.mp4` like a
+  thumbnail: alive exactly as long as its poster.
+- **Frames come from the MP4 itself.** Straight from the bucket that needs a CORS **GET** rule
+  (`docs/SETUP.md` §CORS allows only PUT); without it the video fails to load cross-origin and the
+  dialog asks for the same file from disk — nothing is uploaded again, only frames are taken.
+  Adding `"GET"` to `allowed.methods` makes the dialog work without the file.
+
+## Counting and leaving things out
+
+A guest reads "2 fotky · 1 video", never "1 fotka" for a film (`mediaCounts`, on the card and in
+the gallery header). A gallery with no stills hides what only a still can use: print marks,
+projection, offline saving.
 
 ## What does know about video
 

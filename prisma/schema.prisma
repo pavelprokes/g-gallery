@@ -347,10 +347,15 @@ model Photo {
   /// surface that only knows `objectKey` therefore shows the poster; the ones
   /// that play or hand out the file read this. `fileName`, `sizeBytes`,
   /// `crc32` and `mimeType` describe the MP4 — the thing a download delivers.
-  /// Derived from `objectKey` on the server, never client-supplied.
+  /// Derived from `objectKey` on the server, never client-supplied — at upload.
+  /// Choosing another poster later gives `objectKey` a new stem; this stays.
   videoObjectKey     String?
   /// A video's length, read in the browser at upload. Null on photos.
   durationMs         Int?
+  /// A few muted seconds of the video, `<poster stem>.loop.mp4`, that play on
+  /// the wedding page's card (docs/VIDEO.md). Null until the photographer
+  /// picks a poster in the admin, and whenever their browser could not record.
+  loopObjectKey      String?
   /// OWNER unless a guest uploaded it through a share link with allowUpload.
   source             PhotoSource @default(OWNER)
   /// Which viewer added it, for attribution and for the per-guest quota.

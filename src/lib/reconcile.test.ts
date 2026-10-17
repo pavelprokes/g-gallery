@@ -98,6 +98,19 @@ describe("selectOrphans", () => {
     expect(selectOrphans([mp4], empty, cutoff).orphans).toEqual([mp4]);
   });
 
+  it("keeps a re-postered video's MP4 by its own column, and the loop by the new poster", () => {
+    // After the admin's poster pick the row's `objectKey` is a new stem
+    // (B), while the MP4 stays on the upload's (A).
+    const reposted = liveIndex(
+      [{ objectKey: `${PREFIX}/${UUID_B}.jpg`, videoObjectKey: `${PREFIX}/${UUID_A}.mp4` }],
+      [{ storagePrefix: PREFIX }],
+    );
+    const mp4 = obj(`${PREFIX}/${UUID_A}.mp4`, 500, 300 * 1024 * 1024);
+    const loop = obj(`${PREFIX}/${UUID_B}.loop.mp4`, 500);
+    expect(selectOrphans([mp4, loop], reposted, cutoff).orphans).toEqual([]);
+    expect(selectOrphans([loop], empty, cutoff).orphans).toEqual([loop]);
+  });
+
   it("selects an old original whose row is gone", () => {
     const { orphans } = selectOrphans([obj(`${PREFIX}/${UUID_B}.jpg`, 48)], live, cutoff);
     expect(orphans.map((o) => o.key)).toEqual([`${PREFIX}/${UUID_B}.jpg`]);

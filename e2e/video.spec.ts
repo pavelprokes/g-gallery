@@ -13,7 +13,10 @@ import { test, expect } from "./fixtures";
  */
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   adminCookie: { name: string; value: string };
-  videoGalleries: Record<string, { galleryId: string; token: string; slug: string }>;
+  videoGalleries: Record<
+    string,
+    { galleryId: string; token: string; slug: string; weddingToken: string; weddingSlug: string }
+  >;
 };
 
 const CLIP = process.env.E2E_SAMPLE_VIDEO || path.join(__dirname, "media/svatba_0002_tanec.mp4");
@@ -75,6 +78,8 @@ test.describe("upload and playback", () => {
       name: new RegExp(`Přehrát video ${CLIP_NAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     });
     await expect(tile).toBeVisible();
+    // Counted apart: a film is not "a photo" (docs/VIDEO.md).
+    await expect(page.getByText(/2 fotky · 1 video/)).toBeVisible();
     // Placed by its file name between svatba_0001 and svatba_0003 (docs/PHOTO-ORDER.md).
     const order = await page
       .getByRole("button", { name: /^(Otevřít|Přehrát video) / })
@@ -127,5 +132,48 @@ test.describe("upload and playback", () => {
     expect(payload.entries).toHaveLength(1);
     expect(payload.entries[0]!.key).toBe(item!.video!.key);
     expect(payload.entries[0]!.name).toBe(CLIP_NAME);
+  });
+
+  test("the photographer picks another poster, and the wedding page's card loops the film", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    const { galleryId, token, weddingToken, weddingSlug } = galleryFor(test.info().project.name);
+    const posterKey = async () => {
+      const photos = (await (await request.get(`/api/g/${token}/photos`)).json()) as {
+        items: { objectKey: string; video: { key: string } | null }[];
+      };
+      return photos.items.find((photo) => photo.video)!.objectKey;
+    };
+    const before = await posterKey();
+
+    await page.goto(`/admin/g/${galleryId}`);
+    await page.getByRole("button", { name: "Vybrat náhled" }).click();
+    const dialog = page.getByRole("dialog", { name: /Náhled videa/ });
+    const candidates = dialog.getByRole("button", { name: /^Snímek v / });
+    await expect(candidates).toHaveCount(4, { timeout: 30_000 });
+    await candidates.nth(2).click();
+    await expect(candidates.nth(2)).toHaveAttribute("aria-pressed", "true");
+
+    // Recorded only where MediaRecorder writes MP4; elsewhere the box says so.
+    const loopBox = dialog.getByRole("checkbox", { name: /Živá smyčka/ });
+    const withLoop = await loopBox.isEnabled();
+
+    await dialog.getByRole("button", { name: "Použít tento snímek" }).click();
+    await expect(dialog).toBeHidden({ timeout: 60_000 });
+    const after = await posterKey();
+    expect(after).not.toBe(before);
+    expect(after).toMatch(/\.jpg$/);
+
+    await page.goto(`/s/${weddingToken}/${weddingSlug}`);
+    await expect(page.getByText(/2 fotky · 1 video/)).toBeVisible();
+    if (withLoop) {
+      const loop = page.locator('video[src$=".loop.mp4"]');
+      await expect(loop).toHaveCount(1);
+      await expect
+        .poll(() => loop.evaluate((el: HTMLVideoElement) => el.currentTime), { timeout: 15_000 })
+        .toBeGreaterThan(0);
+    }
   });
 });
