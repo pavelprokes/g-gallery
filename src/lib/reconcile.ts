@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { deleteObject, listObjects, type StoredObject } from "@/lib/r2";
-import { isThumbKey } from "@/lib/thumbnail";
+import { isThumbKey, objectStem } from "@/lib/thumbnail";
 
 // Presigned-PUT flows can leave two kinds of debris (docs/PLAN.md §5):
 //   - ghost rows: a Photo row was created, the upload never confirmed
@@ -28,19 +28,21 @@ export async function reconcileGhostUploads(olderThanMs = GHOST_AGE_MS): Promise
 
   const ghosts = await prisma.photo.findMany({
     where: { status: "PENDING", createdAt: { lt: cutoff } },
-    select: { id: true, objectKey: true },
+    select: { id: true, objectKey: true, videoObjectKey: true },
   });
 
   const failures: string[] = [];
   let objectsDeleted = 0;
 
-  for (const ghost of ghosts) {
-    if (!ghost.objectKey) continue;
+  // An abandoned video's MP4 can be gigabytes that landed before its poster
+  // or confirm failed — it goes with the row, not whenever the sweep gets to it.
+  for (const key of ghosts.flatMap((ghost) => [ghost.objectKey, ghost.videoObjectKey])) {
+    if (!key) continue;
     try {
-      await deleteObject(ghost.objectKey);
+      await deleteObject(key);
       objectsDeleted += 1;
     } catch (error) {
-      failures.push(`${ghost.objectKey}: ${(error as Error).message}`);
+      failures.push(`${key}: ${(error as Error).message}`);
     }
   }
 
@@ -273,10 +275,7 @@ export function liveIndex(
   const photoStems = new Set<string>();
   for (const photo of photos) {
     if (!photo.objectKey) continue;
-    const dot = photo.objectKey.lastIndexOf(".");
-    photoStems.add(
-      dot > photo.objectKey.lastIndexOf("/") ? photo.objectKey.slice(0, dot) : photo.objectKey,
-    );
+    photoStems.add(objectStem(photo.objectKey));
   }
 
   const galleryPrefixes = new Set<string>();

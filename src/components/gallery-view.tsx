@@ -759,6 +759,8 @@ function LightboxPhoto({
 
 interface LightboxVideoProps {
   video: GalleryVideo;
+  /** The share link's download switch — the native controls offer one too. */
+  allowDownload: boolean;
   /** The poster at lightbox size — the row's `objectKey` through the loader. */
   poster: string;
   onSwipe: (delta: 1 | -1) => void;
@@ -782,7 +784,7 @@ const VIDEO_CONTROLS_PX = 64;
  * on, and autoplay with sound is refused by Safari anyway. `preload="none"`
  * spends no bytes until the viewer asks; the poster stands in until then.
  */
-function LightboxVideo({ video, poster, onSwipe }: LightboxVideoProps) {
+function LightboxVideo({ video, allowDownload, poster, onSwipe }: LightboxVideoProps) {
   const t = useTranslations("gallery");
   const src = videoSrc(video.key);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -823,6 +825,10 @@ function LightboxVideo({ video, poster, onSwipe }: LightboxVideoProps) {
               src={src}
               poster={poster}
               controls
+              // Chrome's control bar has its own Download item; a link with
+              // downloads off must not hand out the original there either.
+              controlsList={allowDownload ? undefined : "nodownload"}
+              onContextMenu={allowDownload ? undefined : (event) => event.preventDefault()}
               playsInline
               preload="none"
               onPlay={() => setStarted(true)}
@@ -2456,7 +2462,12 @@ function GalleryViewInner({
     ];
 
     const links = neighbours
-      .filter((photo): photo is GalleryPhoto => photo !== undefined && photo.id !== active?.id)
+      // A video neighbour's poster is requested at one fixed width, not from
+      // this srcset — warming it would be a second billed variant for nothing.
+      .filter(
+        (photo): photo is GalleryPhoto =>
+          photo !== undefined && photo.id !== active?.id && !photo.video,
+      )
       .map((photo) => {
         const link = document.createElement("link");
         link.rel = "preload";
@@ -2941,6 +2952,7 @@ function GalleryViewInner({
             <LightboxVideo
               key={active.id}
               video={active.video}
+              allowDownload={allowDownload}
               poster={imageLoader({
                 src: srcFor(active.objectKey, imageGrant),
                 width: 1920,

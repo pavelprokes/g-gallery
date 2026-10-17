@@ -51,6 +51,7 @@ export class UploadRejection extends Error {
       | "unauthorized"
       | "rate_limited"
       | "size_mismatch"
+      | "poster_missing"
       | "network",
     readonly detail: {
       reason?: string;
@@ -146,7 +147,8 @@ async function rejectionFrom(response: Response): Promise<UploadRejection> {
     code === "upload_denied" ||
     code === "unauthorized" ||
     code === "rate_limited" ||
-    code === "size_mismatch"
+    code === "size_mismatch" ||
+    code === "poster_missing"
   ) {
     return new UploadRejection(code, { ...body, status: response.status });
   }
@@ -287,24 +289,36 @@ async function uploadOne(
   if (signal?.aborted) throw abortError();
 
   let lastError: unknown;
+  // What already landed, so a retry resends only what is missing. A failed
+  // confirm used to send the whole file again — harmless for a 12 MB photo,
+  // gigabytes and many minutes for a film. Only `size_mismatch` (a truncated
+  // object) clears `etag` and forces the bytes up again.
+  let posterStored = false;
+  let etag: string | null | undefined;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (signal?.aborted) throw abortError();
     try {
-      // A retry starts the file from zero; the overall bar must not count the
-      // failed attempt's bytes twice.
-      onBytes(0);
-      const etag = await putWithProgress(target.url, target.headers, body, signal, onBytes);
-
       // Required, unlike the thumbnail below: the poster is the row's
       // `objectKey`, what every image surface shows, and confirm refuses a
-      // video without one. A failure here is retried with the rest.
-      if (video && target.posterTarget) {
+      // video without one. Sent *before* the MP4: it is small, and its
+      // 15-minute signature would be long expired after a multi-GB PUT.
+      if (video && target.posterTarget && !posterStored) {
         const posterPut = await fetch(target.posterTarget.url, {
           method: "PUT",
           headers: target.posterTarget.headers,
           body: video.poster,
+          signal,
         });
+        if (posterPut.status === 403) throw new SignatureExpired();
         if (!posterPut.ok) throw new Error(`poster PUT failed (${posterPut.status})`);
+        posterStored = true;
+      }
+
+      if (etag === undefined) {
+        // A retry starts the file from zero; the overall bar must not count
+        // the failed attempt's bytes twice.
+        onBytes(0);
+        etag = await putWithProgress(target.url, target.headers, body, signal, onBytes);
       }
 
       // Best-effort and deliberately after the original: the photo is what
@@ -348,7 +362,13 @@ async function uploadOne(
           durationMs: video?.durationMs,
         }),
       });
-      if (!confirm.ok) throw await rejectionFrom(confirm);
+      if (!confirm.ok) {
+        const rejection = await rejectionFrom(confirm);
+        // The stored object is short — that is the one case the bytes go again.
+        if (rejection.code === "size_mismatch") etag = undefined;
+        if (rejection.code === "poster_missing") posterStored = false;
+        throw rejection;
+      }
       return;
     } catch (error) {
       lastError = error;

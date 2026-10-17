@@ -30,8 +30,9 @@ Shown to the photographer at the upload spot in the admin (`src/components/uploa
   Read from the `avc1` sample entry before anything is signed, and again from the decoded frame.
   1080p at 8–10 Mbit/s (~200 MB for 3 minutes) is recommended — it starts faster on a phone in a
   venue; 4K at 35–45 Mbit/s is ~900 MB for 3 minutes and is fine.
-- File size is not a policy. The only ceiling is technical: **4.9 GB** (`VIDEO_MAX_BYTES`), because
-  the upload is one presigned PUT and R2 takes at most 4.995 GiB in one. Past Cloudflare's 512 MB
+- File size is not a policy. The only ceiling is technical: **2 GiB** (`VIDEO_MAX_BYTES`), because
+  `Photo.sizeBytes` is a Postgres `int4` — about 6 minutes of 4K at 45 Mbit/s, 30 of 1080p.
+  Widening it to BigInt would lift this to R2's 4.995 GiB single-PUT limit. Past Cloudflare's 512 MB
   cache limit a film still plays — served from R2 range by range, egress-free — it is just not
   held at the edge.
 - **No location metadata** (invariant 2). A photo's GPS is stripped in place; a video is refused

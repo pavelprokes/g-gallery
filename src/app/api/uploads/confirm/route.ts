@@ -163,9 +163,9 @@ export async function POST(request: Request) {
     );
   }
   if (photo.videoObjectKey && !poster) {
-    // Same retryable shape as a truncated PUT: the client sends the poster
-    // again on its next attempt.
-    return NextResponse.json({ error: "size_mismatch", poster: "missing" }, { status: 409 });
+    // Retryable, and distinct from `size_mismatch`: the client sends the
+    // poster again, not the (possibly multi-GB) MP4 that did arrive.
+    return NextResponse.json({ error: "poster_missing" }, { status: 409 });
   }
 
   // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.

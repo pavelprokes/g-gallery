@@ -123,9 +123,17 @@ const THUMB_EXTENSIONS: Record<ThumbFormat, string> = {
  * prefix.
  */
 export function thumbKeyFor(objectKey: string, format: ThumbFormat): string {
+  return `${objectStem(objectKey)}${THUMB_EXTENSIONS[format]}`;
+}
+
+/**
+ * A key without its extension — what an original, its thumbnail and a video's
+ * MP4 share. The one definition: the orphan sweep keeps a derived object
+ * alive only because every writer and `liveIndex` agree on it.
+ */
+export function objectStem(objectKey: string): string {
   const dot = objectKey.lastIndexOf(".");
-  const stem = dot > objectKey.lastIndexOf("/") ? objectKey.slice(0, dot) : objectKey;
-  return `${stem}${THUMB_EXTENSIONS[format]}`;
+  return dot > objectKey.lastIndexOf("/") ? objectKey.slice(0, dot) : objectKey;
 }
 
 /** True for keys `thumbKeyFor` produced — the loader serves these untransformed. */

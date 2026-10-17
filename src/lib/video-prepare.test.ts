@@ -30,8 +30,11 @@ describe("problemIn", () => {
     );
   });
 
-  it("leaves an unreadable header to the decoder", () => {
-    expect(problemIn(null)).toBeNull();
+  it("refuses a file whose header cannot be read — no location check, no upload", () => {
+    expect(problemIn(null)).toBe("video_unreadable");
+  });
+
+  it("leaves a readable header with no recognised video track to the decoder", () => {
     expect(
       problemIn({ ...clean, videoCodec: null, videoWidth: null, videoHeight: null }),
     ).toBeNull();

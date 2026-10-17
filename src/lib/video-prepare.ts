@@ -28,7 +28,8 @@ export interface PreparedVideo {
 }
 
 /** Why a picked MP4 cannot go up — each one has its own sentence in the uploader. */
-export type VideoProblem = "video_location" | "video_codec" | "video_resolution";
+export type VideoProblem =
+  "video_location" | "video_codec" | "video_resolution" | "video_unreadable";
 
 export class VideoNotUsable extends Error {
   constructor(readonly reason: VideoProblem) {
@@ -59,16 +60,19 @@ export async function videoProblem(file: File): Promise<VideoProblem | null> {
 
 /** Pure, for tests: the verdict on what the header says. */
 export function problemIn(facts: Mp4Facts | null): VideoProblem | null {
+  // Fail closed: without a readable `moov` there is no telling whether the
+  // file carries a location, and invariant 2 does not allow guessing.
+  if (!facts) return "video_unreadable";
   // Invariant 2: no location leaves the browser. A photo's GPS is stripped in
   // place; a video is refused instead — an export from an editor never has
   // it, a clip off a phone does, and re-exporting is the honest fix.
-  if (facts?.hasLocation) return "video_location";
+  if (facts.hasLocation) return "video_location";
   // Only H.264 plays everywhere. Checked on the file, not by whether *this*
   // browser decodes it: Safari decodes HEVC and would let through a video
   // that Chrome on Windows then cannot play.
-  if (facts && facts.videoCodec !== null && !isH264(facts.videoCodec)) return "video_codec";
+  if (facts.videoCodec !== null && !isH264(facts.videoCodec)) return "video_codec";
   // The limit is resolution, not file size (src/lib/video.ts).
-  if (facts?.videoWidth && facts.videoHeight) {
+  if (facts.videoWidth && facts.videoHeight) {
     if (!withinVideoResolution(facts.videoWidth, facts.videoHeight)) return "video_resolution";
   }
   return null;
@@ -125,9 +129,11 @@ async function posterFrame(
     video.currentTime = Math.min(video.duration * POSTER_AT, Math.max(0, video.duration - 0.1));
     await withTimeout(once(video, "seeked"), FRAME_TIMEOUT_MS, "video seek");
     // HAVE_CURRENT_DATA: a frame is there to draw. Some engines report the
-    // seek before decoding it.
+    // seek before decoding it. `canplay`, not `loadeddata`: that one fires
+    // once per load and may already be behind us; `canplay` fires again
+    // whenever data arrives after a seek.
     if (video.readyState < 2) {
-      await withTimeout(once(video, "loadeddata"), FRAME_TIMEOUT_MS, "video frame");
+      await withTimeout(once(video, "canplay"), FRAME_TIMEOUT_MS, "video frame");
     }
 
     const scale = Math.min(1, POSTER_MAX_PX / Math.max(video.videoWidth, video.videoHeight));

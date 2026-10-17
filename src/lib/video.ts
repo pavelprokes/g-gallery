@@ -8,9 +8,10 @@
  * Forgetting about video somewhere degrades to a still image, never to a
  * broken one. What has to know is listed in docs/VIDEO.md and reads from here.
  *
- * Pure and dependency-free: imported by Route Handlers, the uploader and the
- * gallery view alike.
+ * Pure: imported by Route Handlers, the uploader and the gallery view alike.
  */
+
+import { objectStem } from "@/lib/thumbnail";
 
 /**
  * The limit is resolution, not size (Pavel, 2026-10-17): a long film at a
@@ -22,12 +23,16 @@
 export const VIDEO_MAX_LONG_EDGE_PX = 4096;
 
 /**
- * Not a policy, a ceiling: R2 takes at most 4.995 GiB in one PUT, and the
- * upload is one presigned PUT. Past Cloudflare's 512 MB cache limit a video
- * still plays — it is served from R2 range by range, egress-free — it is just
- * not held at the edge.
+ * Not a policy, a ceiling: `Photo.sizeBytes` is a Postgres `int4`, so 2 GiB
+ * minus one byte is the most a row can record — about 6 minutes of 4K at
+ * 45 Mbit/s, 30 of 1080p at 9. Past Cloudflare's 512 MB cache limit a video
+ * still plays (served from R2 range by range, egress-free), it is just not
+ * held at the edge.
+ *
+ * ponytail: int4 ceiling; widening `sizeBytes` to BigInt lifts it to R2's
+ * 4.995 GiB single-PUT limit, at the cost of every reader handling a bigint.
  */
-export const VIDEO_MAX_BYTES = Math.floor(4.9 * 1024 ** 3);
+export const VIDEO_MAX_BYTES = 2 ** 31 - 1;
 
 /** How long the MP4's presigned PUT stays valid — six hours, against R2's seven-day maximum. */
 export const VIDEO_PUT_EXPIRY_SECONDS = 6 * 60 * 60;
@@ -41,11 +46,6 @@ export function withinVideoResolution(width: number, height: number): boolean {
 export const POSTER_CONTENT_TYPE = "image/jpeg";
 export const POSTER_EXTENSION = ".jpg";
 
-function stemOf(objectKey: string): string {
-  const dot = objectKey.lastIndexOf(".");
-  return dot > objectKey.lastIndexOf("/") ? objectKey.slice(0, dot) : objectKey;
-}
-
 /**
  * The MP4 beside a poster. Derived on the server, never accepted from the
  * client — a client-named key is a client-chosen write location — and on the
@@ -53,7 +53,7 @@ function stemOf(objectKey: string): string {
  * sweep (src/lib/reconcile.ts spares every key whose stem a live row owns).
  */
 export function videoKeyFor(posterKey: string): string {
-  return `${stemOf(posterKey)}.mp4`;
+  return `${objectStem(posterKey)}.mp4`;
 }
 
 /**

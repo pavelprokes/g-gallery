@@ -338,8 +338,8 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               <dd>AAC, 48 kHz, stereo, 192–320 kbit/s</dd>
               <dt className="font-medium">Limit</dt>
               <dd>
-                Rozlišení do 4K, velikost souboru neomezujeme (technický strop jednoho nahrání je
-                4,9 GB). Bez metadat o poloze.
+                Rozlišení do 4K. Velikost souboru hlídá jen technický strop 2 GB (≈ 6 min 4K při 45
+                Mbit/s, 30 min 1080p). Bez metadat o poloze.
               </dd>
               <dt className="font-medium">Resolve</dt>
               <dd>
@@ -494,7 +494,9 @@ function unsupportedReason(reason: string | undefined): string {
     case "video_codec":
       return "video musí být H.264 — tohle je jiný kodek (nejspíš HEVC z telefonu), řada prohlížečů by ho nepřehrála. Exportuj ho znovu jako H.264.";
     case "video_too_large":
-      return "video je větší než 4,9 GB — víc úložiště jedním nahráním nepřijme. Exportuj ho s nižším datovým tokem.";
+      return "video je větší než 2 GB — to je technický strop jednoho souboru. Exportuj ho s nižším datovým tokem (4K kolem 35 Mbit/s, 1080p 8–10).";
+    case "video_unreadable":
+      return "soubor se nedá přečíst jako MP4. Exportuj ho znovu jako MP4 (H.264).";
     case "video_resolution":
       return "video má vyšší rozlišení než 4K. Exportuj ho nejvýš ve 4K (4096 px na delší straně), ideálně v 1080p.";
     case "video_location":
