@@ -44,7 +44,7 @@ import {
 import { weaveTimes } from "@/lib/woven-order";
 import { buildGridEntries, groupByChapter } from "@/lib/gallery-grid";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { PageHeader } from "@/components/ui/page-header";
@@ -423,6 +423,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         subtitle={`${GALLERY_STATUS[gallery.status].label} · ${pluralize(gallery.photos.length, FORMS.photo)}`}
         actions={
           <>
+            {/* docs/SOCIAL-VIDEO.md — a Reel or a gift from this gallery's photos. */}
+            <a href={`/admin/g/${gallery.id}/video`} className={buttonClasses("secondary", "md")}>
+              Video pro sítě
+            </a>
             <GallerySettings
               galleryId={gallery.id}
               title={gallery.title}

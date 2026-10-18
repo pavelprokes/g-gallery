@@ -1,0 +1,94 @@
+import { notFound, redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { getAdminSession } from "@/lib/auth-guard";
+import { compareTimeline } from "@/lib/gallery-chapters";
+import { HIGHLIGHT_CANDIDATE_SELECT, toHighlightCandidate } from "@/lib/gallery-highlights";
+import { CHAPTER_START_SELECT, chapterStartOf, positionOf } from "@/lib/photo-order";
+import { currentFaces } from "@/lib/social-video/faces";
+import { galleryVideoCrumbs } from "@/lib/admin-breadcrumbs";
+import { SocialVideoStudio, type StudioPhoto } from "@/components/admin/social-video-studio";
+import { Alert } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * A short silent video from the gallery, for Reels and Stories or as the
+ * couple's gift (docs/SOCIAL-VIDEO.md). Everything heavy — fetching, faces,
+ * frames, encoding — happens in the photographer's browser; this page only
+ * hands it the photos.
+ */
+export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/video">) {
+  const session = await getAdminSession();
+  if (!session) redirect("/sign-in?next=/admin");
+
+  const { id } = await props.params;
+  const gallery = await prisma.gallery.findFirst({
+    where: { id, ownerId: session.user.id },
+    select: {
+      id: true,
+      title: true,
+      photoOrder: true,
+      event: { select: { id: true, title: true } },
+      chapters: { select: CHAPTER_START_SELECT },
+      photos: {
+        // Stills with a known size: the camera is planned in the photo's own
+        // pixels before it is fetched. Films are not slides.
+        where: {
+          status: "CONFIRMED",
+          videoObjectKey: null,
+          width: { not: null },
+          height: { not: null },
+        },
+        select: {
+          ...HIGHLIGHT_CANDIDATE_SELECT,
+          objectKey: true,
+          thumbObjectKey: true,
+          fileName: true,
+          width: true,
+          height: true,
+          placeholder: true,
+          faces: true,
+        },
+      },
+    },
+  });
+  if (!gallery) notFound();
+
+  const order = gallery.photoOrder;
+  const photos: StudioPhoto[] = gallery.photos
+    .toSorted((a, b) => compareTimeline(positionOf(order, a), positionOf(order, b)))
+    .map((photo) => ({
+      id: photo.id,
+      objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
+      fileName: photo.fileName,
+      placeholder: photo.placeholder,
+      candidate: {
+        ...toHighlightCandidate(order, photo),
+        width: photo.width,
+        height: photo.height,
+        faces: currentFaces(photo.faces),
+      },
+    }));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Video pro sítě"
+        crumbs={galleryVideoCrumbs(gallery)}
+        subtitle="Krátké video bez zvuku a titulků — na výšku pro Reels a Stories, na šířku pro web."
+      />
+      {photos.length < 2 ? (
+        <Alert>Na video jsou potřeba aspoň dvě fotky. Nahraj je v detailu galerie.</Alert>
+      ) : (
+        <SocialVideoStudio
+          galleryId={gallery.id}
+          galleryTitle={gallery.title}
+          photos={photos}
+          chapterStarts={gallery.chapters.map((chapter) => chapterStartOf(order, chapter))}
+        />
+      )}
+    </div>
+  );
+}

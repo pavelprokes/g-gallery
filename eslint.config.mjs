@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // MediaPipe's WASM loaders, copied from node_modules on install
+    // (scripts/copy-mediapipe.mjs) — vendor code, not ours to lint.
+    "public/vendor/**",
   ]),
 ]);
 

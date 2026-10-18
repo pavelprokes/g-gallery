@@ -1,6 +1,6 @@
 # Social videos — short silent clips made from a gallery
 
-Proposed 2026-10-18, **not built yet** — the build plan is §10. The authority for the feature once it is: read before
+Proposed and built 2026-10-18 (§10 records how). The authority for the feature: read before
 touching face data on `Photo`, the admin "Video" page, or anything that renders frames in the
 browser. Sources are listed at the end; the numbers in §4–§6 come from a spike run
 on 2026-10-17 (§7).
@@ -35,15 +35,20 @@ as here.
 
 ## 2. The flow
 
-1. Admin → gallery → **Video**. Choose 9:16 or 16:9, 15 or 30 s.
-2. The page proposes 6–7 (15 s) or 12–13 (30 s) photos (§3). The photographer reorders, removes or
-   adds any photo of the gallery.
+1. Admin → gallery → **Video pro sítě** (`/admin/g/[id]/video`). Choose 9:16 or 16:9, 15 or 30 s.
+2. The page proposes 6 (15 s) or 12 (30 s) photos (§3). The photographer reorders them — dragging
+   (a finger by the ⠿ handle, so the page still scrolls) or the arrow keys
+   (`src/components/admin/sortable-list.tsx`) — removes, or adds any photo of the gallery. The
+   selection is a draft per gallery in `localStorage`, so a reload keeps it; nothing is stored on
+   the server until a video is added to the gallery.
 3. Faces are detected for the picked photos that have none stored yet (§4), and saved.
 4. A live preview plays, driven by `requestAnimationFrame` through **the same frame function** the
    encoder uses, so the preview is the output.
 5. **Render** encodes frame by frame (§6) and offers the MP4 to download. **Add to gallery** uploads
-   it through the existing owner video path (browser → presigned PUT to R2, `docs/VIDEO.md`), with
-   a poster taken from its first frame.
+   it through the existing owner video path (`runUploads`, browser → presigned PUT to R2,
+   `docs/VIDEO.md`), poster and loop included. Only an H.264 render can be added — the gallery
+   takes no other codec; a browser that encodes only VP9 (Firefox, Playwright's Chromium) offers
+   the download and says why the button is missing.
 
 The tab must stay open while it renders. That is the trade for a feature with no server.
 
@@ -64,10 +69,15 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 ### Detection
 
 [MediaPipe Tasks Vision](https://developers.google.com/edge/mediapipe/solutions/vision/face_detector)
-(Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on a
-1600 px transform of each picked photo — never at guest upload (the WASM bundle is ~13.5 MB, too much
-for wedding-day mobile data). The model and WASM are **self-hosted** in `public/`, so the admin
-makes no request to Google.
+(Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on the
+photo already fetched for the render (`sourceWidth`, §5) — never at guest upload (the WASM bundle
+is ~13.5 MB, too much for wedding-day mobile data). Detecting on the render's own copy costs no
+second download and no second billed transformation; the size hardly matters to the result, since
+BlazeFace scales every tile down to 128 px. The model and WASM are **self-hosted**, so the admin makes no request to
+Google: the WASM is copied from the pinned package on install (`scripts/copy-mediapipe.mjs`, served
+immutable under its version), the two models are committed in `public/vendor/mediapipe/models/`.
+`src/lib/social-video/detect.ts` runs it on the main thread, a photo at a time with a yield between
+them (~0.2 s each); a worker is the next step if that shows (§9.5).
 
 The short-range model is tuned for selfies. In the spike it found **no face below ~12 % of the photo
 height**: every large group and most full-length portraits came back empty (28 of 45 photos with a
@@ -229,6 +239,11 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
    runs.
 
 ## 10. Build plan (2026-10-18)
+
+Built the same day: PR 1 as #62, PRs 2 and 3 together as #63. Where the build departed from the
+plan below, the sections above say what was built — detection runs on the main thread on the
+render's own copy of the photo (§4), not in a worker on a 1600 px transform; the suggestion has no
+seeded randomness (§5 step 9). The plan is kept as written.
 
 Three pull requests, each mergeable on its own; nothing a guest sees changes until the third.
 The order follows what can be tested without the open items in §9: the pure parts first, the
