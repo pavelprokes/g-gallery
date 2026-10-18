@@ -270,11 +270,16 @@ async function main() {
     "mobile-safari": await makeVideoGallery(user.id, "mobile-safari"),
   };
 
+  // docs/SOCIAL-VIDEO.md: the spec uploads real photos through the admin and
+  // renders a video from them — an empty gallery of its own.
+  const socialVideoGalleryId = await makeSocialVideoGallery(user.id);
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
       adminCookie,
       videoGalleries,
+      socialVideoGalleryId,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -834,6 +839,19 @@ async function makeSelectGallery(ownerId: string) {
  * video spec fills it through the admin uploader. Two seeded photos around
  * where the video lands, so the lightbox has neighbours to swipe to.
  */
+async function makeSocialVideoGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Video pro sítě",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-social-video-${Date.now()}`,
+    },
+  });
+  return gallery.id;
+}
+
 async function makeVideoGallery(ownerId: string, project: string) {
   const gallery = await prisma.gallery.create({
     data: {

@@ -35,15 +35,20 @@ as here.
 
 ## 2. The flow
 
-1. Admin → gallery → **Video**. Choose 9:16 or 16:9, 15 or 30 s.
-2. The page proposes 6–7 (15 s) or 12–13 (30 s) photos (§3). The photographer reorders, removes or
-   adds any photo of the gallery.
+1. Admin → gallery → **Video pro sítě** (`/admin/g/[id]/video`). Choose 9:16 or 16:9, 15 or 30 s.
+2. The page proposes 6 (15 s) or 12 (30 s) photos (§3). The photographer reorders them — dragging
+   (a finger by the ⠿ handle, so the page still scrolls) or the arrow keys
+   (`src/components/admin/sortable-list.tsx`) — removes, or adds any photo of the gallery. The
+   selection is a draft per gallery in `localStorage`, so a reload keeps it; nothing is stored on
+   the server until a video is added to the gallery.
 3. Faces are detected for the picked photos that have none stored yet (§4), and saved.
 4. A live preview plays, driven by `requestAnimationFrame` through **the same frame function** the
    encoder uses, so the preview is the output.
 5. **Render** encodes frame by frame (§6) and offers the MP4 to download. **Add to gallery** uploads
-   it through the existing owner video path (browser → presigned PUT to R2, `docs/VIDEO.md`), with
-   a poster taken from its first frame.
+   it through the existing owner video path (`runUploads`, browser → presigned PUT to R2,
+   `docs/VIDEO.md`), poster and loop included. Only an H.264 render can be added — the gallery
+   takes no other codec; a browser that encodes only VP9 (Firefox, Playwright's Chromium) offers
+   the download and says why the button is missing.
 
 The tab must stay open while it renders. That is the trade for a feature with no server.
 
@@ -65,10 +70,10 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 
 [MediaPipe Tasks Vision](https://developers.google.com/edge/mediapipe/solutions/vision/face_detector)
 (Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on the
-1080 px variant of each picked photo — never at guest upload (the WASM bundle is ~13.5 MB, too much
-for wedding-day mobile data). 1080 is a width the lightbox already uses (`src/lib/image-sizes.ts`),
-so detection bills no new transformation; it loses nothing either, since BlazeFace scales every
-tile down to 128 px. The model and WASM are **self-hosted**, so the admin makes no request to
+photo already fetched for the render (`sourceWidth`, §5) — never at guest upload (the WASM bundle
+is ~13.5 MB, too much for wedding-day mobile data). Detecting on the render's own copy costs no
+second download and no second billed transformation; the size hardly matters to the result, since
+BlazeFace scales every tile down to 128 px. The model and WASM are **self-hosted**, so the admin makes no request to
 Google: the WASM is copied from the pinned package on install (`scripts/copy-mediapipe.mjs`, served
 immutable under its version), the two models are committed in `public/vendor/mediapipe/models/`.
 `src/lib/social-video/detect.ts` runs it on the main thread, a photo at a time with a yield between

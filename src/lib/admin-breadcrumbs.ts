@@ -56,3 +56,8 @@ export function eventSignCrumbs(event: EventRef): Crumb[] {
 export function gallerySignCrumbs(gallery: GalleryRef): Crumb[] {
   return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Cedulka k tisku");
 }
+
+/** Přehled / [{wedding}] / {gallery} / Video pro sítě */
+export function galleryVideoCrumbs(gallery: GalleryRef): Crumb[] {
+  return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Video pro sítě");
+}

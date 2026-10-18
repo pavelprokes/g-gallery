@@ -21,6 +21,9 @@ orders or pages photos, `fileOrderKey` (a database trigger maintains it), or cha
 **`docs/VIDEO.md`** is the authority for the photographer's videos (MP4 straight from R2, no
 transcoding, adopted 2026-10-17) — read it before touching `videoObjectKey`, anything that picks
 the key a download delivers, or the lightbox player. On a video row `objectKey` is the _poster_.
+**`docs/SOCIAL-VIDEO.md`** is the authority for the social videos made from a gallery (built
+2026-10-18) — read it before touching `src/lib/social-video/*`, `Photo.faces`, the admin's
+`/admin/g/[id]/video`, or the self-hosted MediaPipe under `public/vendor/mediapipe/`.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
