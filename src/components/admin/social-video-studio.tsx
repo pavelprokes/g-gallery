@@ -205,7 +205,9 @@ export function SocialVideoStudio({
   // ---- Photos in memory: one store per format (the fetch size differs) ----
   // Closing only clears the store's caches, so a store React reuses after a
   // dev-mode remount still works — it fetches again.
-  const images = useMemo(() => new SlideImages(format), [format]);
+  // A new store per format: its photos are fetched at the format's size.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `format` is the key, not an input
+  const images = useMemo(() => new SlideImages(), [format]);
   useEffect(() => () => images.close(), [images]);
 
   const planWith = useCallback(
@@ -217,10 +219,7 @@ export function SocialVideoStudio({
         width: p.width,
         height: p.height,
         shot: shots[i]!,
-        backdrop:
-          shots[i]!.kind === "fit"
-            ? (store.backdropOf(p.id, p.width, p.height) ?? undefined)
-            : undefined,
+        backdrop: shots[i]!.kind === "fit" ? (store.backdropOf(p.id) ?? undefined) : undefined,
       })),
     }),
     [format, timeline, slidePhotos, shots],

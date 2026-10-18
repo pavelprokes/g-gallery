@@ -27,9 +27,9 @@ export interface FrameSlide {
   width: number;
   height: number;
   shot: Shot;
-  /** For a `fit` shot: the photo cropped to fill the frame, blurred and
-   * darkened (`makeBackdrop`), drawn under the whole photo. */
-  backdrop?: CanvasImageSource;
+  /** For a `fit` shot: the colour around the whole photo — dark and muted,
+   * taken from the photo (`backdropColor`). Black without it. */
+  backdrop?: string;
 }
 
 export interface FramePlan {
@@ -72,40 +72,75 @@ function drawSlide(
     ctx.drawImage(image, cam.x * s, cam.y * s, cam.w * s, cam.h * s, 0, 0, W, H);
     return;
   }
-  if (slide.backdrop) ctx.drawImage(slide.backdrop, 0, 0, W, H);
+  // The frame is already black; a colour of the photo, when there is one,
+  // fades in and out with the slide.
+  if (slide.backdrop) {
+    ctx.fillStyle = slide.backdrop;
+    ctx.fillRect(0, 0, W, H);
+  }
   const scale = Math.min(W / slide.width, H / slide.height) * (1 + FIT_DRIFT * ease(progress));
   const w = slide.width * scale;
   const h = slide.height * scale;
   ctx.drawImage(image, (W - w) / 2, (H - h) / 2, w, h);
 }
 
-/** Where a `fit` slide's backdrop is drawn — the caller's canvas (a DOM canvas
- * in the page, an OffscreenCanvas in a worker). */
-export interface BackdropCanvas {
-  width: number;
-  height: number;
-  getContext(kind: "2d"): (FrameContext & { filter: string }) | null;
+/** The average colour of RGBA pixels, 0–255 per channel. */
+export function averageColor(rgba: ArrayLike<number>): [number, number, number] {
+  const sum = [0, 0, 0];
+  const n = Math.floor(rgba.length / 4);
+  for (let i = 0; i < n; i++) {
+    sum[0]! += rgba[i * 4]!;
+    sum[1]! += rgba[i * 4 + 1]!;
+    sum[2]! += rgba[i * 4 + 2]!;
+  }
+  return n > 0 ? [sum[0]! / n, sum[1]! / n, sum[2]! / n] : [0, 0, 0];
 }
 
+/** The most colour and light a backdrop keeps: a hint of the photo's tone,
+ * never a colour that competes with the photo itself. */
+const BACKDROP_MAX_SATURATION = 0.15;
+const BACKDROP_LIGHTNESS = { min: 0.06, max: 0.16 };
+
 /**
- * The photo cropped to fill `canvas`, blurred and darkened, drawn once per
- * slide: a CSS blur this size on every frame would halve the render's speed.
- * Pass a small canvas (a quarter of the frame): the blur is cheaper there, and
- * scaled up to the frame it only gets softer, which it is meant to be.
+ * The colour behind a photo shown whole: its average, nearly grey and dark.
+ * A blurred copy of the photo did this before — but Safari's canvas ignores
+ * `filter`, so there the copy came out sharp and bright, and the photo
+ * appeared twice (docs/SOCIAL-VIDEO.md §5).
  */
-export function makeBackdrop(
-  image: CanvasImageSource,
-  width: number,
-  height: number,
-  canvas: BackdropCanvas,
-): BackdropCanvas {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  const scale = Math.max(canvas.width / width, canvas.height / height);
-  const w = width * scale;
-  const h = height * scale;
-  ctx.filter = "blur(24px) brightness(0.55)";
-  ctx.drawImage(image, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
-  ctx.filter = "none";
-  return canvas;
+export function backdropColor([r, g, b]: [number, number, number]): string {
+  const [h, s, l] = toHsl(r / 255, g / 255, b / 255);
+  const muted = Math.min(s * 0.5, BACKDROP_MAX_SATURATION);
+  const dark = Math.min(BACKDROP_LIGHTNESS.max, Math.max(BACKDROP_LIGHTNESS.min, l * 0.3));
+  const [rr, gg, bb] = fromHsl(h, muted, dark);
+  return `rgb(${Math.round(rr * 255)}, ${Math.round(gg * 255)}, ${Math.round(bb * 255)})`;
+}
+
+function toHsl(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h =
+    max === r
+      ? ((g - b) / d + (g < b ? 6 : 0)) / 6
+      : max === g
+        ? ((b - r) / d + 2) / 6
+        : ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+function fromHsl(h: number, s: number, l: number): [number, number, number] {
+  if (s === 0) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const channel = (t: number) => {
+    const u = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [channel(h + 1 / 3), channel(h), channel(h - 1 / 3)];
 }
