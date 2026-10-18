@@ -16,9 +16,14 @@ export type FrameContext = Pick<
   | "imageSmoothingQuality"
 >;
 
+/** A decoded photo — an ImageBitmap, or anything drawable that knows its size. */
+export type FrameImage = CanvasImageSource & { width: number; height: number };
+
 export interface FrameSlide {
-  /** The decoded photo; the shot's rectangles are in its pixels. */
-  image: CanvasImageSource;
+  /** The decoded photo, at any scale; null while it is not decoded, and the
+   * slide is then skipped. */
+  image: FrameImage | null;
+  /** The size the shot was planned in — the photo's own pixels. */
   width: number;
   height: number;
   shot: Shot;
@@ -45,24 +50,33 @@ export function drawFrame(ctx: FrameContext, plan: FramePlan, t: number): void {
   ctx.fillRect(0, 0, W, H);
   for (const visible of slidesAt(plan.timeline, t)) {
     const slide = plan.slides[visible.index];
-    if (!slide) continue;
+    if (!slide?.image) continue;
     ctx.globalAlpha = visible.alpha;
-    drawSlide(ctx, slide, visible.progress, W, H);
+    drawSlide(ctx, slide, slide.image, visible.progress, W, H);
   }
   ctx.globalAlpha = 1;
 }
 
-function drawSlide(ctx: FrameContext, slide: FrameSlide, progress: number, W: number, H: number) {
+function drawSlide(
+  ctx: FrameContext,
+  slide: FrameSlide,
+  image: FrameImage,
+  progress: number,
+  W: number,
+  H: number,
+) {
   if (slide.shot.kind !== "fit") {
+    // The shot is in the photo's pixels; the bitmap is whatever size was fetched.
+    const s = image.width / slide.width;
     const cam = cameraAt(slide.shot, progress);
-    ctx.drawImage(slide.image, cam.x, cam.y, cam.w, cam.h, 0, 0, W, H);
+    ctx.drawImage(image, cam.x * s, cam.y * s, cam.w * s, cam.h * s, 0, 0, W, H);
     return;
   }
   if (slide.backdrop) ctx.drawImage(slide.backdrop, 0, 0, W, H);
   const scale = Math.min(W / slide.width, H / slide.height) * (1 + FIT_DRIFT * ease(progress));
   const w = slide.width * scale;
   const h = slide.height * scale;
-  ctx.drawImage(slide.image, (W - w) / 2, (H - h) / 2, w, h);
+  ctx.drawImage(image, (W - w) / 2, (H - h) / 2, w, h);
 }
 
 /** Where a `fit` slide's backdrop is drawn — the caller's canvas (a DOM canvas

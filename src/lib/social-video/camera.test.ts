@@ -5,6 +5,7 @@ import {
   eyesInSafeArea,
   FORMATS,
   planShot,
+  sourceWidth,
   type PhotoForShot,
   type Rect,
   type Shot,
@@ -125,10 +126,33 @@ describe("planShot", () => {
     expect(short.from.w / short.to.w).toBeLessThanOrEqual(1.08 + 1e-9);
   });
 
-  it("does not zoom past the source's pixels on a small photo", () => {
-    const small: PhotoForShot = { width: 1200, height: 800, faces: [face(0.5, 0.3, 0.05, 1.5)] };
+  it("enlarges a small photo's pixels by 1.35× at most", () => {
+    const small: PhotoForShot = { width: 1600, height: 1000, faces: [face(0.5, 0.3, 0.05, 1.6)] };
     const shot = planShot(small, WIDE, SECONDS);
-    expect(shot.to.w).toBeCloseTo(shot.from.w);
+    expect(WIDE.width / shot.to.w).toBeLessThanOrEqual(1.35 + 1e-9);
+    // One already enlarged to fill the frame does not zoom at all.
+    const tiny: PhotoForShot = { width: 1200, height: 800, faces: [face(0.5, 0.3, 0.05, 1.5)] };
+    const still = planShot(tiny, WIDE, SECONDS);
+    expect(still.to.w).toBeCloseTo(still.from.w);
+  });
+});
+
+describe("sourceWidth", () => {
+  it("fetches a landscape photo for 9:16 tall enough to fill the frame's height", () => {
+    const w = sourceWidth({ width: 6000, height: 4000 }, VERTICAL);
+    // Height at that width ≥ 1920.
+    expect((w * 4000) / 6000).toBeGreaterThanOrEqual(1920);
+    expect(w % 256).toBe(0);
+  });
+
+  it("fetches a landscape photo for 16:9 at about the output's width", () => {
+    const w = sourceWidth({ width: 6000, height: 4000 }, WIDE);
+    expect(w).toBeGreaterThanOrEqual(1920);
+    expect(w).toBeLessThan(1920 + 256);
+  });
+
+  it("never asks for more than the photo has", () => {
+    expect(sourceWidth({ width: 1000, height: 700 }, VERTICAL)).toBe(1000);
   });
 });
 
