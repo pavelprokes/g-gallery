@@ -11,17 +11,24 @@ const scope = self as unknown as {
   postMessage(reply: FaceReply): void;
 };
 
-/** Created on the first photo; a failed start is tried again on the next. */
+/** Created on the first photo. A failed start is tried again on the next
+ * photo — a passing network error — but only so often: a browser that cannot
+ * run it would otherwise reload ~30 MB of WASM for each of 400 photos. */
 let finder: Promise<FaceFinderCore> | null = null;
+let starts = 0;
+const MAX_STARTS = 2;
 let queue: Promise<void> = Promise.resolve();
 
 scope.onmessage = ({ data: { id, photo } }) => {
   queue = queue.then(async () => {
     try {
-      finder ??= createFaceFinderCore().catch((cause: unknown) => {
-        finder = null;
-        throw cause;
-      });
+      if (!finder) {
+        starts += 1;
+        finder = createFaceFinderCore().catch((cause: unknown) => {
+          if (starts < MAX_STARTS) finder = null;
+          throw cause;
+        });
+      }
       const core = await finder;
       const image = await createImageBitmap(photo);
       try {

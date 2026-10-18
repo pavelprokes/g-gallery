@@ -23,8 +23,9 @@ export interface ScanOptions<P extends { id: string }> {
   fetchPhoto(photo: P): Promise<Blob>;
   find(blob: Blob): Promise<PhotoFaces>;
   save(entries: { photoId: string; faces: PhotoFaces }[]): Promise<unknown>;
-  /** Each photo's faces as soon as they are found, before they are saved. */
-  onFound?(entries: { photoId: string; faces: PhotoFaces }[]): void;
+  /** Faces once they are saved — a failed save leaves its photos unknown, so
+   * the next scan searches them again. */
+  onSaved?(entries: { photoId: string; faces: PhotoFaces }[]): void;
   onProgress?(progress: ScanProgress): void;
   signal?: AbortSignal;
 }
@@ -38,7 +39,7 @@ export interface ScanOptions<P extends { id: string }> {
 export async function scanFaces<P extends { id: string }>(
   options: ScanOptions<P>,
 ): Promise<ScanProgress> {
-  const { photos, fetchPhoto, find, save, onFound, onProgress, signal } = options;
+  const { photos, fetchPhoto, find, save, onSaved, onProgress, signal } = options;
   const progress: ScanProgress = { done: 0, total: photos.length, failed: 0 };
   let unsaved: { photoId: string; faces: PhotoFaces }[] = [];
   const flush = async () => {
@@ -46,6 +47,7 @@ export async function scanFaces<P extends { id: string }>(
     const batch = unsaved;
     unsaved = [];
     await save(batch);
+    onSaved?.(batch);
   };
 
   const fetches = new Map<number, Promise<Blob>>();
@@ -64,9 +66,7 @@ export async function scanFaces<P extends { id: string }>(
     const photo = photos[i]!;
     try {
       const faces = await find(await fetches.get(i)!);
-      const entry = { photoId: photo.id, faces };
-      unsaved.push(entry);
-      onFound?.([entry]);
+      unsaved.push({ photoId: photo.id, faces });
     } catch {
       progress.failed += 1;
     }

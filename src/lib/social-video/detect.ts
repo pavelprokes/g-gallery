@@ -41,8 +41,13 @@ export function createFaceFinder(): FaceFinder {
       if ("error" in data) request.reject(new Error(data.error));
       else request.resolve(data.faces);
     };
-    // The worker's script did not load or threw outside a request.
-    w.onerror = (event) => failAll(new Error(event.message || "FACE_WORKER"));
+    // The worker's script did not load (a deploy replaced its chunk) or it
+    // died: drop it, so the next photo starts a fresh one.
+    w.onerror = (event) => {
+      w.terminate();
+      if (worker === w) worker = null;
+      failAll(new Error(event.message || "FACE_WORKER"));
+    };
     return w;
   };
 

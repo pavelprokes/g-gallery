@@ -11,6 +11,7 @@
 
 import { attachBlinks, FACES_MODEL, MAX_FACES, type PhotoFaces } from "@/lib/social-video/faces";
 import {
+  CHECK_MIN_SCORE,
   CHECK_SIZE,
   checkWindow,
   confirmed,
@@ -29,9 +30,6 @@ export const MEDIAPIPE_VERSION = "1.1.1";
 const MEDIAPIPE_WASM = `/vendor/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
 const LANDMARKER_MODEL = "/vendor/mediapipe/models/face_landmarker.task";
 const YUNET_MODEL = "/vendor/yunet/face_detection_yunet_2026may.onnx";
-
-/** The second look keeps anything the model sees at all; `confirmed` decides. */
-const CHECK_FLOOR = 0.3;
 
 /** Faces the landmarker looks for at most — enough for any photo whose blink
  * matters (a portrait, a couple, a small group). */
@@ -71,7 +69,6 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
   const canvas = new OffscreenCanvas(1, 1);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("NO_CANVAS");
-  ctx.imageSmoothingQuality = "high";
 
   /** `source`'s window `from` drawn into a `width`×`height` input (black
    * around it), run through YuNet; boxes in the input's pixels. */
@@ -81,8 +78,10 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     to: { drawWidth: number; drawHeight: number; width: number; height: number },
     minScore?: number,
   ): Promise<Candidate[]> {
+    // Resizing resets the context's state, smoothing included.
     canvas.width = to.width;
     canvas.height = to.height;
+    ctx!.imageSmoothingQuality = "high";
     ctx!.fillStyle = "#000";
     ctx!.fillRect(0, 0, to.width, to.height);
     ctx!.drawImage(source, from.x, from.y, from.w, from.h, 0, 0, to.drawWidth, to.drawHeight);
@@ -116,7 +115,7 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       };
       for (const c of candidates) {
         const win = checkWindow(c);
-        const check = (await detect(image, win, square, CHECK_FLOOR)).map((d) =>
+        const check = (await detect(image, win, square, CHECK_MIN_SCORE)).map((d) =>
           mapCandidate(d, win.w / CHECK_SIZE, win.x, win.y),
         );
         if (confirmed(c, check)) kept.push(c);

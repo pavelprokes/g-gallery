@@ -13,13 +13,14 @@ import {
   planShot,
   sourceWidth,
   type Aspect,
+  type VideoFormat,
 } from "@/lib/social-video/camera";
 import { createFaceFinder, type FaceFinder } from "@/lib/social-video/detect";
 import { chooseCodec, encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
 import { scanFaces } from "@/lib/social-video/face-scan";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
-import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
+import { fetchPhotoBytes, SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
 import { suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
 import {
   buildTimeline,
@@ -104,18 +105,22 @@ type Scan =
   | { kind: "running"; done: number; total: number }
   | { kind: "finished"; failed: number };
 
+/** The transform URL a video of `format` fetches a photo at. */
+function sourceUrl(
+  objectKey: string,
+  size: { width: number; height: number },
+  format: VideoFormat,
+) {
+  return imageLoader({ src: objectKey, width: sourceWidth(size, format), quality: QUALITY });
+}
+
 /** A photo's bytes at the size a 9:16 video fetches it — the default format,
  * so its render finds the transform already cached. */
-async function fetchForFaces(photo: StudioPhoto): Promise<Blob> {
+function fetchForFaces(photo: StudioPhoto): Promise<Blob> {
   const { width, height } = photo.candidate;
-  const url = imageLoader({
-    src: photo.objectKey,
-    width: sourceWidth({ width: width!, height: height! }, FORMATS["9:16"]),
-    quality: QUALITY,
-  });
-  const response = await fetch(url, { mode: "cors", credentials: "omit" });
-  if (!response.ok) throw new Error(`PHOTO_${response.status}`);
-  return response.blob();
+  return fetchPhotoBytes(
+    sourceUrl(photo.objectKey, { width: width!, height: height! }, FORMATS["9:16"]),
+  );
 }
 
 type Status =
@@ -212,11 +217,7 @@ export function SocialVideoStudio({
             id,
             width,
             height,
-            url: imageLoader({
-              src: photo.objectKey,
-              width: sourceWidth({ width, height }, format),
-              quality: QUALITY,
-            }),
+            url: sourceUrl(photo.objectKey, { width, height }, format),
           },
         ];
       }),
@@ -347,6 +348,9 @@ export function SocialVideoStudio({
     })();
     return () => {
       cancelled = true;
+      // A run cut short must not leave the page "preparing": the next run
+      // returns at once when nothing is left to prepare.
+      setStatus((s) => (s.kind === "preparing" ? { kind: "idle" } : s));
     };
     // `faces` is read for the photos being prepared, not a reason to prepare again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -488,7 +492,7 @@ export function SocialVideoStudio({
         fetchPhoto: fetchForFaces,
         find: (blob) => finder().find(blob),
         save: (entries) => saveFaces(galleryId, entries),
-        onFound: (entries) =>
+        onSaved: (entries) =>
           setFaces((prev) => ({
             ...prev,
             ...Object.fromEntries(entries.map((e) => [e.photoId, e.faces])),

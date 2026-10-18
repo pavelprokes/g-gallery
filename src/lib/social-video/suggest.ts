@@ -5,8 +5,13 @@
 
 import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
 import { pickHighlights, type HighlightCandidate } from "@/lib/gallery-highlights";
-import { eyesInSafeArea, planShot, type VideoFormat } from "@/lib/social-video/camera";
-import type { PhotoFaces } from "@/lib/social-video/faces";
+import {
+  eyesInSafeArea,
+  FRAMING_MIN_SCORE,
+  planShot,
+  type VideoFormat,
+} from "@/lib/social-video/camera";
+import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import { FADE_SECONDS, SLIDE_SECONDS } from "@/lib/social-video/timeline";
 
 export interface VideoCandidate extends HighlightCandidate {
@@ -21,6 +26,18 @@ export interface VideoCandidate extends HighlightCandidate {
  * hug), so they count only from this many faces. */
 const BLINK_LIMIT = 0.5;
 const BLINK_MIN_FACES = 3;
+
+/** A photo's people as the camera sees them: a weaker box does not frame the
+ * shot (camera.ts), so here it does not count as someone either. Null when
+ * faces are not known. */
+function peopleIn(c: VideoCandidate): Face[] | null {
+  return c.faces?.faces.filter((f) => f.score >= FRAMING_MIN_SCORE) ?? null;
+}
+
+/** A photo from the highlights' pick outranks a top-up photo that fits as
+ * well, or one step better — the pick is what the photographer marked and the
+ * day's spread; the top-up only fills the gap. */
+const PICK_BONUS = 1;
 
 /**
  * `count` photo ids: pinned photos always, then the best fit of a pool twice
@@ -46,21 +63,22 @@ export function suggestPhotos(
   const inPick = new Set(highlighted.map((p) => p.candidate.id));
   const others = candidates.filter((c) => c.own && !inPick.has(c.id)).sort(compareTimeline);
   const pool = [
-    ...highlighted,
+    ...highlighted.map((p) => ({ ...p, picked: true })),
     ...evenly(others, count * 2 - highlighted.length).map((candidate) => ({
       candidate,
       pinned: false,
+      picked: false,
     })),
   ].sort((p, q) => compareTimeline(p.candidate, q.candidate));
 
   const fitness = new Map(pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format)]));
+  const rank = (p: (typeof pool)[number]) =>
+    fitness.get(p.candidate.id)! + (p.picked ? PICK_BONUS : 0);
   const pinned = pool.filter((p) => p.pinned);
   const rest = pool
     .map((p, order) => ({ ...p, order }))
     .filter((p) => !p.pinned)
-    .sort(
-      (p, q) => fitness.get(q.candidate.id)! - fitness.get(p.candidate.id)! || p.order - q.order,
-    )
+    .sort((p, q) => rank(q) - rank(p) || p.order - q.order)
     .slice(0, Math.max(0, count - pinned.length));
   const chosen = new Set([...pinned, ...rest].map((p) => p.candidate.id));
   const picked = pool.filter((p) => chosen.has(p.candidate.id)).map((p) => p.candidate);
@@ -83,14 +101,15 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   if (c.width !== null && c.height !== null && portrait === wantsPortrait) score += 2;
 
   const faces = c.faces?.faces;
-  if (!faces || c.width === null || c.height === null) return score;
-  if (faces.length > 0) score += 1;
+  const people = peopleIn(c);
+  if (!faces || !people || c.width === null || c.height === null) return score;
+  if (people.length > 0) score += 1;
   // Known to show no face: for 9:16 a landscape photo is then cut blind — a
   // wide church or a beach with the couple somewhere off the crop.
   else if (wantsPortrait && !portrait) score -= 2;
   if (
-    faces.length >= BLINK_MIN_FACES &&
-    faces.some((f) => f.blink !== null && f.blink > BLINK_LIMIT)
+    people.length >= BLINK_MIN_FACES &&
+    people.some((f) => f.blink !== null && f.blink > BLINK_LIMIT)
   ) {
     score -= 5;
   }
@@ -113,8 +132,8 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
  * and last slides are never the middle of a run, so they stay. */
 function breakFacelessRuns(picked: VideoCandidate[], unused: VideoCandidate[]): VideoCandidate[] {
   const out = [...picked];
-  const spare = unused.filter((c) => (c.faces?.faces.length ?? 0) > 0);
-  const faceless = (c: VideoCandidate) => c.faces !== null && c.faces.faces.length === 0;
+  const spare = unused.filter((c) => (peopleIn(c)?.length ?? 0) > 0);
+  const faceless = (c: VideoCandidate) => peopleIn(c)?.length === 0;
   for (let i = 1; i + 1 < out.length && spare.length > 0; i++) {
     if (!(faceless(out[i - 1]!) && faceless(out[i]!) && faceless(out[i + 1]!))) continue;
     const at = Date.parse(out[i]!.takenAt);

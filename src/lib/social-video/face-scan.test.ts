@@ -64,6 +64,21 @@ describe("scanFaces", () => {
     expect(saved).toEqual(["p0", "p3"]);
   });
 
+  it("reports faces only once they are saved, so a failed save is searched again", async () => {
+    const reported: string[] = [];
+    const scan = scanFaces({
+      photos: photos(3),
+      fetchPhoto: async (p) => blobOf(p.id),
+      find: async () => none,
+      save: async () => {
+        throw new Error("SESSION");
+      },
+      onSaved: (entries) => reported.push(...entries.map((e) => e.photoId)),
+    });
+    await expect(scan).rejects.toThrow("SESSION");
+    expect(reported).toEqual([]);
+  });
+
   it("stops when aborted and keeps what it found", async () => {
     const controller = new AbortController();
     const saved: string[] = [];

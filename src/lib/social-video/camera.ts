@@ -48,7 +48,7 @@ const PAN_MAX_PER_S = 0.35;
  * largest face's area — a stranger far behind the couple does not. 0.7: on a
  * real wedding YuNet's real faces score 0.7–0.96, and the doubtful boxes that
  * pass its second look sit at 0.60–0.63 (docs/SOCIAL-VIDEO.md §7). */
-const FRAMING_MIN_SCORE = 0.7;
+export const FRAMING_MIN_SCORE = 0.7;
 
 /** Without a face, the camera aims here, as a share of the photo's height:
  * at a wedding the heads are in the upper third far more often than in the
