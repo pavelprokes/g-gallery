@@ -106,12 +106,18 @@ interface Subject {
   faces: Face[];
 }
 
+/** The faces the camera frames by: sure ones, not far smaller than the largest. */
+export function framedFaces(faces: readonly Face[]): Face[] {
+  const strong = faces.filter((f) => f.score >= FRAMING_MIN_SCORE);
+  if (strong.length === 0) return [];
+  const largest = Math.max(...strong.map((f) => f.w * f.h));
+  return strong.filter((f) => f.w * f.h >= largest * FRAMING_MIN_AREA);
+}
+
 /** The faces that frame the photo, widened to head and shoulders, as one box. */
 export function subjectOf(photo: PhotoForShot): Subject | null {
-  const strong = photo.faces.filter((f) => f.score >= FRAMING_MIN_SCORE);
-  if (strong.length === 0) return null;
-  const largest = Math.max(...strong.map((f) => f.w * f.h));
-  const faces = strong.filter((f) => f.w * f.h >= largest * FRAMING_MIN_AREA);
+  const faces = framedFaces(photo.faces);
+  if (faces.length === 0) return null;
 
   const { width: W, height: H } = photo;
   let x0 = Infinity;

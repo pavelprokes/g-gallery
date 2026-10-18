@@ -63,6 +63,8 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 - **Fit to the format:** for 9:16 prefer portrait photos, or landscape ones whose subject box fits a
   0.5625-wide crop (§5). For 16:9 the reverse. A landscape photo **known to show no face** is held
   back from 9:16: cut blind, it showed an empty church with the bride sliced off its edge (§7).
+- **The couple, where named** (§4, "Who is who"): +2, and the fit is judged on the shot framed on
+  them.
 - **Blink penalty:** Face Landmarker's `eyeBlinkLeft/Right` above 0.5 on any face — **in a photo of
   three or more**. In a couple's photo closed eyes are as often the moment itself (a kiss, a hug).
 - **A short pick is topped up** from the rest of the day to twice the count before the fit chooses:
@@ -176,6 +178,34 @@ face) listed 122 photos — mostly looks down and sharp profiles. With the rules
 detector took for a face) and 8 posed groups with someone's eyes shut. The crops behind every
 threshold were checked by eye.
 
+### Who is who
+
+**Kdo je kdo** (`/admin/g/[id]/people`, Pavel, 2026-10-18): the photographer names faces by hand —
+"Nevěsta", "Ženich", anyone else — and marks who is one of the couple. **Typed, never recognised**:
+nothing is computed from a face to match it across photos; a face nobody clicked has no name.
+Pavel chose this over automatic recognition, which would be biometric data (GDPR Art. 9) and need
+every guest's explicit consent.
+
+- **The data.** `GalleryPerson` (name, `couple`) per gallery; `FaceTag` (photo, person, box) per
+  named face. The tag keeps **its own copy of the box**, so it outlives the detection it was made
+  on: a new `FACES_MODEL` finds the same face a few pixels off, and the overlap (IoU ≥ 0.5,
+  `src/lib/social-video/face-tags.ts`) finds the tag again. Someone is on a photo once — naming them
+  on another face moves the tag — and a face holds one name. Deleting a person, a photo or the
+  gallery deletes its tags.
+- **The page.** Pick someone, then click their faces — the faces the camera frames by
+  (`framedFaces`), photo by photo in the gallery's order, left to right. "Neoznačené" lists what is
+  left; a face just named stays in place until the filter changes, so the list does not close up
+  under the pointer. Any stored detection serves (`storedFaces`) — naming does not wait for a new
+  scan.
+- **What uses it.** Only the couple flag, so far: the suggestion adds **+2** to a photo showing a
+  named member of the couple (§3) — as much as the right shape for the format — and the camera
+  (`focusFaces`) frames **just the couple** where they are named among the framed faces, in the
+  video and in the party projection (docs/GUEST-GALLERIES.md, F5). A group 9:16 could only show
+  whole becomes a push in on the two of them. Other people are named for the photographer's own
+  overview.
+- **Privacy.** Names stay in the admin. The guests' page gets the couple's **boxes** at most
+  (`projectionFaces`), never a name or a person's id.
+
 ### Storage
 
 `Photo.faces Json?` — additive, null until computed, Zod-validated in the action that saves it:
@@ -205,7 +235,8 @@ Coordinates are 0–1 in the oriented image. A new model or threshold bumps `mod
 demand; nothing else depends on it.
 
 **Privacy.** These are detection boxes, not recognition: **no embeddings, no identities**, nothing
-that could match a face across photos. A few hundred bytes per photo, deleted with the photo. Pavel
+that could match a face across photos. Names exist only where the photographer typed them ("Who is
+who" above). A few hundred bytes per photo, deleted with the photo. Pavel
 to confirm this reading of GDPR Art. 9 before it ships.
 
 **Free second source (to check).** Lightroom can write MWG face regions into the exported JPEG's

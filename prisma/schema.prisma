@@ -319,6 +319,7 @@ model Gallery {
   activityEvents ActivityEvent[]
   promos         GalleryPromo[]
   chapters       GalleryChapter[]
+  people         GalleryPerson[]
 
   @@unique([eventId, eventKey])
   @@index([ownerId, status])
@@ -427,6 +428,7 @@ model Photo {
   /// Galleries using this photo as their cover — at most one in practice.
   coverOf         Gallery[]        @relation("GalleryCover")
   featuredIn      Gallery[]        @relation("GalleryFeaturedVideo")
+  faceTags        FaceTag[]
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.
@@ -767,12 +769,12 @@ model Keepalive {
 /// chapter simply begins at the next photo), and photos added later — a second
 /// shooter's card, a guest's upload — fall into the right chapter by time.
 model GalleryChapter {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   galleryId         String
-  gallery           Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery           Gallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   /// Czech original; other languages live in `translations` (docs/I18N.md §Content).
   title             String
-  translations      Json     @default("{}")
+  translations      Json      @default("{}")
   /// Timeline position of the first photo: that photo's `takenAt`…
   startTakenAt      DateTime
   /// …and its id, the burst tiebreaker. Deliberately not a relation.
@@ -781,7 +783,7 @@ model GalleryChapter {
   /// kept for the same reason as `startTakenAt`: the chapter keeps its place
   /// if that photo is deleted. Filled in by a database trigger from
   /// `startPhotoId` (docs/PHOTO-ORDER.md); past every photo if it has none.
-  startFileOrderKey String   @default("")
+  startFileOrderKey String    @default("")
   /// The start photo's `wovenAt`, kept for the same reason. Follows the photo
   /// in `refreshWovenOrder`; null until the gallery first uses that order.
   startWovenAt      DateTime?
@@ -794,11 +796,52 @@ model GalleryChapter {
   /// already sent. Null only on rows from before it existed — the chapter's id
   /// stands in there.
   slug              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   /// Two chapters starting at the same photo is always a mistake.
   @@unique([galleryId, startTakenAt, startPhotoId])
   @@unique([galleryId, slug])
+  @@schema("g_gallery")
+}
+
+/// Someone the photographer names on the gallery's faces — "Nevěsta",
+/// "Ženich", "Babička" (docs/SOCIAL-VIDEO.md §4, "Who is who"). Typed by hand,
+/// never recognised: nothing about a face is computed from it. Admin-only;
+/// guests never see a name.
+model GalleryPerson {
+  id        String   @id @default(cuid())
+  galleryId String
+  gallery   Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  name      String
+  /// One of the couple: the video's suggestion prefers their photos and the
+  /// camera lands on them in a group.
+  couple    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tags FaceTag[]
+
+  @@index([galleryId])
+  @@schema("g_gallery")
+}
+
+/// A face the photographer named. The box is a copy of the detected face's
+/// (`Photo.faces`, 0–1 of the oriented photo), so a tag outlives a new
+/// detection model: it is matched back to the new boxes by overlap.
+model FaceTag {
+  id        String        @id @default(cuid())
+  photoId   String
+  photo     Photo         @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  personId  String
+  person    GalleryPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  x         Float
+  y         Float
+  w         Float
+  h         Float
+  createdAt DateTime      @default(now())
+
+  /// Someone is on a photo once: naming them on another face moves the tag.
+  @@unique([photoId, personId])
+  @@index([personId])
   @@schema("g_gallery")
 }

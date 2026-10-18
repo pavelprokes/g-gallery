@@ -77,6 +77,24 @@ describe("fitFor", () => {
     expect(fitFor(weak, VERTICAL)).toBe(fitFor(faceless, VERTICAL));
   });
 
+  it("prefers the couple, as named, and frames a group on them", () => {
+    const row = [0.1, 0.3, 0.5, 0.7, 0.9].map((x) => ({
+      ...someone(),
+      x,
+      le: [x + 0.02, 0.34] as [number, number],
+      re: [x + 0.06, 0.34] as [number, number],
+    }));
+    const group = photo(0, { faces: withFaces(...row) });
+    const named = photo(0, {
+      faces: withFaces(...row),
+      coupleTags: [row[2]!, row[3]!].map(({ x, y, w, h }) => ({ x, y, w, h })),
+    });
+    // Shown whole no more, and theirs: ahead of a portrait of a guest.
+    const guest = photo(0, { width: 2000, height: 3000, faces: withFaces(someone()) });
+    expect(fitFor(named, VERTICAL)).toBeGreaterThan(fitFor(group, VERTICAL));
+    expect(fitFor(named, VERTICAL)).toBeGreaterThanOrEqual(fitFor(guest, VERTICAL));
+  });
+
   it("holds back a group that 9:16 can only show whole", () => {
     const open = photo(0, { faces: withFaces(someone()) });
 

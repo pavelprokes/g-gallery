@@ -7,6 +7,7 @@ import { slugify } from "@/lib/gallery-slug";
 import { placeholderStyle } from "@/lib/placeholder";
 import { directShots, FORMATS, planShot, type Aspect } from "@/lib/social-video/camera";
 import { chooseCodec, encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
+import { focusFaces } from "@/lib/social-video/face-tags";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
 import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
@@ -193,14 +194,19 @@ export function SocialVideoStudio({
     return directShots(
       slidePhotos.map((p, i) =>
         planShot(
-          { width: p.width, height: p.height, faces: faces[p.id]?.faces ?? [] },
+          {
+            width: p.width,
+            height: p.height,
+            // On the couple, where the photographer named them (§4, "Who is who").
+            faces: focusFaces(faces[p.id]?.faces ?? [], byId.get(p.id)?.candidate.coupleTags ?? []),
+          },
           format,
           seconds[i] ?? seconds.at(-1) ?? 3,
         ),
       ),
       slidePhotos.map((p) => faces[p.id]?.faces.length ?? 0),
     );
-  }, [slidePhotos, faces, format, timeline]);
+  }, [slidePhotos, faces, format, timeline, byId]);
 
   // ---- Photos in memory: one store per format (the fetch size differs) ----
   // Closing only clears the store's caches, so a store React reuses after a

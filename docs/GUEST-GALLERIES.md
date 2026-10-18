@@ -548,6 +548,8 @@ not sleep, and its only affordance is a way out (Escape, or a click).
   photographer framed — a group too wide to crop, and everything under `prefers-reduced-motion`.
   The guest page gets the boxes only (`projectionFaces`: framing faces, rounded, no blink), any
   stored model will do. The same change fixed the second photo being projected twice in a row.
+  Where the photographer named the couple (docs/SOCIAL-VIDEO.md §4, "Who is who"), only the
+  couple's boxes are sent, so the camera lands on them in a group — boxes, never names.
 
 ### Guest self-delete (2026-08-23)
 

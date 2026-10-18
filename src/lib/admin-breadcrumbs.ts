@@ -67,6 +67,11 @@ export function galleryCheckCrumbs(gallery: GalleryRef): Crumb[] {
   return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Kontrola fotek");
 }
 
+/** Přehled / [{wedding}] / {gallery} / Kdo je kdo */
+export function galleryPeopleCrumbs(gallery: GalleryRef): Crumb[] {
+  return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Kdo je kdo");
+}
+
 /** Přehled / [{wedding}] / {gallery} / Pořadí fotek */
 export function galleryOrderCrumbs(gallery: GalleryRef): Crumb[] {
   return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Pořadí fotek");

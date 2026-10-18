@@ -12,7 +12,8 @@ import {
   type Shot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
-import { photoFacesSchema, type Face } from "@/lib/social-video/faces";
+import { focusFaces, type Box } from "@/lib/social-video/face-tags";
+import { storedFaces, type Face } from "@/lib/social-video/faces";
 
 /** The most faces a photo hands the guests' page — enough to frame any
  * group; the camera only needs the ones it frames by. */
@@ -22,17 +23,26 @@ const MAX_PROJECTED_FACES = 24;
  * the straight lines between them do not show. */
 const STEPS = 24;
 
+/** What `projectionFaces` reads off a photo row: its faces, and the boxes named
+ * as the couple — the boxes only, never who. */
+export const PROJECTION_FACES_SELECT = {
+  faces: true,
+  faceTags: { where: { person: { couple: true } }, select: { x: true, y: true, w: true, h: true } },
+} as const;
+
 /**
  * The faces a guest's page needs for the projection's camera: the boxes the
- * camera frames by, rounded, without the blink and sharpness scores. Any
- * stored detection serves — a box is a box, whichever build found it. Null
- * when the photo's faces were never searched.
+ * camera frames by, rounded, without the blink and sharpness scores — only the
+ * couple's where the photographer named them (`coupleTags`, docs/SOCIAL-VIDEO.md
+ * §4), so the camera lands on them in a group. Never a name: a box is all
+ * that leaves the server. Any stored detection serves — a box is a box,
+ * whichever build found it. Null when the photo's faces were never searched.
  */
-export function projectionFaces(stored: unknown): Face[] | null {
-  const parsed = photoFacesSchema.safeParse(stored);
-  if (!parsed.success) return null;
+export function projectionFaces(stored: unknown, coupleTags: readonly Box[] = []): Face[] | null {
+  const parsed = storedFaces(stored);
+  if (!parsed) return null;
   const r = (n: number) => Math.round(n * 1000) / 1000;
-  return parsed.data.faces
+  return focusFaces(parsed.faces, coupleTags)
     .filter((f) => f.score >= FRAMING_MIN_SCORE)
     .sort((a, b) => b.w * b.h - a.w * a.h)
     .slice(0, MAX_PROJECTED_FACES)

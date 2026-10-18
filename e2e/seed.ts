@@ -289,6 +289,7 @@ async function main() {
   // docs/SOCIAL-VIDEO.md §4, the photo check: faces stored as the worker
   // would, so the flags are known without running the detector.
   const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
+  const faceTagGalleryId = await makeFaceTagGallery(user.id);
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -298,6 +299,7 @@ async function main() {
       socialVideoGalleryId,
       manualOrder,
       photoCheckGalleryId,
+      faceTagGalleryId,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1077,6 +1079,54 @@ async function makePhotoCheckGallery(ownerId: string) {
     ["kontrola_0003.jpg", [face(0.4, { sharp: 0.03 })]],
     // Not searched yet.
     ["kontrola_0004.jpg", null],
+  ];
+  for (const [fileName, faces] of photos) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${fileName}`,
+        fileName,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#7d6a5a",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        ...(faces ? { faces: { v: 1, model: FACES_MODEL, faces } } : {}),
+      },
+    });
+  }
+  return gallery.id;
+}
+
+/**
+ * Naming faces (docs/SOCIAL-VIDEO.md §4, "Who is who"): a couple side by side,
+ * a portrait, and a photo not searched yet. Nobody named.
+ */
+async function makeFaceTagGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Kdo je kdo",
+      status: "DRAFT",
+      storagePrefix: `galleries/e2e-face-tags-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const face = (x: number): Face => ({
+    x,
+    y: 0.2,
+    w: 0.1,
+    h: 0.15,
+    score: 0.9,
+    le: [x + 0.02, 0.25],
+    re: [x + 0.07, 0.25],
+    blink: 0.05,
+  });
+  const photos: [string, Face[] | null][] = [
+    ["lide_0001.jpg", [face(0.3), face(0.5)]],
+    ["lide_0002.jpg", [face(0.4)]],
+    ["lide_0003.jpg", null],
   ];
   for (const [fileName, faces] of photos) {
     await prisma.photo.create({
