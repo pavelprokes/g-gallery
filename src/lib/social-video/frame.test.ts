@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { FORMATS, type Shot } from "@/lib/social-video/camera";
 import {
+  averageColor,
+  backdropColor,
   drawFrame,
-  makeBackdrop,
   type FrameContext,
   type FrameImage,
   type FramePlan,
@@ -18,7 +19,11 @@ function recorder() {
     imageSmoothingEnabled: false,
     imageSmoothingQuality: "low",
     filter: "none",
-    fillRect: () => {},
+    fillRect() {
+      // A fill is recorded by its colour; the frame's own black is left out.
+      if (ctx.fillStyle !== "#000")
+        calls.push({ image: ctx.fillStyle, args: [], alpha: ctx.globalAlpha });
+    },
     drawImage(image: unknown, ...args: number[]) {
       calls.push({ image: String(image), args, alpha: ctx.globalAlpha });
     },
@@ -52,7 +57,7 @@ const plan: FramePlan = {
       width: 2000,
       height: 3000,
       shot: fit,
-      backdrop: image("blur"),
+      backdrop: "rgb(20, 18, 16)",
     },
   ],
 };
@@ -84,7 +89,7 @@ describe("drawFrame", () => {
     drawFrame(ctx, plan, FIRST_SECONDS + FADE_SECONDS / 2);
     expect(calls.map((c) => [c.image, c.alpha])).toEqual([
       ["first", 1],
-      ["blur", expect.closeTo(0.5)],
+      ["rgb(20, 18, 16)", expect.closeTo(0.5)],
       ["second", expect.closeTo(0.5)],
     ]);
     expect(ctx.globalAlpha).toBe(1);
@@ -100,26 +105,35 @@ describe("drawFrame", () => {
   });
 });
 
-describe("makeBackdrop", () => {
-  it("fills the canvas with the photo, blurred, and resets the filter", () => {
-    const { ctx, calls } = recorder();
-    const filters: string[] = [];
-    const tracked = new Proxy(ctx, {
-      set(target, key, value) {
-        if (key === "filter") filters.push(value);
-        return Reflect.set(target, key, value);
-      },
-    });
-    makeBackdrop(image("photo"), 2000, 3000, {
-      width: 480,
-      height: 270,
-      getContext: () => tracked,
-    });
-    const [x, y, w, h] = calls[0]!.args;
-    expect(w! >= 480 && h! >= 270).toBe(true);
-    expect(x! + w! / 2).toBeCloseTo(240);
-    expect(y! + h! / 2).toBeCloseTo(135);
-    expect(filters[0]).toContain("blur");
-    expect(filters.at(-1)).toBe("none");
+describe("backdropColor", () => {
+  const hsl = (rgb: string) => {
+    const [r, g, b] = rgb.match(/\d+/g)!.map((n) => Number(n) / 255) as [number, number, number];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+    return { s, l };
+  };
+
+  it("keeps a hint of the photo's tone, dark and nearly grey", () => {
+    const wall = backdropColor([214, 196, 170]);
+    expect(hsl(wall).l).toBeLessThanOrEqual(0.17);
+    expect(hsl(wall).s).toBeLessThanOrEqual(0.16);
+    const [r, , b] = wall.match(/\d+/g)!.map(Number);
+    // Still warm: a sandstone wall does not turn blue.
+    expect(r!).toBeGreaterThan(b!);
+  });
+
+  it("never lets a vivid photo through vivid, nor a white one through light", () => {
+    expect(hsl(backdropColor([230, 20, 40])).s).toBeLessThanOrEqual(0.16);
+    expect(hsl(backdropColor([255, 255, 255])).l).toBeLessThanOrEqual(0.17);
+    expect(backdropColor([0, 0, 0])).toBe("rgb(15, 15, 15)");
+  });
+});
+
+describe("averageColor", () => {
+  it("averages the pixels, alpha ignored", () => {
+    expect(averageColor([0, 100, 200, 255, 100, 100, 0, 0])).toEqual([50, 100, 100]);
+    expect(averageColor([])).toEqual([0, 0, 0]);
   });
 });

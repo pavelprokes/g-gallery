@@ -204,8 +204,11 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
    on the two heads wherever they are. If S is **wider than C** (two people far apart in a landscape
    photo cropped to 9:16) and is at most three people, it **pans** from the leftmost face to the
    rightmost at C's width. If neither works (a wide group in 9:16, or a pan faster than the cap in
-   step 6), the photo is shown whole over a blurred, darkened copy of itself, and its 9:16 fit score
-   drops so the suggestion avoids it.
+   step 6), the photo is shown whole on a dark, muted colour of its own — its average, at most 15 %
+   saturation and 6–16 % lightness (`backdropColor`) — and its 9:16 fit score drops so the
+   suggestion avoids it. (Until 2026-10-18 it was a blurred, darkened copy of the photo; Safari's
+   canvas ignores `filter`, so there the copy came out sharp and bright and the photo appeared
+   twice, cut, above and below itself.)
 5. **Direction.** Push in (C→T) and pull out (T→C) alternate; groups (three faces or more) and the
    opening slide always pull out, even when that makes three alike in a row. Pans alternate left
    and right.

@@ -5,7 +5,7 @@
 // screen — and the next one — are decoded. Thirteen decoded 2900 px photos
 // would be ~400 MB; two or three are not.
 
-import { makeBackdrop, type BackdropCanvas, type FrameImage } from "@/lib/social-video/frame";
+import { averageColor, backdropColor, type FrameImage } from "@/lib/social-video/frame";
 
 export interface SlidePhoto {
   id: string;
@@ -17,7 +17,7 @@ export interface SlidePhoto {
 
 interface Decoded {
   image: ImageBitmap;
-  backdrop: FrameImage | null;
+  backdrop: string | null;
 }
 
 /** A photo's bytes from the CDN. CORS, so the canvas it is drawn on stays
@@ -28,13 +28,13 @@ export async function fetchPhotoBytes(url: string): Promise<Blob> {
   return response.blob();
 }
 
+/** The side of the square a photo is shrunk to for its backdrop colour. */
+const BACKDROP_SAMPLE = 16;
+
 export class SlideImages {
   private readonly blobs = new Map<string, Promise<Blob>>();
   private readonly decoded = new Map<string, Promise<Decoded>>();
   private readonly ready = new Map<string, Decoded>();
-
-  /** @param backdropSize the frame's size, a quarter of it is enough (makeBackdrop). */
-  constructor(private readonly backdropSize: { width: number; height: number }) {}
 
   /** The photo's bytes, fetched once. */
   fetch(photo: SlidePhoto): Promise<Blob> {
@@ -82,16 +82,20 @@ export class SlideImages {
     return this.ready.get(id)?.image ?? null;
   }
 
-  /** The blurred backdrop of a `fit` slide, made on first use. */
-  backdropOf(id: string, width: number, height: number): FrameImage | null {
+  /** The colour behind a `fit` slide (`backdropColor`), taken on first use. */
+  backdropOf(id: string): string | null {
     const entry = this.ready.get(id);
     if (!entry) return null;
-    if (!entry.backdrop) {
+    if (entry.backdrop === null) {
+      // A few pixels are enough for an average — and cheap to read back.
       const canvas = document.createElement("canvas");
-      canvas.width = Math.round(this.backdropSize.width / 4);
-      canvas.height = Math.round(this.backdropSize.height / 4);
-      makeBackdrop(entry.image, width, height, canvas as unknown as BackdropCanvas);
-      entry.backdrop = canvas;
+      canvas.width = BACKDROP_SAMPLE;
+      canvas.height = BACKDROP_SAMPLE;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return null;
+      ctx.drawImage(entry.image, 0, 0, BACKDROP_SAMPLE, BACKDROP_SAMPLE);
+      const pixels = ctx.getImageData(0, 0, BACKDROP_SAMPLE, BACKDROP_SAMPLE).data;
+      entry.backdrop = backdropColor(averageColor(pixels));
     }
     return entry.backdrop;
   }
