@@ -167,6 +167,16 @@ test.describe("wedding page", () => {
     await expect(projection.getByRole("button")).toHaveCount(1);
     await expect(projection.getByRole("button", { name: "Ukončit" })).toBeAttached();
 
+    // These photos have a face stored: the camera moves towards it
+    // (src/lib/projection-camera.ts) rather than showing a still.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.getAnimations().filter((a) => a.playState === "running").length,
+        ),
+      )
+      .toBeGreaterThan(0);
+
     await page.keyboard.press("Escape");
     await expect(projection).toBeHidden();
   });

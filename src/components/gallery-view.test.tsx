@@ -115,6 +115,7 @@ describe("a long press on a tile", () => {
     favoriteCount: 0,
     uploaderName: null,
     orderKey: "2026-09-19T14:00:00.000Z",
+    faces: null,
   };
 
   const renderTile = (onPick: (index: number, id: string, shift: boolean) => void) => {

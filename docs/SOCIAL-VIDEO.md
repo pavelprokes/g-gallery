@@ -215,6 +215,9 @@ setting behaving inconsistently.
 
 ## 5. The camera move
 
+The party projection uses the same camera on the venue's screen (docs/GUEST-GALLERIES.md, F5,
+"Face-aware camera") — `planShot` with the screen as the format.
+
 For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9), the slide length.
 
 1. **Subject box S.** Faces with score **≥ 0.7** and area ≥ 15 % of the largest face (on a real
