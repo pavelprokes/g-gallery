@@ -1,0 +1,146 @@
+// The photo check (docs/SOCIAL-VIDEO.md §4, "The photo check"): closed eyes
+// and soft eyes on the faces that matter, for the photographer to look at
+// before the couple does. Pure — the measuring runs in the face worker
+// (src/lib/social-video/face-finder.ts), the deciding here, so both are
+// unit-tested.
+//
+// It only flags. Whether closed eyes are a blink or a kiss, whether a soft face
+// is a missed focus or the depth of field, is the photographer's call.
+
+import { FRAMING_MIN_SCORE } from "@/lib/social-video/camera";
+import type { Face } from "@/lib/social-video/faces";
+
+/** A face is looked at from this share of the largest face's area — a guest
+ * far behind the couple is not the photo's subject. Closed eyes count in the
+ * whole group; softness only on the main faces, since a shallow depth of field
+ * is meant to leave the second row soft. */
+const CLOSED_FROM_SHARE = 0.25;
+const SOFT_FROM_SHARE = 0.5;
+
+/** Per photo, the most faces given the per-face look (blink, sharpness) —
+ * the largest first; a group of 80 is not culled eye by eye. */
+export const MAX_ANALYSED = 24;
+
+/** Face Landmarker's eyeBlink of the more open eye. Both eyes must be shut:
+ * a laugh squints one eye past 0.5 as often as not. */
+export const CLOSED_FROM = 0.5;
+
+/** Eye-region sharpness below this reads as soft. On a real wedding (§7) every
+ * face under 0.12 was visibly out of focus or moving, every face above 0.2
+ * was sharp. */
+export const SOFT_BELOW = 0.12;
+
+/** Eyes closer than this (in the searched copy's pixels) are too small to
+ * judge sharpness — the measure then says more about the JPEG than the lens. */
+export const MIN_EYE_PX = 24;
+
+/** The eye region is sampled to this width (nearest pixel, so the measure
+ * compares like with like across face sizes). */
+export const EYE_SAMPLE_WIDTH = 64;
+const EYE_REGION = { w: 2, h: 0.9 };
+export const EYE_SAMPLE_HEIGHT = Math.round((EYE_SAMPLE_WIDTH * EYE_REGION.h) / EYE_REGION.w);
+
+/** Darker than this (mean grey, 0–255) the eyes cannot be judged: shadow, not focus. */
+const MIN_BRIGHTNESS = 35;
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The faces worth the per-face look, largest first. */
+export function facesToAnalyse(faces: readonly Face[]): Face[] {
+  const strong = faces.filter((f) => f.score >= FRAMING_MIN_SCORE);
+  const largest = Math.max(0, ...strong.map(area));
+  return strong
+    .filter((f) => area(f) >= largest * CLOSED_FROM_SHARE)
+    .sort((a, b) => area(b) - area(a))
+    .slice(0, MAX_ANALYSED);
+}
+
+/** Around both eyes, in the image's pixels; null when the eyes are too small. */
+export function eyeRegion(face: Face, width: number, height: number): Rect | null {
+  const [lx, ly] = [face.le[0] * width, face.le[1] * height];
+  const [rx, ry] = [face.re[0] * width, face.re[1] * height];
+  const apart = Math.hypot(rx - lx, ry - ly);
+  if (apart < MIN_EYE_PX) return null;
+  const w = apart * EYE_REGION.w;
+  const h = apart * EYE_REGION.h;
+  return { x: (lx + rx) / 2 - w / 2, y: (ly + ry) / 2 - h / 2, w, h };
+}
+
+/** A square around the face, for the landmarker: it wants the whole head. */
+export function headRegion(face: Face, width: number, height: number): Rect {
+  const side = Math.max(face.w * width, face.h * height) * 1.8;
+  return {
+    x: (face.x + face.w / 2) * width - side / 2,
+    y: (face.y + face.h / 2) * height - side / 2,
+    w: side,
+    h: side,
+  };
+}
+
+/**
+ * How sharp the eye region is: the energy of its Laplacian over its contrast,
+ * on `rgba` sampled to EYE_SAMPLE_WIDTH × EYE_SAMPLE_HEIGHT. Null when it is
+ * too dark to tell.
+ */
+export function eyeSharpness(
+  rgba: ArrayLike<number>,
+  width: number,
+  height: number,
+): number | null {
+  const grey = new Float32Array(width * height);
+  let mean = 0;
+  for (let i = 0; i < grey.length; i++) {
+    grey[i] = 0.299 * rgba[i * 4]! + 0.587 * rgba[i * 4 + 1]! + 0.114 * rgba[i * 4 + 2]!;
+    mean += grey[i]!;
+  }
+  mean /= grey.length;
+  if (mean < MIN_BRIGHTNESS) return null;
+  let variance = 0;
+  for (const v of grey) variance += (v - mean) ** 2;
+  variance /= grey.length;
+  let energy = 0;
+  let n = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const l = 4 * grey[i]! - grey[i - 1]! - grey[i + 1]! - grey[i - width]! - grey[i + width]!;
+      energy += l * l;
+      n += 1;
+    }
+  }
+  // The +25 keeps a flat, low-contrast patch (skin) from dividing by ~0.
+  return n > 0 ? energy / n / (variance + 25) : null;
+}
+
+export interface PhotoCheck {
+  /** Faces with both eyes shut. */
+  closed: Face[];
+  /** Main faces whose eyes are soft. */
+  soft: Face[];
+}
+
+/** What the check flags on one photo's stored faces. */
+export function checkPhoto(faces: readonly Face[]): PhotoCheck {
+  const looked = facesToAnalyse(faces);
+  const largest = Math.max(0, ...looked.map(area));
+  let closed = looked.filter((f) => f.blink !== null && f.blink >= CLOSED_FROM);
+  // A couple with their eyes shut is a kiss or a hug — the moment, not a miss.
+  if (looked.length <= 2 && closed.length === looked.length) closed = [];
+  const soft = looked.filter(
+    (f) =>
+      area(f) >= largest * SOFT_FROM_SHARE &&
+      f.sharp !== undefined &&
+      f.sharp !== null &&
+      f.sharp < SOFT_BELOW,
+  );
+  return { closed, soft };
+}
+
+function area(f: Face): number {
+  return f.w * f.h;
+}

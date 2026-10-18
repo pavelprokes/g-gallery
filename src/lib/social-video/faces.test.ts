@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  attachBlinks,
-  currentFaces,
-  FACES_MODEL,
-  MAX_FACES,
-  type Face,
-} from "@/lib/social-video/faces";
+import { currentFaces, FACES_MODEL, MAX_FACES, type Face } from "@/lib/social-video/faces";
 
 const face = (over: Partial<Face> = {}): Face => ({
   x: 0.4,
@@ -39,18 +33,5 @@ describe("currentFaces", () => {
     });
     expect(currentFaces(many(MAX_FACES))).not.toBeNull();
     expect(currentFaces(many(MAX_FACES + 1))).toBeNull();
-  });
-});
-
-describe("attachBlinks", () => {
-  it("gives a face the blink of the landmarked face centred in it, and only that", () => {
-    const a = face({ x: 0.1, y: 0.1, w: 0.1, h: 0.1 });
-    const b = face({ x: 0.6, y: 0.1, w: 0.1, h: 0.1 });
-    const [withBlink, without] = attachBlinks(
-      [a, b],
-      [{ x: 0.11, y: 0.11, w: 0.08, h: 0.08, blink: 0.8 }],
-    );
-    expect(withBlink!.blink).toBe(0.8);
-    expect(without!.blink).toBeNull();
   });
 });
