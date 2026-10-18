@@ -90,6 +90,20 @@ describe("suggestPhotos", () => {
     );
   });
 
+  it("tops up a pick that bursts left short — photos taken seconds apart", () => {
+    const burst = Array.from({ length: 8 }, (_, i) => {
+      const p = photo(0);
+      const at = DAY + i * 1000;
+      return {
+        ...p,
+        id: `b${i}`,
+        key: new Date(at).toISOString(),
+        takenAt: new Date(at).toISOString(),
+      };
+    });
+    expect(suggestPhotos(burst, [], VERTICAL, 6)).toHaveLength(6);
+  });
+
   it("steers a 9:16 video towards portrait photos", () => {
     const mixed = day.map((p, i) => (i % 2 ? { ...p, width: 2000, height: 3000 } : p));
     const ids = new Set(suggestPhotos(mixed, [], VERTICAL, 6));

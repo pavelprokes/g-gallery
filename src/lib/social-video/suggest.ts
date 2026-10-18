@@ -3,7 +3,7 @@
 // highlights' pick, which already spreads the choice over the parts of the day
 // and keeps one frame per burst.
 
-import type { TimelinePosition } from "@/lib/gallery-chapters";
+import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
 import { pickHighlights, type HighlightCandidate } from "@/lib/gallery-highlights";
 import { eyesInSafeArea, planShot, type VideoFormat } from "@/lib/social-video/camera";
 import type { PhotoFaces } from "@/lib/social-video/faces";
@@ -32,10 +32,22 @@ export function suggestPhotos(
   const byId = new Map(candidates.map((c) => [c.id, c]));
   // Any gallery gets a proposal — a small one simply all of its photos. (The
   // highlights hold back below 40 photos; a video of five is still a video.)
-  const pool = pickHighlights(candidates, chapterStarts, count * 2, {
+  const highlighted = pickHighlights(candidates, chapterStarts, count * 2, {
     maxPinned: count,
     minPhotosForAuto: 0,
   }).map(({ id, pinned }) => ({ candidate: byId.get(id)!, pinned }));
+  // The pick keeps one frame per burst; a gallery of a few bursts (or photos
+  // without a capture time, uploaded seconds apart) would leave the video
+  // short. Top it up from the rest of the day, evenly.
+  const inPick = new Set(highlighted.map((p) => p.candidate.id));
+  const others = candidates.filter((c) => c.own && !inPick.has(c.id)).sort(compareTimeline);
+  const pool = [
+    ...highlighted,
+    ...evenly(others, count - highlighted.length).map((candidate) => ({
+      candidate,
+      pinned: false,
+    })),
+  ].sort((p, q) => compareTimeline(p.candidate, q.candidate));
 
   const fitness = new Map(pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format)]));
   const pinned = pool.filter((p) => p.pinned);
@@ -114,4 +126,15 @@ function withStrongEnds(
   const first = ranked[0]!.c;
   const last = ranked[1]!.c;
   return [first, ...picked.filter((c) => c !== first && c !== last), last];
+}
+
+/** `n` of `items`, evenly spaced from the first to the last. */
+function evenly<T>(items: readonly T[], n: number): T[] {
+  if (n <= 0) return [];
+  if (items.length <= n) return [...items];
+  if (n === 1) return [items[Math.floor(items.length / 2)]!];
+  return Array.from(
+    { length: n },
+    (_, i) => items[Math.round((i * (items.length - 1)) / (n - 1))]!,
+  );
 }
