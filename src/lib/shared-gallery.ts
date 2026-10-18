@@ -30,6 +30,8 @@ import {
   type PhotoOrder,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
+import { projectionFaces } from "@/lib/projection-camera";
+import type { Face } from "@/lib/social-video/faces";
 import {
   IMAGE_GRANT_TTL_SECONDS,
   signImageAccess,
@@ -86,6 +88,8 @@ export interface GalleryViewData {
     uploaderName: string | null;
     /** Key in the gallery's order — places chapter headers (docs/CHAPTERS.md). */
     orderKey: string;
+    /** For the projection's camera (src/lib/projection-camera.ts). */
+    faces: Face[] | null;
   }[];
   initialCursor: string | null;
   /** The order `initialPhotos` and every `orderKey` are in (src/lib/photo-order.ts). */
@@ -187,6 +191,7 @@ export async function loadGalleryViewData(
           ...ORDER_KEY_SELECT,
           _count: { select: { favorites: true } },
           ...UPLOADER_SELECT,
+          faces: true,
         },
       },
       viewers: {
@@ -299,6 +304,7 @@ export async function loadGalleryViewData(
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
       orderKey: orderKeyOf(order, photo),
+      faces: projectionFaces(photo.faces),
     })),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,

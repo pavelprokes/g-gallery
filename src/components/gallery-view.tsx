@@ -1,5 +1,6 @@
 "use client";
 
+import type { Face } from "@/lib/social-video/faces";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -171,6 +172,9 @@ export interface GalleryPhoto {
   /** Its key in the gallery's order (src/lib/photo-order.ts) — capture time
    * or file name — which is what chapters start at (docs/CHAPTERS.md). */
   orderKey: string;
+  /** The face boxes the projection's camera frames by
+   * (src/lib/projection-camera.ts); null when they were never searched. */
+  faces: Face[] | null;
 }
 
 export interface GalleryViewer {

@@ -149,7 +149,17 @@ async function main() {
   // Accepts uploads, so the wedding page renders it as the compact guest row
   // under the photographer's tiles (docs/GUEST-GALLERIES.md §2).
   const guests = await makeEventGallery(user.id, wedding.id, "Od hostů", "od-hostu", true, 4, true);
-  const listed = await makeEventGallery(user.id, wedding.id, "První výběr", "prvni-vyber", true, 3);
+  // Its photos carry a face, so the projection's camera has one to move to.
+  const listed = await makeEventGallery(
+    user.id,
+    wedding.id,
+    "První výběr",
+    "prvni-vyber",
+    true,
+    3,
+    false,
+    true,
+  );
   const hidden = await makeEventGallery(
     user.id,
     wedding.id,
@@ -438,6 +448,7 @@ async function makeEventGallery(
   listedOnEvent: boolean,
   photos: number,
   allowUpload = false,
+  withFaces = false,
 ): Promise<string> {
   const gallery = await prisma.gallery.create({
     data: {
@@ -468,6 +479,26 @@ async function makeEventGallery(
         status: "CONFIRMED",
         sizeBytes: 900_000,
         takenAt: new Date(Date.UTC(2026, 7, 22, 12, i)),
+        ...(withFaces
+          ? {
+              faces: {
+                v: 1,
+                model: FACES_MODEL,
+                faces: [
+                  {
+                    x: 0.45,
+                    y: 0.25,
+                    w: 0.1,
+                    h: 0.15,
+                    score: 0.9,
+                    le: [0.47, 0.3],
+                    re: [0.53, 0.3],
+                    blink: null,
+                  },
+                ],
+              },
+            }
+          : {}),
       },
     });
   }

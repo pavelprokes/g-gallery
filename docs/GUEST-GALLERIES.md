@@ -537,6 +537,17 @@ not sleep, and its only affordance is a way out (Escape, or a click).
 - **No controls on purpose.** Arrows, a counter or a scrubber on a screen nobody stands next to are
   only things for a guest to poke at. The E2E asserts the dialog contains exactly one button.
 - 6 s per photo, 1.2 s fade, both constants at the top of `src/components/slideshow.tsx`.
+- **Face-aware camera (2026-10-18).** A photo whose faces were searched in the admin
+  (docs/SOCIAL-VIDEO.md §4) moves the way the social video's camera does (§5): a slow push towards the
+  people, a pull out of a group, by turns, across the whole time it is on screen — the outgoing
+  photo keeps moving under the crossfade. `src/lib/projection-camera.ts` plans it with the video's
+  `planShot` for the screen's shape and hands the slideshow keyframes of a CSS transform, so the
+  compositor moves the photo and nothing is drawn per frame. Everything else stands still and
+  whole, as before: photos never searched (a guest's upload arriving live), a photo of the other
+  orientation than the screen — a portrait cut to a landscape band would lose the people the
+  photographer framed — a group too wide to crop, and everything under `prefers-reduced-motion`.
+  The guest page gets the boxes only (`projectionFaces`: framing faces, rounded, no blink), any
+  stored model will do. The same change fixed the second photo being projected twice in a row.
 
 ### Guest self-delete (2026-08-23)
 
