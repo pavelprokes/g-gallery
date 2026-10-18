@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import imageLoader from "@/lib/image-loader";
 import { QUALITY } from "@/lib/image-sizes";
 import type { TimelinePosition } from "@/lib/gallery-chapters";
+import { FORMS, pluralize } from "@/lib/czech-plural";
 import { slugify } from "@/lib/gallery-slug";
 import { placeholderStyle } from "@/lib/placeholder";
 import {
@@ -12,12 +13,14 @@ import {
   planShot,
   sourceWidth,
   type Aspect,
+  type VideoFormat,
 } from "@/lib/social-video/camera";
 import { createFaceFinder, type FaceFinder } from "@/lib/social-video/detect";
 import { chooseCodec, encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
+import { scanFaces } from "@/lib/social-video/face-scan";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
-import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
+import { fetchPhotoBytes, SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
 import { suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
 import {
   buildTimeline,
@@ -86,6 +89,38 @@ function writeDraft(galleryId: string, draft: Draft) {
   } catch {
     // Private mode or full storage: the draft is a convenience, not state.
   }
+}
+
+/** "… se nenačetla": the verb agrees with the count. */
+const NOT_LOADED = {
+  one: "fotka se nenačetla",
+  few: "fotky se nenačetly",
+  many: "fotek se nenačetlo",
+};
+/** After "z": the genitive. */
+const PHOTO_GENITIVE = { one: "fotky", few: "fotek", many: "fotek" };
+
+type Scan =
+  | { kind: "idle" }
+  | { kind: "running"; done: number; total: number }
+  | { kind: "finished"; failed: number };
+
+/** The transform URL a video of `format` fetches a photo at. */
+function sourceUrl(
+  objectKey: string,
+  size: { width: number; height: number },
+  format: VideoFormat,
+) {
+  return imageLoader({ src: objectKey, width: sourceWidth(size, format), quality: QUALITY });
+}
+
+/** A photo's bytes at the size a 9:16 video fetches it — the default format,
+ * so its render finds the transform already cached. */
+function fetchForFaces(photo: StudioPhoto): Promise<Blob> {
+  const { width, height } = photo.candidate;
+  return fetchPhotoBytes(
+    sourceUrl(photo.objectKey, { width: width!, height: height! }, FORMATS["9:16"]),
+  );
 }
 
 type Status =
@@ -182,11 +217,7 @@ export function SocialVideoStudio({
             id,
             width,
             height,
-            url: imageLoader({
-              src: photo.objectKey,
-              width: sourceWidth({ width, height }, format),
-              quality: QUALITY,
-            }),
+            url: sourceUrl(photo.objectKey, { width, height }, format),
           },
         ];
       }),
@@ -231,7 +262,17 @@ export function SocialVideoStudio({
   );
 
   // ---- Prepare: fetch every picked photo, find faces where none are stored ----
-  const finderRef = useRef<Promise<FaceFinder> | null>(null);
+  // One face worker for the page — the picked photos and the whole-gallery
+  // scan queue in it — started on first use.
+  const finderRef = useRef<FaceFinder | null>(null);
+  const finder = useCallback(() => (finderRef.current ??= createFaceFinder()), []);
+  useEffect(
+    () => () => {
+      finderRef.current?.close();
+      finderRef.current = null;
+    },
+    [],
+  );
   const prepared = useRef(new Set<string>());
   useEffect(() => {
     if (!images) return;
@@ -268,7 +309,7 @@ export function SocialVideoStudio({
       if (cancelled) return;
       if (failed.length > 0) {
         setError(
-          `${failed.length} ${failed.length === 1 ? "fotka se nenačetla" : "fotek se nenačetlo"} — ` +
+          `${pluralize(failed.length, NOT_LOADED)} — ` +
             "nejspíš chybí CORS pravidlo GET na úložišti (docs/SETUP.md §3). Video je bez nich.",
         );
       }
@@ -278,18 +319,14 @@ export function SocialVideoStudio({
       if (unknown.length > 0) {
         setStatus({ kind: "preparing", text: "Načítám rozpoznávání tváří…" });
         try {
-          finderRef.current ??= createFaceFinder();
-          const finder = await finderRef.current;
           for (const [i, p] of unknown.entries()) {
             if (cancelled) return;
             setStatus({ kind: "preparing", text: `Hledám tváře ${i + 1}/${unknown.length}` });
-            const { image } = await images.decode(p);
-            found.push({ photoId: p.id, faces: await finder.find(image) });
-            // Let the page breathe between photos — detection blocks the thread.
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            found.push({ photoId: p.id, faces: await finder().find(await images.fetch(p)) });
           }
         } catch (cause) {
-          finderRef.current = null;
+          // The worker stays: a gallery-wide search may be queued in it, and
+          // it tries a failed start again on the next photo.
           console.warn("[g-gallery/social-video] face detection unavailable", cause);
           setNotice("Tváře se nepodařilo rozpoznat — kamera u těch fotek míří na střed.");
         }
@@ -307,16 +344,17 @@ export function SocialVideoStudio({
           console.warn("[g-gallery/social-video] faces not saved", cause),
         );
       }
-      // Decoded for detection only; the preview decodes what it shows.
-      await images.keepOnly([]);
       setStatus({ kind: "idle" });
     })();
     return () => {
       cancelled = true;
+      // A run cut short must not leave the page "preparing": the next run
+      // returns at once when nothing is left to prepare.
+      setStatus((s) => (s.kind === "preparing" ? { kind: "idle" } : s));
     };
     // `faces` is read for the photos being prepared, not a reason to prepare again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images, slidePhotos, galleryId]);
+  }, [images, slidePhotos, galleryId, finder]);
 
   /** The photos on screen at `t` and the one after — what must be decoded. */
   const onScreen = useCallback(
@@ -436,6 +474,41 @@ export function SocialVideoStudio({
   };
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // ---- Faces for the whole gallery, on a click (docs/SOCIAL-VIDEO.md §4) ----
+  const [scan, setScan] = useState<Scan>({ kind: "idle" });
+  const scanAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => scanAbortRef.current?.abort(), []);
+  const withFaces = photos.filter((p) => faces[p.id]).length;
+  const findAllFaces = async () => {
+    const missing = photos.filter((p) => !faces[p.id]);
+    if (missing.length === 0) return;
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setScan({ kind: "running", done: 0, total: missing.length });
+    try {
+      const { failed } = await scanFaces({
+        photos: missing,
+        fetchPhoto: fetchForFaces,
+        find: (blob) => finder().find(blob),
+        save: (entries) => saveFaces(galleryId, entries),
+        onSaved: (entries) =>
+          setFaces((prev) => ({
+            ...prev,
+            ...Object.fromEntries(entries.map((e) => [e.photoId, e.faces])),
+          })),
+        onProgress: ({ done, total }) => setScan({ kind: "running", done, total }),
+        signal: controller.signal,
+      });
+      setScan(controller.signal.aborted ? { kind: "idle" } : { kind: "finished", failed });
+    } catch (cause) {
+      console.warn("[g-gallery/social-video] face scan failed", cause);
+      setScan({ kind: "idle" });
+      setError("Tváře se nepodařilo uložit — zkus hledání spustit znovu, naváže, kde skončilo.");
+    } finally {
+      scanAbortRef.current = null;
+    }
+  };
 
   // ---- Editing the selection ----
   const selected = new Set(order);
@@ -577,6 +650,46 @@ export function SocialVideoStudio({
                 })}
               </ul>
             </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardTitle>Tváře v galerii</CardTitle>
+          <p className="mb-3">
+            Tváře známe u {withFaces} z {pluralize(photos.length, PHOTO_GENITIVE)}.
+          </p>
+          <p className="text-admin-muted text-caption mb-3 dark:text-neutral-400">
+            Podle nich návrh vybírá fotky a kamera míří na lidi. U fotek ve videu se hledají samy;
+            pro celou galerii hledání spusť tady. Běží v prohlížeči na pozadí — u 400 fotek pět až
+            deset minut — a stránku můžeš dál používat. Co najde, se ukládá průběžně.
+          </p>
+          {scan.kind === "running" ? (
+            <div className="space-y-2" role="status">
+              <p>
+                Hledám tváře {scan.done}/{scan.total}
+              </p>
+              <progress className="w-full" value={scan.done} max={scan.total} />
+              <Button size="sm" variant="secondary" onClick={() => scanAbortRef.current?.abort()}>
+                Pozastavit
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={withFaces === photos.length}
+              onClick={() => void findAllFaces()}
+            >
+              {withFaces === photos.length
+                ? "Tváře jsou u všech fotek"
+                : `Najít tváře (${pluralize(photos.length - withFaces, FORMS.photo)})`}
+            </Button>
+          )}
+          {scan.kind === "finished" && (
+            <p className="text-caption mt-3" role="status">
+              Hotovo. Návrh teď počítá s tvářemi — zkus „Navrhnout znovu“.
+              {scan.failed > 0 &&
+                ` ${pluralize(scan.failed, NOT_LOADED)}, zkusí se při dalším hledání.`}
+            </p>
           )}
         </Card>
       </div>

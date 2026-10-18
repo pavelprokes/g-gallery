@@ -41,7 +41,9 @@ as here.
    (`src/components/admin/sortable-list.tsx`) — removes, or adds any photo of the gallery. The
    selection is a draft per gallery in `localStorage`, so a reload keeps it; nothing is stored on
    the server until a video is added to the gallery.
-3. Faces are detected for the picked photos that have none stored yet (§4), and saved.
+3. Faces are detected for the picked photos that have none stored yet (§4), and saved. For the
+   rest of the gallery — so the suggestion sees faces on every photo — the photographer clicks
+   **Najít tváře** on the same page (§4, "The whole gallery"); nothing searches on its own.
 4. A live preview plays, driven by `requestAnimationFrame` through **the same frame function** the
    encoder uses, so the preview is the output.
 5. **Render** encodes frame by frame (§6) and offers the MP4 to download. **Add to gallery** uploads
@@ -74,20 +76,27 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 
 [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) from OpenCV Zoo,
 `face_detection_yunet_2026may.onnx` (**MIT**, 230 kB), run by
-[onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/) 1.30.0 (MIT, Microsoft) **lazily in
-the admin** on the photo already fetched for the render (`sourceWidth`, §5) — never at guest upload
-(the WASM is ~14 MB, too much for wedding-day mobile data). Detecting on the render's own copy costs
-no second download and no second billed transformation. Everything is served from our own origin,
+[onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/) 1.30.0 (MIT, Microsoft) **in a Web
+Worker in the admin** — never at upload, and never at guest upload (the WASM is ~14 MB, too much
+for wedding-day mobile data). A picked photo is searched in the copy already fetched for the render
+(`sourceWidth`, §5): no second download, no second billed transformation. Everything is served from our own origin,
 so the admin makes no request to a third party: the model is committed in `public/vendor/yunet/`,
 onnxruntime's WASM is a hashed static asset of the build (the package asks for it by
 `new URL(…, import.meta.url)`, which Turbopack emits). Single-threaded — threads need a
 cross-origin-isolated page, which the admin is not.
 
-`src/lib/social-video/detect.ts` runs it, its pure half (tensor, decoding, the second look) is
-`yunet.ts`:
+The page hands the worker a photo's compressed bytes (`detect.ts`); the worker (`face-worker.ts`)
+decodes and searches it (`face-finder.ts`, OffscreenCanvas, no DOM), one photo at a time. Turbopack
+bundles it from `new Worker(new URL("./face-worker.ts", import.meta.url))` and starts it as a
+**classic** worker — its bootstrap loads chunks with `importScripts` — so MediaPipe below uses its
+classic build too; the module build fails there on `import.meta`. The pure half (tensor, decoding,
+the second look) is `yunet.ts`:
 
-- **one pass over the whole photo** at its own size (long edge capped at 4096, padded to a multiple
-  of 32) — YuNet has anchors at strides 8/16/32, so a face of ~10 px is found without tiles;
+- **one pass over the whole photo**, long edge scaled to **2048** (padded to a multiple of 32) —
+  YuNet has anchors at strides 8/16/32, so a face of ~10 px is found without tiles. 2048 rather
+  than the ~3000 px source: on the wedding in §7 it found a face on the same photos, lost a few
+  small faces in groups and the bride of one dancing couple, dropped the false hit on the rings'
+  basket, and took half the time;
 - candidates at **score ≥ 0.6**, merged by non-max suppression at IoU 0.3;
 - **a second look** at each one: its surroundings, 3× the box's longer side, scaled to 320 px and
   run again; the box stays only if the model finds the same face there (IoU > 0.4) at **≥ 0.6**.
@@ -95,8 +104,25 @@ cross-origin-isolated page, which the admin is not.
   hands on a steering wheel, a painting over an altar — and no real face;
 - at most **128 faces** a photo, the best-scored (a whole wedding on the steps was 79).
 
-About 0.4 s a photo in Chromium on 4 vCPU without a GPU, main thread, a photo at a time with a yield
-between them; a worker is the next step if that shows (§9.5).
+About **1 s a photo** in Chromium on 4 vCPU without a GPU (single-threaded WASM): the whole pass
+~0.5–1 s, the second look ~20 ms a face, the landmarker ~0.1 s. A laptop is faster; onnxruntime's
+WebGPU backend is the next step if a 400-photo gallery takes too long (§9.5).
+
+### The whole gallery
+
+**Najít tváře** on the video page (Pavel, 2026-10-18: on a click only, never on its own) searches
+every photo without current faces — a gallery uploaded before this existed, or after a `model`
+bump (§Storage). `src/lib/social-video/face-scan.ts`:
+
+- fetches each photo at the size a 9:16 render would (`sourceWidth`, the default format), so a
+  later render finds the transform cached; four photos ahead of the one being searched, never
+  the whole gallery in memory;
+- saves every **20** photos through `saveFaces`, so a scan stopped halfway — **Pozastavit**, the tab
+  closed — keeps what it found, and the next click searches only the rest;
+- skips a photo that does not load or fails (counted, tried again next time).
+
+The worker keeps the page usable meanwhile (measured: no main-thread task over 200 ms during a
+scan). The 29 photos of §7 took ~30 s here; 400 photos are ~7 minutes on this machine.
 
 **Why YuNet** (compared 2026-10-18 on the wedding in §7): MediaPipe's BlazeFace short-range, used
 until then, is tuned for selfies and finds nothing under ~12 % of the photo's height; even with
@@ -118,7 +144,7 @@ score only — YuNet has no eye openness. Its WASM is copied from the pinned pac
 ```json
 {
   "v": 1,
-  "model": "yunet-2026may+check@ort-web-1.30.0",
+  "model": "yunet-2026may@2048+check@ort-web-1.30.0",
   "faces": [
     {
       "x": 0.41,
@@ -252,14 +278,15 @@ there.
 **The detector replaced, same day.** BlazeFace's 19 of 29 led to a comparison of detectors (§4) and
 YuNet, measured on the same 29 photos:
 
-| YuNet                                                   | Result                                                                                                                                                      |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One pass, full resolution (Node, CPU)                   | 29 / 29 photos, 199 faces, ~0.17 s per photo — the groups whole (81 on the steps), but false hits: the rings, hands on a steering wheel, the altar painting |
-| + the second look (§4)                                  | 26 / 29, 175 faces; every one of those false hits gone, no real face lost                                                                                   |
-| In the app (Chromium, onnxruntime-web, ~2900 px source) | **28 / 29 photos, 175 faces**, ~0.4 s per photo                                                                                                             |
-| Faceless in the app                                     | hands on the steering wheel                                                                                                                                 |
-| Left doubtful                                           | the handle of the rings' basket (0.78 — the camera would drift to it), three boxes at 0.60–0.63, under the framing score                                    |
-| Kiss in profile                                         | at the render's size the groom's face is found (0.83); at full resolution it was not                                                                        |
+| YuNet                                                   | Result                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One pass, full resolution (Node, CPU)                   | 29 / 29 photos, 199 faces, ~0.17 s per photo — the groups whole (81 on the steps), but false hits: the rings, hands on a steering wheel, the altar painting                                                             |
+| + the second look (§4)                                  | 26 / 29, 175 faces; every one of those false hits gone, no real face lost                                                                                                                                               |
+| In the app (Chromium, onnxruntime-web, ~2900 px source) | **28 / 29 photos, 175 faces**, ~1.5 s per photo (3072 px, main thread)                                                                                                                                                  |
+| Faceless in the app                                     | hands on the steering wheel                                                                                                                                                                                             |
+| Left doubtful                                           | the handle of the rings' basket (0.78 — the camera would drift to it), three boxes at 0.60–0.63, under the framing score                                                                                                |
+| Kiss in profile                                         | at the render's size the groom's face is found (0.83); at full resolution it was not                                                                                                                                    |
+| In the worker, capped at 2048 px (§4, now)              | **27 / 29 photos, 167 faces**, ~1 s per photo; faceless: the rings and the hands on the steering wheel, both right; the basket's handle gone; lost: 4 small background faces and the bride of the dancing couple (0029) |
 
 The sheet with every box drawn was checked by eye against the photos; the numbers in §4 come from it.
 
@@ -291,8 +318,8 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
    come.
 3. **Lightroom MWG regions** in one of Pavel's exports.
 4. **H.264 encode speed and quality** in Chrome and Safari on Pavel's Mac.
-5. Detector inside a module Web Worker, GPU delegate vs CPU — keeps the admin responsive while it
-   runs.
+5. ~~Detector inside a Web Worker~~ — done (§4). Left: onnxruntime's WebGPU backend vs the
+   single-threaded WASM, if a 400-photo gallery is too slow on Pavel's Mac.
 
 ## 10. Build plan (2026-10-18)
 

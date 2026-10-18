@@ -5,8 +5,9 @@ import { test, expect } from "./fixtures";
 /**
  * The social video, end to end (docs/SOCIAL-VIDEO.md): photos uploaded through
  * the admin into MinIO → the video page proposes them → reordered by keyboard
- * and by dragging → faces looked for with the self-hosted MediaPipe → frames
- * encoded in the browser → an MP4 downloaded.
+ * and by dragging → faces looked for in the face worker → frames encoded in
+ * the browser → an MP4 downloaded → a photo outside the video found by the
+ * whole-gallery "Najít tváře".
  *
  * Chromium only: WebCodecs encoding is what is under test, and Playwright's
  * Chromium has it (VP9 — it lacks H.264, which real Chrome has). The photos are
@@ -50,15 +51,20 @@ test("the photographer turns the gallery into a video and downloads it", async (
       );
       return Array.from(new Uint8Array(await blob.arrayBuffer()));
     };
-    return [await draw(3000, 2000, 20), await draw(2000, 3000, 200), await draw(3000, 2000, 120)];
+    return [
+      await draw(3000, 2000, 20),
+      await draw(2000, 3000, 200),
+      await draw(3000, 2000, 120),
+      await draw(3000, 2000, 300),
+    ];
   });
-  await page.locator('input[type="file"][accept*="image/jpeg"]').setInputFiles(
-    photos.map((bytes, i) => ({
-      name: `svatba_000${i + 1}.jpg`,
-      mimeType: "image/jpeg",
-      buffer: Buffer.from(bytes),
-    })),
-  );
+  const files = photos.map((bytes, i) => ({
+    name: `svatba_000${i + 1}.jpg`,
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(bytes),
+  }));
+  // The fourth comes after the video is drafted, so it is not in it.
+  await page.locator('input[type="file"][accept*="image/jpeg"]').setInputFiles(files.slice(0, 3));
   await expect(page.getByText("3/3 nahráno")).toBeVisible({ timeout: 90_000 });
 
   await page.getByRole("link", { name: "Video pro sítě" }).click();
@@ -111,4 +117,17 @@ test("the photographer turns the gallery into a video and downloads it", async (
   // This Chromium encodes VP9 only, and the gallery takes H.264 only.
   await expect(page.getByText(/umí jen VP9/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Přidat do galerie/ })).toHaveCount(0);
+
+  // A photo outside the video is searched only on the photographer's click.
+  await page.goto(`/admin/g/${seed.socialVideoGalleryId}`);
+  await page.locator('input[type="file"][accept*="image/jpeg"]').setInputFiles(files.slice(3));
+  await expect(page.getByText("1/1 nahráno")).toBeVisible({ timeout: 90_000 });
+  await page.goto(`/admin/g/${seed.socialVideoGalleryId}/video`);
+  await expect(page.getByText("Tváře známe u 3 z 4 fotek.")).toBeVisible();
+  await page.getByRole("button", { name: "Najít tváře (1 fotka)" }).click();
+  await expect(page.getByText(/^Hotovo\./)).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("Tváře známe u 4 z 4 fotek.")).toBeVisible();
+  // Saved, not only shown: a reload still knows.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Tváře jsou u všech fotek" })).toBeDisabled();
 });

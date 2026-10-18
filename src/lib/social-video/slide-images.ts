@@ -20,6 +20,14 @@ interface Decoded {
   backdrop: FrameImage | null;
 }
 
+/** A photo's bytes from the CDN. CORS, so the canvas it is drawn on stays
+ * exportable (docs/SOCIAL-VIDEO.md §9.1). */
+export async function fetchPhotoBytes(url: string): Promise<Blob> {
+  const response = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!response.ok) throw new Error(`PHOTO_${response.status}`);
+  return response.blob();
+}
+
 export class SlideImages {
   private readonly blobs = new Map<string, Promise<Blob>>();
   private readonly decoded = new Map<string, Promise<Decoded>>();
@@ -28,14 +36,11 @@ export class SlideImages {
   /** @param backdropSize the frame's size, a quarter of it is enough (makeBackdrop). */
   constructor(private readonly backdropSize: { width: number; height: number }) {}
 
-  /** The photo's bytes, fetched once. CORS, so the canvas it is drawn on stays exportable. */
+  /** The photo's bytes, fetched once. */
   fetch(photo: SlidePhoto): Promise<Blob> {
     let blob = this.blobs.get(photo.id);
     if (!blob) {
-      blob = fetch(photo.url, { mode: "cors", credentials: "omit" }).then((response) => {
-        if (!response.ok) throw new Error(`PHOTO_${response.status}`);
-        return response.blob();
-      });
+      blob = fetchPhotoBytes(photo.url);
       // A failed fetch is not cached: the next attempt tries again.
       blob.catch(() => this.blobs.delete(photo.id));
       this.blobs.set(photo.id, blob);

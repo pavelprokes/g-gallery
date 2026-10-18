@@ -71,6 +71,12 @@ describe("fitFor", () => {
     expect(fitFor(detail, VERTICAL)).toBeGreaterThan(fitFor(faceless, VERTICAL));
   });
 
+  it("counts as someone only a face the camera would frame", () => {
+    const weak = photo(0, { faces: withFaces({ ...someone(), score: 0.65 }) });
+    const faceless = photo(0, { faces: withFaces() });
+    expect(fitFor(weak, VERTICAL)).toBe(fitFor(faceless, VERTICAL));
+  });
+
   it("holds back a group that 9:16 can only show whole", () => {
     const open = photo(0, { faces: withFaces(someone()) });
 
@@ -141,6 +147,24 @@ describe("suggestPhotos", () => {
     });
     const ids = suggestPhotos(burst, [], VERTICAL, 6);
     expect(ids.filter((id) => Number(id.slice(1)) % 3 === 0)).toEqual([]);
+  });
+
+  it("prefers the highlights' pick over the top-up when they fit as well", () => {
+    // Three rated photos an hour apart and one burst, seconds apart, between
+    // them: the pick holds the three and one frame of the burst, the top-up
+    // fills the pool from the rest of the burst — earlier in the day than two
+    // of the three.
+    const rated = Array.from({ length: 3 }, (_, i) => photo(i * 60, { rating: 5 }));
+    const burst = Array.from({ length: 20 }, (_, i) => {
+      const at = DAY + 30 * 60_000 + i * 1000;
+      return photo(0, {
+        id: `b${String(i).padStart(2, "0")}`,
+        key: new Date(at).toISOString(),
+        takenAt: new Date(at).toISOString(),
+      });
+    });
+    const ids = suggestPhotos([...rated, ...burst], [], FORMATS["16:9"], 6);
+    for (const p of rated) expect(ids).toContain(p.id);
   });
 
   it("steers a 9:16 video towards portrait photos", () => {

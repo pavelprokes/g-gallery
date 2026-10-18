@@ -5,6 +5,7 @@ import {
   confirmed,
   decodeOutputs,
   inputFor,
+  MAX_EDGE,
   mapCandidate,
   suppress,
   toBgrPlanar,
@@ -26,22 +27,22 @@ const candidate = (over: Partial<Candidate> = {}): Candidate => ({
 });
 
 describe("inputFor", () => {
-  it("pads the photo to multiples of 32 and leaves a usual size unscaled", () => {
-    expect(inputFor(3000, 2000)).toEqual({
+  it("pads a small photo to multiples of 32 and leaves it unscaled", () => {
+    expect(inputFor(1500, 1000)).toEqual({
       scale: 1,
-      drawWidth: 3000,
-      drawHeight: 2000,
-      width: 3008,
-      height: 2016,
+      drawWidth: 1500,
+      drawHeight: 1000,
+      width: 1504,
+      height: 1024,
     });
   });
 
-  it("scales an oversized photo down to the long-edge cap", () => {
-    expect(inputFor(8192, 4096)).toMatchObject({
+  it("scales a larger one down to the long-edge cap", () => {
+    expect(inputFor(MAX_EDGE * 2, MAX_EDGE)).toMatchObject({
       scale: 0.5,
-      drawWidth: 4096,
-      width: 4096,
-      height: 2048,
+      drawWidth: MAX_EDGE,
+      width: MAX_EDGE,
+      height: MAX_EDGE / 2,
     });
   });
 });

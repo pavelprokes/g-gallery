@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MEDIAPIPE_VERSION } from "@/lib/social-video/detect";
+import { MEDIAPIPE_VERSION } from "@/lib/social-video/face-finder";
 
 describe("MEDIAPIPE_VERSION", () => {
   it("is the pinned package's — the WASM is served from a path with it", () => {

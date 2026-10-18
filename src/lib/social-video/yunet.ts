@@ -1,6 +1,6 @@
 // YuNet face detection, the pure half (docs/SOCIAL-VIDEO.md §4): the input
 // tensor, decoding the model's raw outputs into boxes, and the second look
-// that confirms each box. The model runs in detect.ts; nothing here touches
+// that confirms each box. The model runs in face-finder.ts; nothing here touches
 // onnxruntime, so all of it is unit-tested.
 //
 // Model: OpenCV Zoo's face_detection_yunet_2026may.onnx (MIT). One pass over
@@ -13,9 +13,11 @@ import { iou, type Face } from "@/lib/social-video/faces";
 
 const STRIDES = [8, 16, 32] as const;
 
-/** The input's long edge at most — the render's source is ~2900 px (§5), so
- * this only bounds memory for an unusually large one. */
-export const MAX_EDGE = 4096;
+/** The input's long edge at most. On a real wedding (§7) 2048 px found a face
+ * on the same photos as the full ~3000 px source, a few of 80 faces fewer in
+ * a big group, in half the time — ~1 s a photo in the browser's single
+ * WASM thread, and a gallery is 400 photos. */
+export const MAX_EDGE = 2048;
 
 /** A box below this score is not a candidate at all. */
 export const MIN_SCORE = 0.6;

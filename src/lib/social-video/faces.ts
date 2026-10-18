@@ -1,6 +1,7 @@
 // Face boxes for the social-video camera (docs/SOCIAL-VIDEO.md §4): the stored
 // shape of `Photo.faces`, and how a blink score joins a detected face. The
-// detector runs in the admin's browser (detect.ts, its pure half in yunet.ts).
+// detector runs in a worker in the admin's browser (face-finder.ts, its pure
+// half in yunet.ts).
 //
 // Detection, not recognition: a box, two eye points and a blink score per face.
 // No embedding, nothing that could match a face across photos.
@@ -9,7 +10,7 @@ import { z } from "zod";
 
 /** Bumped with any change to the model or the thresholds — a stored result
  * from another `model` is recomputed on demand, never mixed in. */
-export const FACES_MODEL = "yunet-2026may+check@ort-web-1.30.0";
+export const FACES_MODEL = "yunet-2026may@2048+check@ort-web-1.30.0";
 
 /** The most faces stored for a photo — the best-scored ones. A whole wedding
  * on the steps is ~80 (docs/SOCIAL-VIDEO.md §7); the cap keeps a bad run from
