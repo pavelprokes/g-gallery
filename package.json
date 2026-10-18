@@ -27,12 +27,13 @@
     "backfill:placeholders": "tsx --conditions=react-server scripts/backfill-placeholders.ts",
     "backfill:taken-at": "tsx --conditions=react-server scripts/backfill-taken-at.ts",
     "clear:missing-thumbs": "tsx --conditions=react-server scripts/clear-missing-thumbs.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copy-mediapipe.mjs",
     "prepare": "husky",
     "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.13",
+    "@mediapipe/tasks-vision": "1.1.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@supabase/supabase-js": "^2.112.3",

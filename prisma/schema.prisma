@@ -396,6 +396,11 @@ model Photo {
   /// The photographer's hand in the highlights: true pinned in, false kept
   /// out, null left to the automatic fill.
   highlightPin       Boolean?
+  /// Face boxes for the social-video camera (docs/SOCIAL-VIDEO.md §4) —
+  /// detection, never recognition: boxes, eye points, a blink score. Computed
+  /// in the admin's browser on demand; null until then. Shape and model in
+  /// src/lib/social-video/faces.ts.
+  faces              Json?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
     imageSizes: [...IMAGE_SIZES],
     qualities: [QUALITY],
   },
+  async headers() {
+    return [
+      {
+        // MediaPipe's WASM for face detection in the admin, copied on install
+        // under its version (scripts/copy-mediapipe.mjs): a new version is a
+        // new path, so the 13 MB file is fetched once per version.
+        source: "/vendor/mediapipe/:version/wasm/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
+  },
 };
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");

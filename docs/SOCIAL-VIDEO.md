@@ -64,10 +64,15 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 ### Detection
 
 [MediaPipe Tasks Vision](https://developers.google.com/edge/mediapipe/solutions/vision/face_detector)
-(Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on a
-1600 px transform of each picked photo — never at guest upload (the WASM bundle is ~13.5 MB, too much
-for wedding-day mobile data). The model and WASM are **self-hosted** in `public/`, so the admin
-makes no request to Google.
+(Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on the
+1080 px variant of each picked photo — never at guest upload (the WASM bundle is ~13.5 MB, too much
+for wedding-day mobile data). 1080 is a width the lightbox already uses (`src/lib/image-sizes.ts`),
+so detection bills no new transformation; it loses nothing either, since BlazeFace scales every
+tile down to 128 px. The model and WASM are **self-hosted**, so the admin makes no request to
+Google: the WASM is copied from the pinned package on install (`scripts/copy-mediapipe.mjs`, served
+immutable under its version), the two models are committed in `public/vendor/mediapipe/models/`.
+`src/lib/social-video/detect.ts` runs it on the main thread, a photo at a time with a yield between
+them (~0.2 s each); a worker is the next step if that shows (§9.5).
 
 The short-range model is tuned for selfies. In the spike it found **no face below ~12 % of the photo
 height**: every large group and most full-length portraits came back empty (28 of 45 photos with a
