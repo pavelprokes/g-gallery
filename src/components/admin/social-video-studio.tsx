@@ -656,8 +656,8 @@ export function SocialVideoStudio({
           </p>
           <p className="text-admin-muted text-caption mb-3 dark:text-neutral-400">
             Podle nich návrh vybírá fotky a kamera míří na lidi. U fotek ve videu se hledají samy;
-            pro celou galerii hledání spusť tady. Běží v prohlížeči na pozadí — u 400 fotek pár
-            minut — a stránku můžeš dál používat. Co najde, se ukládá průběžně.
+            pro celou galerii hledání spusť tady. Běží v prohlížeči na pozadí — u 400 fotek pět až
+            deset minut — a stránku můžeš dál používat. Co najde, se ukládá průběžně.
           </p>
           {scan.kind === "running" ? (
             <div className="space-y-2" role="status">
