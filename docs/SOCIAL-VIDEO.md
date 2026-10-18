@@ -1,6 +1,6 @@
 # Social videos — short silent clips made from a gallery
 
-Proposed 2026-10-18, **not built yet** — the build plan is §10. The authority for the feature once it is: read before
+Proposed and built 2026-10-18 (§10 records how). The authority for the feature: read before
 touching face data on `Photo`, the admin "Video" page, or anything that renders frames in the
 browser. Sources are listed at the end; the numbers in §4–§6 come from a spike run
 on 2026-10-17 (§7).
@@ -239,6 +239,11 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
    runs.
 
 ## 10. Build plan (2026-10-18)
+
+Built the same day: PR 1 as #62, PRs 2 and 3 together as #63. Where the build departed from the
+plan below, the sections above say what was built — detection runs on the main thread on the
+render's own copy of the photo (§4), not in a worker on a 1600 px transform; the suggestion has no
+seeded randomness (§5 step 9). The plan is kept as written.
 
 Three pull requests, each mergeable on its own; nothing a guest sees changes until the third.
 The order follows what can be tested without the open items in §9: the pure parts first, the
