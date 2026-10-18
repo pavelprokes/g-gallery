@@ -15,6 +15,7 @@ const photo = {
   createdAt: new Date("2026-09-20T10:00:00.000Z"),
   fileOrderKey: "svatba0016p0015d0042738jpg",
   wovenAt: new Date("2026-09-05T09:00:00.000Z"),
+  manualOrderKey: "k4",
 };
 
 describe("orderKeyOf", () => {
@@ -36,6 +37,12 @@ describe("orderKeyOf", () => {
       "2026-09-05T08:07:33.880Z",
     );
   });
+
+  it("is the hand-placed key in manual order", () => {
+    expect(orderKeyOf("MANUAL", photo)).toBe("k4");
+    // The trigger's provisional key, for a row read before it ran.
+    expect(orderKeyOf("MANUAL", { ...photo, manualOrderKey: "" })).toBe(`z${photo.fileOrderKey}`);
+  });
 });
 
 describe("queries", () => {
@@ -43,6 +50,7 @@ describe("queries", () => {
     expect(photoOrderBy("TAKEN_AT")).toEqual([{ takenAt: "asc" }, { id: "asc" }]);
     expect(photoOrderBy("FILE_NAME")).toEqual([{ fileOrderKey: "asc" }, { id: "asc" }]);
     expect(photoOrderBy("FILE_NAME_GUESTS_BY_TIME")).toEqual([{ wovenAt: "asc" }, { id: "asc" }]);
+    expect(photoOrderBy("MANUAL")).toEqual([{ manualOrderKey: "asc" }, { id: "asc" }]);
   });
 
   it("pages strictly after a position, in the order's own column", () => {
@@ -58,6 +66,12 @@ describe("queries", () => {
     });
   });
 
+  it("pages a hand-arranged gallery by its key", () => {
+    expect(afterPosition("MANUAL", { key: "k4", id: "p1" })).toEqual({
+      OR: [{ manualOrderKey: { gt: "k4" } }, { manualOrderKey: "k4", id: { gt: "p1" } }],
+    });
+  });
+
   it("counts strictly before a position", () => {
     expect(beforePosition("FILE_NAME", { key: "svatba", id: "p1" })).toEqual({
       OR: [{ fileOrderKey: { lt: "svatba" } }, { fileOrderKey: "svatba", id: { lt: "p1" } }],
@@ -70,12 +84,14 @@ describe("chapter starts", () => {
     startTakenAt: new Date("2026-09-05T11:00:00.000Z"),
     startFileOrderKey: "svatba0012jpg",
     startWovenAt: new Date("2026-09-05T12:30:00.000Z"),
+    startManualKey: "a5" as string | null,
     startPhotoId: "b",
   };
   const pripravy = {
     startTakenAt: new Date("2026-09-05T12:00:00.000Z"),
     startFileOrderKey: "svatba0011jpg",
     startWovenAt: null,
+    startManualKey: null,
     startPhotoId: "a",
   };
 
@@ -86,6 +102,9 @@ describe("chapter starts", () => {
       key: "2026-09-05T12:30:00.000Z",
       id: "b",
     });
+    expect(chapterStartOf("MANUAL", obrad)).toEqual({ key: "a5", id: "b" });
+    // Never arranged by hand: its photo's provisional key.
+    expect(chapterStartOf("MANUAL", pripravy).key).toBe("zsvatba0011jpg");
     // Not woven yet: its capture time stands in.
     expect(chapterStartOf("FILE_NAME_GUESTS_BY_TIME", pripravy).key).toBe(
       "2026-09-05T12:00:00.000Z",
@@ -108,6 +127,8 @@ describe("isValidOrderKey", () => {
     expect(isValidOrderKey("FILE_NAME", "svatba0011jpg")).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "")).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "Svatba_01")).toBe(false);
+    expect(isValidOrderKey("MANUAL", "a5")).toBe(true);
+    expect(isValidOrderKey("MANUAL", "")).toBe(false);
     expect(isValidOrderKey("FILE_NAME", "a".repeat(1280))).toBe(true);
     expect(isValidOrderKey("FILE_NAME", "a".repeat(4097))).toBe(false);
     expect(isValidOrderKey("FILE_NAME_GUESTS_BY_TIME", "2026-09-05T08:07:33.880Z")).toBe(true);

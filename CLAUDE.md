@@ -16,8 +16,9 @@ chapter (it must stay an instant scroll, or it downloads every photo it passes).
 2026-09-28) — read it before touching `pickHighlights`, the `xmp*`/`highlightPin` columns, or the
 jump from a highlight to its photo (same instant-scroll rule as chapters).
 **`docs/PHOTO-ORDER.md`** is the authority for the order a gallery shows its photos in (capture time
-or file name, adopted 2026-09-28) — read it before touching `src/lib/photo-order.ts`, anything that
-orders or pages photos, `fileOrderKey` (a database trigger maintains it), or chapter starts.
+or file name, adopted 2026-09-28; by hand, 2026-10-18) — read it before touching `src/lib/photo-order.ts`, anything that
+orders or pages photos, `fileOrderKey` or `manualOrderKey` (database triggers write them), or
+chapter starts.
 **`docs/VIDEO.md`** is the authority for the photographer's videos (MP4 straight from R2, no
 transcoding, adopted 2026-10-17) — read it before touching `videoObjectKey`, anything that picks
 the key a download delivers, or the lightbox player. On a video row `objectKey` is the _poster_.

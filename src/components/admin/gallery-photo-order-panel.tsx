@@ -1,5 +1,5 @@
 import { setPhotoOrder } from "@/app/admin/photo-order-actions";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import type { PhotoOrder } from "@/lib/photo-order";
@@ -20,6 +20,11 @@ const ORDERS: { value: PhotoOrder; label: string; hint: string }[] = [
     label: "Podle času pořízení",
     hint: "Podle času z fotoaparátu — vhodné pro galerii od hostů. Když má některé tělo nebo dron posunuté hodiny, jeho fotky se zařadí jinam.",
   },
+  {
+    value: "MANUAL",
+    label: "Ručně",
+    hint: "Fotky seřadíš přetažením na stránce Pořadí fotek. Nově nahrané fotky se přidají na konec.",
+  },
 ];
 
 /**
@@ -32,9 +37,12 @@ export function GalleryPhotoOrderPanel({
   order,
   displaced,
   takesGuestPhotos,
+  arrangedBefore,
 }: {
   galleryId: string;
   order: PhotoOrder;
+  /** Arranged by hand before — switching back keeps that order. */
+  arrangedBefore: boolean;
   /** Photos each order would move from the current one (`photosOutOfPlace`). */
   displaced: Record<PhotoOrder, number>;
   /** Guests can add photos here, or already have. */
@@ -63,6 +71,14 @@ export function GalleryPhotoOrderPanel({
         </div>
       </div>
       <p className="text-admin-muted text-sm dark:text-neutral-400">{current.hint}</p>
+      {order === "MANUAL" && (
+        <a
+          href={`/admin/g/${galleryId}/order`}
+          className={`${buttonClasses("primary", "md")} mt-3`}
+        >
+          Upravit pořadí
+        </a>
+      )}
       {order === "FILE_NAME" && takesGuestPhotos && (
         <p className="text-admin-danger mt-2 text-sm">
           Do galerie nahrávají hosté. Fotky z telefonů mají názvy podle počítadla telefonu
@@ -73,9 +89,11 @@ export function GalleryPhotoOrderPanel({
       <ul className="text-admin-muted mt-2 text-sm dark:text-neutral-400">
         {others.map((other) => (
           <li key={other.value}>
-            {displaced[other.value] === 0
-              ? `Řazení ${other.label.toLocaleLowerCase("cs")} vychází u této galerie stejně.`
-              : `Řazení ${other.label.toLocaleLowerCase("cs")} by přesunulo ${pluralize(displaced[other.value], FORMS.photoAccusative)}.`}
+            {other.value === "MANUAL" && !arrangedBefore
+              ? "Ruční řazení začne od toho současného — pak fotky přetahuješ, kam patří."
+              : displaced[other.value] === 0
+                ? `Řazení ${other.label.toLocaleLowerCase("cs")} vychází u této galerie stejně.`
+                : `Řazení ${other.label.toLocaleLowerCase("cs")} by přesunulo ${pluralize(displaced[other.value], FORMS.photoAccusative)}.`}
           </li>
         ))}
       </ul>

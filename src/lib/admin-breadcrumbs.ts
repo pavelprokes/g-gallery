@@ -61,3 +61,8 @@ export function gallerySignCrumbs(gallery: GalleryRef): Crumb[] {
 export function galleryVideoCrumbs(gallery: GalleryRef): Crumb[] {
   return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Video pro sítě");
 }
+
+/** Přehled / [{wedding}] / {gallery} / Pořadí fotek */
+export function galleryOrderCrumbs(gallery: GalleryRef): Crumb[] {
+  return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Pořadí fotek");
+}

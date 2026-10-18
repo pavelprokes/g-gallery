@@ -17,15 +17,16 @@ The photographer already has the right order: Lightroom's, which is where the ph
 corrected and sequenced. The export writes it into the file names (`svatba_0001_PPR57923.jpg`). A
 gallery can now be shown in that order instead.
 
-## The two orders
+## The orders
 
 `Gallery.photoOrder`, per gallery, set in the admin (panel "Pořadí fotek"):
 
-| Order                      | Key                  | Use when                                                    |
-| -------------------------- | -------------------- | ----------------------------------------------------------- |
-| `FILE_NAME` (default)      | `Photo.fileOrderKey` | the export numbers the files in Lightroom's order           |
-| `TAKEN_AT`                 | `Photo.takenAt`, ISO | guests' galleries; originals with their camera names        |
-| `FILE_NAME_GUESTS_BY_TIME` | `Photo.wovenAt`, ISO | a delivered gallery guests also add to (opt-in, 2026-09-29) |
+| Order                      | Key                    | Use when                                                    |
+| -------------------------- | ---------------------- | ----------------------------------------------------------- |
+| `FILE_NAME` (default)      | `Photo.fileOrderKey`   | the export numbers the files in Lightroom's order           |
+| `TAKEN_AT`                 | `Photo.takenAt`, ISO   | guests' galleries; originals with their camera names        |
+| `FILE_NAME_GUESTS_BY_TIME` | `Photo.wovenAt`, ISO   | a delivered gallery guests also add to (opt-in, 2026-09-29) |
+| `MANUAL`                   | `Photo.manualOrderKey` | the photographer arranges it by hand (opt-in, 2026-10-18)   |
 
 File-name order is the default since 2026-09-28 (Pavel: the photographer exports from Lightroom
 with a sequence "almost always"). A **guests' gallery** gets capture time instead, set where one is made as such: the wedding
@@ -138,3 +139,41 @@ when a chapter is created; a chapter that has never had one reads its capture ti
 
 The admin panel counts, for each order, how many photos it would move from the current one; the
 woven order is computed on the spot for that, so the number is right before the switch too.
+
+## Manual order
+
+Adopted 2026-10-18, **opt-in only** (Pavel: "drag & drop pro změnu pořadí" in the gallery). The
+photographer picks "Ručně" in "Pořadí fotek" and drags the photos into place on
+`/admin/g/[id]/order` — a mouse anywhere on a tile, a finger by its ⠿ handle (so the page still
+scrolls), the keyboard with the arrows, Home and End; the page scrolls itself near the window's
+edge (`src/components/admin/sortable-list.tsx`).
+
+**The key.** `Photo.manualOrderKey`, over the same `[0-9a-z]` alphabet as `fileOrderKey`, for the
+same load-bearing reason (the grid compares keys as JavaScript strings). A drop writes **one row**:
+the moved photo gets a key strictly between its new neighbours' (`keyBetween`,
+`src/lib/manual-order.ts` — the shortest such key, never ending in "0", so there is always room
+before it). The neighbours are read from the database under a per-gallery advisory lock
+(`movePhoto`, `src/lib/manual-order-db.ts`), not taken from the browser, so two tabs dragging at
+once still end consistent. If there is no room — two photos sharing a provisional key — the gallery
+is renumbered in the new order instead.
+
+**New photos go to the end.** A database trigger (`Photo_manualOrderKey`, firing after
+`Photo_fileOrderKey`) gives every inserted photo `"z"` + its file-name key, so uploads wait at the
+end in file-name order until placed. Placed keys stay below `"z"`: the first arrangement spreads
+keys under it (`spreadKeys`), and a photo dropped last among placed ones gets a key under it too
+(`placeBetween`). A photo dropped among the waiting ones gets a key between theirs. The migration
+gave every existing photo its provisional key.
+
+**The first switch, and switching back.** The first time a gallery is switched to `MANUAL`,
+`arrangeByHandFirstTime` gives its photos evenly spread keys **in the order it shows at that
+moment**, so nothing a guest sees moves, and stamps `Gallery.manualOrderAt`. After that the
+arrangement is the photographer's work and is kept: switching to file names and back restores it,
+with anything uploaded in between at the end.
+
+**Chapters** store `startManualKey`. A chapter begins at a photo, so it moves with it: a drop
+writes the moved photo's new key to every chapter starting on it. The first arrangement puts each
+chapter on its start photo's key, or — its photo deleted — just before the photo that stood in for
+it; a chapter never arranged reads its photo's provisional key.
+
+Everything else follows as for the other orders: the cursor (`isValidOrderKey` accepts the key
+alphabet only), the ZIP, the link preview, the highlights' order.

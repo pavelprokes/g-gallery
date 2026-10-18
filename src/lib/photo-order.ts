@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { PhotoOrder } from "@/generated/prisma/enums";
 import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
+import { isManualKey } from "@/lib/manual-order";
 
 /**
  * The order a gallery shows its photos in (docs/PHOTO-ORDER.md), in one place
@@ -15,7 +16,9 @@ import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
  *     comparison order the same way;
  *   - FILE_NAME_GUESTS_BY_TIME — `key` is `Photo.wovenAt` as an ISO string:
  *     the photographer's photos in file-name order, guests' woven in by
- *     capture time (src/lib/woven-order.ts).
+ *     capture time (src/lib/woven-order.ts);
+ *   - MANUAL — `key` is `Photo.manualOrderKey`, placed by hand in the admin
+ *     over the same [0-9a-z] alphabet (src/lib/manual-order.ts).
  * `id` breaks ties: a burst shares a second, two cameras can share a name.
  */
 
@@ -26,6 +29,7 @@ const ORDERS: Record<PhotoOrder, true> = {
   TAKEN_AT: true,
   FILE_NAME: true,
   FILE_NAME_GUESTS_BY_TIME: true,
+  MANUAL: true,
 };
 export const PHOTO_ORDERS = Object.keys(ORDERS) as PhotoOrder[];
 
@@ -39,6 +43,7 @@ export const ORDER_KEY_SELECT = {
   createdAt: true,
   fileOrderKey: true,
   wovenAt: true,
+  manualOrderKey: true,
 } as const;
 
 interface OrderKeyColumns {
@@ -46,10 +51,18 @@ interface OrderKeyColumns {
   createdAt: Date;
   fileOrderKey: string;
   wovenAt: Date | null;
+  manualOrderKey: string;
+}
+
+/** The orders whose key is a string column rather than a time. */
+type StringKeyed = "FILE_NAME" | "MANUAL";
+const stringColumn = { FILE_NAME: "fileOrderKey", MANUAL: "manualOrderKey" } as const;
+function isStringKeyed(order: PhotoOrder): order is StringKeyed {
+  return order === "FILE_NAME" || order === "MANUAL";
 }
 
 /** The time column a time-keyed order sorts by. */
-function timeColumn(order: Exclude<PhotoOrder, "FILE_NAME">): "takenAt" | "wovenAt" {
+function timeColumn(order: Exclude<PhotoOrder, StringKeyed>): "takenAt" | "wovenAt" {
   return order === "FILE_NAME_GUESTS_BY_TIME" ? "wovenAt" : "takenAt";
 }
 
@@ -59,6 +72,9 @@ function timeColumn(order: Exclude<PhotoOrder, "FILE_NAME">): "takenAt" | "woven
  */
 export function orderKeyOf(order: PhotoOrder, photo: OrderKeyColumns): string {
   if (order === "FILE_NAME") return photo.fileOrderKey;
+  // A trigger writes every row's key; the fallback mirrors it for a row read
+  // in the instant before (it cannot be empty in the database).
+  if (order === "MANUAL") return photo.manualOrderKey || `z${photo.fileOrderKey}`;
   // `wovenAt` is written for every confirmed photo before a gallery switches
   // to that order and on every change after; the fallbacks only keep a photo
   // caught between two writes on the page rather than dropping it.
@@ -72,8 +88,8 @@ export function positionOf(order: PhotoOrder, photo: OrderKeyColumns & { id: str
 
 /** Prisma `orderBy` for the gallery's order. */
 export function photoOrderBy(order: PhotoOrder): Prisma.PhotoOrderByWithRelationInput[] {
-  return order === "FILE_NAME"
-    ? [{ fileOrderKey: "asc" }, { id: "asc" }]
+  return isStringKeyed(order)
+    ? [{ [stringColumn[order]]: "asc" }, { id: "asc" }]
     : [{ [timeColumn(order)]: "asc" }, { id: "asc" }];
 }
 
@@ -93,9 +109,10 @@ function strictly(
   side: "gt" | "lt",
 ): Prisma.PhotoWhereInput {
   const id = { [side]: position.id };
-  if (order === "FILE_NAME") {
+  if (isStringKeyed(order)) {
+    const column = stringColumn[order];
     return {
-      OR: [{ fileOrderKey: { [side]: position.key } }, { fileOrderKey: position.key, id }],
+      OR: [{ [column]: { [side]: position.key } }, { [column]: position.key, id }],
     };
   }
   const column = timeColumn(order);
@@ -108,6 +125,7 @@ export const CHAPTER_START_SELECT = {
   startTakenAt: true,
   startFileOrderKey: true,
   startWovenAt: true,
+  startManualKey: true,
   startPhotoId: true,
 } as const;
 
@@ -122,16 +140,20 @@ export function chapterStartOf(
     startTakenAt: Date;
     startFileOrderKey: string;
     startWovenAt: Date | null;
+    startManualKey: string | null;
     startPhotoId: string;
   },
 ): TimelinePosition {
   const key =
     order === "FILE_NAME"
       ? chapter.startFileOrderKey
-      : (
-          (order === "FILE_NAME_GUESTS_BY_TIME" ? chapter.startWovenAt : null) ??
-          chapter.startTakenAt
-        ).toISOString();
+      : order === "MANUAL"
+        ? // Never arranged: the start photo's provisional key, as the trigger writes it.
+          (chapter.startManualKey ?? `z${chapter.startFileOrderKey}`)
+        : (
+            (order === "FILE_NAME_GUESTS_BY_TIME" ? chapter.startWovenAt : null) ??
+            chapter.startTakenAt
+          ).toISOString();
   return { key, id: chapter.startPhotoId };
 }
 
@@ -173,5 +195,6 @@ export function isValidOrderKey(order: PhotoOrder, key: string): boolean {
   // A 512-character file name keys to at most ~2.5 times its length (every
   // digit run gains a length prefix, "æ" becomes "ae"); 4096 is well clear.
   if (order === "FILE_NAME") return /^[0-9a-z]*$/.test(key) && key.length <= 4096;
+  if (order === "MANUAL") return isManualKey(key);
   return !Number.isNaN(new Date(key).getTime());
 }

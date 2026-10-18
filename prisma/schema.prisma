@@ -131,6 +131,8 @@ enum PhotoOrder {
   /// The photographer's photos by file name, guests' photos woven in among
   /// them by capture time (`Photo.wovenAt`). Opt-in only.
   FILE_NAME_GUESTS_BY_TIME
+  /// Arranged by hand in the admin (`Photo.manualOrderKey`). Opt-in only.
+  MANUAL
 
   @@schema("g_gallery")
 }
@@ -284,6 +286,10 @@ model Gallery {
   /// order even where a camera's clock was off — or capture time, which a
   /// guests' gallery gets (phones name their files, not the day).
   photoOrder        PhotoOrder @default(FILE_NAME)
+  /// When the photos were first given hand-made keys (docs/PHOTO-ORDER.md
+  /// §Manual order). Switching back to MANUAL after that keeps the order the
+  /// photographer made; null means it starts from the order shown at the time.
+  manualOrderAt     DateTime?
 
   /// Which wedding page lists this gallery, if any. Nullable by design:
   /// a standalone gallery with no wedding page around it stays legal.
@@ -385,6 +391,11 @@ model Photo {
   /// `refreshWovenOrder` whenever the gallery's photos change — only while the
   /// gallery uses that order; null everywhere else.
   wovenAt            DateTime?
+  /// Position in MANUAL order (docs/PHOTO-ORDER.md §Manual order), over the
+  /// same [0-9a-z] alphabet as `fileOrderKey`. A database trigger gives every
+  /// new photo "z" + its file-name key, so it waits at the end until placed;
+  /// a drag in the admin writes a key between its new neighbours'.
+  manualOrderKey     String      @default("")
   /// The photographer's Lightroom marks, read from the export's XMP in the
   /// browser at upload (src/lib/xmp-picks.ts). Hints for the automatic
   /// highlights (docs/HIGHLIGHTS.md) and nothing else; null/false on photos
@@ -419,6 +430,8 @@ model Photo {
   @@index([galleryId, status, fileOrderKey])
   /// The same, for file names with guests woven in by time.
   @@index([galleryId, status, wovenAt])
+  /// The same, for galleries arranged by hand.
+  @@index([galleryId, status, manualOrderKey])
   /// Drives the per-gallery guest quota count and the admin's "from guests" view.
   @@index([galleryId, source])
   @@index([uploadedByViewerId])
@@ -767,6 +780,10 @@ model GalleryChapter {
   /// The start photo's `wovenAt`, kept for the same reason. Follows the photo
   /// in `refreshWovenOrder`; null until the gallery first uses that order.
   startWovenAt      DateTime?
+  /// The start photo's `manualOrderKey`, kept for the same reason; moved with
+  /// the photo when it is dragged. Null until the gallery is first arranged by
+  /// hand — read as the start photo's provisional key then.
+  startManualKey    String?
   /// The link anchor (`…/g/{token}/{slug}#obrad`), from the Czech title and
   /// frozen at creation like `ShareLink.slug`: a rename never breaks a link
   /// already sent. Null only on rows from before it existed — the chapter's id

@@ -79,6 +79,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       featuredVideoId: true,
       highlightsEnabled: true,
       photoOrder: true,
+      manualOrderAt: true,
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
       event: { select: { id: true, title: true } },
       photos: {
@@ -493,6 +494,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         galleryId={gallery.id}
         order={order}
         displaced={displacedByOrder(order, gallery.photos)}
+        arrangedBefore={gallery.manualOrderAt !== null}
         takesGuestPhotos={
           gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
           gallery.photos.some((photo) => photo.source === "GUEST")

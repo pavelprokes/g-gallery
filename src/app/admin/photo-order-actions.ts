@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { PHOTO_ORDERS, type PhotoOrder } from "@/lib/photo-order";
 import { refreshWovenOrder } from "@/lib/woven-order-db";
+import { arrangeByHandFirstTime } from "@/lib/manual-order-db";
 
 // Server Actions are publicly reachable POST endpoints — this one re-verifies
 // the session (CLAUDE.md invariant #3) and scopes the write by `ownerId`.
@@ -16,8 +17,8 @@ const inputSchema = z.object({
   order: z.enum(PHOTO_ORDERS as [PhotoOrder, ...PhotoOrder[]]),
 });
 
-/** Shows the gallery's photos by capture time, by file name, or by file name
- * with guests' photos woven in by capture time. */
+/** Shows the gallery's photos by capture time, by file name, by file name
+ * with guests' photos woven in by capture time, or in the order arranged by hand. */
 export async function setPhotoOrder(galleryId: string, order: PhotoOrder) {
   const session = await requireAdmin();
 
@@ -29,6 +30,11 @@ export async function setPhotoOrder(galleryId: string, order: PhotoOrder) {
     select: { id: true },
   });
   if (!owned) throw new Error("NOT_FOUND");
+
+  // The first time a gallery is arranged by hand it starts from the order it
+  // shows now; after that its hand-made order is kept, whatever it was
+  // switched to in between (docs/PHOTO-ORDER.md §Manual order).
+  if (input.data.order === "MANUAL") await arrangeByHandFirstTime(owned.id);
 
   // The woven order reads `wovenAt`, which is only kept up to date while a
   // gallery uses it — so it is written, for every photo and chapter start,
@@ -48,5 +54,6 @@ export async function setPhotoOrder(galleryId: string, order: PhotoOrder) {
   // Once more after the switch: a photo confirmed between the two writes was
   // skipped by its own refresh (the order was not woven yet when it ran).
   if (input.data.order === "FILE_NAME_GUESTS_BY_TIME") await refreshWovenOrder(owned.id);
-  revalidatePath(`/admin/g/${input.data.galleryId}`);
+  // "layout": the order page under it (/order) shows the switch too.
+  revalidatePath(`/admin/g/${input.data.galleryId}`, "layout");
 }

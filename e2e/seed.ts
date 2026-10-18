@@ -273,6 +273,8 @@ async function main() {
   // docs/SOCIAL-VIDEO.md: the spec uploads real photos through the admin and
   // renders a video from them — an empty gallery of its own.
   const socialVideoGalleryId = await makeSocialVideoGallery(user.id);
+  // docs/PHOTO-ORDER.md §Manual order: arranged by hand in the spec, so its own.
+  const manualOrder = await makeManualOrderGallery(user.id);
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -280,6 +282,7 @@ async function main() {
       adminCookie,
       videoGalleries,
       socialVideoGalleryId,
+      manualOrder,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -839,6 +842,73 @@ async function makeSelectGallery(ownerId: string) {
  * video spec fills it through the admin uploader. Two seeded photos around
  * where the video lands, so the lightbox has neighbours to swipe to.
  */
+/**
+ * A gallery to arrange by hand (docs/PHOTO-ORDER.md §Manual order): seventy
+ * photos in file-name order — more than a page, so the cursor is crossed — and
+ * two chapters, at the first photo and the thirtieth.
+ */
+async function makeManualOrderGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Ruční pořadí",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-manual-order-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const photoCount = 70;
+  const fileName = (n: number) => `rucne_${String(n).padStart(4, "0")}.jpg`;
+  const takenAt = (n: number) => new Date(Date.UTC(2026, 8, 5, 8, n));
+  const rows = new Map<number, { id: string }>();
+  for (let n = 1; n <= photoCount; n += 1) {
+    rows.set(
+      n,
+      await prisma.photo.create({
+        data: {
+          galleryId: gallery.id,
+          objectKey: `${gallery.storagePrefix}/manual-photo-${n}.jpg`,
+          fileName: fileName(n),
+          mimeType: "image/jpeg",
+          width: 1200,
+          height: 800,
+          placeholder: "#7d6a5a",
+          status: "CONFIRMED",
+          sizeBytes: 900_000,
+          takenAt: takenAt(n),
+        },
+        select: { id: true },
+      }),
+    );
+  }
+  for (const { title, slug, at } of [
+    { title: "Přípravy", slug: "pripravy", at: 1 },
+    { title: "Obřad", slug: "obrad", at: 30 },
+  ]) {
+    await prisma.galleryChapter.create({
+      data: {
+        galleryId: gallery.id,
+        title,
+        slug,
+        startTakenAt: takenAt(at),
+        startPhotoId: rows.get(at)!.id,
+      },
+    });
+  }
+  const token = generateShareToken();
+  const slug = gallerySlug(gallery.title, null);
+  await prisma.shareLink.create({
+    data: { galleryId: gallery.id, tokenHash: hashShareToken(token), slug },
+  });
+  return {
+    galleryId: gallery.id,
+    token,
+    slug,
+    fileNames: Array.from({ length: photoCount }, (_, i) => fileName(i + 1)),
+  };
+}
+
 async function makeSocialVideoGallery(ownerId: string) {
   const gallery = await prisma.gallery.create({
     data: {
