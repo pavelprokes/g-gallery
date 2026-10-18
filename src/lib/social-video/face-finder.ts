@@ -1,6 +1,7 @@
 // Face detection (docs/SOCIAL-VIDEO.md §4): YuNet over the whole photo, a
-// second look at each box, and MediaPipe's Face Landmarker for the blink
-// score. Runs inside the face worker (face-worker.ts, driven by detect.ts), so
+// second look at each box, then for the faces that matter MediaPipe's Face
+// Landmarker on the head for the blink score and the eye region's sharpness
+// (the photo check, src/lib/photo-check.ts). Runs inside the face worker (face-worker.ts, driven by detect.ts), so
 // it uses only what a worker has: OffscreenCanvas, no DOM.
 //
 // Everything is served from our own origin: onnxruntime's WASM is a hashed
@@ -9,7 +10,17 @@
 // on install (scripts/copy-mediapipe.mjs). The model is committed in
 // public/vendor/yunet/ — OpenCV Zoo, MIT, sha256 ebafce4e…22f0f0.
 
-import { attachBlinks, FACES_MODEL, MAX_FACES, type PhotoFaces } from "@/lib/social-video/faces";
+import {
+  centredInCrop,
+  EYE_SAMPLE_HEIGHT,
+  EYE_SAMPLE_WIDTH,
+  eyeRegion,
+  eyeSharpness,
+  facesToAnalyse,
+  headRegion,
+  type Rect,
+} from "@/lib/photo-check";
+import { FACES_MODEL, MAX_FACES, type Face, type PhotoFaces } from "@/lib/social-video/faces";
 import {
   CHECK_MIN_SCORE,
   CHECK_SIZE,
@@ -31,9 +42,8 @@ const MEDIAPIPE_WASM = `/vendor/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
 const LANDMARKER_MODEL = "/vendor/mediapipe/models/face_landmarker.task";
 const YUNET_MODEL = "/vendor/yunet/face_detection_yunet_2026may.onnx";
 
-/** Faces the landmarker looks for at most — enough for any photo whose blink
- * matters (a portrait, a couple, a small group). */
-const LANDMARKER_FACES = 12;
+/** The head is drawn this large for the landmarker — its own input is 192 px. */
+const HEAD_SIZE = 256;
 
 export interface FaceFinderCore {
   /** The faces in a decoded photo, ready to store. */
@@ -58,7 +68,9 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       vision.FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: LANDMARKER_MODEL },
         runningMode: "IMAGE",
-        numFaces: LANDMARKER_FACES,
+        // One head at a time, cut out around a face YuNet found: on the whole
+        // photo the landmarker misses most faces smaller than a portrait's.
+        numFaces: 1,
         outputFaceBlendshapes: true,
       }),
     )
@@ -81,6 +93,7 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     // Resizing resets the context's state, smoothing included.
     canvas.width = to.width;
     canvas.height = to.height;
+    ctx!.imageSmoothingEnabled = true;
     ctx!.imageSmoothingQuality = "high";
     ctx!.fillStyle = "#000";
     ctx!.fillRect(0, 0, to.width, to.height);
@@ -94,6 +107,62 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     ]);
     const outputs = await session.run({ [session.inputNames[0]!]: input });
     return decodeOutputs(outputs, to.width, to.height, minScore);
+  }
+
+  /** `source`'s `region` drawn into a `width`×`height` canvas (black where it
+   * leaves the photo); nearest pixel when `nearest`. */
+  function sample(
+    source: ImageBitmap,
+    region: Rect,
+    width: number,
+    height: number,
+    nearest: boolean,
+  ) {
+    canvas.width = width;
+    canvas.height = height;
+    ctx!.imageSmoothingEnabled = !nearest;
+    ctx!.imageSmoothingQuality = "high";
+    ctx!.fillStyle = "#000";
+    ctx!.fillRect(0, 0, width, height);
+    ctx!.drawImage(source, region.x, region.y, region.w, region.h, 0, 0, width, height);
+    return ctx!.getImageData(0, 0, width, height);
+  }
+
+  /** The eyes and the smile on the head cut out around `face`: what tells a
+   * blink from a laugh (src/lib/photo-check.ts). Nulls without a landmarker or
+   * a face. */
+  function expressionOf(image: ImageBitmap, face: Face): Pick<Face, "blink" | "smile"> {
+    const none = { blink: null, smile: null };
+    if (!landmarker) return none;
+    const head = sample(
+      image,
+      headRegion(face, image.width, image.height),
+      HEAD_SIZE,
+      HEAD_SIZE,
+      false,
+    );
+    const marked = landmarker.detect(head);
+    // The crop can hold a neighbour's face too (a couple cheek to cheek, a
+    // tight row); its blink must not land on this face.
+    if (!centredInCrop(marked.faceLandmarks[0] ?? [])) return none;
+    const shapes = marked.faceBlendshapes[0]?.categories ?? [];
+    const pair = (name: string, both: (a: number, b: number) => number) => {
+      const left = shapes.find((c) => c.categoryName === `${name}Left`)?.score;
+      const right = shapes.find((c) => c.categoryName === `${name}Right`)?.score;
+      return left === undefined || right === undefined ? null : round3(both(left, right));
+    };
+    return {
+      blink: pair("eyeBlink", Math.min),
+      smile: pair("mouthSmile", (a, b) => (a + b) / 2),
+    };
+  }
+
+  function sharpnessOf(image: ImageBitmap, face: Face): number | null {
+    const region = eyeRegion(face, image.width, image.height);
+    if (!region) return null;
+    const pixels = sample(image, region, EYE_SAMPLE_WIDTH, EYE_SAMPLE_HEIGHT, true);
+    const sharp = eyeSharpness(pixels.data, EYE_SAMPLE_WIDTH, EYE_SAMPLE_HEIGHT);
+    return sharp === null ? null : round3(sharp);
   }
 
   return {
@@ -123,23 +192,20 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       // Best first (suppress sorts), so the cap drops the least sure.
       const faces = kept.slice(0, MAX_FACES).map((c) => toFace(c, width, height));
 
-      if (!landmarker) return { v: 1, model: FACES_MODEL, faces };
-      const marked = landmarker.detect(image);
-      const landmarked = marked.faceLandmarks.map((points, i) => {
-        const xs = points.map((p) => p.x);
-        const ys = points.map((p) => p.y);
-        const blink = Math.max(
-          0,
-          ...(marked.faceBlendshapes[i]?.categories ?? [])
-            .filter((c) => c.categoryName.startsWith("eyeBlink"))
-            .map((c) => c.score),
-        );
-        const x = Math.min(...xs);
-        const y = Math.min(...ys);
-        return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, blink };
-      });
-
-      return { v: 1, model: FACES_MODEL, faces: attachBlinks(faces, landmarked) };
+      const looked = new Set(facesToAnalyse(faces));
+      return {
+        v: 1,
+        model: FACES_MODEL,
+        faces: faces.map((face) =>
+          looked.has(face)
+            ? { ...face, ...expressionOf(image, face), sharp: sharpnessOf(image, face) }
+            : face,
+        ),
+      };
     },
   };
+}
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
 }

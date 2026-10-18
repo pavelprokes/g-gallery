@@ -17,6 +17,7 @@ import { prisma } from "../src/lib/db";
 import { generateShareToken, hashShareToken } from "../src/lib/share-token";
 import { gallerySlug } from "../src/lib/gallery-slug";
 import { refreshWovenOrder } from "../src/lib/woven-order-db";
+import { FACES_MODEL, type Face } from "../src/lib/social-video/faces";
 
 async function main() {
   let user = await prisma.user.findFirst({ where: { email: "e2e@example.com" } });
@@ -275,6 +276,9 @@ async function main() {
   const socialVideoGalleryId = await makeSocialVideoGallery(user.id);
   // docs/PHOTO-ORDER.md §Manual order: arranged by hand in the spec, so its own.
   const manualOrder = await makeManualOrderGallery(user.id);
+  // docs/SOCIAL-VIDEO.md §4, the photo check: faces stored as the worker
+  // would, so the flags are known without running the detector.
+  const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -283,6 +287,7 @@ async function main() {
       videoGalleries,
       socialVideoGalleryId,
       manualOrder,
+      photoCheckGalleryId,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1005,4 +1010,58 @@ async function makeActivity(ownerId: string) {
     createdAt: new Date(Date.UTC(2025, 0, 1 + day, 12)),
   }));
   await prisma.activityEvent.createMany({ data: [...downloads, ...favorites] });
+}
+
+async function makePhotoCheckGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Kontrola fotek",
+      status: "DRAFT",
+      storagePrefix: `galleries/e2e-photo-check-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const face = (x: number, over: Partial<Face> = {}): Face => ({
+    x,
+    y: 0.2,
+    w: 0.1,
+    h: 0.15,
+    score: 0.9,
+    le: [x + 0.02, 0.25],
+    re: [x + 0.07, 0.25],
+    blink: 0.05,
+    sharp: 0.8,
+    ...over,
+  });
+  const photos: [string, Face[] | null][] = [
+    // A group of five, one of them blinking.
+    [
+      "kontrola_0001.jpg",
+      [0, 0.15, 0.3, 0.45, 0.6].map((x, i) => face(x, i === 2 ? { blink: 0.9 } : {})),
+    ],
+    // A sharp portrait: nothing to say.
+    ["kontrola_0002.jpg", [face(0.4)]],
+    // A portrait whose eyes are soft.
+    ["kontrola_0003.jpg", [face(0.4, { sharp: 0.03 })]],
+    // Not searched yet.
+    ["kontrola_0004.jpg", null],
+  ];
+  for (const [fileName, faces] of photos) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${fileName}`,
+        fileName,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#7d6a5a",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        ...(faces ? { faces: { v: 1, model: FACES_MODEL, faces } } : {}),
+      },
+    });
+  }
+  return gallery.id;
 }
