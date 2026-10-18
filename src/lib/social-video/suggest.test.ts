@@ -46,10 +46,33 @@ describe("fitFor", () => {
     expect(fitFor(wide, FORMATS["16:9"])).toBeGreaterThan(fitFor(tall, FORMATS["16:9"]));
   });
 
-  it("holds back a blink and a group that 9:16 can only show whole", () => {
+  it("holds back a group photo where someone blinked, not a couple with eyes closed", () => {
+    const at = (x: number, blink: number | null = 0.05) => ({
+      ...someone(blink),
+      x,
+      le: [x + 0.02, 0.34] as [number, number],
+      re: [x + 0.06, 0.34] as [number, number],
+    });
+    const group = (blink: number) =>
+      photo(0, { faces: withFaces(at(0.3), at(0.45, blink), at(0.6)) });
+    expect(fitFor(group(0.9), FORMATS["16:9"])).toBeLessThan(fitFor(group(0.05), FORMATS["16:9"]));
+    // A kiss: closed eyes are the moment, not a mistake.
+    const couple = (blink: number) =>
+      photo(0, { faces: withFaces(at(0.4, blink), at(0.5, blink)) });
+    expect(fitFor(couple(0.9), FORMATS["16:9"])).toBe(fitFor(couple(0.05), FORMATS["16:9"]));
+  });
+
+  it("steers a 9:16 video away from a landscape photo known to show no face", () => {
+    const faceless = photo(0, { faces: withFaces() });
+    const unknown = photo(0);
+    expect(fitFor(faceless, VERTICAL)).toBeLessThan(fitFor(unknown, VERTICAL));
+    // A portrait without faces still fits 9:16 — a detail, the rings.
+    const detail = photo(0, { width: 2000, height: 3000, faces: withFaces() });
+    expect(fitFor(detail, VERTICAL)).toBeGreaterThan(fitFor(faceless, VERTICAL));
+  });
+
+  it("holds back a group that 9:16 can only show whole", () => {
     const open = photo(0, { faces: withFaces(someone()) });
-    const blinking = photo(0, { faces: withFaces(someone(0.9)) });
-    expect(fitFor(blinking, VERTICAL)).toBeLessThan(fitFor(open, VERTICAL));
 
     const row = [0.1, 0.3, 0.5, 0.7, 0.9].map((x) => ({
       ...someone(),
@@ -102,6 +125,22 @@ describe("suggestPhotos", () => {
       };
     });
     expect(suggestPhotos(burst, [], VERTICAL, 6)).toHaveLength(6);
+  });
+
+  it("still chooses by fit when the pick was topped up", () => {
+    // Twelve photos uploaded a second apart — one burst to the highlights —
+    // four of them landscape photos known to show no face.
+    const burst = Array.from({ length: 12 }, (_, i) => {
+      const at = DAY + i * 1000;
+      return photo(0, {
+        id: `b${i}`,
+        key: new Date(at).toISOString(),
+        takenAt: new Date(at).toISOString(),
+        ...(i % 3 === 0 ? { faces: withFaces() } : { width: 2000, height: 3000 }),
+      });
+    });
+    const ids = suggestPhotos(burst, [], VERTICAL, 6);
+    expect(ids.filter((id) => Number(id.slice(1)) % 3 === 0)).toEqual([]);
   });
 
   it("steers a 9:16 video towards portrait photos", () => {

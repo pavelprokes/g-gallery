@@ -35,9 +35,9 @@ describe("currentFaces", () => {
 });
 
 describe("tilesFor", () => {
-  it("covers the photo with the frame, 2×2 and 3×3 overlapping tiles", () => {
+  it("covers the photo with the frame and 2×2 to 5×5 overlapping tiles", () => {
     const tiles = tilesFor(3000, 2000);
-    expect(tiles).toHaveLength(1 + 4 + 9);
+    expect(tiles).toHaveLength(1 + 4 + 9 + 16 + 25);
     expect(tiles[0]).toMatchObject({ x: 0, y: 0, w: 3000, h: 2000 });
     for (const t of tiles) {
       expect(t.x).toBeGreaterThanOrEqual(0);

@@ -45,8 +45,15 @@ const SCALE_MAX_PER_S = 0.08;
 const PAN_MAX_PER_S = 0.35;
 
 /** A face counts for framing from this score, and from this share of the
- * largest face's area — a stranger far behind the couple does not. */
-const FRAMING_MIN_SCORE = 0.6;
+ * largest face's area — a stranger far behind the couple does not. 0.7: on a
+ * real wedding the only whole-frame hits below it were a dark doorway and a
+ * box of rings; the tiles find the real small faces above it. */
+const FRAMING_MIN_SCORE = 0.7;
+
+/** Without a face, the camera aims here, as a share of the photo's height:
+ * at a wedding the heads are in the upper third far more often than in the
+ * middle, and the middle of a full-length portrait cut to 16:9 is a waist. */
+const FACELESS_AIM = 1 / 3;
 const FRAMING_MIN_AREA = 0.15;
 
 /** Head and shoulders around a face box, in face heights and widths. */
@@ -147,8 +154,9 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   const subject = subjectOf(photo);
 
   if (!subject) {
-    const cover = frame(photo, a, coverW, W / 2, H / 2);
-    const tight = frame(photo, a, Math.max(minW, coverW / Math.min(maxZoom, 1.12)), W / 2, H / 2);
+    const cy = H * FACELESS_AIM;
+    const cover = frame(photo, a, coverW, W / 2, cy);
+    const tight = frame(photo, a, Math.max(minW, coverW / Math.min(maxZoom, 1.12)), W / 2, cy);
     return { kind: "push", from: cover, to: tight };
   }
 
