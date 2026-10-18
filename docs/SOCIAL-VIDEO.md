@@ -127,33 +127,47 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
 
 1. **Subject box S.** Faces with score ≥ 0.6 and area ≥ 15 % of the largest face. Each is widened
    to **head and shoulders** — about ×1.8 wide, from **0.8 h above** the face box to 1.0 h below it
-   (the spike's 0.5 h above cut the top of heads on tight frames). S is their union. No face: a small
-   box at the [smartcrop.js](https://npmjs.com/package/smartcrop) (MIT) focal point, else the centre.
-2. **Cover frame C:** the largest A-aspect rectangle in the photo, centred on S, clamped inside.
+   (the spike's 0.5 h above cut the top of heads on tight frames). S is their union. No face: a
+   gentle zoom (≤ 1.12) on the centre; a [smartcrop.js](https://npmjs.com/package/smartcrop) (MIT)
+   focal point is a later refinement.
+2. **Cover frame C:** the largest A-aspect rectangle in the photo, centred on S horizontally and
+   placed by the same eye line as T vertically, so the move does not drift up or down; clamped
+   inside.
 3. **Tight frame T:** the smallest A-aspect rectangle holding S plus 8 %, with
    - `T.w ≥ C.w / Zmax`, Zmax = 1.25 (9:16) / 1.35 (16:9) — a small zoom looks expensive, a big one
      cheap;
-   - no upscaling past the fetched source (fetch ≈ 1.4× the output size);
+   - `T.w ≤ C.w / 1.06` — a push that moves less reads as a frozen frame;
+   - the tight frame enlarges the source's pixels by **1.35× at most** — Instagram's own re-encode
+     hides that. The photo is fetched so its cover frame is at least the output's size
+     (`sourceWidth`, rounded up to 256 px so renders share a cached variant); a 3:2 photo for 9:16
+     is ~2900 px wide, not 4K, which keeps a 30 s render's decoded photos in memory. This floor
+     wins over the 1.06, so a small photo simply does not zoom;
+   - a subject **taller** than C (a standing couple in 16:9) keeps the heads and loses the legs;
    - the mean eye line at **38 %** of the frame height (9:16) or 40 % (16:9), but never so high that
      the top of S leaves the frame;
    - clamped inside the photo.
 4. **Off-centre pairs — Pavel's case.** If S fits in C, the camera drifts from C to T and ends framed
    on the two heads wherever they are. If S is **wider than C** (two people far apart in a landscape
-   photo cropped to 9:16), it **pans** from one face cluster to the other at a near-constant zoom. If
-   neither works (a wide group in 9:16), the photo is shown whole over a blurred, darkened copy of
-   itself, and its 9:16 fit score drops so the suggestion avoids it.
-5. **Direction.** Push in (C→T) and pull out (T→C) alternate, never three alike in a row; groups and
-   the opening slide pull out.
+   photo cropped to 9:16) and is at most three people, it **pans** from the leftmost face to the
+   rightmost at C's width. If neither works (a wide group in 9:16, or a pan faster than the cap in
+   step 6), the photo is shown whole over a blurred, darkened copy of itself, and its 9:16 fit score
+   drops so the suggestion avoids it.
+5. **Direction.** Push in (C→T) and pull out (T→C) alternate; groups (three faces or more) and the
+   opening slide always pull out, even when that makes three alike in a row. Pans alternate left
+   and right.
 6. **Interpolation.** Centre linear, scale geometric (`w(t) = w0·(w1/w0)^e(t)`, so the zoom speed
-   feels constant), `e(t) = 0.5 − 0.5·cos(πt)`. Caps: scale ≤ 8 %/s, pan ≤ 6 % of the frame width
-   per second — faster reads as seasick on a phone.
+   feels constant), `e(t) = 0.5 − 0.5·cos(πt)`. Caps: scale ≤ 8 %/s — over a 2.95 s slide that is
+   1.25×, so it, not Zmax, limits 16:9 — and pan ≤ 0.35 frame widths per second. Faster reads as
+   seasick on a phone. (The proposal said 6 % per second for the pan; that allows no pan between two
+   people at all — the concept's couple needs about 0.3.)
 7. **Timing.** 2.5 s per photo, 0.45 s crossfade during which both slides keep moving; the first
    slide 3 s, the last one holds still for its final 0.5 s. 30 s ≈ 12–13 photos.
 8. **9:16 safe area.** Eyes and faces stay inside y 14–65 %, x 6–86 % of the frame, clear of the
    Reels caption and buttons (Meta publishes percentages; pixel figures online disagree — check on a
-   phone). 16:9 keeps a 5 % margin.
-9. **Determinism.** Any randomness (alternation, later the polaroid tilt) is seeded from the gallery
-   id and a style version: rendering twice gives the same file.
+   phone). 16:9 keeps a 5 % margin. The eye line keeps them there in the usual case; a photo whose
+   tight frame cannot (a face at the photo's edge) scores lower in the suggestion.
+9. **Determinism.** The Ken Burns style has no randomness. Any later one (the polaroid tilt) is
+   seeded from the gallery id and a style version: rendering twice gives the same file.
 
 ## 6. Encoding
 
