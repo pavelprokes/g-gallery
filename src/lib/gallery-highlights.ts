@@ -83,6 +83,15 @@ interface Moment extends HighlightCandidate {
   score: number;
 }
 
+/** For another use of the same pick — the social video's longer list
+ * (docs/SOCIAL-VIDEO.md §3) — than the strip above the grid. */
+export interface PickOptions {
+  /** Pins that count, at most; the strip's own limit by default. */
+  maxPinned?: number;
+  /** Below this many own photos only pins are returned. */
+  minPhotosForAuto?: number;
+}
+
 /**
  * Picks the highlights, in timeline order. `chapterStarts` cut the day into
  * parts when there are any; otherwise pauses in shooting do.
@@ -91,16 +100,17 @@ export function pickHighlights(
   candidates: readonly HighlightCandidate[],
   chapterStarts: readonly TimelinePosition[] = [],
   count: number = HIGHLIGHT_COUNT,
+  { maxPinned = MAX_PINNED, minPhotosForAuto = MIN_PHOTOS_FOR_AUTO }: PickOptions = {},
 ): HighlightPick[] {
   const timeline = [...candidates].sort(compareTimeline);
   const pinned = spread(
     timeline.filter((c) => c.pin === true),
-    Math.min(count, MAX_PINNED),
+    Math.min(count, maxPinned),
   );
   const own = timeline.filter((c) => c.own);
 
   const budget = count - pinned.length;
-  if (budget <= 0 || own.length < MIN_PHOTOS_FOR_AUTO) {
+  if (budget <= 0 || own.length < minPhotosForAuto) {
     return pinned.map((c) => ({ id: c.id, pinned: true }));
   }
 

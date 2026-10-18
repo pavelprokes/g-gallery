@@ -1,0 +1,112 @@
+import { describe, expect, it } from "vitest";
+import { FORMATS } from "@/lib/social-video/camera";
+import { FACES_MODEL, type Face } from "@/lib/social-video/faces";
+import { fitFor, suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
+
+const DAY = Date.UTC(2026, 8, 12, 10, 0);
+const VERTICAL = FORMATS["9:16"];
+
+const someone = (blink: number | null = 0.05): Face => ({
+  x: 0.45,
+  y: 0.3,
+  w: 0.08,
+  h: 0.12,
+  score: 0.9,
+  le: [0.47, 0.34],
+  re: [0.51, 0.34],
+  blink,
+});
+
+/** A photo `minutes` into the day. */
+function photo(minutes: number, extra: Partial<VideoCandidate> = {}): VideoCandidate {
+  const at = DAY + minutes * 60_000;
+  return {
+    id: `p${String(at).padStart(16, "0")}`,
+    key: new Date(at).toISOString(),
+    takenAt: new Date(at).toISOString(),
+    rating: 0,
+    label: null,
+    tagged: false,
+    pin: null,
+    own: true,
+    width: 3000,
+    height: 2000,
+    faces: null,
+    ...extra,
+  };
+}
+
+const withFaces = (...faces: Face[]) => ({ v: 1 as const, model: FACES_MODEL, faces });
+
+describe("fitFor", () => {
+  it("prefers a portrait photo for 9:16 and a landscape one for 16:9", () => {
+    const tall = photo(0, { width: 2000, height: 3000 });
+    const wide = photo(0);
+    expect(fitFor(tall, VERTICAL)).toBeGreaterThan(fitFor(wide, VERTICAL));
+    expect(fitFor(wide, FORMATS["16:9"])).toBeGreaterThan(fitFor(tall, FORMATS["16:9"]));
+  });
+
+  it("holds back a blink and a group that 9:16 can only show whole", () => {
+    const open = photo(0, { faces: withFaces(someone()) });
+    const blinking = photo(0, { faces: withFaces(someone(0.9)) });
+    expect(fitFor(blinking, VERTICAL)).toBeLessThan(fitFor(open, VERTICAL));
+
+    const row = [0.1, 0.3, 0.5, 0.7, 0.9].map((x) => ({
+      ...someone(),
+      x,
+      le: [x + 0.02, 0.34] as [number, number],
+      re: [x + 0.06, 0.34] as [number, number],
+    }));
+    const group = photo(0, { faces: withFaces(...row) });
+    expect(fitFor(group, VERTICAL)).toBeLessThan(fitFor(open, VERTICAL));
+  });
+});
+
+describe("suggestPhotos", () => {
+  const day = Array.from({ length: 60 }, (_, i) => photo(i * 5));
+
+  it("proposes the number asked for, each photo once", () => {
+    const ids = suggestPhotos(day, [], VERTICAL, 6);
+    expect(ids).toHaveLength(6);
+    expect(new Set(ids).size).toBe(6);
+  });
+
+  it("always takes a pinned photo, and opens with the strongest", () => {
+    const pinned = photo(17, { pin: true });
+    const ids = suggestPhotos([...day, pinned], [], VERTICAL, 6);
+    expect(ids[0]).toBe(pinned.id);
+  });
+
+  it("takes more pins than the highlights strip holds", () => {
+    const pins = Array.from({ length: 10 }, (_, i) => photo(i * 30 + 1, { pin: true }));
+    const ids = suggestPhotos([...day, ...pins], [], VERTICAL, 12);
+    for (const p of pins) expect(ids).toContain(p.id);
+  });
+
+  it("proposes from a small gallery too", () => {
+    expect(suggestPhotos(day.slice(0, 10), [], VERTICAL, 6)).toHaveLength(6);
+  });
+
+  it("steers a 9:16 video towards portrait photos", () => {
+    const mixed = day.map((p, i) => (i % 2 ? { ...p, width: 2000, height: 3000 } : p));
+    const ids = new Set(suggestPhotos(mixed, [], VERTICAL, 6));
+    const portraits = mixed.filter((p) => ids.has(p.id) && p.height! > p.width!);
+    expect(portraits.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("breaks a run of three photos without people when one with people is spare", () => {
+    // Portraits of the venue outscore landscape photos of people for 9:16, so
+    // on fit alone the video would hold no one.
+    const mixed = day.map((p, i) =>
+      i % 2
+        ? { ...p, faces: withFaces(someone()) }
+        : { ...p, width: 2000, height: 3000, faces: withFaces() },
+    );
+    const hasPeople = new Set(mixed.filter((_, i) => i % 2).map((p) => p.id));
+    const ids = suggestPhotos(mixed, [], VERTICAL, 6);
+    expect(ids.some((id) => hasPeople.has(id))).toBe(true);
+    for (let i = 2; i < ids.length; i++) {
+      expect([ids[i - 2], ids[i - 1], ids[i]].some((id) => hasPeople.has(id!))).toBe(true);
+    }
+  });
+});
