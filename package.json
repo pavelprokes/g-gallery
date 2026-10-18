@@ -47,6 +47,7 @@
     "next": "16.3.1",
     "next-intl": "^4.13.7",
     "nodemailer": "^9.0.5",
+    "onnxruntime-web": "1.30.0",
     "pg": "^8.23.0",
     "pica": "^10.0.3",
     "qrcode": "^1.5.4",

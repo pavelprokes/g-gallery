@@ -1,31 +1,42 @@
 "use client";
 
-// Face detection in the admin's browser (docs/SOCIAL-VIDEO.md §4): MediaPipe's
-// short-range BlazeFace over the whole photo and its tiles, plus Face
-// Landmarker for the blink score. Loaded on first use only — the WASM is
-// ~13 MB — and from our own origin (scripts/copy-mediapipe.mjs).
+// Face detection in the admin's browser (docs/SOCIAL-VIDEO.md §4): YuNet over
+// the whole photo, a second look at each box, and MediaPipe's Face Landmarker
+// for the blink score. Loaded on first use only — onnxruntime's WASM is
+// ~14 MB, MediaPipe's ~13 MB — and from our own origin: onnxruntime's is a
+// hashed static asset of the build (the bundle asks for it by
+// `new URL(…, import.meta.url)`, which Turbopack emits), MediaPipe's is copied
+// on install (scripts/copy-mediapipe.mjs). The model is committed in
+// public/vendor/yunet/ — OpenCV Zoo, MIT, sha256 ebafce4e…22f0f0.
 //
 // It runs on the main thread, one photo at a time with a yield between them:
-// ~0.2 s per photo on a laptop, a dozen photos per video. A worker would keep
-// even that off the page; it is the next step if it shows (§9.5).
+// well under a second per photo on a laptop, a dozen photos per video, the
+// result stored. A worker would keep even that off the page; it is the next
+// step if it shows (§9.5).
 
-import type { Detection } from "@mediapipe/tasks-vision";
+import { attachBlinks, FACES_MODEL, MAX_FACES, type PhotoFaces } from "@/lib/social-video/faces";
 import {
-  attachBlinks,
-  FACES_MODEL,
-  FRAME_MIN_SCORE,
-  mergeDetections,
-  tilesFor,
-  type PhotoFaces,
-  type TileDetection,
-} from "@/lib/social-video/faces";
+  CHECK_SIZE,
+  checkWindow,
+  confirmed,
+  decodeOutputs,
+  inputFor,
+  mapCandidate,
+  suppress,
+  toBgrPlanar,
+  toFace,
+  type Candidate,
+} from "@/lib/social-video/yunet";
 
 /** Must match package.json — the WASM is served from a path with it. */
 export const MEDIAPIPE_VERSION = "1.1.1";
 
-const WASM_PATH = `/vendor/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
-const DETECTOR_MODEL = "/vendor/mediapipe/models/face_detector.tflite";
+const MEDIAPIPE_WASM = `/vendor/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
 const LANDMARKER_MODEL = "/vendor/mediapipe/models/face_landmarker.task";
+const YUNET_MODEL = "/vendor/yunet/face_detection_yunet_2026may.onnx";
+
+/** The second look keeps anything the model sees at all; `confirmed` decides. */
+const CHECK_FLOOR = 0.3;
 
 /** Faces the landmarker looks for at most — enough for any photo whose blink
  * matters (a portrait, a couple, a small group). */
@@ -33,58 +44,82 @@ const LANDMARKER_FACES = 12;
 
 export interface FaceFinder {
   /** The faces in a decoded photo, ready to store. */
-  find(image: ImageBitmap): PhotoFaces;
+  find(image: ImageBitmap): Promise<PhotoFaces>;
   close(): void;
 }
 
-/** MediaPipe's detection as the merge wants it; null without a box or two eyes. */
-export function toTileDetection(d: Detection): TileDetection | null {
-  const box = d.boundingBox;
-  const [a, b] = d.keypoints;
-  if (!box || !a || !b) return null;
-  return {
-    box: { x: box.originX, y: box.originY, w: box.width, h: box.height },
-    score: d.categories[0]?.score ?? 0,
-    eyes: [
-      { x: a.x, y: a.y },
-      { x: b.x, y: b.y },
-    ],
-  };
-}
-
 export async function createFaceFinder(): Promise<FaceFinder> {
-  const { FaceDetector, FaceLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision");
-  const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
-  const detector = await FaceDetector.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: DETECTOR_MODEL },
-    runningMode: "IMAGE",
-    // Tiles apply their own, stricter bar in mergeDetections.
-    minDetectionConfidence: FRAME_MIN_SCORE,
+  const [ort, vision] = await Promise.all([
+    import("onnxruntime-web/wasm"),
+    import("@mediapipe/tasks-vision"),
+  ]);
+  // Threads need a cross-origin-isolated page, which the admin is not.
+  ort.env.wasm.numThreads = 1;
+  const session = await ort.InferenceSession.create(YUNET_MODEL, {
+    executionProviders: ["wasm"],
   });
-  const landmarker = await FaceLandmarker.createFromOptions(fileset, {
+  const fileset = await vision.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
+  const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: LANDMARKER_MODEL },
     runningMode: "IMAGE",
     numFaces: LANDMARKER_FACES,
     outputFaceBlendshapes: true,
   });
-  const tileCanvas = document.createElement("canvas");
-  const tileCtx = tileCanvas.getContext("2d");
-  if (!tileCtx) throw new Error("NO_CANVAS");
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("NO_CANVAS");
+  ctx.imageSmoothingQuality = "high";
+
+  /** `source`'s window `from` drawn into a `width`×`height` input (black
+   * around it), run through YuNet; boxes in the input's pixels. */
+  async function detect(
+    source: ImageBitmap,
+    from: { x: number; y: number; w: number; h: number },
+    to: { drawWidth: number; drawHeight: number; width: number; height: number },
+    minScore?: number,
+  ): Promise<Candidate[]> {
+    canvas.width = to.width;
+    canvas.height = to.height;
+    ctx!.fillStyle = "#000";
+    ctx!.fillRect(0, 0, to.width, to.height);
+    ctx!.drawImage(source, from.x, from.y, from.w, from.h, 0, 0, to.drawWidth, to.drawHeight);
+    const pixels = ctx!.getImageData(0, 0, to.width, to.height).data;
+    const input = new ort.Tensor("float32", toBgrPlanar(pixels, to.width, to.height), [
+      1,
+      3,
+      to.height,
+      to.width,
+    ]);
+    const outputs = await session.run({ [session.inputNames[0]!]: input });
+    return decodeOutputs(outputs, to.width, to.height, minScore);
+  }
 
   return {
-    find(image) {
+    async find(image) {
       const { width, height } = image;
-      const passes = tilesFor(width, height).map((tile) => {
-        tileCanvas.width = Math.round(tile.w);
-        tileCanvas.height = Math.round(tile.h);
-        tileCtx.drawImage(image, tile.x, tile.y, tile.w, tile.h, 0, 0, tile.w, tile.h);
-        const detections = detector
-          .detect(tileCanvas)
-          .detections.map(toTileDetection)
-          .filter((d): d is TileDetection => d !== null);
-        return { tile, detections };
-      });
-      const faces = mergeDetections(width, height, passes);
+      const whole = inputFor(width, height);
+      const candidates = suppress(
+        (await detect(image, { x: 0, y: 0, w: width, h: height }, whole)).map((c) =>
+          mapCandidate(c, 1 / whole.scale),
+        ),
+      );
+
+      const kept: Candidate[] = [];
+      const square = {
+        drawWidth: CHECK_SIZE,
+        drawHeight: CHECK_SIZE,
+        width: CHECK_SIZE,
+        height: CHECK_SIZE,
+      };
+      for (const c of candidates) {
+        const win = checkWindow(c);
+        const check = (await detect(image, win, square, CHECK_FLOOR)).map((d) =>
+          mapCandidate(d, win.w / CHECK_SIZE, win.x, win.y),
+        );
+        if (confirmed(c, check)) kept.push(c);
+      }
+      // Best first (suppress sorts), so the cap drops the least sure.
+      const faces = kept.slice(0, MAX_FACES).map((c) => toFace(c, width, height));
 
       const marked = landmarker.detect(image);
       const landmarked = marked.faceLandmarks.map((points, i) => {
@@ -104,7 +139,7 @@ export async function createFaceFinder(): Promise<FaceFinder> {
       return { v: 1, model: FACES_MODEL, faces: attachBlinks(faces, landmarked) };
     },
     close() {
-      detector.close();
+      void session.release();
       landmarker.close();
     },
   };

@@ -284,7 +284,7 @@ export function SocialVideoStudio({
             if (cancelled) return;
             setStatus({ kind: "preparing", text: `Hledám tváře ${i + 1}/${unknown.length}` });
             const { image } = await images.decode(p);
-            found.push({ photoId: p.id, faces: finder.find(image) });
+            found.push({ photoId: p.id, faces: await finder.find(image) });
             // Let the page breathe between photos — detection blocks the thread.
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
