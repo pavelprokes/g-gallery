@@ -137,8 +137,11 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
    - `T.w ≥ C.w / Zmax`, Zmax = 1.25 (9:16) / 1.35 (16:9) — a small zoom looks expensive, a big one
      cheap;
    - `T.w ≤ C.w / 1.06` — a push that moves less reads as a frozen frame;
-   - no upscaling past the fetched source (fetch ≈ 1.4× the output size) — this floor wins over
-     the 1.06, so a small photo simply does not zoom;
+   - the tight frame enlarges the source's pixels by **1.35× at most** — Instagram's own re-encode
+     hides that. The photo is fetched so its cover frame is at least the output's size
+     (`sourceWidth`, rounded up to 256 px so renders share a cached variant); a 3:2 photo for 9:16
+     is ~2900 px wide, not 4K, which keeps a 30 s render's decoded photos in memory. This floor
+     wins over the 1.06, so a small photo simply does not zoom;
    - a subject **taller** than C (a standing couple in 16:9) keeps the heads and loses the legs;
    - the mean eye line at **38 %** of the frame height (9:16) or 40 % (16:9), but never so high that
      the top of S leaves the frame;

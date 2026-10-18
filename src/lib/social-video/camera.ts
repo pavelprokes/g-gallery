@@ -57,6 +57,9 @@ const BESIDE_FACE = 0.4;
 /** Air around the subject in the tight frame. */
 const TIGHT_MARGIN = 1.08;
 
+/** How far the tight frame may enlarge the source's pixels. */
+const MAX_UPSCALE = 1.35;
+
 /** The least a push moves — below it a slide reads as a frozen frame. */
 const MIN_ZOOM = 1.06;
 
@@ -137,9 +140,10 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   const a = format.width / format.height;
   const coverW = Math.min(W, H * a);
   const maxZoom = Math.min(format.maxZoom, (1 + SCALE_MAX_PER_S) ** seconds);
-  // Never past the source's own pixels: on a small photo the tight frame stays
-  // as wide as the output, or the cover frame if the photo is smaller still.
-  const minW = Math.max(coverW / maxZoom, Math.min(coverW, format.width));
+  // Not much past the source's own pixels: the tight frame may enlarge it by
+  // MAX_UPSCALE (Instagram's own re-encode hides that), no more. The fetch
+  // sizes the source so the cover frame is at least the output (sourceWidth).
+  const minW = Math.max(coverW / maxZoom, Math.min(coverW, format.width / MAX_UPSCALE));
   const subject = subjectOf(photo);
 
   if (!subject) {
@@ -269,4 +273,19 @@ export function eyesInSafeArea(photo: PhotoForShot, rect: Rect, format: VideoFor
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), Math.max(min, max));
+}
+
+/** Widths the transform is asked for are rounded up to this, so renders of
+ * the same photo share a cached variant (each one is billed once). */
+const SOURCE_STEP = 256;
+
+/**
+ * The width to fetch a photo at so that its cover frame is at least the
+ * output's size — never more than the photo itself.
+ */
+export function sourceWidth(photo: { width: number; height: number }, format: VideoFormat): number {
+  const a = format.width / format.height;
+  const coverW = Math.min(photo.width, photo.height * a);
+  const scale = Math.min(1, format.width / coverW);
+  return Math.min(photo.width, Math.ceil((photo.width * scale) / SOURCE_STEP) * SOURCE_STEP);
 }

@@ -4,6 +4,7 @@ import {
   drawFrame,
   makeBackdrop,
   type FrameContext,
+  type FrameImage,
   type FramePlan,
 } from "@/lib/social-video/frame";
 import { buildTimeline, FIRST_SECONDS, FADE_SECONDS } from "@/lib/social-video/timeline";
@@ -19,14 +20,15 @@ function recorder() {
     filter: "none",
     fillRect: () => {},
     drawImage(image: unknown, ...args: number[]) {
-      calls.push({ image, args, alpha: ctx.globalAlpha });
+      calls.push({ image: String(image), args, alpha: ctx.globalAlpha });
     },
   };
   return { ctx: ctx as unknown as FrameContext & { filter: string }, calls };
 }
 
-/** The recorder only compares images by identity; a name stands in for one. */
-const image = (name: string) => name as unknown as CanvasImageSource;
+/** The recorder compares images by name; `width` is the decoded size. */
+const image = (name: string, width = 0) =>
+  ({ name, width, height: 0, toString: () => name }) as unknown as FrameImage;
 
 const WIDE = FORMATS["16:9"];
 const push: Shot = {
@@ -44,8 +46,14 @@ const plan: FramePlan = {
   format: WIDE,
   timeline: buildTimeline(2, 6),
   slides: [
-    { image: image("first"), width: 3000, height: 2000, shot: push },
-    { image: image("second"), width: 2000, height: 3000, shot: fit, backdrop: image("blur") },
+    { image: image("first", 3000), width: 3000, height: 2000, shot: push },
+    {
+      image: image("second", 2000),
+      width: 2000,
+      height: 3000,
+      shot: fit,
+      backdrop: image("blur"),
+    },
   ],
 };
 
@@ -56,6 +64,19 @@ describe("drawFrame", () => {
     expect(calls).toEqual([
       { image: "first", args: [0, 0, 3000, 1687.5, 0, 0, 1920, 1080], alpha: 1 },
     ]);
+  });
+
+  it("scales the shot to a bitmap fetched smaller than the photo", () => {
+    const { ctx, calls } = recorder();
+    const half = { ...plan, slides: [{ ...plan.slides[0]!, image: image("first", 1500) }] };
+    drawFrame(ctx, half, 0);
+    expect(calls[0]!.args).toEqual([0, 0, 1500, 843.75, 0, 0, 1920, 1080]);
+  });
+
+  it("skips a slide whose photo is not decoded yet", () => {
+    const { ctx, calls } = recorder();
+    drawFrame(ctx, { ...plan, slides: [{ ...plan.slides[0]!, image: null }] }, 0);
+    expect(calls).toEqual([]);
   });
 
   it("fades the next slide in over the one still moving underneath", () => {
