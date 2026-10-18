@@ -1,6 +1,6 @@
 # Social videos — short silent clips made from a gallery
 
-Proposed 2026-10-18, **not built yet**. The authority for the feature once it is: read before
+Proposed 2026-10-18, **not built yet** — the build plan is §10. The authority for the feature once it is: read before
 touching face data on `Photo`, the admin "Video" page, or anything that renders frames in the
 browser. Sources are listed at the end; the numbers in §4–§6 come from a spike run
 on 2026-10-17 (§7).
@@ -213,6 +213,61 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
 4. **H.264 encode speed and quality** in Chrome and Safari on Pavel's Mac.
 5. Detector inside a module Web Worker, GPU delegate vs CPU — keeps the admin responsive while it
    runs.
+
+## 10. Build plan (2026-10-18)
+
+Three pull requests, each mergeable on its own; nothing a guest sees changes until the third.
+The order follows what can be tested without the open items in §9: the pure parts first, the
+browser-only parts last.
+
+### PR 1 — the pure core (no dependencies, no UI)
+
+`src/lib/social-video/`, client-safe, unit-tested against the spike's photos and faces:
+
+| File          | Does                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `faces.ts`    | Zod schema of `Photo.faces` (§4); the tile grid, the per-tile score floor and NMS that merge whole-frame and tile detections into one list. |
+| `camera.ts`   | §5 steps 1–8: subject box, cover and tight frames, eye line, pan for pairs wider than the crop, blurred fallback, speed caps, safe area.    |
+| `timeline.ts` | Slides → time: 2.5 s each, 3 s first, 0.45 s crossfade, last-slide hold; `slideAt(t)` returns the one or two slides and their progress.     |
+| `suggest.ts`  | §3 on top of `pickHighlights` (count 6–7 / 12–13), fit-to-format, blink penalty, rhythm and strong ends; seeded alternation (§5 step 9).    |
+| `frame.ts`    | `drawFrame(ctx, t, plan, bitmaps)` — the one function the preview and the encoder both call, so the preview is the output (§2 step 4).      |
+
+`pickHighlights` gets a `maxPinned` option: today it caps pins at the highlight count (6), a
+30 s video needs room for 13.
+
+### PR 2 — faces in the database, detected in the admin
+
+- Migration: `Photo.faces Json?` — additive, null until computed.
+- `saveFaces(galleryId, entries)` in `src/app/admin/social-video-actions.ts`: session re-verified,
+  Zod on every entry, only rows of that gallery.
+- `@mediapipe/tasks-vision` pinned at 1.1.1; the WASM and the two models self-hosted under
+  `public/vendor/mediapipe/` by a copy script, so the admin never calls a Google CDN.
+- Detection in a module Web Worker (§9.5) on a 1600 px transform fetched with `mode: "cors"`,
+  only for picked photos whose `faces` is null or from an older `model`.
+
+### PR 3 — the admin page and the render
+
+- `/admin/g/[id]/video`, linked from the gallery's admin page. Format (9:16 / 16:9), length
+  (15 / 30 s), the suggested strip — reorder by drag and by buttons (keyboard, touch), remove, add
+  from the gallery — a live preview and **Render**.
+- `mediabunny` pinned at 1.61.6: `canEncodeVideo("avc")` → H.264, else VP9; progress, cancel,
+  and a clear message where neither encoder exists (old Safari, Firefox on Android).
+- **Download** the MP4; **Add to gallery** hands the file to `runUploads` with the owner's
+  credentials — the same path as a hand-uploaded film (`docs/VIDEO.md`), poster and loop included.
+- The selection is not stored in the database: a draft per gallery in `localStorage`, so a reload
+  keeps it. A table comes with the first need to re-render later.
+- E2E (`e2e/social-video.spec.ts`, admin cookie as in `e2e/video.spec.ts`): open the page, accept
+  the suggestion, render 15 s 9:16, check the MP4's size and duration with `inspectMp4` (`src/lib/mp4-inspect.ts`).
+
+### Before PR 3 ships
+
+- §9.1, the CORS **GET** rule: one `wrangler r2 bucket cors set` with `"methods": ["PUT", "GET"]`.
+  It also fixes the poster picker's fallback (`docs/VIDEO.md`). Whether the transform URL
+  (`/cdn-cgi/image/…`) passes the header through is checked right after with `curl -H Origin:`;
+  if it does not, a Response Header Transform Rule on the CDN zone adds it for `/cdn-cgi/image/*`.
+- §9.2 hit rate on two real weddings — tunes the thresholds in `faces.ts`, does not block the
+  code.
+- §4 GDPR reading of `Photo.faces` confirmed by Pavel.
 
 ## Sources (checked 2026-10-17)
 
