@@ -46,8 +46,8 @@ const PAN_MAX_PER_S = 0.35;
 
 /** A face counts for framing from this score, and from this share of the
  * largest face's area — a stranger far behind the couple does not. 0.7: on a
- * real wedding the only whole-frame hits below it were a dark doorway and a
- * box of rings; the tiles find the real small faces above it. */
+ * real wedding YuNet's real faces score 0.7–0.96, and the doubtful boxes that
+ * pass its second look sit at 0.60–0.63 (docs/SOCIAL-VIDEO.md §7). */
 const FRAMING_MIN_SCORE = 0.7;
 
 /** Without a face, the camera aims here, as a share of the photo's height:

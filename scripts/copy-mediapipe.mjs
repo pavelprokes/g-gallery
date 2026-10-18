@@ -4,11 +4,12 @@
  * fetches anything from a Google CDN (docs/SOCIAL-VIDEO.md §4). Runs on every
  * install (`postinstall`), so the copy always matches the pinned package.
  *
- * Only the WASM comes from the package; the two models are committed in
- * `public/vendor/mediapipe/models/` (they are not on npm):
+ * MediaPipe gives the blink score only (Face Landmarker); the faces themselves
+ * come from YuNet (src/lib/social-video/detect.ts).
  *
- *   face_detector.tflite  — storage.googleapis.com/mediapipe-models/face_detector/
- *                           blaze_face_short_range/float16/1/blaze_face_short_range.tflite
+ * Only the WASM comes from the package; the model is committed in
+ * `public/vendor/mediapipe/models/` (it is not on npm):
+ *
  *   face_landmarker.task  — storage.googleapis.com/mediapipe-models/face_landmarker/
  *                           face_landmarker/float16/1/face_landmarker.task
  *

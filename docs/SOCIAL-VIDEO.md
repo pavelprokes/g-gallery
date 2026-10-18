@@ -72,35 +72,44 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 
 ### Detection
 
-[MediaPipe Tasks Vision](https://developers.google.com/edge/mediapipe/solutions/vision/face_detector)
-(Apache-2.0) `FaceDetector`, model BlazeFace short-range, run **lazily in the admin** on the
-photo already fetched for the render (`sourceWidth`, §5) — never at guest upload (the WASM bundle
-is ~13.5 MB, too much for wedding-day mobile data). Detecting on the render's own copy costs no
-second download and no second billed transformation; the size hardly matters to the result, since
-BlazeFace scales every tile down to 128 px. The model and WASM are **self-hosted**, so the admin makes no request to
-Google: the WASM is copied from the pinned package on install (`scripts/copy-mediapipe.mjs`, served
-immutable under its version), the two models are committed in `public/vendor/mediapipe/models/`.
-`src/lib/social-video/detect.ts` runs it on the main thread, a photo at a time with a yield between
-them (~0.2 s each); a worker is the next step if that shows (§9.5).
+[YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) from OpenCV Zoo,
+`face_detection_yunet_2026may.onnx` (**MIT**, 230 kB), run by
+[onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/) 1.30.0 (MIT, Microsoft) **lazily in
+the admin** on the photo already fetched for the render (`sourceWidth`, §5) — never at guest upload
+(the WASM is ~14 MB, too much for wedding-day mobile data). Detecting on the render's own copy costs
+no second download and no second billed transformation. Everything is served from our own origin,
+so the admin makes no request to a third party: the model is committed in `public/vendor/yunet/`,
+onnxruntime's WASM is a hashed static asset of the build (the package asks for it by
+`new URL(…, import.meta.url)`, which Turbopack emits). Single-threaded — threads need a
+cross-origin-isolated page, which the admin is not.
 
-The short-range model is tuned for selfies. In the spike it found **no face below ~12 % of the photo
-height**: every large group and most full-length portraits came back empty (28 of 45 photos with a
-face). The fix measured in the spike:
+`src/lib/social-video/detect.ts` runs it, its pure half (tensor, decoding, the second look) is
+`yunet.ts`:
 
-- run the detector on the whole photo **and** on 2×2 to **5×5** overlapping tiles (30 % overlap),
-  where each face is two to five times larger — 4×4 and 5×5 were added after the real wedding in §7,
-  where full-length shots of the couple put faces at 3–5 % of the photo's height;
-- accept a tile detection only at **score ≥ 0.75** (0.5 on the whole frame) — at 0.5, tiles read
-  shoulders and knees as faces;
-- merge everything by non-max suppression at IoU 0.3.
+- **one pass over the whole photo** at its own size (long edge capped at 4096, padded to a multiple
+  of 32) — YuNet has anchors at strides 8/16/32, so a face of ~10 px is found without tiles;
+- candidates at **score ≥ 0.6**, merged by non-max suppression at IoU 0.3;
+- **a second look** at each one: its surroundings, 3× the box's longer side, scaled to 320 px and
+  run again; the box stays only if the model finds the same face there (IoU > 0.4) at **≥ 0.6**.
+  On a real wedding (§7) this removed every false hit of the single pass — rings in a basket,
+  hands on a steering wheel, a painting over an altar — and no real face;
+- at most **128 faces** a photo, the best-scored (a whole wedding on the steps was 79).
 
-Result in the spike (2×2 and 3×3 only): **42 of 45 photos** with a face, 68 faces, false hits nearly
-gone, **~0.16 s per photo** on 4 vCPU without a GPU. On a real wedding the 5×5 grid costs ~1.5 s
-per photo on the same machine, once per photo — the result is stored. The 1927 Solvay group photo (tiny faces, 29 people) still returns nothing, and
-it should not zoom anyway.
+About 0.4 s a photo in Chromium on 4 vCPU without a GPU, main thread, a photo at a time with a yield
+between them; a worker is the next step if that shows (§9.5).
 
-`FaceLandmarker` (with blendshapes) runs on the same photo for the blink score only; it is not used
-for framing because it misses more faces than the tiled detector.
+**Why YuNet** (compared 2026-10-18 on the wedding in §7): MediaPipe's BlazeFace short-range, used
+until then, is tuned for selfies and finds nothing under ~12 % of the photo's height; even with
+2×2 … 5×5 tiles it found faces on 19 of 29 photos, ~1.5 s each, with false hits on a doorway and
+the rings. Its full-range model exists only as a .tflite the Tasks API does not ship. The other
+candidates: `vladmandic/face-api` archived (2025-02), `face-api.js` unmaintained since 2020,
+`vladmandic/human` wraps BlazeFace too, SCRFD / InsightFace weights non-commercial, YOLO-face
+GPL/AGPL, RetinaFace weights of unclear licence, UltraFace weaker and without eye points.
+
+MediaPipe's `FaceLandmarker` (Apache-2.0, with blendshapes) runs on the same photo for the blink
+score only — YuNet has no eye openness. Its WASM is copied from the pinned package on install
+(`scripts/copy-mediapipe.mjs`, served immutable under its version), its model committed in
+`public/vendor/mediapipe/models/`. It is not used for framing: it misses far more faces than YuNet.
 
 ### Storage
 
@@ -109,7 +118,7 @@ for framing because it misses more faces than the tiled detector.
 ```json
 {
   "v": 1,
-  "model": "blazeface-sr+tiles@tasks-vision-1.1.1",
+  "model": "yunet-2026may+check@ort-web-1.30.0",
   "faces": [
     {
       "x": 0.41,
@@ -141,8 +150,9 @@ setting behaving inconsistently.
 
 For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9), the slide length.
 
-1. **Subject box S.** Faces with score **≥ 0.7** and area ≥ 15 % of the largest face (0.6 framed a
-   dark church doorway on a real wedding; the real small faces come from the tiles, above 0.75).
+1. **Subject box S.** Faces with score **≥ 0.7** and area ≥ 15 % of the largest face (on a real
+   wedding YuNet's real faces scored 0.7–0.96; the doubtful boxes left after its second look,
+   0.60–0.63).
    Each is widened to **head and shoulders** — about ×1.8 wide, from **0.8 h above** the face box
    to 1.0 h below it (the spike's 0.5 h above cut the top of heads on tight frames). S is their
    union. No face: a gentle zoom (≤ 1.12) centred across and aimed at the **upper third** — at a
@@ -227,7 +237,7 @@ same 4 vCPU without GPU.
 | Measured                                   | Result                                                                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Faces, frame + 2×2, 3×3 (the spike's grid) | 15 / 29 photos; misses: full-length couples (faces 3–5 % high), kisses in profile, big groups                                                              |
-| Faces, frame + 2×2 … 5×5 (now)             | **19 / 29 photos**, 39 faces, ~1.5 s per photo; every new hit a real face                                                                                  |
+| Faces, frame + 2×2 … 5×5                   | **19 / 29 photos**, 39 faces, ~1.5 s per photo; every new hit a real face                                                                                  |
 | Correctly faceless                         | the rings, hands on the steering wheel; the rest of the misses are wide groups and backs                                                                   |
 | False hits                                 | two on the whole frame (a dark doorway 0.65, the rings 0.51) — below the framing score of 0.7                                                              |
 | Render 15 s / 30 s at 1080p                | about real time: 15 s and 30 s of wall time, 18–42 MB, software VP9                                                                                        |
@@ -238,6 +248,20 @@ middle) and a 9:16 video opened its second slide on an empty church. After them,
 this set. The photos carried no capture time or Lightroom marks (fetched through the transform,
 which strips metadata), so the suggestion here ran on the fit alone; in the gallery itself both are
 there.
+
+**The detector replaced, same day.** BlazeFace's 19 of 29 led to a comparison of detectors (§4) and
+YuNet, measured on the same 29 photos:
+
+| YuNet                                                   | Result                                                                                                                                                      |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One pass, full resolution (Node, CPU)                   | 29 / 29 photos, 199 faces, ~0.17 s per photo — the groups whole (81 on the steps), but false hits: the rings, hands on a steering wheel, the altar painting |
+| + the second look (§4)                                  | 26 / 29, 175 faces; every one of those false hits gone, no real face lost                                                                                   |
+| In the app (Chromium, onnxruntime-web, ~2900 px source) | **28 / 29 photos, 175 faces**, ~0.4 s per photo                                                                                                             |
+| Faceless in the app                                     | hands on the steering wheel                                                                                                                                 |
+| Left doubtful                                           | the handle of the rings' basket (0.78 — the camera would drift to it), three boxes at 0.60–0.63, under the framing score                                    |
+| Kiss in profile                                         | at the render's size the groom's face is found (0.83); at full resolution it was not                                                                        |
+
+The sheet with every box drawn was checked by eye against the photos; the numbers in §4 come from it.
 
 ## 8. Later
 
@@ -275,7 +299,8 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
 Built the same day: PR 1 as #62, PRs 2 and 3 together as #63. Where the build departed from the
 plan below, the sections above say what was built — detection runs on the main thread on the
 render's own copy of the photo (§4), not in a worker on a 1600 px transform; the suggestion has no
-seeded randomness (§5 step 9). The plan is kept as written.
+seeded randomness (§5 step 9); the detector became YuNet instead of tiled BlazeFace (§4, §7). The
+plan is kept as written.
 
 Three pull requests, each mergeable on its own; nothing a guest sees changes until the third.
 The order follows what can be tested without the open items in §9: the pure parts first, the
