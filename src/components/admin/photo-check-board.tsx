@@ -75,7 +75,7 @@ export function PhotoCheckBoard({
     () =>
       photos.flatMap((photo): Flagged[] => {
         if (!photo.faces) return [];
-        const { closed, soft } = checkPhoto(photo.faces.faces);
+        const { closed, soft } = checkPhoto(photo.faces.faces, photo.width, photo.height);
         return closed.length + soft.length > 0 ? [{ photo, closed, soft }] : [];
       }),
     [photos],

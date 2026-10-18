@@ -10,7 +10,7 @@ import { z } from "zod";
 
 /** Bumped with any change to the model or the thresholds — a stored result
  * from another `model` is recomputed on demand, never mixed in. */
-export const FACES_MODEL = "yunet-2026may@2048+check+eyes@ort-web-1.30.0";
+export const FACES_MODEL = "yunet-2026may@2048+check+eyes2@ort-web-1.30.0";
 
 /** The most faces stored for a photo — the best-scored ones. A whole wedding
  * on the steps is ~80 (docs/SOCIAL-VIDEO.md §7); the cap keeps a bad run from
@@ -37,6 +37,10 @@ const faceSchema = z.object({
    * null where the eyes are too small or too dark to tell. Absent in values
    * written before it existed. */
   sharp: z.number().min(0).max(1000).nullable().optional(),
+  /** Face Landmarker's mouthSmile, both sides averaged: eyes narrowed by a
+   * laugh read as shut (src/lib/photo-check.ts). Null or absent where it was
+   * not looked at. */
+  smile: unit.nullable().optional(),
 });
 
 export const photoFacesSchema = z.object({

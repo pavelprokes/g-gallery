@@ -24,11 +24,29 @@ export const MAX_ANALYSED = 24;
 /** Face Landmarker's eyeBlink of the more open eye. Both eyes must be shut:
  * a laugh squints one eye past 0.5 as often as not. */
 export const CLOSED_FROM = 0.5;
+/** Eyes this open are looking at the camera. */
+const OPEN_BELOW = 0.3;
 
-/** Eye-region sharpness below this reads as soft. On a real wedding (§7) every
- * face under 0.12 was visibly out of focus or moving, every face above 0.2
- * was sharp. */
-export const SOFT_BELOW = 0.12;
+/**
+ * Shut eyes are flagged only where they are a miss: a posed group — this many
+ * faces read, nearly all of them open-eyed — with someone's eyes shut. Over a
+ * whole wedding (§7, 547 photos) shut eyes everywhere else were a moment: a
+ * bride reading her speech, a kiss, a laugh, a look down at the rings — and
+ * the landmarker cannot tell a look down from a blink.
+ */
+const GROUP_FROM = 4;
+const GROUP_OPEN_SHARE = 0.75;
+/** A laugh narrows the eyes to shut: not a blink. */
+const LAUGH_FROM = 0.6;
+
+/** Eye-region sharpness below this reads as soft. Over a whole wedding (§7,
+ * 547 photos) the frontal faces under 0.07 were out of focus or moving, those
+ * above it sharp but for a few borderline ones. */
+export const SOFT_BELOW = 0.07;
+/** Eyes at least this far apart, as a share of the face's width, face the
+ * camera. In a profile the eye region falls on an ear or the hair, and reads
+ * soft however sharp the photo. */
+const FRONTAL_FROM = 0.3;
 
 /** Eyes closer than this (in the searched copy's pixels) are too small to
  * judge sharpness — the measure then says more about the JPEG than the lens. */
@@ -143,26 +161,36 @@ export interface PhotoCheck {
   soft: Face[];
 }
 
-/** What the check flags on one photo's stored faces. */
-export function checkPhoto(faces: readonly Face[]): PhotoCheck {
+/** What the check flags on one photo's stored faces; `width` × `height` is
+ * the photo's shape, which a face's proportions are read against. */
+export function checkPhoto(faces: readonly Face[], width: number, height: number): PhotoCheck {
   const looked = facesToAnalyse(faces);
   const largest = Math.max(0, ...looked.map(area));
-  let closed = looked.filter((f) => f.blink !== null && f.blink >= CLOSED_FROM);
-  // A couple with their eyes shut is a kiss or a hug — the moment, not a
-  // miss. A face the landmarker could not read (a profile) does not count
-  // against it; a lone portrait with shut eyes is still worth a look.
-  const measured = looked.filter((f) => f.blink !== null);
-  if (looked.length === 2 && measured.length > 0 && closed.length === measured.length) {
-    closed = [];
-  }
-  const soft = looked.filter(
+  // A face the landmarker read: a face, not a painting or the back of a head.
+  const read = looked.filter((f) => f.blink !== null);
+
+  const posedGroup =
+    read.length >= GROUP_FROM &&
+    read.filter((f) => f.blink! < OPEN_BELOW).length >= read.length * GROUP_OPEN_SHARE;
+  const closed = posedGroup
+    ? read.filter((f) => f.blink! >= CLOSED_FROM && (f.smile ?? 0) < LAUGH_FROM)
+    : [];
+
+  const soft = read.filter(
     (f) =>
       area(f) >= largest * SOFT_FROM_SHARE &&
+      frontality(f, width, height) >= FRONTAL_FROM &&
       f.sharp !== undefined &&
       f.sharp !== null &&
       f.sharp < SOFT_BELOW,
   );
   return { closed, soft };
+}
+
+/** The eyes' distance over the face's width, in the photo's pixels. */
+function frontality(f: Face, width: number, height: number): number {
+  const apart = Math.hypot((f.re[0] - f.le[0]) * width, (f.re[1] - f.le[1]) * height);
+  return apart / (f.w * width);
 }
 
 function area(f: Face): number {

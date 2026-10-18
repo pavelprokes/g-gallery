@@ -128,9 +128,12 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     return ctx!.getImageData(0, 0, width, height);
   }
 
-  /** Both eyes' blink on the head cut out around `face`; null without a landmarker or a face. */
-  function blinkOf(image: ImageBitmap, face: Face): number | null {
-    if (!landmarker) return null;
+  /** The eyes and the smile on the head cut out around `face`: what tells a
+   * blink from a laugh (src/lib/photo-check.ts). Nulls without a landmarker or
+   * a face. */
+  function expressionOf(image: ImageBitmap, face: Face): Pick<Face, "blink" | "smile"> {
+    const none = { blink: null, smile: null };
+    if (!landmarker) return none;
     const head = sample(
       image,
       headRegion(face, image.width, image.height),
@@ -141,12 +144,17 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     const marked = landmarker.detect(head);
     // The crop can hold a neighbour's face too (a couple cheek to cheek, a
     // tight row); its blink must not land on this face.
-    if (!centredInCrop(marked.faceLandmarks[0] ?? [])) return null;
+    if (!centredInCrop(marked.faceLandmarks[0] ?? [])) return none;
     const shapes = marked.faceBlendshapes[0]?.categories ?? [];
-    const score = (name: string) => shapes.find((c) => c.categoryName === name)?.score;
-    const left = score("eyeBlinkLeft");
-    const right = score("eyeBlinkRight");
-    return left === undefined || right === undefined ? null : round3(Math.min(left, right));
+    const pair = (name: string, both: (a: number, b: number) => number) => {
+      const left = shapes.find((c) => c.categoryName === `${name}Left`)?.score;
+      const right = shapes.find((c) => c.categoryName === `${name}Right`)?.score;
+      return left === undefined || right === undefined ? null : round3(both(left, right));
+    };
+    return {
+      blink: pair("eyeBlink", Math.min),
+      smile: pair("mouthSmile", (a, b) => (a + b) / 2),
+    };
   }
 
   function sharpnessOf(image: ImageBitmap, face: Face): number | null {
@@ -190,7 +198,7 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
         model: FACES_MODEL,
         faces: faces.map((face) =>
           looked.has(face)
-            ? { ...face, blink: blinkOf(image, face), sharp: sharpnessOf(image, face) }
+            ? { ...face, ...expressionOf(image, face), sharp: sharpnessOf(image, face) }
             : face,
         ),
       };

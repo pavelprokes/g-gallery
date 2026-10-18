@@ -155,23 +155,26 @@ The measuring runs in the face worker, the deciding in `src/lib/photo-check.ts`:
 - **Which faces.** At the framing score (0.7), from a quarter of the largest face's area, the 24
   largest — a guest far behind the couple is not the photo's subject, and a group of 80 is not culled
   eye by eye.
-- **Shut eyes**: `blink` ≥ 0.5 (the same bar the video suggestion uses for groups). A couple with
-  all their measured eyes shut is left alone — a kiss, a hug; a lone portrait with shut eyes is
-  still listed, it is the most common blink worth catching. The landmarker's face must be centred in
-  the head's crop, so a neighbour's blink does not land on the wrong face. On §7's wedding the
-  highest scores were two guests in the steps photo with their eyes really shut (0.67, 0.62) and a
-  kiss (0.60); looking down scored 0.38–0.49.
+- **Shut eyes**: only in a **posed group** — at least 4 faces the landmarker read, at least 3 in 4
+  of them with open eyes (`blink` < 0.3) — on a face with `blink` ≥ 0.5 that is not laughing
+  (`smile` < 0.6). Everywhere else shut eyes were a moment, not a miss: over the whole wedding of
+  §7 (547 photos, see below) the 59 faces at ≥ 0.5 were a bride reading her speech, kisses, laughs,
+  looks down at the rings. Face Landmarker cannot tell a look down from a blink — its eyeLookDown
+  was as high on the shut eyes as on the lowered ones, so it is not stored.
 - **Soft eyes**: the region around both eyes (2× their distance wide, 0.9× tall), sampled
   nearest-pixel to 64 × 29, scored as the Laplacian's energy over the region's contrast
-  (`eyeSharpness`). Below **0.12** is soft. Only faces from half the largest face's area count — a
-  soft second row is the depth of field — and only eyes at least 24 px apart in the searched copy,
-  bright enough to judge, and inside the frame. Calibrated on §7's wedding at the scan's size: every face under 0.12 was
-  visibly out of focus or moving (guests behind the car, a hug in motion), every face above 0.2 was
-  sharp.
+  (`eyeSharpness`). Below **0.07** is soft. Judged only on main faces (from half the largest face's
+  area — a soft second row is the depth of field), facing the camera (eyes at least 0.3 of the face's
+  width apart — in a profile the region falls on an ear and reads soft however sharp the photo), read
+  by the landmarker (which rules out most paintings and the backs of heads), with eyes at least 24 px
+  apart in the searched copy, bright enough to judge and inside the frame.
 
-On that wedding, an already delivered selection, the check listed two photos: the steps photo (two
-guests with their eyes shut) and the car photo (a soft guest behind). Both are a fair question to
-the photographer, neither a false alarm.
+**Calibrated on the whole wedding** (Jáchym & Sophie, all 547 photos of the delivered gallery,
+fetched at 2560 px, run locally, 6.9 min): the first rules (shut eyes anywhere, soft below 0.12, any
+face) listed 122 photos — mostly looks down and sharp profiles. With the rules above it lists 21:
+13 soft (a child and a priest out of focus, guests in motion on the dance floor, a lace sleeve the
+detector took for a face) and 8 posed groups with someone's eyes shut. The crops behind every
+threshold were checked by eye.
 
 ### Storage
 
@@ -180,7 +183,7 @@ the photographer, neither a false alarm.
 ```json
 {
   "v": 1,
-  "model": "yunet-2026may@2048+check+eyes@ort-web-1.30.0",
+  "model": "yunet-2026may@2048+check+eyes2@ort-web-1.30.0",
   "faces": [
     {
       "x": 0.41,
@@ -191,6 +194,7 @@ the photographer, neither a false alarm.
       "le": [0.43, 0.25],
       "re": [0.45, 0.25],
       "blink": 0.04,
+      "smile": 0.62,
       "sharp": 0.81
     }
   ]
