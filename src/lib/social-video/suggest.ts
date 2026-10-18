@@ -30,9 +30,11 @@ export function suggestPhotos(
   count: number,
 ): string[] {
   const byId = new Map(candidates.map((c) => [c.id, c]));
+  // Any gallery gets a proposal — a small one simply all of its photos. (The
+  // highlights hold back below 40 photos; a video of five is still a video.)
   const pool = pickHighlights(candidates, chapterStarts, count * 2, {
     maxPinned: count,
-    minPhotosForAuto: count,
+    minPhotosForAuto: 0,
   }).map(({ id, pinned }) => ({ candidate: byId.get(id)!, pinned }));
 
   const fitness = new Map(pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format)]));

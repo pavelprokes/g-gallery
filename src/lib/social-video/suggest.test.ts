@@ -83,8 +83,11 @@ describe("suggestPhotos", () => {
     for (const p of pins) expect(ids).toContain(p.id);
   });
 
-  it("proposes from a small gallery too", () => {
+  it("proposes from a small gallery too — all of it when it has fewer than asked", () => {
     expect(suggestPhotos(day.slice(0, 10), [], VERTICAL, 6)).toHaveLength(6);
+    expect(new Set(suggestPhotos(day.slice(0, 3), [], VERTICAL, 6))).toEqual(
+      new Set(day.slice(0, 3).map((p) => p.id)),
+    );
   });
 
   it("steers a 9:16 video towards portrait photos", () => {
