@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   downloadKeyOf,
+  featuredFilmOf,
   formatDuration,
   mediaCounts,
   videoKeyFor,
@@ -65,6 +66,36 @@ describe("videoSrc", () => {
     vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "imgproxy");
     vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "http://localhost:8080");
     expect(videoSrc("galleries/a/x.mp4")).toBeNull();
+  });
+});
+
+describe("featuredFilmOf", () => {
+  const row = {
+    id: "v1",
+    status: "CONFIRMED",
+    objectKey: POSTER,
+    placeholder: "#aabbcc",
+    width: 1920,
+    height: 1080,
+    videoObjectKey: videoKeyFor(POSTER),
+    durationMs: 222_000,
+  };
+
+  it("draws the card from the poster and plays the MP4", () => {
+    expect(featuredFilmOf(row)).toEqual({
+      id: "v1",
+      objectKey: POSTER,
+      placeholder: "#aabbcc",
+      width: 1920,
+      height: 1080,
+      video: { key: videoKeyFor(POSTER), durationMs: 222_000 },
+    });
+  });
+
+  it("drops a pointer that no longer names a playable film", () => {
+    expect(featuredFilmOf(null)).toBeNull();
+    expect(featuredFilmOf({ ...row, status: "PENDING" })).toBeNull();
+    expect(featuredFilmOf({ ...row, videoObjectKey: null })).toBeNull();
   });
 });
 

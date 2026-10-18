@@ -276,7 +276,9 @@
       "errorExpired": "Platnost kódu vypršela. Nech si na prvním zařízení vygenerovat nový.",
       "errorNoIdentity": "Prohlížeč nedovolil uložit data. Zkontroluj, jestli nemáš zakázané ukládání pro tuhle stránku.",
       "errorGeneric": "Přenos se teď nepovedl. Zkus to prosím za chvíli znovu."
-    }
+    },
+    "featuredFilm": "Svatební film",
+    "playFeaturedFilm": "Přehrát svatební film {duration, select, none {} other {({duration})}}"
   },
   "guestUpload": {
     "addPhotos": "Přidat fotky",

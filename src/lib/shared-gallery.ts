@@ -1,6 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { VIDEO_SELECT, videoOf, type GalleryVideo } from "@/lib/video";
+import {
+  VIDEO_SELECT,
+  featuredFilmOf,
+  videoOf,
+  type FeaturedFilm,
+  type GalleryVideo,
+} from "@/lib/video";
 import type { Locale } from "@/i18n/locales";
 import {
   CHAPTER_TRANSLATED_FIELDS,
@@ -97,6 +103,8 @@ export interface GalleryViewData {
   /** The "best of the day" shown above the grid (docs/HIGHLIGHTS.md), in
    * timeline order; empty when switched off or the gallery is too small. */
   highlights: GalleryHighlight[];
+  /** The film shown above the highlights, or null (docs/VIDEO.md §Featured film). */
+  featuredFilm: FeaturedFilm | null;
   archive: GalleryArchive;
 }
 
@@ -141,6 +149,17 @@ export async function loadGalleryViewData(
       zipSizeBytes: true,
       zipBuiltAt: true,
       highlightsEnabled: true,
+      featuredVideo: {
+        select: {
+          id: true,
+          status: true,
+          objectKey: true,
+          placeholder: true,
+          width: true,
+          height: true,
+          ...VIDEO_SELECT,
+        },
+      },
       // One filtered aggregate rides along with the row we are already
       // fetching, so the header's "56 fotek" costs no extra round trip.
       _count: { select: { photos: { where: { status: "CONFIRMED" } } } },
@@ -307,6 +326,7 @@ export async function loadGalleryViewData(
       }),
     chapters,
     highlights,
+    featuredFilm: featuredFilmOf(gallery.featuredVideo),
     archive: archiveFor(
       gallery.zipStatus,
       gallery.zipObjectKey,

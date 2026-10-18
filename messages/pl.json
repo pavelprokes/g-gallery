@@ -276,7 +276,9 @@
       "errorExpired": "Kod wygasł. Wygeneruj nowy na pierwszym urządzeniu.",
       "errorNoIdentity": "Przeglądarka nie pozwoliła nam nic zapisać. Sprawdź, czy dane witryn nie są zablokowane dla tej strony.",
       "errorGeneric": "Przeniesienie właśnie się nie udało. Spróbuj ponownie za chwilę."
-    }
+    },
+    "featuredFilm": "Film ze ślubu",
+    "playFeaturedFilm": "Odtwórz film ze ślubu {duration, select, none {} other {({duration})}}"
   },
   "guestUpload": {
     "addPhotos": "Dodaj zdjęcia",

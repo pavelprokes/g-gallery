@@ -797,6 +797,45 @@ export async function setGalleryCover(galleryId: string, photoId: string | null)
 }
 
 /**
+ * Picks the film shown as the large card above the highlights
+ * (docs/VIDEO.md §Featured film), or clears it with `null`. Same rule as the
+ * cover: only a CONFIRMED video of *this* gallery — a pointer at a row whose
+ * bytes never landed would draw a card that plays nothing.
+ */
+export async function setFeaturedVideo(galleryId: string, photoId: string | null) {
+  const session = await requireAdmin();
+
+  const parsed = setGalleryCoverSchema.safeParse({ galleryId, photoId });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const gallery = await prisma.gallery.findFirst({
+    where: { id: parsed.data.galleryId, ownerId: session.user.id },
+    select: { id: true },
+  });
+  if (!gallery) throw new Error("NOT_FOUND");
+
+  if (parsed.data.photoId) {
+    const video = await prisma.photo.findFirst({
+      where: {
+        id: parsed.data.photoId,
+        galleryId: gallery.id,
+        status: "CONFIRMED",
+        videoObjectKey: { not: null },
+      },
+      select: { id: true },
+    });
+    if (!video) throw new Error("NOT_FOUND");
+  }
+
+  await prisma.gallery.update({
+    where: { id: gallery.id },
+    data: { featuredVideoId: parsed.data.photoId },
+  });
+
+  revalidatePath(`/admin/g/${gallery.id}`);
+}
+
+/**
  * Short-lived download links for every photo marked for print, each saved
  * under its print name ("5x_…" for several copies). The browser fetches the
  * bytes from R2 itself — nothing passes through Vercel, and no ZIP is built
