@@ -46,7 +46,14 @@ export async function saveFaces(
   const ownedIds = new Set(owned.map((p) => p.id));
   const writes = input.data.entries.filter((e) => ownedIds.has(e.photoId));
   await prisma.$transaction(
-    writes.map((e) => prisma.photo.update({ where: { id: e.photoId }, data: { faces: e.faces } })),
+    writes.map((e) =>
+      prisma.photo.update({
+        where: { id: e.photoId },
+        // New faces can raise new flags: a photo kept in the photo check is
+        // put back on its list (docs/SOCIAL-VIDEO.md §4).
+        data: { faces: e.faces, checkKeptAt: null },
+      }),
+    ),
   );
   return writes.length;
 }

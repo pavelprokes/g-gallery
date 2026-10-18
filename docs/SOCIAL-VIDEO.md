@@ -146,7 +146,8 @@ its model committed in `public/vendor/mediapipe/models/`.
 their eyes shut or where the eyes of a main face are soft, for the photographer to look at before
 the couple does. It only flags: whether shut eyes are a blink or a kiss, whether a soft face is a
 missed focus or the depth of field, is the photographer's call — **Ponechat** keeps the photo and
-takes it off the list (`Photo.checkKeptAt`), **Smazat z galerie** is the gallery's own delete. The
+takes it off the list (`Photo.checkKeptAt`, reset whenever the photo's faces are written anew —
+new faces, new flags), **Smazat z galerie** is the gallery's own delete. The
 search is the same click-to-start scan as the video page's (§4, "The whole gallery").
 
 The measuring runs in the face worker, the deciding in `src/lib/photo-check.ts`:
@@ -154,14 +155,17 @@ The measuring runs in the face worker, the deciding in `src/lib/photo-check.ts`:
 - **Which faces.** At the framing score (0.7), from a quarter of the largest face's area, the 24
   largest — a guest far behind the couple is not the photo's subject, and a group of 80 is not culled
   eye by eye.
-- **Shut eyes**: `blink` ≥ 0.5. A photo of one or two people with all their eyes shut is left alone
-  — a kiss, a hug. On §7's wedding the highest scores were two guests in the steps photo with their
-  eyes really shut (0.67, 0.62) and a kiss (0.60); looking down scored 0.38–0.49.
+- **Shut eyes**: `blink` ≥ 0.5 (the same bar the video suggestion uses for groups). A couple with
+  all their measured eyes shut is left alone — a kiss, a hug; a lone portrait with shut eyes is
+  still listed, it is the most common blink worth catching. The landmarker's face must be centred in
+  the head's crop, so a neighbour's blink does not land on the wrong face. On §7's wedding the
+  highest scores were two guests in the steps photo with their eyes really shut (0.67, 0.62) and a
+  kiss (0.60); looking down scored 0.38–0.49.
 - **Soft eyes**: the region around both eyes (2× their distance wide, 0.9× tall), sampled
   nearest-pixel to 64 × 29, scored as the Laplacian's energy over the region's contrast
   (`eyeSharpness`). Below **0.12** is soft. Only faces from half the largest face's area count — a
   soft second row is the depth of field — and only eyes at least 24 px apart in the searched copy,
-  bright enough to judge. Calibrated on §7's wedding at the scan's size: every face under 0.12 was
+  bright enough to judge, and inside the frame. Calibrated on §7's wedding at the scan's size: every face under 0.12 was
   visibly out of focus or moving (guests behind the car, a hug in motion), every face above 0.2 was
   sharp.
 

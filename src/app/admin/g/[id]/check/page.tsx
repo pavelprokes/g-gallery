@@ -40,7 +40,6 @@ export default async function PhotoCheckPage(props: PageProps<"/admin/g/[id]/che
           ...ORDER_KEY_SELECT,
           id: true,
           objectKey: true,
-          thumbObjectKey: true,
           fileName: true,
           width: true,
           height: true,
@@ -58,7 +57,6 @@ export default async function PhotoCheckPage(props: PageProps<"/admin/g/[id]/che
     .map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
-      thumbObjectKey: photo.thumbObjectKey,
       fileName: photo.fileName,
       width: photo.width!,
       height: photo.height!,

@@ -11,6 +11,7 @@
 // public/vendor/yunet/ — OpenCV Zoo, MIT, sha256 ebafce4e…22f0f0.
 
 import {
+  centredInCrop,
   EYE_SAMPLE_HEIGHT,
   EYE_SAMPLE_WIDTH,
   eyeRegion,
@@ -137,7 +138,11 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       HEAD_SIZE,
       false,
     );
-    const shapes = landmarker.detect(head).faceBlendshapes[0]?.categories ?? [];
+    const marked = landmarker.detect(head);
+    // The crop can hold a neighbour's face too (a couple cheek to cheek, a
+    // tight row); its blink must not land on this face.
+    if (!centredInCrop(marked.faceLandmarks[0] ?? [])) return null;
+    const shapes = marked.faceBlendshapes[0]?.categories ?? [];
     const score = (name: string) => shapes.find((c) => c.categoryName === name)?.score;
     const left = score("eyeBlinkLeft");
     const right = score("eyeBlinkRight");

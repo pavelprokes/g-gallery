@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  centredInCrop,
   checkPhoto,
   CLOSED_FROM,
   eyeRegion,
@@ -46,9 +47,26 @@ describe("eyeRegion", () => {
     expect(region.w).toBeCloseTo(120);
   });
 
+  it("gives up on eyes cut by the frame", () => {
+    expect(eyeRegion(face({ le: [0.01, 0.25], re: [0.06, 0.25] }), 1000, 1000)).toBeNull();
+  });
+
   it("gives up on eyes too small to judge", () => {
     const apart = (MIN_EYE_PX - 1) / 1000;
     expect(eyeRegion(face({ le: [0.4, 0.25], re: [0.4 + apart, 0.25] }), 1000, 1000)).toBeNull();
+  });
+});
+
+describe("centredInCrop", () => {
+  const box = (cx: number, cy: number) => [
+    { x: cx - 0.25, y: cy - 0.3 },
+    { x: cx + 0.25, y: cy + 0.3 },
+  ];
+
+  it("takes the face the crop was cut around, not a neighbour at its edge", () => {
+    expect(centredInCrop(box(0.5, 0.5))).toBe(true);
+    expect(centredInCrop(box(0.85, 0.5))).toBe(false);
+    expect(centredInCrop([])).toBe(false);
   });
 });
 
@@ -109,6 +127,13 @@ describe("checkPhoto", () => {
     expect(checkPhoto(row(2, () => shut)).closed).toEqual([]);
     const couple = row(2, (i) => (i === 0 ? shut : {}));
     expect(checkPhoto(couple).closed).toEqual([couple[0]]);
+    // A kiss in profile: one face unread, the other shut.
+    expect(checkPhoto(row(2, (i) => (i === 0 ? shut : { blink: null }))).closed).toEqual([]);
+  });
+
+  it("still flags a lone portrait with shut eyes", () => {
+    const portrait = face(shut);
+    expect(checkPhoto([portrait]).closed).toEqual([portrait]);
   });
 
   it("flags a soft main face, not a soft face in the second row or one it could not judge", () => {

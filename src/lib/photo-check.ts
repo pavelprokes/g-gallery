@@ -40,6 +40,10 @@ export const EYE_SAMPLE_WIDTH = 64;
 const EYE_REGION = { w: 2, h: 0.9 };
 export const EYE_SAMPLE_HEIGHT = Math.round((EYE_SAMPLE_WIDTH * EYE_REGION.h) / EYE_REGION.w);
 
+/** How far from the crop's centre the landmarked face may sit, as a share of
+ * the crop: the face fills ~55 % of it, so a neighbour's centre is further out. */
+const CENTRE_TOLERANCE = 0.2;
+
 /** Darker than this (mean grey, 0–255) the eyes cannot be judged: shadow, not focus. */
 const MIN_BRIGHTNESS = 35;
 
@@ -68,7 +72,22 @@ export function eyeRegion(face: Face, width: number, height: number): Rect | nul
   if (apart < MIN_EYE_PX) return null;
   const w = apart * EYE_REGION.w;
   const h = apart * EYE_REGION.h;
-  return { x: (lx + rx) / 2 - w / 2, y: (ly + ry) / 2 - h / 2, w, h };
+  const x = (lx + rx) / 2 - w / 2;
+  const y = (ly + ry) / 2 - h / 2;
+  // Cut by the frame, the black beyond it would read as a hard edge.
+  if (x < 0 || y < 0 || x + w > width || y + h > height) return null;
+  return { x, y, w, h };
+}
+
+/** Whether the landmarker's face (its points, 0–1 of the crop) is the one
+ * the crop was cut around — centred in it, not a neighbour at its edge. */
+export function centredInCrop(points: readonly { x: number; y: number }[]): boolean {
+  if (points.length === 0) return false;
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  return Math.abs(cx - 0.5) < CENTRE_TOLERANCE && Math.abs(cy - 0.5) < CENTRE_TOLERANCE;
 }
 
 /** A square around the face, for the landmarker: it wants the whole head. */
@@ -129,8 +148,13 @@ export function checkPhoto(faces: readonly Face[]): PhotoCheck {
   const looked = facesToAnalyse(faces);
   const largest = Math.max(0, ...looked.map(area));
   let closed = looked.filter((f) => f.blink !== null && f.blink >= CLOSED_FROM);
-  // A couple with their eyes shut is a kiss or a hug — the moment, not a miss.
-  if (looked.length <= 2 && closed.length === looked.length) closed = [];
+  // A couple with their eyes shut is a kiss or a hug — the moment, not a
+  // miss. A face the landmarker could not read (a profile) does not count
+  // against it; a lone portrait with shut eyes is still worth a look.
+  const measured = looked.filter((f) => f.blink !== null);
+  if (looked.length === 2 && measured.length > 0 && closed.length === measured.length) {
+    closed = [];
+  }
   const soft = looked.filter(
     (f) =>
       area(f) >= largest * SOFT_FROM_SHARE &&

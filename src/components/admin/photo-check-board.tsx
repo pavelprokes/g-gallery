@@ -26,7 +26,6 @@ import { Card, CardTitle } from "@/components/ui/card";
 export interface CheckPhoto {
   id: string;
   objectKey: string;
-  thumbObjectKey: string | null;
   fileName: string;
   width: number;
   height: number;

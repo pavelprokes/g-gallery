@@ -4,6 +4,7 @@
 // and keeps one frame per burst.
 
 import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
+import { CLOSED_FROM } from "@/lib/photo-check";
 import { pickHighlights, type HighlightCandidate } from "@/lib/gallery-highlights";
 import {
   eyesInSafeArea,
@@ -21,10 +22,9 @@ export interface VideoCandidate extends HighlightCandidate {
   faces: PhotoFaces | null;
 }
 
-/** An eye this closed spoils a group photo — someone blinked. In a photo of
- * one or two people closed eyes are as often the moment itself (a kiss, a
- * hug), so they count only from this many faces. */
-const BLINK_LIMIT = 0.5;
+/** Shut eyes (src/lib/photo-check.ts, `CLOSED_FROM`) spoil a group photo —
+ * someone blinked. In a photo of one or two people they are as often the
+ * moment itself (a kiss, a hug), so they count only from this many faces. */
 const BLINK_MIN_FACES = 3;
 
 /** A photo's people as the camera sees them: a weaker box does not frame the
@@ -109,7 +109,7 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   else if (wantsPortrait && !portrait) score -= 2;
   if (
     people.length >= BLINK_MIN_FACES &&
-    people.some((f) => f.blink !== null && f.blink > BLINK_LIMIT)
+    people.some((f) => f.blink !== null && f.blink >= CLOSED_FROM)
   ) {
     score -= 5;
   }
