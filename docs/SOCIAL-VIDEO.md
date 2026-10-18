@@ -132,10 +132,49 @@ candidates: `vladmandic/face-api` archived (2025-02), `face-api.js` unmaintained
 `vladmandic/human` wraps BlazeFace too, SCRFD / InsightFace weights non-commercial, YOLO-face
 GPL/AGPL, RetinaFace weights of unclear licence, UltraFace weaker and without eye points.
 
-MediaPipe's `FaceLandmarker` (Apache-2.0, with blendshapes) runs on the same photo for the blink
-score only — YuNet has no eye openness. Its WASM is copied from the pinned package on install
-(`scripts/copy-mediapipe.mjs`, served immutable under its version), its model committed in
-`public/vendor/mediapipe/models/`. It is not used for framing: it misses far more faces than YuNet.
+MediaPipe's `FaceLandmarker` (Apache-2.0, with blendshapes) gives the blink score only — YuNet has
+no eye openness. It runs **on each head YuNet found**, cut out 1.8× the face box and drawn at
+256 px, not on the whole photo: on the whole photo it found a blink for 3 of 168 faces on the
+wedding in §7, on the heads for 88. `blink` is the eyeBlink of the _more open_ eye, so it is high
+only when both are shut — a laugh squints one eye past 0.5 as often as not. Its WASM is copied from
+the pinned package on install (`scripts/copy-mediapipe.mjs`, served immutable under its version),
+its model committed in `public/vendor/mediapipe/models/`.
+
+### The photo check
+
+**Kontrola fotek** (`/admin/g/[id]/check`, Pavel, 2026-10-18) lists the photos where someone has
+their eyes shut or where the eyes of a main face are soft, for the photographer to look at before
+the couple does. It only flags: whether shut eyes are a blink or a kiss, whether a soft face is a
+missed focus or the depth of field, is the photographer's call — **Ponechat** keeps the photo and
+takes it off the list (`Photo.checkKeptAt`, reset whenever the photo's faces are written anew —
+new faces, new flags), **Smazat z galerie** is the gallery's own delete. The
+search is the same click-to-start scan as the video page's (§4, "The whole gallery").
+
+The measuring runs in the face worker, the deciding in `src/lib/photo-check.ts`:
+
+- **Which faces.** At the framing score (0.7), from a quarter of the largest face's area, the 24
+  largest — a guest far behind the couple is not the photo's subject, and a group of 80 is not culled
+  eye by eye.
+- **Shut eyes**: only in a **posed group** — at least 4 faces the landmarker read, at least 3 in 4
+  of them with open eyes (`blink` < 0.3) — on a face with `blink` ≥ 0.5 that is not laughing
+  (`smile` < 0.6). Everywhere else shut eyes were a moment, not a miss: over the whole wedding of
+  §7 (547 photos, see below) the 59 faces at ≥ 0.5 were a bride reading her speech, kisses, laughs,
+  looks down at the rings. Face Landmarker cannot tell a look down from a blink — its eyeLookDown
+  was as high on the shut eyes as on the lowered ones, so it is not stored.
+- **Soft eyes**: the region around both eyes (2× their distance wide, 0.9× tall), sampled
+  nearest-pixel to 64 × 29, scored as the Laplacian's energy over the region's contrast
+  (`eyeSharpness`). Below **0.07** is soft. Judged only on main faces (from half the largest face's
+  area — a soft second row is the depth of field), facing the camera (eyes at least 0.3 of the face's
+  width apart — in a profile the region falls on an ear and reads soft however sharp the photo), read
+  by the landmarker (which rules out most paintings and the backs of heads), with eyes at least 24 px
+  apart in the searched copy, bright enough to judge and inside the frame.
+
+**Calibrated on the whole wedding** (Jáchym & Sophie, all 547 photos of the delivered gallery,
+fetched at 2560 px, run locally, 6.9 min): the first rules (shut eyes anywhere, soft below 0.12, any
+face) listed 122 photos — mostly looks down and sharp profiles. With the rules above it lists 21:
+13 soft (a child and a priest out of focus, guests in motion on the dance floor, a lace sleeve the
+detector took for a face) and 8 posed groups with someone's eyes shut. The crops behind every
+threshold were checked by eye.
 
 ### Storage
 
@@ -144,7 +183,7 @@ score only — YuNet has no eye openness. Its WASM is copied from the pinned pac
 ```json
 {
   "v": 1,
-  "model": "yunet-2026may@2048+check@ort-web-1.30.0",
+  "model": "yunet-2026may@2048+check+eyes2@ort-web-1.30.0",
   "faces": [
     {
       "x": 0.41,
@@ -154,7 +193,9 @@ score only — YuNet has no eye openness. Its WASM is copied from the pinned pac
       "score": 0.93,
       "le": [0.43, 0.25],
       "re": [0.45, 0.25],
-      "blink": 0.04
+      "blink": 0.04,
+      "smile": 0.62,
+      "sharp": 0.81
     }
   ]
 }

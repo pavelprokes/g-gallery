@@ -1,26 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import imageLoader from "@/lib/image-loader";
-import { QUALITY } from "@/lib/image-sizes";
 import type { TimelinePosition } from "@/lib/gallery-chapters";
-import { FORMS, pluralize } from "@/lib/czech-plural";
+import { pluralize } from "@/lib/czech-plural";
 import { slugify } from "@/lib/gallery-slug";
 import { placeholderStyle } from "@/lib/placeholder";
-import {
-  directShots,
-  FORMATS,
-  planShot,
-  sourceWidth,
-  type Aspect,
-  type VideoFormat,
-} from "@/lib/social-video/camera";
-import { createFaceFinder, type FaceFinder } from "@/lib/social-video/detect";
+import { directShots, FORMATS, planShot, type Aspect } from "@/lib/social-video/camera";
 import { chooseCodec, encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
-import { scanFaces } from "@/lib/social-video/face-scan";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
-import { fetchPhotoBytes, SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
+import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
 import { suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
 import {
   buildTimeline,
@@ -32,6 +21,14 @@ import {
 } from "@/lib/social-video/timeline";
 import { runUploads } from "@/lib/upload-run";
 import { saveFaces } from "@/app/admin/social-video-actions";
+import {
+  FaceScanControls,
+  NOT_LOADED,
+  PHOTO_GENITIVE,
+  sourceUrl,
+  useFaceFinder,
+  useFaceScan,
+} from "@/components/admin/face-scan";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { SortableList } from "@/components/admin/sortable-list";
 import { Alert } from "@/components/ui/alert";
@@ -89,38 +86,6 @@ function writeDraft(galleryId: string, draft: Draft) {
   } catch {
     // Private mode or full storage: the draft is a convenience, not state.
   }
-}
-
-/** "… se nenačetla": the verb agrees with the count. */
-const NOT_LOADED = {
-  one: "fotka se nenačetla",
-  few: "fotky se nenačetly",
-  many: "fotek se nenačetlo",
-};
-/** After "z": the genitive. */
-const PHOTO_GENITIVE = { one: "fotky", few: "fotek", many: "fotek" };
-
-type Scan =
-  | { kind: "idle" }
-  | { kind: "running"; done: number; total: number }
-  | { kind: "finished"; failed: number };
-
-/** The transform URL a video of `format` fetches a photo at. */
-function sourceUrl(
-  objectKey: string,
-  size: { width: number; height: number },
-  format: VideoFormat,
-) {
-  return imageLoader({ src: objectKey, width: sourceWidth(size, format), quality: QUALITY });
-}
-
-/** A photo's bytes at the size a 9:16 video fetches it — the default format,
- * so its render finds the transform already cached. */
-function fetchForFaces(photo: StudioPhoto): Promise<Blob> {
-  const { width, height } = photo.candidate;
-  return fetchPhotoBytes(
-    sourceUrl(photo.objectKey, { width: width!, height: height! }, FORMATS["9:16"]),
-  );
 }
 
 type Status =
@@ -264,15 +229,7 @@ export function SocialVideoStudio({
   // ---- Prepare: fetch every picked photo, find faces where none are stored ----
   // One face worker for the page — the picked photos and the whole-gallery
   // scan queue in it — started on first use.
-  const finderRef = useRef<FaceFinder | null>(null);
-  const finder = useCallback(() => (finderRef.current ??= createFaceFinder()), []);
-  useEffect(
-    () => () => {
-      finderRef.current?.close();
-      finderRef.current = null;
-    },
-    [],
-  );
+  const finder = useFaceFinder();
   const prepared = useRef(new Set<string>());
   useEffect(() => {
     if (!images) return;
@@ -476,39 +433,25 @@ export function SocialVideoStudio({
   useEffect(() => () => abortRef.current?.abort(), []);
 
   // ---- Faces for the whole gallery, on a click (docs/SOCIAL-VIDEO.md §4) ----
-  const [scan, setScan] = useState<Scan>({ kind: "idle" });
-  const scanAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => scanAbortRef.current?.abort(), []);
   const withFaces = photos.filter((p) => faces[p.id]).length;
-  const findAllFaces = async () => {
-    const missing = photos.filter((p) => !faces[p.id]);
-    if (missing.length === 0) return;
-    const controller = new AbortController();
-    scanAbortRef.current = controller;
-    setScan({ kind: "running", done: 0, total: missing.length });
-    try {
-      const { failed } = await scanFaces({
-        photos: missing,
-        fetchPhoto: fetchForFaces,
-        find: (blob) => finder().find(blob),
-        save: (entries) => saveFaces(galleryId, entries),
-        onSaved: (entries) =>
-          setFaces((prev) => ({
-            ...prev,
-            ...Object.fromEntries(entries.map((e) => [e.photoId, e.faces])),
-          })),
-        onProgress: ({ done, total }) => setScan({ kind: "running", done, total }),
-        signal: controller.signal,
-      });
-      setScan(controller.signal.aborted ? { kind: "idle" } : { kind: "finished", failed });
-    } catch (cause) {
-      console.warn("[g-gallery/social-video] face scan failed", cause);
-      setScan({ kind: "idle" });
-      setError("Tváře se nepodařilo uložit — zkus hledání spustit znovu, naváže, kde skončilo.");
-    } finally {
-      scanAbortRef.current = null;
-    }
-  };
+  const faceScan = useFaceScan({
+    galleryId,
+    finder,
+    missing: () =>
+      photos
+        .filter((p) => !faces[p.id])
+        .map((p) => ({
+          id: p.id,
+          objectKey: p.objectKey,
+          width: p.candidate.width!,
+          height: p.candidate.height!,
+        })),
+    onSaved: (entries) =>
+      setFaces((prev) => ({
+        ...prev,
+        ...Object.fromEntries(entries.map((e) => [e.photoId, e.faces])),
+      })),
+  });
 
   // ---- Editing the selection ----
   const selected = new Set(order);
@@ -663,34 +606,15 @@ export function SocialVideoStudio({
             pro celou galerii hledání spusť tady. Běží v prohlížeči na pozadí — u 400 fotek pět až
             deset minut — a stránku můžeš dál používat. Co najde, se ukládá průběžně.
           </p>
-          {scan.kind === "running" ? (
-            <div className="space-y-2" role="status">
-              <p>
-                Hledám tváře {scan.done}/{scan.total}
-              </p>
-              <progress className="w-full" value={scan.done} max={scan.total} />
-              <Button size="sm" variant="secondary" onClick={() => scanAbortRef.current?.abort()}>
-                Pozastavit
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="secondary"
-              disabled={withFaces === photos.length}
-              onClick={() => void findAllFaces()}
-            >
-              {withFaces === photos.length
-                ? "Tváře jsou u všech fotek"
-                : `Najít tváře (${pluralize(photos.length - withFaces, FORMS.photo)})`}
-            </Button>
-          )}
-          {scan.kind === "finished" && (
-            <p className="text-caption mt-3" role="status">
-              Hotovo. Návrh teď počítá s tvářemi — zkus „Navrhnout znovu“.
-              {scan.failed > 0 &&
-                ` ${pluralize(scan.failed, NOT_LOADED)}, zkusí se při dalším hledání.`}
-            </p>
-          )}
+          <FaceScanControls
+            scan={faceScan.scan}
+            missing={photos.length - withFaces}
+            onStart={() => void faceScan.start()}
+            onPause={faceScan.pause}
+            idleLabel={(count) => `Najít tváře (${count})`}
+            doneLabel="Tváře jsou u všech fotek"
+            finishedText="Hotovo. Návrh teď počítá s tvářemi — zkus „Navrhnout znovu“."
+          />
         </Card>
       </div>
 
