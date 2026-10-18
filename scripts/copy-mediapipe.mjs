@@ -5,7 +5,7 @@
  * install (`postinstall`), so the copy always matches the pinned package.
  *
  * MediaPipe gives the blink score only (Face Landmarker); the faces themselves
- * come from YuNet (src/lib/social-video/detect.ts).
+ * come from YuNet (src/lib/social-video/face-finder.ts).
  *
  * Only the WASM comes from the package; the model is committed in
  * `public/vendor/mediapipe/models/` (it is not on npm):
@@ -34,7 +34,9 @@ const { version } = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"
 const target = join(root, "public", "vendor", "mediapipe", version, "wasm");
 mkdirSync(target, { recursive: true });
 // The SIMD build and the fallback for browsers without SIMD; FilesetResolver
-// picks one. The "module" variant is for module workers, which we do not use.
+// picks one. The classic build, not the "module" one: detection runs in a
+// worker (src/lib/social-video/face-worker.ts) that Turbopack starts as a
+// classic worker, where MediaPipe loads its loader with importScripts.
 for (const name of [
   "vision_wasm_internal.js",
   "vision_wasm_internal.wasm",
