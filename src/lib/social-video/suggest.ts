@@ -16,8 +16,11 @@ export interface VideoCandidate extends HighlightCandidate {
   faces: PhotoFaces | null;
 }
 
-/** An eye this closed spoils a photo that would otherwise be picked. */
+/** An eye this closed spoils a group photo — someone blinked. In a photo of
+ * one or two people closed eyes are as often the moment itself (a kiss, a
+ * hug), so they count only from this many faces. */
 const BLINK_LIMIT = 0.5;
+const BLINK_MIN_FACES = 3;
 
 /**
  * `count` photo ids: pinned photos always, then the best fit of a pool twice
@@ -37,13 +40,14 @@ export function suggestPhotos(
     minPhotosForAuto: 0,
   }).map(({ id, pinned }) => ({ candidate: byId.get(id)!, pinned }));
   // The pick keeps one frame per burst; a gallery of a few bursts (or photos
-  // without a capture time, uploaded seconds apart) would leave the video
-  // short. Top it up from the rest of the day, evenly.
+  // without a capture time, uploaded seconds apart) would leave the pool
+  // short. Top it up from the rest of the day, evenly, to the same twice the
+  // count — so the fit to the format still has a choice to make.
   const inPick = new Set(highlighted.map((p) => p.candidate.id));
   const others = candidates.filter((c) => c.own && !inPick.has(c.id)).sort(compareTimeline);
   const pool = [
     ...highlighted,
-    ...evenly(others, count - highlighted.length).map((candidate) => ({
+    ...evenly(others, count * 2 - highlighted.length).map((candidate) => ({
       candidate,
       pinned: false,
     })),
@@ -81,7 +85,15 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   const faces = c.faces?.faces;
   if (!faces || c.width === null || c.height === null) return score;
   if (faces.length > 0) score += 1;
-  if (faces.some((f) => f.blink !== null && f.blink > BLINK_LIMIT)) score -= 5;
+  // Known to show no face: for 9:16 a landscape photo is then cut blind — a
+  // wide church or a beach with the couple somewhere off the crop.
+  else if (wantsPortrait && !portrait) score -= 2;
+  if (
+    faces.length >= BLINK_MIN_FACES &&
+    faces.some((f) => f.blink !== null && f.blink > BLINK_LIMIT)
+  ) {
+    score -= 5;
+  }
   const shot = planShot(
     { width: c.width, height: c.height, faces },
     format,

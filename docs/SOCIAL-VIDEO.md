@@ -59,8 +59,12 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 - Reuse `pickHighlights`' signals: pins, XMP stars above the gallery's usual, colour labels, the
   spread across parts of the day, burst de-duplication. N = 6–7 or 12–13 instead of 6.
 - **Fit to the format:** for 9:16 prefer portrait photos, or landscape ones whose subject box fits a
-  0.5625-wide crop (§5). For 16:9 the reverse.
-- **Blink penalty:** Face Landmarker's `eyeBlinkLeft/Right` above 0.5 on any face.
+  0.5625-wide crop (§5). For 16:9 the reverse. A landscape photo **known to show no face** is held
+  back from 9:16: cut blind, it showed an empty church with the bride sliced off its edge (§7).
+- **Blink penalty:** Face Landmarker's `eyeBlinkLeft/Right` above 0.5 on any face — **in a photo of
+  three or more**. In a couple's photo closed eyes are as often the moment itself (a kiss, a hug).
+- **A short pick is topped up** from the rest of the day to twice the count before the fit chooses:
+  photos seconds apart are one burst to the highlights, and the fit must still have a choice.
 - **Rhythm:** no three face-less slides in a row; alternate people and details.
 - **Ends:** the first and last slides are the strongest (pinned or highest score).
 
@@ -83,14 +87,16 @@ The short-range model is tuned for selfies. In the spike it found **no face belo
 height**: every large group and most full-length portraits came back empty (28 of 45 photos with a
 face). The fix measured in the spike:
 
-- run the detector on the whole photo **and** on 2×2 and 3×3 overlapping tiles (30 % overlap), where
-  each face is two to three times larger;
+- run the detector on the whole photo **and** on 2×2 to **5×5** overlapping tiles (30 % overlap),
+  where each face is two to five times larger — 4×4 and 5×5 were added after the real wedding in §7,
+  where full-length shots of the couple put faces at 3–5 % of the photo's height;
 - accept a tile detection only at **score ≥ 0.75** (0.5 on the whole frame) — at 0.5, tiles read
   shoulders and knees as faces;
 - merge everything by non-max suppression at IoU 0.3.
 
-Result: **42 of 45 photos** with a face, 68 faces, false hits nearly gone, **~0.16 s per photo** on
-4 vCPU without a GPU. The 1927 Solvay group photo (tiny faces, 29 people) still returns nothing, and
+Result in the spike (2×2 and 3×3 only): **42 of 45 photos** with a face, 68 faces, false hits nearly
+gone, **~0.16 s per photo** on 4 vCPU without a GPU. On a real wedding the 5×5 grid costs ~1.5 s
+per photo on the same machine, once per photo — the result is stored. The 1927 Solvay group photo (tiny faces, 29 people) still returns nothing, and
 it should not zoom anyway.
 
 `FaceLandmarker` (with blendshapes) runs on the same photo for the blink score only; it is not used
@@ -135,11 +141,13 @@ setting behaving inconsistently.
 
 For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9), the slide length.
 
-1. **Subject box S.** Faces with score ≥ 0.6 and area ≥ 15 % of the largest face. Each is widened
-   to **head and shoulders** — about ×1.8 wide, from **0.8 h above** the face box to 1.0 h below it
-   (the spike's 0.5 h above cut the top of heads on tight frames). S is their union. No face: a
-   gentle zoom (≤ 1.12) on the centre; a [smartcrop.js](https://npmjs.com/package/smartcrop) (MIT)
-   focal point is a later refinement.
+1. **Subject box S.** Faces with score **≥ 0.7** and area ≥ 15 % of the largest face (0.6 framed a
+   dark church doorway on a real wedding; the real small faces come from the tiles, above 0.75).
+   Each is widened to **head and shoulders** — about ×1.8 wide, from **0.8 h above** the face box
+   to 1.0 h below it (the spike's 0.5 h above cut the top of heads on tight frames). S is their
+   union. No face: a gentle zoom (≤ 1.12) centred across and aimed at the **upper third** — at a
+   wedding the heads are up there, and the middle of a full-length portrait cut to 16:9 is a waist.
+   A [smartcrop.js](https://npmjs.com/package/smartcrop) (MIT) focal point is a later refinement.
 2. **Cover frame C:** the largest A-aspect rectangle in the photo, centred on S horizontally and
    placed by the same eye line as T vertically, so the move does not drift up or down; clamped
    inside.
@@ -210,6 +218,27 @@ dancing) is still to be measured.
 A laptop with a hardware H.264 encoder should be faster than this software VP9 run; to be measured
 on Pavel's Mac.
 
+### A real wedding, 2026-10-18
+
+Jáchym & Sophie, Saint-Paul-de-Vence — the 29 photos of the gallery's first set (20 landscape,
+9 portrait), fetched at 3072 px wide, run through the app locally (upload → video page → render),
+same 4 vCPU without GPU.
+
+| Measured                                   | Result                                                                                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Faces, frame + 2×2, 3×3 (the spike's grid) | 15 / 29 photos; misses: full-length couples (faces 3–5 % high), kisses in profile, big groups                                                              |
+| Faces, frame + 2×2 … 5×5 (now)             | **19 / 29 photos**, 39 faces, ~1.5 s per photo; every new hit a real face                                                                                  |
+| Correctly faceless                         | the rings, hands on the steering wheel; the rest of the misses are wide groups and backs                                                                   |
+| False hits                                 | two on the whole frame (a dark doorway 0.65, the rings 0.51) — below the framing score of 0.7                                                              |
+| Render 15 s / 30 s at 1080p                | about real time: 15 s and 30 s of wall time, 18–42 MB, software VP9                                                                                        |
+| What it changed                            | tiles to 5×5, framing score 0.7, faceless aim at the upper third, faceless landscapes out of 9:16, blink only in groups, top-up to twice the count (§3–§5) |
+
+Before the changes, a full-length portrait cut to 16:9 lost the couple's heads (it aimed at the
+middle) and a 9:16 video opened its second slide on an empty church. After them, neither happens on
+this set. The photos carried no capture time or Lightroom marks (fetched through the transform,
+which strips metadata), so the suggestion here ran on the fit alone; in the gallery itself both are
+there.
+
 ## 8. Later
 
 - **Polaroid:** white frame with a thicker bottom, soft shadow, ±6° seeded tilt, dropped in with an
@@ -229,10 +258,13 @@ ticket #4298), **InsightFace** models (non-commercial licence), running detectio
 
 1. **CORS GET on the transform URL.** Drawing a photo into a canvas that is then encoded needs
    `Access-Control-Allow-Origin` on the image response, or the canvas is tainted and the export
-   throws. The offline mode already fetches with `mode: "cors"` (`public/sw.js`), which suggests the
-   header is there; a `curl -H Origin:` against a real transformed photo settles it. If missing, add
-   `GET` to the bucket's CORS rule (`docs/SETUP.md` §3).
-2. **Hit rate on two real weddings** (~100 photos: portraits, medium, wide, dance floor).
+   throws. Checked 2026-10-18 with `curl -H Origin:` on a real photo: **missing**, on the object
+   and on its transform alike. Add `GET` to the bucket's CORS rule (`docs/SETUP.md` §3), then check
+   the transform again; if it still lacks the header, a Response Header Transform Rule on the CDN
+   zone adds it for `/cdn-cgi/image/*`. The offline mode fetches the same way (`public/sw.js`) and
+   needs the same header.
+2. **Hit rate on real weddings** — one measured (§7, 29 photos); a second, with a dance floor, to
+   come.
 3. **Lightroom MWG regions** in one of Pavel's exports.
 4. **H.264 encode speed and quality** in Chrome and Safari on Pavel's Mac.
 5. Detector inside a module Web Worker, GPU delegate vs CPU — keeps the admin responsive while it

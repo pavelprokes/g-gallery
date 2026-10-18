@@ -10,7 +10,7 @@ import { z } from "zod";
 
 /** Bumped with any change to the model, the tiles or the thresholds — a stored
  * result from another `model` is recomputed on demand, never mixed in. */
-export const FACES_MODEL = "blazeface-sr+tiles@tasks-vision-1.1.1";
+export const FACES_MODEL = "blazeface-sr+tiles2-5@tasks-vision-1.1.1";
 
 /** Whole-frame detections below this are dropped. */
 export const FRAME_MIN_SCORE = 0.5;
@@ -71,14 +71,19 @@ export interface Tile {
   minScore: number;
 }
 
+/** The tile grids after the whole frame. 4×4 and 5×5 were added after a real
+ * wedding (docs/SOCIAL-VIDEO.md §7): full-length shots of the couple put
+ * faces at 3–5 % of the photo's height, which even a 3×3 tile misses. */
+const TILE_GRIDS = [2, 3, 4, 5];
+
 /**
- * The whole frame, then 2×2 and 3×3 overlapping tiles: the short-range model
- * finds nothing under ~12 % of the frame's height, and in a tile every face is
- * two to three times larger.
+ * The whole frame, then overlapping tiles from 2×2 to 5×5: the short-range
+ * model finds nothing under ~12 % of the frame's height, and in a tile every
+ * face is two to five times larger.
  */
 export function tilesFor(width: number, height: number): Tile[] {
   const tiles: Tile[] = [{ x: 0, y: 0, w: width, h: height, minScore: FRAME_MIN_SCORE }];
-  for (const n of [2, 3]) {
+  for (const n of TILE_GRIDS) {
     const w = Math.min(width, (width / n) * (1 + TILE_OVERLAP));
     const h = Math.min(height, (height / n) * (1 + TILE_OVERLAP));
     for (let row = 0; row < n; row++) {

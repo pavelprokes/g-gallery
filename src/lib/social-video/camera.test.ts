@@ -103,13 +103,28 @@ describe("planShot", () => {
     expect(planShot(landscape(...group), WIDE, SECONDS).kind).toBe("push");
   });
 
-  it("zooms gently on the centre when there is no face", () => {
+  it("zooms gently, centred across, when there is no face", () => {
     const photo = landscape();
     const shot = planShot(photo, WIDE, SECONDS);
     expect(shot.kind).toBe("push");
     expect(shot.from.x + shot.from.w / 2).toBeCloseTo(1500);
     expect(shot.to.x + shot.to.w / 2).toBeCloseTo(1500);
     expect(shot.from.w / shot.to.w).toBeLessThanOrEqual(1.12 + 1e-9);
+  });
+
+  it("aims at the upper third of a portrait cut to 16:9 when it finds no face", () => {
+    // A full-length couple whose faces were too small to find: the middle of
+    // the photo is their waists, the upper third their heads.
+    const photo = portrait();
+    const shot = planShot(photo, WIDE, SECONDS);
+    expect(shot.from.y + shot.from.h / 2).toBeCloseTo(1000);
+    inside(shot.from, photo);
+  });
+
+  it("does not frame by a weak whole-frame hit — a doorway, a box of rings", () => {
+    const doorway = { ...face(0.8, 0.3, 0.1, 1.5), score: 0.65 };
+    const shot = planShot(landscape(doorway), VERTICAL, SECONDS);
+    expect(shot.from.x + shot.from.w / 2).toBeCloseTo(1500);
   });
 
   it("ignores a small face in the background", () => {
