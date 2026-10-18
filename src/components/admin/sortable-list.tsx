@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { moveItem, slotAt } from "@/lib/reorder";
 
 /**
@@ -14,7 +21,13 @@ import { moveItem, slotAt } from "@/lib/reorder";
  * - the keyboard moves the focused handle with the arrow keys, Home and End.
  *
  * The list shows the new order while dragging and reports it once, on drop.
+ * Near the top or bottom of the window the page scrolls, so a photo can be
+ * carried across a gallery of hundreds.
  */
+
+/** How close to the window's edge the page starts scrolling, and how fast. */
+const EDGE_PX = 72;
+const SCROLL_PX_PER_FRAME = 14;
 export function SortableList<T extends { id: string }>({
   items,
   onReorder,
@@ -25,7 +38,8 @@ export function SortableList<T extends { id: string }>({
   itemClassName = "",
 }: {
   items: readonly T[];
-  onReorder: (next: T[]) => void;
+  /** The new order, and which item went where. */
+  onReorder: (next: T[], move: { item: T; from: number; to: number }) => void;
   renderItem: (item: T, index: number) => ReactNode;
   /** "Fotka 3" — for the handle's label and the announcement. */
   itemName: (item: T, index: number) => string;
@@ -41,15 +55,18 @@ export function SortableList<T extends { id: string }>({
     x: number;
     y: number;
     pointerId: number;
-    rects: DOMRect[];
+    /** In page coordinates, so the page may scroll during the drag. */
+    rects: { left: number; top: number; width: number; height: number }[];
   } | null>(null);
+  /** The pointer's last position in the window, for the edge scroll. */
+  const pointer = useRef({ x: 0, y: 0 });
 
   const shown = drag ? moveItem(items, drag.from, drag.over) : items;
 
   const commit = (from: number, to: number) => {
     if (from === to) return;
     const next = moveItem(items, from, to);
-    onReorder(next);
+    onReorder(next, { item: items[from]!, from, to });
     setAnnouncement(`${itemName(items[from]!, from)} je teď ${to + 1}. z ${items.length}.`);
   };
 
@@ -61,7 +78,10 @@ export function SortableList<T extends { id: string }>({
     if (!fromHandle && target.closest("button, a, input, select, textarea")) return;
     const rects = Array.from(
       listRef.current?.querySelectorAll<HTMLElement>(":scope > li") ?? [],
-      (li) => li.getBoundingClientRect(),
+      (li) => {
+        const r = li.getBoundingClientRect();
+        return { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height };
+      },
     );
     pending.current = {
       from: index,
@@ -81,9 +101,34 @@ export function SortableList<T extends { id: string }>({
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) < 6) return;
       listRef.current?.setPointerCapture(event.pointerId);
     }
-    const over = slotAt(event.clientX, event.clientY, start.rects);
+    pointer.current = { x: event.clientX, y: event.clientY };
+    const over = slotAt(event.clientX + scrollX, event.clientY + scrollY, start.rects);
     setDrag({ from: start.from, over: over === -1 ? start.from : over });
   };
+
+  // While dragging near the window's edge, scroll — and re-aim at whatever
+  // slot the pointer now sits over, since the page moved under it.
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    let frame = 0;
+    const tick = () => {
+      const { x, y } = pointer.current;
+      const step =
+        y < EDGE_PX ? -SCROLL_PX_PER_FRAME : y > innerHeight - EDGE_PX ? SCROLL_PX_PER_FRAME : 0;
+      const start = pending.current;
+      if (step !== 0 && start) {
+        scrollBy(0, step);
+        const over = slotAt(x + scrollX, y + scrollY, start.rects);
+        if (over !== -1) {
+          setDrag((d) => (d && d.over !== over ? { from: d.from, over } : d));
+        }
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [dragging]);
 
   const end = (event: PointerEvent<HTMLOListElement>, drop: boolean) => {
     const start = pending.current;

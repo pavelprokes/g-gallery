@@ -421,6 +421,7 @@ export function toHighlightCandidate(
     createdAt: Date;
     fileOrderKey: string;
     wovenAt: Date | null;
+    manualOrderKey: string;
     source: string;
     xmpRating: number | null;
     xmpLabel: string | null;

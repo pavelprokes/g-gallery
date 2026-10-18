@@ -59,7 +59,7 @@ export async function startChapter(galleryId: string, photoId: string, formData:
       status: "CONFIRMED",
       gallery: { ownerId: session.user.id },
     },
-    select: { id: true, takenAt: true, createdAt: true, wovenAt: true },
+    select: { id: true, takenAt: true, createdAt: true, wovenAt: true, manualOrderKey: true },
   });
   if (!photo) throw new Error("NOT_FOUND");
 
@@ -94,7 +94,16 @@ export async function startChapter(galleryId: string, photoId: string, formData:
         // start photo (docs/PHOTO-ORDER.md), like the photo's own key.
         // `startWovenAt` is the photo's current woven time (null unless the
         // gallery uses that order); `refreshWovenOrder` moves it from here.
-        data: { ...at, startWovenAt: photo.wovenAt, title: title.data, translations, slug },
+        // `startManualKey` is the photo's hand-placed key (or its provisional
+        // one); a drag moves it with the photo (src/lib/manual-order-db.ts).
+        data: {
+          ...at,
+          startWovenAt: photo.wovenAt,
+          startManualKey: photo.manualOrderKey,
+          title: title.data,
+          translations,
+          slug,
+        },
       });
       break;
     } catch (error) {
