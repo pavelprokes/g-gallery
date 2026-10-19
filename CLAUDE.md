@@ -33,6 +33,9 @@ self-hosted face detection (YuNet in `public/vendor/yunet/`, MediaPipe's blink m
 **`docs/REPLACE-PHOTOS.md`** is the authority for replacing delivered photos with a corrected export
 and filing new shots by camera number (adopted 2026-10-19) — read it before touching pairing,
 `planPick` or the replace path in `api/uploads/confirm`.
+**`docs/CORRECTIONS.md`** is the authority for the corrections mode (adopted 2026-10-19) — the
+couple's comments behind a per-link PIN; read it before touching `PhotoComment`, the PIN columns on
+`ShareLink` or `api/g/[token]/corrections`.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).

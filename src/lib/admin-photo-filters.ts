@@ -7,6 +7,7 @@
 
 /** Each one narrows the grid; several together must all hold. */
 export const ADMIN_FILTERS = [
+  "comments",
   "print",
   "favorites",
   "reactions",
@@ -116,6 +117,8 @@ export interface PhotoFacts {
   favorites: number;
   reactions: number;
   print: number;
+  /** Open corrections from the couple (docs/CORRECTIONS.md). */
+  comments: number;
   views: number;
   viewers: number;
   highlight: boolean;
@@ -127,6 +130,7 @@ export interface PhotoFacts {
 }
 
 const HOLDS: Record<AdminFilter, (photo: PhotoFacts) => boolean> = {
+  comments: (photo) => photo.comments > 0,
   print: (photo) => photo.print > 0,
   favorites: (photo) => photo.favorites > 0,
   reactions: (photo) => photo.reactions > 0,

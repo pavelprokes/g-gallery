@@ -10,13 +10,13 @@ browser's Back. Chips are plain links; the person and chapter selects and the se
 `src/lib/admin-photo-filters.ts` parses and writes it — unknown values are dropped, never refused,
 and the links from before (`?print=1`, `?timeline=1`) still work.
 
-| Parameter | Values                                                                                                                                        |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `f`       | comma list, all must hold: `print`, `favorites`, `reactions`, `viewed`, `highlights`, `video-draft`, `tagged`, `untagged`, `guests`, `videos` |
-| `person`  | a `GalleryPerson` id — photos with them named (docs/SOCIAL-VIDEO.md §4)                                                                       |
-| `chapter` | a chapter id — its photos as the guests' grid places them (docs/CHAPTERS.md)                                                                  |
-| `q`       | part of the file name — a camera number (`PPR55013`) is enough                                                                                |
-| `sort`    | `loved` (default), `views`, `viewers`, `order` (the guests' order with chapter headings), `name`                                              |
+| Parameter | Values                                                                                                                                                                                            |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `f`       | comma list, all must hold: `comments` (open corrections, docs/CORRECTIONS.md), `print`, `favorites`, `reactions`, `viewed`, `highlights`, `video-draft`, `tagged`, `untagged`, `guests`, `videos` |
+| `person`  | a `GalleryPerson` id — photos with them named (docs/SOCIAL-VIDEO.md §4)                                                                                                                           |
+| `chapter` | a chapter id — its photos as the guests' grid places them (docs/CHAPTERS.md)                                                                                                                      |
+| `q`       | part of the file name — a camera number (`PPR55013`) is enough                                                                                                                                    |
+| `sort`    | `loved` (default), `views`, `viewers`, `order` (the guests' order with chapter headings), `name`                                                                                                  |
 
 Each chip shows how many photos it would leave on top of the rest of the view; a chip that would
 leave none is hidden unless it is on. `tagged` and `untagged` exclude each other.
@@ -34,5 +34,4 @@ localStorage, so the filter can see it and another device continues the draft.
 
 ## Later
 
-`comments` (docs/CORRECTIONS.md, when the corrections mode lands) and a "replaced" filter join the
-same list.
+A "replaced" filter (photos swapped for a corrected export) would join the same list.

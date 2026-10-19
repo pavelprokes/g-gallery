@@ -11,6 +11,7 @@ const SECTION_IDS = [
   "prohlizeni",
   "oblibene",
   "stahovani",
+  "pripominky",
   "hoste",
   "offline",
   "soukromi",

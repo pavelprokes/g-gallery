@@ -312,6 +312,12 @@ async function replacePhotoBytes(
         },
       });
       if (count !== 1) throw new ReplaceConflict();
+      // The corrected file is the answer to the couple's corrections on it
+      // (docs/CORRECTIONS.md): they read "Opraveno ✓" from now on.
+      await tx.photoComment.updateMany({
+        where: { photoId: target.id, resolvedAt: null },
+        data: { resolvedAt: new Date() },
+      });
       return true;
     })
     .catch((error: unknown) => {

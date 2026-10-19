@@ -62,7 +62,7 @@ export interface ExistingPhoto {
 /** An export's sequence and what follows it: `svatba_0412_` + `PPR57923`. */
 const SEQUENCED = /^(.*[_-]\d+[_-])(.+)$/;
 /** A Photoshop round trip's suffix — the same shot. */
-const EDITED = /[-_ ](edit|upravit)(-\d+)?$/;
+const EDITED = /[-_ ](edit|upravit)(-\d+)?$/i;
 const stemOf = (fileName: string) => fileName.replace(/\.[^.]*$/, "");
 
 /** A file's stem, lowercased and without a Photoshop round trip's suffix. */
@@ -260,4 +260,14 @@ export function planPick(
       lostTarget: false,
     };
   });
+}
+
+/**
+ * The camera's own name for a delivered photo, as written — `PPR55013` out of
+ * `svatba_0215_PPR55013.jpg` — for finding it in Lightroom
+ * (docs/CORRECTIONS.md). The stem itself when there is no sequence.
+ */
+export function cameraName(fileName: string): string {
+  const stem = stemOf(fileName).replace(EDITED, "");
+  return SEQUENCED.exec(stem)?.[2] ?? stem;
 }

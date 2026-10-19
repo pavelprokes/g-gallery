@@ -21,6 +21,7 @@ import { FORMS, pluralize } from "@/lib/czech-plural";
 // view is bookmarked, shared and undone with the browser's Back like any page.
 
 const FILTER_LABEL: Record<AdminFilter, string> = {
+  comments: "✎ Připomínky",
   print: "🖨 K tisku",
   favorites: "♥ Srdíčka",
   reactions: "Reakce",

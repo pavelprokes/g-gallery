@@ -63,6 +63,8 @@ import {
 } from "@/lib/admin-photo-filters";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
 import { AdminFilterBar } from "@/components/admin/admin-filter-bar";
+import { PhotoCorrections } from "@/components/admin/photo-corrections";
+import { cameraName } from "@/lib/upload-resume";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +126,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           xmpHighlight: true,
           highlightPin: true,
           faceTags: { select: { personId: true } },
+          // docs/CORRECTIONS.md — the couple's corrections, oldest first.
+          comments: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true, body: true, x: true, y: true, resolvedAt: true },
+          },
         },
       },
       chapters: {
@@ -147,6 +154,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           allowReactions: true,
           allowPrintSelection: true,
           allowUpload: true,
+          allowCorrections: true,
+          correctionPinCipher: true,
           createdAt: true,
           slug: true,
           tokenCipher: true,
@@ -192,7 +201,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // and the chapters' "copy link" buttons.
   const shareLinks = gallery.shareLinks.map((link) => {
     const token = decryptToken(link.tokenCipher);
-    return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+    return {
+      ...link,
+      url: token ? `/g/${token}/${link.slug ?? ""}` : null,
+      correctionPin: decryptToken(link.correctionPinCipher),
+    };
   });
   // A chapter's link is a share link plus its anchor: the newest one a guest
   // can actually open — live, copyable, and on a published gallery (a draft
@@ -293,6 +306,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       favorites: photo._count.favorites,
       reactions: reactions.get(photo.id) ?? 0,
       print: printQuantities.get(photo.id) ?? 0,
+      comments: photo.comments.filter((comment) => comment.resolvedAt === null).length,
       views: stats?.views ?? 0,
       viewers: stats?.uniqueViewers ?? 0,
       highlight: pickedPinned.has(photo.id),
@@ -304,6 +318,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     };
   };
   const facts = new Map(gallery.photos.map((photo) => [photo.id, factsOf(photo)]));
+  const openCorrections = [...facts.values()].filter((fact) => fact.comments > 0).length;
   const shows = (photo: AdminPhoto) => matchesAdminView(view, facts.get(photo.id)!);
   // Most-loved (the order gallery.photos is in) unless another sort is picked.
   const visiblePhotos = sortAdminPhotos(
@@ -442,6 +457,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           )}
         </p>
         {printQuantity > 0 && <CopyButton value={photo.fileName} label="Kopírovat název souboru" />}
+        {photo.comments.length > 0 && <PhotoCorrections photo={photo} comments={photo.comments} />}
         {photo.videoObjectKey && (
           <VideoPosterPicker
             photoId={photo.id}
@@ -491,6 +507,15 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             <a href={`/admin/g/${gallery.id}/people`} className={buttonClasses("secondary", "md")}>
               Kdo je kdo
             </a>
+            {/* docs/CORRECTIONS.md — only while the couple has asked for something. */}
+            {openCorrections > 0 && (
+              <a
+                href={`/admin/g/${gallery.id}?f=comments`}
+                className={buttonClasses("primary", "md")}
+              >
+                Připomínky ({openCorrections})
+              </a>
+            )}
             <GallerySettings
               galleryId={gallery.id}
               title={gallery.title}
@@ -600,6 +625,33 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           people={gallery.people}
           chapters={adminChapters.map((chapter) => ({ id: chapter.id, title: chapter.title }))}
         />
+        {view.filters.includes("comments") && visiblePhotos.length > 0 && (
+          <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
+            <p>
+              Fotky s otevřenou připomínkou: <strong>{visiblePhotos.length}</strong>. Po nahrání
+              opravené fotky se její připomínky vyřídí samy.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Camera numbers, for finding the shots in Lightroom's text filter. */}
+              <CopyButton
+                value={visiblePhotos.map((photo) => cameraName(photo.fileName)).join(" ")}
+                label="Kopírovat čísla z fotoaparátu"
+                text="Čísla pro Lightroom"
+              />
+              <CopyButton
+                value={visiblePhotos
+                  .flatMap((photo) =>
+                    photo.comments
+                      .filter((comment) => comment.resolvedAt === null)
+                      .map((comment) => `${photo.fileName}: ${comment.body}`),
+                  )
+                  .join("\n")}
+                label="Kopírovat připomínky jako text"
+                text="Připomínky jako text"
+              />
+            </div>
+          </div>
+        )}
         {printOnly && printItems.length > 0 && (
           <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
             <p>

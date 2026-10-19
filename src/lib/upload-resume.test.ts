@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countResumed,
+  cameraName,
   matchResumeTargets,
   planPick,
   replaceCandidates,
@@ -210,5 +211,13 @@ describe("planPick", () => {
     expect(planPick([file("PPR56600.jpg")], gone, existing)[0]).toMatchObject({
       lostTarget: true,
     });
+  });
+});
+
+describe("cameraName", () => {
+  it("keeps the camera's own spelling", () => {
+    expect(cameraName("svatba_0215_PPR55013.jpg")).toBe("PPR55013");
+    expect(cameraName("svatba_0001_DSC_1234-Edit.jpg")).toBe("DSC_1234");
+    expect(cameraName("IMG_4821.jpg")).toBe("IMG_4821");
   });
 });

@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} — abre {cta} en una ventana nueva"
+  },
+  "corrections": {
+    "toolbar": "Retoques",
+    "toolbarTitle": "Peticiones de retoque – indica qué cambiar en las fotos",
+    "pinTitle": "PIN para peticiones de retoque",
+    "pinHint": "Tu fotógrafo te envió un PIN de 6 dígitos con la galería. Se pide cada vez que abres este modo.",
+    "pinSubmit": "Entrar",
+    "pinWrong": "El PIN no coincide. Inténtalo de nuevo.",
+    "pinLocked": "Demasiados intentos. Vuelve a intentarlo en {minutes} min.",
+    "cancel": "Cancelar",
+    "barTitle": "Peticiones de retoque",
+    "barCount": "{count, plural, =0 {ninguna todavía} one {# foto con petición} other {# fotos con petición}}",
+    "exit": "Terminar",
+    "expired": "El modo de retoques se cerró. Introduce el PIN de nuevo para añadir más.",
+    "badge": "{count, plural, one {# petición} other {# peticiones}}",
+    "panelTitle": "Peticiones para esta foto",
+    "empty": "Nada para esta foto todavía. Escribe qué cambiar.",
+    "newLabel": "Nueva petición",
+    "placeholder": "P. ej. retocar la mancha del vestido",
+    "markSpot": "Marcar el lugar",
+    "placing": "Toca la foto…",
+    "placeHint": "Toca el lugar de la foto al que se refiere la petición.",
+    "removeSpot": "Quitar la marca",
+    "add": "Añadir",
+    "edit": "Editar",
+    "editLabel": "Editar la petición {n}",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Eliminarla?",
+    "resolved": "Retocada ✓",
+    "error": "No se pudo guardar. Inténtalo de nuevo.",
+    "privacy": "Solo tú y el fotógrafo las veis, no tus invitados."
   }
 }

@@ -8,6 +8,7 @@ import {
   DownloadIcon,
   HeartIcon,
   MinusIcon,
+  PencilIcon,
   PlusIcon,
   PrinterIcon,
   ProjectorIcon,
@@ -55,6 +56,7 @@ const SECTIONS = [
   { id: "prohlizeni", key: "browse" },
   { id: "oblibene", key: "favorites" },
   { id: "stahovani", key: "download" },
+  { id: "pripominky", key: "corrections" },
   { id: "hoste", key: "guests" },
   { id: "offline", key: "offline" },
   { id: "soukromi", key: "privacy" },
@@ -103,6 +105,11 @@ export default function GuidePage() {
     locale: GUIDE_LOCALE,
     messages: MESSAGES,
     namespace: "gallery",
+  });
+  const tCorrections = createTranslator({
+    locale: GUIDE_LOCALE,
+    messages: MESSAGES,
+    namespace: "corrections",
   });
   const tMarketing = createTranslator({
     locale: GUIDE_LOCALE,
@@ -153,6 +160,11 @@ export default function GuidePage() {
     check: () => (
       <InlineGlyph label={tGallery("select")}>
         <CheckIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
+    pencil: () => (
+      <InlineGlyph label={tCorrections("toolbar")}>
+        <PencilIcon className="size-3.5" />
       </InlineGlyph>
     ),
     projector: () => (
@@ -433,7 +445,32 @@ export default function GuidePage() {
         <CheckList items={t.raw("download.tips") as TitledEntry[]} />
       </GuideSection>
 
-      {/* 5 — Guest uploads */}
+      {/* 5 — Corrections (docs/CORRECTIONS.md) */}
+      <GuideSection
+        id="pripominky"
+        heading={t("corrections.heading")}
+        intro={t("corrections.intro")}
+      >
+        <div className="mt-6">
+          <StepCard
+            title={t("corrections.stepsTitle")}
+            steps={[
+              {
+                title: t("corrections.enterTitle"),
+                body: <p>{t.rich("corrections.enterBody", glyphs)}</p>,
+              },
+              { title: t("corrections.openTitle"), body: <p>{t("corrections.openBody")}</p> },
+              { title: t("corrections.writeTitle"), body: <p>{t("corrections.writeBody")}</p> },
+            ]}
+          />
+        </div>
+        <SubHeading lead={t("corrections.editBody")}>{t("corrections.editHeading")}</SubHeading>
+        <SubHeading lead={t("corrections.doneBody")}>{t("corrections.doneHeading")}</SubHeading>
+        <Note>{t("corrections.badgeNote")}</Note>
+        <Note>{t("corrections.missing")}</Note>
+      </GuideSection>
+
+      {/* 6 — Guest uploads */}
       <GuideSection id="hoste" heading={t("guests.heading")} intro={t("guests.intro")}>
         <StepList
           steps={(["add", "name", "wait"] as const).map((key) => ({
@@ -446,7 +483,7 @@ export default function GuidePage() {
         <SubHeading lead={t("guests.hubBody")}>{t("guests.hubHeading")}</SubHeading>
       </GuideSection>
 
-      {/* 6 — Offline */}
+      {/* 7 — Offline */}
       <GuideSection id="offline" heading={t("offline.heading")} intro={t("offline.intro")}>
         <StepList
           steps={(["scroll", "tap", "save"] as const).map((key) => ({
@@ -457,7 +494,7 @@ export default function GuidePage() {
         <CheckList items={t.raw("offline.tips") as string[]} />
       </GuideSection>
 
-      {/* 7 — Name and privacy */}
+      {/* 8 — Name and privacy */}
       <GuideSection id="soukromi" heading={t("privacy.heading")} intro={t("privacy.intro")}>
         <TermList terms={t.raw("privacy.terms") as TermEntry[]} />
         <Note>{t("privacy.countsNote")}</Note>
@@ -465,7 +502,7 @@ export default function GuidePage() {
         <Note>{t("privacy.optOutWarning")}</Note>
       </GuideSection>
 
-      {/* 8 — Troubleshooting */}
+      {/* 9 — Troubleshooting */}
       <GuideSection id="problemy" heading={t("trouble.heading")}>
         <CheckList items={t.raw("trouble.items") as TitledEntry[]} />
       </GuideSection>

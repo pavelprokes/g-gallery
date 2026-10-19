@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} – ouvre {cta} dans une nouvelle fenêtre"
+  },
+  "corrections": {
+    "toolbar": "Retouches",
+    "toolbarTitle": "Demandes de retouche – indiquez ce qu'il faut modifier",
+    "pinTitle": "Code PIN des retouches",
+    "pinHint": "Votre photographe vous a envoyé un code à 6 chiffres avec la galerie. Il est demandé à chaque ouverture de ce mode.",
+    "pinSubmit": "Entrer",
+    "pinWrong": "Ce code ne correspond pas. Veuillez réessayer.",
+    "pinLocked": "Trop de tentatives. Réessayez dans {minutes} min.",
+    "cancel": "Annuler",
+    "barTitle": "Demandes de retouche",
+    "barCount": "{count, plural, =0 {aucune pour l'instant} one {# photo avec demande} other {# photos avec demande}}",
+    "exit": "Terminer",
+    "expired": "Le mode retouches s'est fermé. Saisissez à nouveau le code pour continuer.",
+    "badge": "{count, plural, one {# demande} other {# demandes}}",
+    "panelTitle": "Demandes pour cette photo",
+    "empty": "Rien pour cette photo. Écrivez ce qu'il faut modifier.",
+    "newLabel": "Nouvelle demande",
+    "placeholder": "Ex. : retoucher la tache sur la robe",
+    "markSpot": "Marquer l'endroit",
+    "placing": "Touchez la photo…",
+    "placeHint": "Touchez l'endroit de la photo concerné par la demande.",
+    "removeSpot": "Retirer le repère",
+    "add": "Ajouter",
+    "edit": "Modifier",
+    "editLabel": "Modifier la demande {n}",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "confirmDelete": "Supprimer ?",
+    "resolved": "Retouchée ✓",
+    "error": "Échec de l'enregistrement. Veuillez réessayer.",
+    "privacy": "Seuls vous et le photographe les voyez, pas vos invités."
   }
 }

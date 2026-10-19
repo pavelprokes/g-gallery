@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} – otvorí {cta} v novom okne"
+  },
+  "corrections": {
+    "toolbar": "Pripomienky",
+    "toolbarTitle": "Režim pripomienok – napíšte, čo na fotkách upraviť",
+    "pinTitle": "PIN pre pripomienky",
+    "pinHint": "Šesťmiestny PIN vám fotograf poslal spolu s galériou. Zadáva sa pri každom vstupe do režimu.",
+    "pinSubmit": "Vstúpiť",
+    "pinWrong": "PIN nesedí. Skúste to prosím znova.",
+    "pinLocked": "Príliš veľa pokusov. Skúste to znova o {minutes} min.",
+    "cancel": "Zrušiť",
+    "barTitle": "Režim pripomienok",
+    "barCount": "{count, plural, =0 {zatiaľ bez pripomienok} one {# fotka s pripomienkou} few {# fotky s pripomienkou} other {# fotiek s pripomienkou}}",
+    "exit": "Ukončiť",
+    "expired": "Režim pripomienok sa ukončil. Pre ďalšie pripomienky zadajte PIN znova.",
+    "badge": "{count, plural, one {# pripomienka} few {# pripomienky} other {# pripomienok}}",
+    "panelTitle": "Pripomienky k fotke",
+    "empty": "K tejto fotke zatiaľ nič. Napíšte, čo upraviť.",
+    "newLabel": "Nová pripomienka",
+    "placeholder": "Napr. vyretušovať škvrnu na šatách",
+    "markSpot": "Označiť miesto",
+    "placing": "Ťuknite do fotky…",
+    "placeHint": "Ťuknite na miesto vo fotke, ktorého sa pripomienka týka.",
+    "removeSpot": "Zrušiť miesto",
+    "add": "Pridať",
+    "edit": "Upraviť",
+    "editLabel": "Upraviť pripomienku {n}",
+    "save": "Uložiť",
+    "delete": "Zmazať",
+    "confirmDelete": "Naozaj zmazať?",
+    "resolved": "Opravené ✓",
+    "error": "Nepodarilo sa uložiť. Skúste to prosím znova.",
+    "privacy": "Pripomienky vidíte len vy a fotograf, hostia nie."
   }
 }

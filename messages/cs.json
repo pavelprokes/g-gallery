@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} – otevře {cta} v novém okně"
+  },
+  "corrections": {
+    "toolbar": "Připomínky",
+    "toolbarTitle": "Režim připomínek – napiš, co na fotkách upravit",
+    "pinTitle": "PIN pro připomínky",
+    "pinHint": "Šestimístný PIN ti fotograf poslal spolu s galerií. Zadáváš ho při každém vstupu do režimu.",
+    "pinSubmit": "Vstoupit",
+    "pinWrong": "PIN nesedí. Zkus to prosím znovu.",
+    "pinLocked": "Příliš mnoho pokusů. Zkus to znovu za {minutes} min.",
+    "cancel": "Zrušit",
+    "barTitle": "Režim připomínek",
+    "barCount": "{count, plural, =0 {zatím bez připomínek} one {# fotka s připomínkou} few {# fotky s připomínkou} other {# fotek s připomínkou}}",
+    "exit": "Ukončit",
+    "expired": "Režim připomínek se ukončil. Pro další připomínky zadej PIN znovu.",
+    "badge": "{count, plural, one {# připomínka} few {# připomínky} other {# připomínek}}",
+    "panelTitle": "Připomínky k fotce",
+    "empty": "K téhle fotce zatím nic. Napiš, co upravit.",
+    "newLabel": "Nová připomínka",
+    "placeholder": "Např. vyretušovat skvrnu na šatech",
+    "markSpot": "Označit místo",
+    "placing": "Ťukni do fotky…",
+    "placeHint": "Ťukni na místo ve fotce, kterého se připomínka týká.",
+    "removeSpot": "Zrušit místo",
+    "add": "Přidat",
+    "edit": "Upravit",
+    "editLabel": "Upravit připomínku {n}",
+    "save": "Uložit",
+    "delete": "Smazat",
+    "confirmDelete": "Opravdu smazat?",
+    "resolved": "Opraveno ✓",
+    "error": "Nepodařilo se uložit. Zkus to prosím znovu.",
+    "privacy": "Připomínky vidíte jen vy a fotograf, hosté ne."
   }
 }

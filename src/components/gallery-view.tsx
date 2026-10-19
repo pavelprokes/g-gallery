@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   memo,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -108,9 +109,19 @@ import {
   MinusIcon,
   PlayIcon,
   PlusIcon,
+  PencilIcon,
   PrinterIcon,
   ProjectorIcon,
 } from "@/components/ui/icons";
+import { useCorrections } from "@/components/corrections/use-corrections";
+import {
+  CorrectionBadge,
+  CorrectionMarkers,
+  CorrectionsBar,
+  CorrectionsExpired,
+  CorrectionsPanel,
+  CorrectionsPinSheet,
+} from "@/components/corrections/corrections-ui";
 import type { SignedImageGrant } from "@/lib/image-signing";
 import type { GalleryArchive } from "@/lib/shared-gallery";
 import {
@@ -640,6 +651,8 @@ interface LightboxPhotoProps {
   onDismiss: () => void;
   onTap: () => void;
   onZoomChange: (zoomed: boolean) => void;
+  /** Drawn over the photo inside the zoomed frame — the corrections' spots. */
+  overlay?: ReactNode;
 }
 
 /**
@@ -665,6 +678,7 @@ function LightboxPhoto({
   onDismiss,
   onTap,
   onZoomChange,
+  overlay,
 }: LightboxPhotoProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const { reset, handlers } = useLightboxGestures(
@@ -746,6 +760,7 @@ function LightboxPhoto({
           }`}
           priority
         />
+        {overlay}
       </div>
       {showStale && (
         <span
@@ -1017,6 +1032,8 @@ interface GalleryViewProps {
   allowUpload: boolean;
   /** Share link lets whoever holds it mark photos for print, with a quantity. */
   allowPrintSelection: boolean;
+  /** The corrections mode behind a PIN is offered on this link (docs/CORRECTIONS.md). */
+  allowCorrections?: boolean;
   /** Set only when this gallery was opened from a wedding page that lists more
    * than one — the way back to the rozcestník. Absent on a plain `/g/` link,
    * which must never reveal that a wedding page exists. */
@@ -1050,11 +1067,13 @@ function GalleryViewInner({
   allowReactions,
   allowUpload,
   allowPrintSelection: printSelectionAllowed,
+  allowCorrections = false,
   archive,
   backHref,
   backLabel,
 }: GalleryViewProps) {
   const t = useTranslations("gallery");
+  const tc = useTranslations("corrections");
   const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   // Which photo's full-res image has actually finished loading — drives the
@@ -1222,6 +1241,12 @@ function GalleryViewInner({
    * Google Photos puts it too.
    */
   const [markingMode, setMarkingMode] = useState(false);
+  // docs/CORRECTIONS.md — the couple's corrections, behind the link's PIN.
+  const corrections = useCorrections(token, allowCorrections);
+  const [pinOpen, setPinOpen] = useState(false);
+  // Marking a spot for the next correction on the photo in the lightbox.
+  const [placingSpot, setPlacingSpot] = useState(false);
+  const [draftSpot, setDraftSpot] = useState<{ x: number; y: number } | null>(null);
   // Chrome hides so the photo can be looked at, either because the viewer
   // tapped it away or because they zoomed in — the transform itself lives in
   // `LightboxPhoto`, which reports only this crossing back up.
@@ -2256,6 +2281,17 @@ function GalleryViewInner({
       ? null
       : Math.min(lightboxIndex, photos.length - 1);
   const active = activeIndex === null ? null : photos[activeIndex];
+  // A spot being marked belongs to the photo it was marked on.
+  const activeId = active?.id ?? null;
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- reset on a change of photo or mode */
+    setPlacingSpot(false);
+    setDraftSpot(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activeId, corrections.active]);
+  // The lightbox makes room for the corrections panel: beside the photo on a
+  // desktop, above the sheet on a phone (docs/CORRECTIONS.md).
+  const panelOpen = corrections.active && active !== null;
 
   /**
    * The grid thumbnail to show under the opening photo. Null when the tile's
@@ -2627,6 +2663,21 @@ function GalleryViewInner({
               </IconButton>
             </span>
           )}
+          {/* docs/CORRECTIONS.md — labelled, on every pointer: the couple has
+              to find it once, with the PIN in hand. */}
+          {corrections.available && allPhotos.length > 0 && (
+            <IconButton
+              onClick={() => (corrections.active ? corrections.exit() : setPinOpen(true))}
+              aria-pressed={corrections.active}
+              label={tc("toolbar")}
+              title={tc("toolbarTitle")}
+              className={
+                corrections.active ? "border-brand-primary bg-brand-tint text-brand-ink" : ""
+              }
+            >
+              <PencilIcon />
+            </IconButton>
+          )}
           {allowReactions && (favorites.size > 0 || favoritesOnly) && (
             <IconButton
               onClick={() => {
@@ -2752,6 +2803,23 @@ function GalleryViewInner({
           currentId={currentChapterId}
           jumpingTo={jumpingTo}
           onJump={setJumpingTo}
+        />
+      )}
+
+      {corrections.active && (
+        <CorrectionsBar photoCount={corrections.photoCount} onExit={corrections.exit} />
+      )}
+      {!corrections.active && corrections.expired && (
+        <CorrectionsExpired onReenter={() => setPinOpen(true)} />
+      )}
+      {pinOpen && (
+        <CorrectionsPinSheet
+          onEnter={async (pin) => {
+            const result = await corrections.enter(pin);
+            if (result.ok) setPinOpen(false);
+            return result;
+          }}
+          onDismiss={() => setPinOpen(false)}
         />
       )}
 
@@ -2959,6 +3027,9 @@ function GalleryViewInner({
                     reactionState={reactions.get(photo.id)}
                     printQuantity={printSelections.get(photo.id) ?? 0}
                     printOthers={printOthers.get(photo.id) ?? 0}
+                    correctionCount={
+                      corrections.active ? (corrections.byPhoto.get(photo.id)?.length ?? 0) : 0
+                    }
                     onPick={pick}
                     onOpen={openPhoto}
                     onToggleFavorite={toggleFavorite}
@@ -2991,7 +3062,9 @@ function GalleryViewInner({
           aria-modal="true"
           aria-label={t("lightboxAriaLabel", { index: activeIndex! + 1, total: photos.length })}
           tabIndex={-1}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none"
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none ${
+            panelOpen ? "max-md:pb-[45dvh] md:pr-96" : ""
+          }`}
           onClick={closeLightbox}
         >
           {active.video ? (
@@ -3018,6 +3091,20 @@ function GalleryViewInner({
               onDismiss={closeLightbox}
               onTap={toggleChrome}
               onZoomChange={setZoomed}
+              overlay={
+                panelOpen ? (
+                  <CorrectionMarkers
+                    aspect={aspectOf(active)}
+                    comments={corrections.byPhoto.get(active.id) ?? []}
+                    draft={draftSpot}
+                    placing={placingSpot}
+                    onPlace={(point) => {
+                      setDraftSpot(point);
+                      setPlacingSpot(false);
+                    }}
+                  />
+                ) : undefined
+              }
             />
           )}
 
@@ -3045,13 +3132,13 @@ function GalleryViewInner({
             }}
             inert={chromeInert}
             disabled={activeIndex! >= photos.length - 1 && !hasNextPage}
-            className={`absolute right-0 pe-[env(safe-area-inset-right)] ${chromeClasses}`}
+            className={`absolute right-0 pe-[env(safe-area-inset-right)] ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
             aria-label={t("next")}
           >
             <ChevronRightIcon />
           </NavButton>
           <div
-            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))] ${chromeClasses}`}
+            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))] ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
@@ -3136,7 +3223,7 @@ function GalleryViewInner({
               of. `bottom` clears the home indicator — the guest uploader was
               the only surface in the app already doing this. */}
           <div
-            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/55 px-2 py-1.5 [-ms-overflow-style:none] pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
+            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] ${panelOpen ? "max-md:bottom-[calc(45dvh+0.5rem)]" : ""} flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/55 px-2 py-1.5 [-ms-overflow-style:none] pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
@@ -3180,6 +3267,31 @@ function GalleryViewInner({
               </button>
             )}
           </div>
+          {panelOpen && (
+            <CorrectionsPanel
+              key={active.id}
+              fileName={active.fileName}
+              comments={corrections.byPhoto.get(active.id) ?? []}
+              placing={placingSpot}
+              // Films get words only: a spot on a poster frame means nothing.
+              canMarkSpot={!active.video}
+              draft={draftSpot}
+              onPlacingChange={setPlacingSpot}
+              onClearDraft={() => setDraftSpot(null)}
+              onCreate={async (body) => {
+                const ok = await corrections.create(
+                  active.id,
+                  body,
+                  draftSpot?.x ?? null,
+                  draftSpot?.y ?? null,
+                );
+                if (ok) setDraftSpot(null);
+                return ok;
+              }}
+              onUpdate={(id, body) => corrections.update(id, { body })}
+              onRemove={corrections.remove}
+            />
+          )}
         </div>
       )}
 
@@ -3377,6 +3489,8 @@ interface PhotoTileProps {
   printQuantity: number;
   /** Copies everyone else has marked on this photo. */
   printOthers?: number;
+  /** Corrections on it, shown only while the corrections mode is on. */
+  correctionCount?: number;
   onPick: (index: number, id: string, shiftKey: boolean) => void;
   onOpen: (index: number) => void;
   onToggleFavorite: (photoId: string) => void;
@@ -3415,6 +3529,7 @@ export const PhotoTile = memo(function PhotoTile({
   reactionState,
   printQuantity,
   printOthers = 0,
+  correctionCount = 0,
   onPick,
   onOpen,
   onToggleFavorite,
@@ -3606,6 +3721,7 @@ export const PhotoTile = memo(function PhotoTile({
           <ReactionBadge state={reactionState} />
         </>
       )}
+      {correctionCount > 0 && <CorrectionBadge count={correctionCount} />}
     </div>
   );
 });
