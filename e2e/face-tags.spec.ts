@@ -12,6 +12,7 @@ import { test, expect } from "./fixtures";
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   adminCookie: { name: string; value: string };
   faceTagGalleryId: string;
+  faceSeriesGalleryId: string;
 };
 
 test.beforeEach(async ({ context, baseURL }) => {
@@ -51,6 +52,7 @@ test("the photographer names the couple's faces by hand", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "3 tváře" })).toBeVisible();
 
   await page.getByRole("button", { name: "Přidat: Ženich" }).click();
+  await expect(person(/^Ženich, novomanželé · 0$/)).toHaveAttribute("aria-pressed", "true");
   await right.click();
   await expect(person(/^Ženich, novomanželé · 1$/)).toBeVisible();
   await page.waitForLoadState("networkidle");
@@ -90,4 +92,31 @@ test("the photographer names the couple's faces by hand", async ({ page }) => {
   }).toPass();
   await page.reload();
   await expect(page.getByLabel("Zobrazit").locator("option:checked")).toHaveText("Neoznačené (3)");
+});
+
+test("a face named in a burst is offered on the rest of the series", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.faceSeriesGalleryId}/people`);
+  await expect(page.getByRole("heading", { name: "4 tváře" })).toBeVisible();
+  const offer = page.getByRole("status").filter({ hasText: "ze série" });
+
+  // Retried: a click before the page hydrates does nothing.
+  await expect(async () => {
+    const preset = page.getByRole("button", { name: "Přidat: Nevěsta" });
+    if (await preset.count()) await preset.click({ timeout: 1000 });
+    await expect(page.getByRole("button", { name: /^Nevěsta, novomanželé/ })).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
+  await page.getByRole("button", { name: /^Tvář na fotce serie_0002\.jpg/ }).click();
+  // The shots either side, seconds apart — not the one a minute later.
+  await expect(offer).toContainText("na 2 sousedních fotkách");
+  const saved = page.waitForResponse((r) => r.request().method() === "POST");
+  await offer.getByRole("button", { name: "Označit i tam" }).click();
+  await saved;
+  await expect(offer).toHaveCount(0);
+
+  await page.reload();
+  const bride = page.getByRole("button", { name: /^Nevěsta, novomanželé · 3$/ });
+  await expect(bride).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tvář na fotce serie_0004.jpg" })).toBeVisible();
 });

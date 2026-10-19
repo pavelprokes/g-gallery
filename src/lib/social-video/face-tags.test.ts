@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { planShot, FORMATS } from "@/lib/social-video/camera";
-import { coupleFaces, faceTiles, focusFaces, matchTags } from "@/lib/social-video/face-tags";
+import {
+  coupleFaces,
+  faceTiles,
+  focusFaces,
+  matchTags,
+  seriesMatches,
+  type SeriesPhoto,
+} from "@/lib/social-video/face-tags";
 import type { Face } from "@/lib/social-video/faces";
 
 const face = (x: number, over: Partial<Face> = {}): Face => ({
@@ -72,5 +79,74 @@ describe("faceTiles", () => {
       ["a", 0.2, null],
       ["a", 0.6, "groom"],
     ]);
+  });
+});
+
+describe("seriesMatches", () => {
+  const T = Date.UTC(2026, 8, 19, 15, 0);
+  const shot = (
+    id: string,
+    seconds: number,
+    x: number | null,
+    over: Partial<SeriesPhoto> = {},
+  ) => ({
+    id,
+    takenAt: T + seconds * 1000,
+    width: 3000,
+    height: 2000,
+    faces: x === null ? [] : [face(x), face(0.7)],
+    tags: [],
+    ...over,
+  });
+
+  it("follows the face through a burst either side, while it stays in place", () => {
+    const photos = [
+      shot("a", 0, 0.2),
+      shot("b", 2, 0.205),
+      shot("c", 4, 0.21),
+      shot("d", 6, 0.215),
+      shot("e", 8, 0.5), // moved away: the series ends here
+    ];
+    const found = seriesMatches(photos, "c", box(face(0.21)), "bride");
+    expect(found.map((m) => [m.photoId, m.face.x])).toEqual([
+      ["b", 0.205],
+      ["a", 0.2],
+      ["d", 0.215],
+    ]);
+  });
+
+  it("stops at a pause, a turn of the camera, or where the person is already named", () => {
+    const named = { personId: "bride", ...box(face(0.2)) };
+    expect(
+      seriesMatches([shot("a", 0, 0.2), shot("b", 60, 0.2)], "a", box(face(0.2)), "bride"),
+    ).toEqual([]);
+    expect(
+      seriesMatches(
+        [shot("a", 0, 0.2), shot("b", 2, 0.2, { width: 2000, height: 3000 })],
+        "a",
+        box(face(0.2)),
+        "bride",
+      ),
+    ).toEqual([]);
+    expect(
+      seriesMatches(
+        [shot("a", 0, 0.2), shot("b", 2, 0.2, { tags: [named] })],
+        "a",
+        box(face(0.2)),
+        "bride",
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves a face someone else holds", () => {
+    const groom = { personId: "groom", ...box(face(0.2)) };
+    expect(
+      seriesMatches(
+        [shot("a", 0, 0.2), shot("b", 2, 0.2, { tags: [groom] })],
+        "a",
+        box(face(0.2)),
+        "bride",
+      ),
+    ).toEqual([]);
   });
 });

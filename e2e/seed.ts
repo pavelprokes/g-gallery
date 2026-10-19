@@ -290,6 +290,7 @@ async function main() {
   // would, so the flags are known without running the detector.
   const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
   const faceTagGalleryId = await makeFaceTagGallery(user.id);
+  const faceSeriesGalleryId = await makeFaceSeriesGallery(user.id);
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -300,6 +301,7 @@ async function main() {
       manualOrder,
       photoCheckGalleryId,
       faceTagGalleryId,
+      faceSeriesGalleryId,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1141,6 +1143,58 @@ async function makeFaceTagGallery(ownerId: string) {
         status: "CONFIRMED",
         sizeBytes: 900_000,
         ...(faces ? { faces: { v: 1, model: FACES_MODEL, faces } } : {}),
+      },
+    });
+  }
+  return gallery.id;
+}
+
+/**
+ * A burst for naming faces (docs/SOCIAL-VIDEO.md §4, "Who is who"): three
+ * shots seconds apart with the face in the same place, then one a minute later
+ * — the next moment, not the same series.
+ */
+async function makeFaceSeriesGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Série",
+      status: "DRAFT",
+      storagePrefix: `galleries/e2e-face-series-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const face = (x: number): Face => ({
+    x,
+    y: 0.2,
+    w: 0.1,
+    h: 0.15,
+    score: 0.9,
+    le: [x + 0.02, 0.25],
+    re: [x + 0.07, 0.25],
+    blink: 0.05,
+  });
+  const start = Date.UTC(2026, 8, 19, 15, 0);
+  const shots: [string, number, number][] = [
+    ["serie_0001.jpg", 0, 0.4],
+    ["serie_0002.jpg", 2, 0.405],
+    ["serie_0003.jpg", 4, 0.41],
+    ["serie_0004.jpg", 64, 0.41],
+  ];
+  for (const [fileName, seconds, x] of shots) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${fileName}`,
+        fileName,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#7d6a5a",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        takenAt: new Date(start + seconds * 1000),
+        faces: { v: 1, model: FACES_MODEL, faces: [face(x)] },
       },
     });
   }

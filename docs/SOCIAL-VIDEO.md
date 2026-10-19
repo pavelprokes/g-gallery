@@ -197,6 +197,13 @@ every guest's explicit consent.
   left; a face just named stays in place until the filter changes, so the list does not close up
   under the pointer. Any stored detection serves (`storedFaces`) — naming does not wait for a new
   scan.
+- **A series, offered.** After a face is named, the shots either side of it in the gallery's order
+  are walked while each was taken within 30 s of the last, has the same shape, and has an unnamed
+  framed face where the previous one stood (IoU ≥ 0.5, `seriesMatches`). Those faces are outlined
+  and offered in one bar — **Označit i tam** names them all (`tagFaces`), nothing is named without
+  the click. Place and time only: a person who moved is not followed. On the delivered wedding of §7
+  (2248 faces, a culled set — few bursts survive culling) 301 faces had a neighbour to offer, about
+  420 clicks saved, a fifth.
 - **What uses it.** Only the couple flag, so far: the suggestion adds **+2** to a photo showing a
   named member of the couple (§3) — as much as the right shape for the format — and the camera
   (`focusFaces`) frames **just the couple** where they are named among the framed faces, in the
