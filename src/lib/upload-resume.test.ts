@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   countResumed,
   matchResumeTargets,
+  planPick,
   replaceCandidates,
   shotKey,
   slotter,
@@ -81,11 +82,10 @@ describe("shotKey", () => {
     expect(shotKey("PPR57923-Edit-2.jpg")).toBe("ppr57923.jpg");
   });
 
-  it("takes a bare camera name from a picked file, never from a delivered one", () => {
+  it("takes a bare camera name, edited or not", () => {
     expect(shotKey("PPR55013.jpg")).toBe("ppr55013.jpg");
-    expect(shotKey("PPR55013.jpg", { bare: false })).toBeNull();
-    // A delivery named by sequence alone has no shot to pair with.
-    expect(shotKey("svatba_0001.jpg", { bare: false })).toBeNull();
+    expect(shotKey("DSC_1234-Edit.jpg")).toBe("dsc_1234.jpg");
+    expect(shotKey("svatba_0001_DSC_1234-Edit.jpg")).toBe("dsc_1234.jpg");
   });
 
   it("never keys on a bare number", () => {
@@ -120,11 +120,6 @@ describe("replaceCandidates", () => {
     expect(replaceCandidates([file("PPR55013.jpg")], copies)).toEqual([["colour", "bw"]]);
   });
 
-  it("does not pair a second batch numbered by sequence alone", () => {
-    const bySequence = [{ id: "s", fileName: "svatba_0001.jpg" }];
-    expect(replaceCandidates([file("svatba_0001.jpg")], bySequence)).toEqual([[]]);
-  });
-
   it("pairs nothing for two picked files with one key, or a resumed file", () => {
     expect(
       replaceCandidates([file("x_1_PPR1002.jpg"), file("PPR1002-Edit.jpg")], existing),
@@ -154,5 +149,65 @@ describe("slotter", () => {
     expect(slot("PPR56511-Edit.jpg")).toBeNull();
     expect(slot("PPR10000.jpg")).toBeNull();
     expect(slot("IMG_0001.jpg")).toBeNull();
+  });
+});
+
+describe("planPick", () => {
+  const existing = [
+    { id: "a", fileName: "svatba_0384_PPR56511.jpg" },
+    { id: "b", fileName: "svatba_0385_PPR56600.jpg" },
+    { id: "bare", fileName: "PPR70000.jpg" },
+    { id: "seq", fileName: "svatba_0001.jpg" },
+  ];
+  const file = (name: string) => ({ name, size: 7 });
+
+  it("pre-selects only a pair whose delivered name carries a sequence", () => {
+    const [sure, bare, bySequence] = planPick(
+      [file("PPR56600.jpg"), file("PPR70000.jpg"), file("svatba_0001.jpg")],
+      [],
+      existing,
+    );
+    expect(sure).toMatchObject({ candidates: ["b"], preselect: "b" });
+    // Offered, but a choice: a camera-named delivery, or a second batch
+    // numbered from 1, may be a different shot.
+    expect(bare).toMatchObject({ candidates: ["bare"], preselect: undefined });
+    expect(bySequence).toMatchObject({ candidates: ["seq"], preselect: undefined });
+  });
+
+  it("still files a declined pair next to its twin", () => {
+    expect(planPick([file("PPR56600.jpg")], [], existing)[0]!.slot?.name).toBe(
+      "svatba_0384_PPR56600.jpg",
+    );
+  });
+
+  it("resumes a filed upload under its filed name, once", () => {
+    const pending = [
+      { id: "p", fileName: "svatba_0384_PPR56518.jpg", sizeBytes: 7, replacesPhotoId: null },
+    ];
+    const [a, b] = planPick(
+      [file("PPR56518.jpg"), file("svatba_0384_PPR56518.jpg")],
+      pending,
+      existing,
+    );
+    // The file named so claims the row first; the bare one is a new upload.
+    expect(b).toMatchObject({ resumeId: "p", keepName: undefined });
+    expect(a).toMatchObject({ resumeId: undefined, slot: { name: "svatba_0384_PPR56518.jpg" } });
+    expect(planPick([file("PPR56518.jpg")], pending, existing)[0]).toMatchObject({
+      resumeId: "p",
+      keepName: "svatba_0384_PPR56518.jpg",
+    });
+  });
+
+  it("goes on replacing what an interrupted run replaced, or says it cannot", () => {
+    const pending = [{ id: "p", fileName: "PPR56600.jpg", sizeBytes: 7, replacesPhotoId: "b" }];
+    expect(planPick([file("PPR56600.jpg")], pending, existing)[0]).toMatchObject({
+      candidates: ["b"],
+      preselect: "b",
+      resumeId: "p",
+    });
+    const gone = [{ ...pending[0]!, replacesPhotoId: "deleted" }];
+    expect(planPick([file("PPR56600.jpg")], gone, existing)[0]).toMatchObject({
+      lostTarget: true,
+    });
   });
 });
