@@ -30,6 +30,12 @@ describe("projectionFaces", () => {
     expect(projectionFaces(stored)).toEqual([{ ...face({ x: 0.123 }), blink: null }]);
   });
 
+  it("hands over only the couple's boxes where they are named", () => {
+    const stored = { v: 1, model: FACES_MODEL, faces: [0.2, 0.4, 0.6].map((x) => face({ x })) };
+    const bride = { x: 0.4, y: 0.25, w: 0.08, h: 0.12 };
+    expect(projectionFaces(stored, [bride])).toEqual([{ ...face({ x: 0.4 }), blink: null }]);
+  });
+
   it("says unknown, not faceless, when the photo was never searched", () => {
     expect(projectionFaces(null)).toBeNull();
     expect(projectionFaces({ v: 1, model: FACES_MODEL, faces: [] })).toEqual([]);

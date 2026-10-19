@@ -12,6 +12,7 @@ import {
   planShot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
+import { coupleFaces, focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import { FADE_SECONDS, SLIDE_SECONDS } from "@/lib/social-video/timeline";
 
@@ -20,6 +21,9 @@ export interface VideoCandidate extends HighlightCandidate {
   height: number | null;
   /** Null until detected — such a photo is neither helped nor held back. */
   faces: PhotoFaces | null;
+  /** The boxes the photographer named as the couple on this photo (§4, "Who
+   * is who"); none when absent. */
+  coupleTags?: readonly Box[];
 }
 
 /** Shut eyes (src/lib/photo-check.ts, `CLOSED_FROM`) spoil a group photo —
@@ -33,6 +37,11 @@ const BLINK_MIN_FACES = 3;
 function peopleIn(c: VideoCandidate): Face[] | null {
   return c.faces?.faces.filter((f) => f.score >= FRAMING_MIN_SCORE) ?? null;
 }
+
+/** The couple named on a photo: it is their video. As much as the right
+ * shape for the format, so a landscape photo of them still beats a portrait
+ * of a guest. */
+const COUPLE_BONUS = 2;
 
 /** A photo from the highlights' pick outranks a top-up photo that fits as
  * well, or one step better — the pick is what the photographer marked and the
@@ -104,6 +113,8 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   const people = peopleIn(c);
   if (!faces || !people || c.width === null || c.height === null) return score;
   if (people.length > 0) score += 1;
+  const coupleTags = c.coupleTags ?? [];
+  if (coupleFaces(faces, coupleTags).length > 0) score += COUPLE_BONUS;
   // Known to show no face: for 9:16 a landscape photo is then cut blind — a
   // wide church or a beach with the couple somewhere off the crop.
   else if (wantsPortrait && !portrait) score -= 2;
@@ -113,17 +124,14 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   ) {
     score -= 5;
   }
-  const shot = planShot(
-    { width: c.width, height: c.height, faces },
-    format,
-    SLIDE_SECONDS + FADE_SECONDS,
-  );
+  // Framed as the video will frame it: on the couple, where they are named.
+  const framing = { width: c.width, height: c.height, faces: focusFaces(faces, coupleTags) };
+  const shot = planShot(framing, format, SLIDE_SECONDS + FADE_SECONDS);
   // A wide group cut to 9:16 can only be shown whole, over its own blur — the
   // suggestion steers away from it; the photographer can still add it.
   if (shot.kind === "fit") score -= 3;
   // A face at the photo's very edge cannot be brought to the eye line.
-  else if (!eyesInSafeArea({ width: c.width, height: c.height, faces }, shot.to, format))
-    score -= 1;
+  else if (!eyesInSafeArea(framing, shot.to, format)) score -= 1;
   return score;
 }
 

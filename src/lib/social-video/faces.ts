@@ -60,6 +60,14 @@ export function currentFaces(stored: unknown): PhotoFaces | null {
   return parsed.success && parsed.data.model === FACES_MODEL ? parsed.data : null;
 }
 
+/** The stored value from any detection build; null for none or anything that
+ * does not parse. For what only needs a box — a box is a box, whichever build
+ * found it (the projection, naming faces). */
+export function storedFaces(stored: unknown): PhotoFaces | null {
+  const parsed = photoFacesSchema.safeParse(stored);
+  return parsed.success ? parsed.data : null;
+}
+
 export function iou(
   p: { x: number; y: number; w: number; h: number },
   q: { x: number; y: number; w: number; h: number },

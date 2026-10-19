@@ -30,7 +30,7 @@ import {
   type PhotoOrder,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
-import { projectionFaces } from "@/lib/projection-camera";
+import { PROJECTION_FACES_SELECT, projectionFaces } from "@/lib/projection-camera";
 import type { Face } from "@/lib/social-video/faces";
 import {
   IMAGE_GRANT_TTL_SECONDS,
@@ -191,7 +191,7 @@ export async function loadGalleryViewData(
           ...ORDER_KEY_SELECT,
           _count: { select: { favorites: true } },
           ...UPLOADER_SELECT,
-          faces: true,
+          ...PROJECTION_FACES_SELECT,
         },
       },
       viewers: {
@@ -304,7 +304,7 @@ export async function loadGalleryViewData(
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
       orderKey: orderKeyOf(order, photo),
-      faces: projectionFaces(photo.faces),
+      faces: projectionFaces(photo.faces, photo.faceTags),
     })),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import imageLoader from "@/lib/image-loader";
 import { QUALITY } from "@/lib/image-sizes";
@@ -9,6 +8,7 @@ import { checkPhoto } from "@/lib/photo-check";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import { deletePhotos } from "@/app/admin/actions";
 import { keepCheckedPhoto } from "@/app/admin/photo-check-actions";
+import { FaceZoom } from "@/components/admin/face-zoom";
 import {
   FaceScanControls,
   PHOTO_GENITIVE,
@@ -263,30 +263,5 @@ function FlaggedCard({
         <div className="flex flex-wrap gap-2">{actions}</div>
       </div>
     </li>
-  );
-}
-
-/** The face that raised the flag, cut out of the photo: the reason, at a glance. */
-function FaceZoom({ photo, face }: { photo: CheckPhoto; face: Face }) {
-  const SIZE = 128;
-  const side = Math.max(face.w * photo.width, face.h * photo.height) * 1.6;
-  const k = SIZE / side;
-  const width = Math.round(photo.width * k);
-  const height = Math.round(photo.height * k);
-  return (
-    <div className="bg-brand-tint relative size-32 shrink-0 overflow-hidden rounded">
-      <Image
-        src={photo.objectKey}
-        alt={`Tvář na fotce ${photo.fileName}`}
-        width={width}
-        height={height}
-        sizes={`${width}px`}
-        className="absolute max-w-none"
-        style={{
-          left: Math.round(SIZE / 2 - (face.x + face.w / 2) * photo.width * k),
-          top: Math.round(SIZE / 2 - (face.y + face.h / 2) * photo.height * k),
-        }}
-      />
-    </div>
   );
 }

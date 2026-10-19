@@ -49,6 +49,10 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
           height: true,
           placeholder: true,
           faces: true,
+          faceTags: {
+            where: { person: { couple: true } },
+            select: { x: true, y: true, w: true, h: true },
+          },
         },
       },
     },
@@ -69,6 +73,7 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
         width: photo.width,
         height: photo.height,
         faces: currentFaces(photo.faces),
+        coupleTags: photo.faceTags,
       },
     }));
 
