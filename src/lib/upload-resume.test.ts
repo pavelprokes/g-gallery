@@ -3,7 +3,9 @@ import {
   countResumed,
   matchReplaceTargets,
   matchResumeTargets,
+  replaceCandidates,
   shotKey,
+  slotAfter,
   type PendingUpload,
 } from "./upload-resume";
 
@@ -80,11 +82,15 @@ describe("shotKey", () => {
     expect(shotKey("svatba_001_PPR57923-Edit-2.jpg")).toBe("ppr57923.jpg");
   });
 
-  it("will not guess without a camera name after a sequence", () => {
-    expect(shotKey("IMG_4821.jpg")).toBeNull();
-    expect(shotKey("svatba_0001.jpg")).toBeNull();
+  it("takes a bare camera name as the shot", () => {
+    expect(shotKey("PPR55013.jpg")).toBe("ppr55013.jpg");
+    expect(shotKey("IMG_4821.jpg")).toBe("img_4821.jpg");
+  });
+
+  it("never keys on a bare number", () => {
     expect(shotKey("2026-09-05_0412.jpg")).toBeNull();
-    expect(shotKey("IMG_4821-2.jpg")).toBeNull();
+    // A virtual copy's "-2" is not a shot: the name only matches itself.
+    expect(shotKey("IMG_4821-2.jpg")).toBe("img_4821-2.jpg");
   });
 
   it("keeps the extension apart", () => {
@@ -98,6 +104,10 @@ describe("matchReplaceTargets", () => {
     { id: "b", fileName: "svatba_0002_PPR1002.jpg" },
   ];
   const file = (name: string) => ({ name, size: 1 });
+
+  it("pairs a bare camera-named export with its delivered photo", () => {
+    expect(matchReplaceTargets([file("PPR1001.jpg")], existing)).toEqual(["a"]);
+  });
 
   it("pairs a corrected export with the photo it replaces", () => {
     expect(
@@ -118,5 +128,39 @@ describe("matchReplaceTargets", () => {
 
   it("leaves a file that resumes a pending row alone", () => {
     expect(matchReplaceTargets([file("x_1_PPR1001.jpg")], existing, ["p1"])).toEqual([undefined]);
+  });
+});
+
+describe("replaceCandidates", () => {
+  it("offers every virtual copy of a shot to choose from", () => {
+    const copies = [
+      { id: "colour", fileName: "svatba_0215_PPR55013.jpg" },
+      { id: "bw", fileName: "svatba_0216_PPR55013.jpg" },
+    ];
+    expect(replaceCandidates([{ name: "PPR55013.jpg", size: 1 }], copies)).toEqual([
+      ["colour", "bw"],
+    ]);
+  });
+});
+
+describe("slotAfter", () => {
+  const delivered = [
+    { id: "a", fileName: "svatba_0384_PPR56511.jpg" },
+    { id: "b", fileName: "svatba_0385_PPR56600.jpg" },
+    { id: "c", fileName: "svatba_0386_DSC_0100.jpg" },
+  ];
+
+  it("files a new shot under the same camera's nearest lower number", () => {
+    expect(slotAfter("PPR56518.jpg", delivered)).toEqual({
+      name: "svatba_0384_PPR56518.jpg",
+      after: "svatba_0384_PPR56511.jpg",
+    });
+    expect(slotAfter("DSC_0200.jpg", delivered)?.name).toBe("svatba_0386_DSC_0200.jpg");
+  });
+
+  it("leaves a sequenced name, or a shot before everything, alone", () => {
+    expect(slotAfter("svatba_001_PPR56518.jpg", delivered)).toBeNull();
+    expect(slotAfter("PPR10000.jpg", delivered)).toBeNull();
+    expect(slotAfter("IMG_0001.jpg", delivered)).toBeNull();
   });
 });

@@ -16,7 +16,9 @@ test.beforeEach(async ({ context, baseURL }) => {
   await context.addCookies([{ ...seed.adminCookie, url: baseURL! }]);
 });
 
-test("a re-numbered export replaces its photo after asking", async ({ page }) => {
+test("a corrected export replaces its photo and a new shot is filed by number", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
   const galleryId = seed.replaceGalleryIds[test.info().project.name]!;
   await page.goto(`/admin/g/${galleryId}`);
@@ -37,12 +39,13 @@ test("a re-numbered export replaces its photo after asking", async ({ page }) =>
 
   await page
     .locator('input[type="file"][accept*="image/jpeg"]')
-    .setInputFiles([file("svatba_001_PPR1002.jpg"), file("svatba_002_PPR2000.jpg")]);
+    // Exported with bare camera names, as Lightroom does without a sequence.
+    .setInputFiles([file("PPR1002.jpg"), file("PPR1500.jpg")]);
 
   const pairs = page.getByRole("list", { name: "Co se nahradí" });
-  await expect(pairs).toContainText("svatba_001_PPR1002.jpg → nahradí svatba_0002_PPR1002.jpg");
-  await expect(page.getByText("1 fotka bez shody se nahraje jako nová")).toBeVisible();
-  await page.getByRole("button", { name: "Nahradit 1 fotku" }).click();
+  await expect(pairs).toContainText("PPR1002.jpg → nahradí svatba_0002_PPR1002.jpg");
+  await expect(pairs).toContainText("PPR1500.jpg → nová, zařadí se za svatba_0003_PPR1003.jpg");
+  await page.getByRole("button", { name: "Nahradit a zařadit" }).click();
   await expect(page.getByText("2/2 nahráno")).toBeVisible({ timeout: 45_000 });
 
   // Three delivered + one new: the replaced one did not become a fourth.
@@ -52,5 +55,7 @@ test("a re-numbered export replaces its photo after asking", async ({ page }) =>
   // Its file is the new upload — a fresh key — and its heart is still on it.
   await expect(replaced).not.toHaveAttribute("src", /PPR1002/);
   await expect(page.getByText("♥ 1")).toBeVisible();
-  await expect(page.getByRole("img", { name: "svatba_001_PPR1002.jpg" })).toHaveCount(0);
+  await expect(page.getByRole("img", { name: "PPR1002.jpg", exact: true })).toHaveCount(0);
+  // The new shot is stored under the delivered sequence, so it sorts in place.
+  await expect(page.getByRole("img", { name: "svatba_0003_PPR1500.jpg" })).toHaveCount(1);
 });
