@@ -189,9 +189,10 @@ describe("planPick", () => {
       pending,
       existing,
     );
-    // The file named so claims the row first; the bare one is a new upload.
+    // The file named so claims the row first; the bare one is a new upload,
+    // and is not filed under the name the other one already has.
     expect(b).toMatchObject({ resumeId: "p", keepName: undefined });
-    expect(a).toMatchObject({ resumeId: undefined, slot: { name: "svatba_0384_PPR56518.jpg" } });
+    expect(a).toMatchObject({ resumeId: undefined, slot: null });
     expect(planPick([file("PPR56518.jpg")], pending, existing)[0]).toMatchObject({
       resumeId: "p",
       keepName: "svatba_0384_PPR56518.jpg",

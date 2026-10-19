@@ -13,6 +13,7 @@ import {
 const photo = (over: Partial<PhotoFacts>): PhotoFacts => ({
   id: "p",
   fileName: "svatba_0001_PPR1.jpg",
+  fileOrderKey: "svatba0041ppr0011jpg",
   favorites: 0,
   reactions: 0,
   print: 0,
@@ -89,6 +90,11 @@ describe("filterCounts", () => {
     expect(counts.print).toBe(2);
     expect(counts.favorites).toBe(1);
   });
+
+  it("counts an opposite as the switch would leave it", () => {
+    const photos = [photo({ id: "a", people: ["s"] }), photo({ id: "b" }), photo({ id: "c" })];
+    expect(filterCounts({ ...DEFAULT_VIEW, filters: ["tagged"] }, photos).untagged).toBe(2);
+  });
 });
 
 describe("sortAdminPhotos", () => {
@@ -101,8 +107,8 @@ describe("sortAdminPhotos", () => {
     expect(sortAdminPhotos("views", photos).map((p) => p.id)).toEqual(["b", "a", "c"]);
     expect(
       sortAdminPhotos("name", [
-        photo({ id: "x", fileName: "s_10.jpg" }),
-        photo({ id: "y", fileName: "s_9.jpg" }),
+        photo({ id: "x", fileOrderKey: "s00210jpg" }),
+        photo({ id: "y", fileOrderKey: "s0019jpg" }),
       ]).map((p) => p.id),
     ).toEqual(["y", "x"]);
   });

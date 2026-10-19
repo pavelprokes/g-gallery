@@ -141,6 +141,19 @@ export function SocialVideoStudio({
     [candidatesNow, chapterStarts],
   );
 
+  // Persisting starts only once the photographer changes something: a
+  // suggestion nobody touched is not "in the video" (docs/ADMIN-FILTERS.md).
+  const baseline = useRef<string | null>(null);
+  const pending = useRef<Draft | null>(null);
+  const flush = () => {
+    const draft = pending.current;
+    if (!draft) return;
+    pending.current = null;
+    saveSocialVideoDraft(galleryId, draft).catch(() => {
+      // This browser's copy still holds it; the newer copy wins next time.
+    });
+  };
+
   // The last draft of this gallery, or a fresh suggestion. In an effect, not
   // in useState's initialiser: localStorage does not exist on the server.
   useEffect(() => {
@@ -149,32 +162,45 @@ export function SocialVideoStudio({
       ...savedDraft,
       order: savedDraft.order.filter((id) => known.has(id)),
     };
-    const draft = saved && saved.order.length > 0 ? saved : readDraft(galleryId, known);
+    // The newer copy wins: the gallery's may lag a change made on this device.
+    const draft =
+      [saved, readDraft(galleryId, known)]
+        .filter((d): d is Draft => d !== null && d.order.length > 0)
+        .sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0))[0] ?? null;
+    const start = draft ?? {
+      aspect: "9:16" as const,
+      length: 15 as const,
+      order: suggest("9:16", 15),
+    };
     /* eslint-disable react-hooks/set-state-in-effect -- one-time restore after mount */
-    if (draft) {
-      setAspect(draft.aspect);
-      setLength(draft.length);
-      setOrder(draft.order);
-    } else {
-      setOrder(suggest("9:16", 15));
-    }
+    setAspect(start.aspect);
+    setLength(start.length);
+    setOrder(start.order);
     /* eslint-enable react-hooks/set-state-in-effect */
+    baseline.current = JSON.stringify([start.aspect, start.length, start.order]);
     // Once, on mount — later suggestions are the photographer's call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (order.length === 0) return;
-    writeDraft(galleryId, { aspect, length, order });
+    const now = JSON.stringify([aspect, length, order]);
+    // Before the restore lands, and while nothing has changed since: nothing to keep.
+    if (baseline.current === null || now === baseline.current) return;
+    baseline.current = "changed";
+    const draft: Draft = { aspect, length, order, savedAt: Date.now() };
+    writeDraft(galleryId, draft);
     // On the gallery too, a moment after the last change: the admin grid's
-    // "Ve videu" filter and another device read it from there.
-    const timer = setTimeout(() => {
-      saveSocialVideoDraft(galleryId, { aspect, length, order }).catch(() => {
-        // This browser's copy above still holds it.
-      });
-    }, 1000);
+    // "Ve videu" filter and another device read it from there. An empty
+    // order is kept as well — deselecting everything empties the filter.
+    pending.current = draft;
+    const timer = setTimeout(flush, 1000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryId, aspect, length, order]);
+
+  // Leaving within that second still saves the last change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => flush(), []);
 
   useEffect(() => {
     let live = true;

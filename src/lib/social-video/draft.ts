@@ -9,7 +9,10 @@ import { idSchema } from "@/lib/id-schema";
 export const socialVideoDraftSchema = z.object({
   aspect: z.enum(["9:16", "16:9"]),
   length: z.union([z.literal(15), z.literal(30)]),
-  order: z.array(idSchema).max(100),
+  // Generous: the studio adds without a limit, and a refused save is a stale draft.
+  order: z.array(idSchema).max(1000),
+  /** When it was last changed (ms) — the newer of the gallery's and the browser's copy wins. */
+  savedAt: z.number().int().nonnegative().optional(),
 });
 export type SocialVideoDraft = z.infer<typeof socialVideoDraftSchema>;
 

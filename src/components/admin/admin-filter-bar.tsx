@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -16,8 +17,8 @@ import {
 import { FORMS, pluralize } from "@/lib/czech-plural";
 
 // The admin grid's filters (docs/ADMIN-FILTERS.md). Every choice is a URL —
-// chips are plain links — so a view is bookmarked, shared and undone with the
-// browser's Back like any page.
+// chips are links, client-side so a running upload is not interrupted — so a
+// view is bookmarked, shared and undone with the browser's Back like any page.
 
 const FILTER_LABEL: Record<AdminFilter, string> = {
   print: "🖨 K tisku",
@@ -71,14 +72,14 @@ export function AdminFilterBar({
     <div className="mt-3 space-y-2" aria-label="Filtry fotek" role="group">
       <div className="flex flex-wrap gap-1.5">
         {ADMIN_SORTS.map((sort) => (
-          <a
+          <Link
             key={sort}
             href={pathname + adminViewQuery({ ...view, sort })}
             aria-current={view.sort === sort ? "true" : undefined}
             className={chip(view.sort === sort)}
           >
             {SORT_LABEL[sort]}
-          </a>
+          </Link>
         ))}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -87,7 +88,7 @@ export function AdminFilterBar({
           // A filter nothing would pass is noise — unless it is the one on.
           if (!active && counts[filter] === 0) return null;
           return (
-            <a
+            <Link
               key={filter}
               href={pathname + adminViewQuery(toggleAdminFilter(view, filter))}
               aria-current={active ? "true" : undefined}
@@ -95,7 +96,7 @@ export function AdminFilterBar({
             >
               {FILTER_LABEL[filter]}
               <span className="tabular-nums opacity-70">{counts[filter]}</span>
-            </a>
+            </Link>
           );
         })}
       </div>
@@ -152,12 +153,12 @@ export function AdminFilterBar({
           {shown === total ? pluralize(total, FORMS.photo) : `${shown} z ${total} fotek`}
         </p>
         {isFiltered(view) && (
-          <a
+          <Link
             href={pathname + adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}
             className="text-brand-primary inline-flex min-h-8 items-center px-1 text-xs font-semibold underline"
           >
             Zrušit filtry
-          </a>
+          </Link>
         )}
       </div>
     </div>

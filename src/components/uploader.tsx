@@ -113,6 +113,8 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       files: File[],
       replaceIds: (string | undefined)[] = [],
       uploadNames: (string | undefined)[] = [],
+      /** The rows the review already matched (`planPick`); otherwise matched here. */
+      plannedResumeIds?: (string | undefined)[],
     ) => {
       setReview(null);
       const initial = files.map((file, index) => ({
@@ -136,10 +138,12 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       const pending = await fetchPendingUploads(credentials);
       // Computed once for the whole selection: each pending row may be claimed
       // by only one file, which a per-batch match could not guarantee.
-      const resumeIds = matchResumeTargets(
-        files.map((file, index) => ({ name: uploadNames[index] ?? file.name, size: file.size })),
-        pending,
-      );
+      const resumeIds =
+        plannedResumeIds ??
+        matchResumeTargets(
+          files.map((file, index) => ({ name: uploadNames[index] ?? file.name, size: file.size })),
+          pending,
+        );
 
       await runUploads({
         files,
@@ -356,13 +360,21 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       {review && !running && (
         <ReplaceReview
           review={review}
-          onConfirm={(replaceIds, uploadNames) => void start(review.files, replaceIds, uploadNames)}
+          onConfirm={(replaceIds, uploadNames) =>
+            void start(
+              review.files,
+              replaceIds,
+              uploadNames,
+              review.plans.map((plan) => plan.resumeId),
+            )
+          }
           // A resumed row filed under another name keeps it, or it is not resumed.
           onAsNew={() =>
             void start(
               review.files,
               [],
               review.plans.map((plan) => plan.keepName),
+              review.plans.map((plan) => plan.resumeId),
             )
           }
           onCancel={() => setReview(null)}

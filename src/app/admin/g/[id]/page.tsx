@@ -188,16 +188,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     printOnly ? printTotalsByViewer(gallery.id) : [],
   ]);
 
-  const printMarkedPhotos = gallery.photos.filter(
-    (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
-  );
-  const printItems = printMarkedPhotos.map((photo) => ({
-    id: photo.id,
-    fileName: photo.fileName,
-    quantity: printQuantities.get(photo.id) ?? 0,
-  }));
-  const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
-
   // Each link's copyable URL, decrypted once for both the share-link panel
   // and the chapters' "copy link" buttons.
   const shareLinks = gallery.shareLinks.map((link) => {
@@ -299,6 +289,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     return {
       id: photo.id,
       fileName: photo.fileName,
+      fileOrderKey: photo.fileOrderKey,
       favorites: photo._count.favorites,
       reactions: reactions.get(photo.id) ?? 0,
       print: printQuantities.get(photo.id) ?? 0,
@@ -319,6 +310,19 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     view.sort,
     gallery.photos.filter(shows).map((photo) => ({ ...facts.get(photo.id)!, photo })),
   ).map((entry) => entry.photo);
+
+  // The print summary covers what the view shows: narrowed by a person or a
+  // chapter, the list, the copy and the download narrow with it.
+  const printScoped = printOnly && isFiltered({ ...view, filters: [] });
+  const printMarkedPhotos = (printOnly ? visiblePhotos : gallery.photos).filter(
+    (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
+  );
+  const printItems = printMarkedPhotos.map((photo) => ({
+    id: photo.id,
+    fileName: photo.fileName,
+    quantity: printQuantities.get(photo.id) ?? 0,
+  }));
+  const printPieces = printItems.reduce((sum, item) => sum + item.quantity, 0);
 
   /** The film above the highlights (docs/VIDEO.md §Featured film); pressing the current one clears it. */
   const featuredId = gallery.featuredVideoId;
@@ -603,14 +607,19 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             </p>
             {/* Totals add up every guest's marks; this says whose they are. */}
             <ul className="text-caption">
-              {printByViewer.map((row) => (
-                <li key={row.viewerId}>
-                  {row.displayName ?? "Bez jména"}: fotky {row.photos} · {row.pieces} ks
-                </li>
-              ))}
+              {!printScoped &&
+                printByViewer.map((row) => (
+                  <li key={row.viewerId}>
+                    {row.displayName ?? "Bez jména"}: fotky {row.photos} · {row.pieces} ks
+                  </li>
+                ))}
             </ul>
             <div className="flex flex-wrap items-center gap-2">
-              <PrintDownloadButton galleryId={gallery.id} count={printMarkedPhotos.length} />
+              <PrintDownloadButton
+                galleryId={gallery.id}
+                count={printMarkedPhotos.length}
+                photoIds={printScoped ? printMarkedPhotos.map((photo) => photo.id) : undefined}
+              />
               <CopyButton
                 value={printList(printItems)}
                 label="Kopírovat seznam souborů s počty kusů"
@@ -666,7 +675,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               <>
                 Žádná fotka neodpovídá filtrům.{" "}
                 <a
-                  href={adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}
+                  href={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}`}
                   className="underline"
                 >
                   Zrušit filtry

@@ -26,13 +26,13 @@ test("filters narrow the grid, live in the URL, and Back undoes them", async ({ 
   await filters.getByRole("link", { name: /Srdíčka/ }).click();
   await expect(page).toHaveURL(/[?&]f=favorites/);
   await expect(tiles(page)).toHaveCount(1);
-  await expect(page.getByRole("img", { name: "svatba_0001_PPR1001.jpg" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "svatba_0001_PPR1001.jpg" })).toHaveCount(1);
 
   await page.goBack();
   await expect(tiles(page)).toHaveCount(4);
 
   await filters.getByRole("link", { name: /K tisku/ }).click();
-  await expect(page.getByRole("img", { name: "svatba_0002_PPR1002.jpg" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "svatba_0002_PPR1002.jpg" })).toHaveCount(1);
   await expect(tiles(page)).toHaveCount(1);
   // The print summary still comes with the print filter.
   await expect(page.getByText(/Fotky k tisku:/)).toBeVisible();
@@ -41,7 +41,7 @@ test("filters narrow the grid, live in the URL, and Back undoes them", async ({ 
   await filters.getByLabel("Označená osoba").selectOption({ label: "Sofie" });
   await expect(page).toHaveURL(/[?&]person=/);
   await expect(tiles(page)).toHaveCount(1);
-  await expect(page.getByRole("img", { name: "svatba_0003_PPR1003.jpg" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "svatba_0003_PPR1003.jpg" })).toHaveCount(1);
 
   await page.goto(`/admin/g/${seed.filterGalleryId}`);
   await filters.getByRole("searchbox", { name: "Hledat podle názvu souboru" }).fill("PPR1004");

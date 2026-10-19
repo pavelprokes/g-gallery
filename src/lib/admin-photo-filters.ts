@@ -84,11 +84,16 @@ export function adminViewQuery(view: AdminView): string {
   return query ? `?${query}` : "";
 }
 
+/** A photo cannot be both tagged and untagged: picking one drops the other. */
+const OPPOSITE: Partial<Record<AdminFilter, AdminFilter>> = {
+  tagged: "untagged",
+  untagged: "tagged",
+};
+
 /** The view with one filter switched, in the canonical order. */
 export function toggleAdminFilter(view: AdminView, filter: AdminFilter): AdminView {
   const on = !view.filters.includes(filter);
-  // A photo cannot be both tagged and untagged: picking one drops the other.
-  const opposite = filter === "tagged" ? "untagged" : filter === "untagged" ? "tagged" : null;
+  const opposite = OPPOSITE[filter];
   return {
     ...view,
     filters: ADMIN_FILTERS.filter((f) =>
@@ -106,6 +111,8 @@ export function isFiltered(view: AdminView): boolean {
 export interface PhotoFacts {
   id: string;
   fileName: string;
+  /** The gallery's file-name key (docs/PHOTO-ORDER.md) — "Podle názvu" sorts by it, as guests see. */
+  fileOrderKey: string;
   favorites: number;
   reactions: number;
   print: number;
@@ -151,8 +158,12 @@ export function filterCounts(
   return Object.fromEntries(
     ADMIN_FILTERS.map((filter) => [
       filter,
-      rest.filter((photo) => view.filters.every((f) => HOLDS[f](photo)) && HOLDS[filter](photo))
-        .length,
+      // Switching to an opposite drops the active one, so it is counted without it.
+      rest.filter(
+        (photo) =>
+          view.filters.every((f) => f === OPPOSITE[filter] || HOLDS[f](photo)) &&
+          HOLDS[filter](photo),
+      ).length,
     ]),
   ) as Record<AdminFilter, number>;
 }
@@ -166,7 +177,9 @@ export function sortAdminPhotos<T extends PhotoFacts>(sort: AdminSort, photos: r
     loved: (a, b) => b.favorites - a.favorites,
     views: (a, b) => b.views - a.views,
     viewers: (a, b) => b.viewers - a.viewers,
-    name: (a, b) => a.fileName.localeCompare(b.fileName, "cs", { numeric: true }),
+    // Plain string order of the [0-9a-z] key, exactly as the database sorts it.
+    name: (a, b) =>
+      a.fileOrderKey < b.fileOrderKey ? -1 : a.fileOrderKey > b.fileOrderKey ? 1 : 0,
   };
   return sort === "order" ? [...photos] : photos.toSorted(by[sort]);
 }
