@@ -4,11 +4,26 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { idSchema } from "@/lib/id-schema";
+import { socialVideoDraftSchema } from "@/lib/social-video/draft";
 import { photoFacesSchema } from "@/lib/social-video/faces";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3), and every write
 // is scoped by the gallery's `ownerId`. docs/SOCIAL-VIDEO.md is the authority.
+
+/**
+ * Keeps the studio's draft on the gallery, so another device continues it and
+ * the admin grid can filter by it (docs/ADMIN-FILTERS.md).
+ */
+export async function saveSocialVideoDraft(galleryId: string, draft: unknown): Promise<void> {
+  const session = await requireAdmin();
+  const id = idSchema.parse(galleryId);
+  const data = socialVideoDraftSchema.parse(draft);
+  await prisma.gallery.updateMany({
+    where: { id, ownerId: session.user.id },
+    data: { socialVideoDraft: data },
+  });
+}
 
 /** The most photos one call saves — a 30 s video holds about thirteen. */
 const MAX_ENTRIES = 50;

@@ -51,6 +51,18 @@ import { PageHeader } from "@/components/ui/page-header";
 import { galleryCrumbs } from "@/lib/admin-breadcrumbs";
 import { GALLERY_STATUS } from "@/lib/gallery-status";
 import { FORMS, pluralize } from "@/lib/czech-plural";
+import {
+  adminViewQuery,
+  DEFAULT_VIEW,
+  filterCounts,
+  isFiltered,
+  matchesAdminView,
+  parseAdminView,
+  sortAdminPhotos,
+  type PhotoFacts,
+} from "@/lib/admin-photo-filters";
+import { parseSocialVideoDraft } from "@/lib/social-video/draft";
+import { AdminFilterBar } from "@/components/admin/admin-filter-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -59,10 +71,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   if (!session) redirect("/sign-in");
 
   const { id } = await props.params;
-  const { print, timeline: timelineParam } = await props.searchParams;
-  const printOnly = print === "1";
+  // docs/ADMIN-FILTERS.md — filters and sort live in the URL.
+  const view = parseAdminView(await props.searchParams);
+  const printOnly = view.filters.includes("print");
   // docs/CHAPTERS.md — the photos in the guests' order, where chapters are set.
-  const timelineView = !printOnly && timelineParam === "1";
+  const timelineView = view.sort === "order";
 
   const gallery = await prisma.gallery.findFirst({
     where: { id, ownerId: session.user.id },
@@ -80,6 +93,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       highlightsEnabled: true,
       photoOrder: true,
       manualOrderAt: true,
+      socialVideoDraft: true,
+      people: { orderBy: { name: "asc" }, select: { id: true, name: true } },
       // Only for the breadcrumb — a gallery hanging off a wedding routes through it.
       event: { select: { id: true, title: true } },
       photos: {
@@ -108,6 +123,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           xmpLabel: true,
           xmpHighlight: true,
           highlightPin: true,
+          faceTags: { select: { personId: true } },
         },
       },
       chapters: {
@@ -175,7 +191,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   const printMarkedPhotos = gallery.photos.filter(
     (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
   );
-  const visiblePhotos = printOnly ? printMarkedPhotos : gallery.photos;
   const printItems = printMarkedPhotos.map((photo) => ({
     id: photo.id,
     fileName: photo.fileName,
@@ -269,6 +284,41 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         ]
       : [];
   });
+
+  // docs/ADMIN-FILTERS.md — what each photo is, for the filters and sorts.
+  const chapterOf = new Map(
+    segments.flatMap((segment) =>
+      segment.chapter
+        ? photosOf(segment.entries).map((photo) => [photo.id, segment.chapter!.id] as const)
+        : [],
+    ),
+  );
+  const inVideoDraft = new Set(parseSocialVideoDraft(gallery.socialVideoDraft)?.order ?? []);
+  const factsOf = (photo: AdminPhoto): PhotoFacts => {
+    const stats = perPhoto.get(photo.id);
+    return {
+      id: photo.id,
+      fileName: photo.fileName,
+      favorites: photo._count.favorites,
+      reactions: reactions.get(photo.id) ?? 0,
+      print: printQuantities.get(photo.id) ?? 0,
+      views: stats?.views ?? 0,
+      viewers: stats?.uniqueViewers ?? 0,
+      highlight: pickedPinned.has(photo.id),
+      inVideoDraft: inVideoDraft.has(photo.id),
+      people: photo.faceTags.map((tag) => tag.personId),
+      guest: photo.source === "GUEST",
+      video: photo.videoObjectKey !== null,
+      chapter: chapterOf.get(photo.id) ?? null,
+    };
+  };
+  const facts = new Map(gallery.photos.map((photo) => [photo.id, factsOf(photo)]));
+  const shows = (photo: AdminPhoto) => matchesAdminView(view, facts.get(photo.id)!);
+  // Most-loved (the order gallery.photos is in) unless another sort is picked.
+  const visiblePhotos = sortAdminPhotos(
+    view.sort,
+    gallery.photos.filter(shows).map((photo) => ({ ...facts.get(photo.id)!, photo })),
+  ).map((entry) => entry.photo);
 
   /** The film above the highlights (docs/VIDEO.md §Featured film); pressing the current one clears it. */
   const featuredId = gallery.featuredVideoId;
@@ -512,7 +562,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       <GalleryChapterPanel
         chapters={adminChapters}
         shareUrl={chapterShareUrl}
-        timelineHref="?timeline=1"
+        timelineHref={`/admin/g/${gallery.id}` + adminViewQuery({ ...view, sort: "order" })}
         timelineActive={timelineView}
       />
 
@@ -535,34 +585,16 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                 : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
             </p>
           )}
-          {!printOnly && (
-            <a
-              href={timelineView ? "?" : "?timeline=1"}
-              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${
-                timelineView
-                  ? "border-brand-primary bg-brand-tint text-brand-primary-dark"
-                  : "border-admin-border hover:border-brand-primary hover:text-brand-primary text-brand-primary-dark bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              }`}
-            >
-              {timelineView ? "Zobrazit podle oblíbenosti" : "Časová osa a kapitoly"}
-            </a>
-          )}
-          {printMarkedPhotos.length > 0 && (
-            <a
-              href={printOnly ? "?" : "?print=1"}
-              className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${
-                printOnly
-                  ? "border-brand-primary bg-brand-tint text-brand-primary-dark"
-                  : "border-admin-border hover:border-brand-primary hover:text-brand-primary text-brand-primary-dark bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-              }`}
-            >
-              🖨{" "}
-              {printOnly
-                ? "Zobrazit vše"
-                : `Jen pro tisk (${printMarkedPhotos.length} · ${printPieces} ks)`}
-            </a>
-          )}
         </div>
+        <AdminFilterBar
+          key={adminViewQuery(view)}
+          view={view}
+          counts={filterCounts(view, [...facts.values()])}
+          shown={visiblePhotos.length}
+          total={gallery.photos.length}
+          people={gallery.people}
+          chapters={adminChapters.map((chapter) => ({ id: chapter.id, title: chapter.title }))}
+        />
         {printOnly && printItems.length > 0 && (
           <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
             <p>
@@ -601,7 +633,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           <ul className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
             {timelineView
               ? segments.map((segment) => {
-                  const segmentPhotos = photosOf(segment.entries);
+                  const segmentPhotos = photosOf(segment.entries).filter(shows);
+                  // A filtered view hides a chapter with nothing left in it.
+                  if (segmentPhotos.length === 0 && isFiltered(view)) return [];
                   return [
                     segment.chapter && (
                       <li
@@ -626,7 +660,19 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         </PhotoSelection>
         {visiblePhotos.length === 0 && (
           <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">
-            {printOnly ? "Žádná fotka není označená k tisku." : "Zatím žádné potvrzené fotky."}
+            {gallery.photos.length === 0 ? (
+              "Zatím žádné potvrzené fotky."
+            ) : (
+              <>
+                Žádná fotka neodpovídá filtrům.{" "}
+                <a
+                  href={adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}
+                  className="underline"
+                >
+                  Zrušit filtry
+                </a>
+              </>
+            )}
           </p>
         )}
       </section>

@@ -21,7 +21,8 @@ import {
   type Length,
 } from "@/lib/social-video/timeline";
 import { runUploads } from "@/lib/upload-run";
-import { saveFaces } from "@/app/admin/social-video-actions";
+import { saveFaces, saveSocialVideoDraft } from "@/app/admin/social-video-actions";
+import type { SocialVideoDraft } from "@/lib/social-video/draft";
 import {
   FaceScanControls,
   NOT_LOADED,
@@ -60,11 +61,7 @@ const ASPECT_LABEL: Record<Aspect, string> = {
   "16:9": "Na šířku 16:9 · web, YouTube",
 };
 
-interface Draft {
-  aspect: Aspect;
-  length: Length;
-  order: string[];
-}
+type Draft = SocialVideoDraft;
 
 const draftKey = (galleryId: string) => `g-gallery:social-video:${galleryId}`;
 
@@ -107,11 +104,14 @@ export function SocialVideoStudio({
   galleryTitle,
   photos,
   chapterStarts,
+  savedDraft,
 }: {
   galleryId: string;
   galleryTitle: string;
   photos: StudioPhoto[];
   chapterStarts: TimelinePosition[];
+  /** The draft kept on the gallery (any device); this browser's copy is the fallback. */
+  savedDraft: Draft | null;
 }) {
   const byId = useMemo(() => new Map(photos.map((p) => [p.id, p])), [photos]);
   const [faces, setFaces] = useState<Record<string, PhotoFaces | null>>(() =>
@@ -144,7 +144,12 @@ export function SocialVideoStudio({
   // The last draft of this gallery, or a fresh suggestion. In an effect, not
   // in useState's initialiser: localStorage does not exist on the server.
   useEffect(() => {
-    const draft = readDraft(galleryId, new Set(byId.keys()));
+    const known = new Set(byId.keys());
+    const saved = savedDraft && {
+      ...savedDraft,
+      order: savedDraft.order.filter((id) => known.has(id)),
+    };
+    const draft = saved && saved.order.length > 0 ? saved : readDraft(galleryId, known);
     /* eslint-disable react-hooks/set-state-in-effect -- one-time restore after mount */
     if (draft) {
       setAspect(draft.aspect);
@@ -159,7 +164,16 @@ export function SocialVideoStudio({
   }, []);
 
   useEffect(() => {
-    if (order.length > 0) writeDraft(galleryId, { aspect, length, order });
+    if (order.length === 0) return;
+    writeDraft(galleryId, { aspect, length, order });
+    // On the gallery too, a moment after the last change: the admin grid's
+    // "Ve videu" filter and another device read it from there.
+    const timer = setTimeout(() => {
+      saveSocialVideoDraft(galleryId, { aspect, length, order }).catch(() => {
+        // This browser's copy above still holds it.
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [galleryId, aspect, length, order]);
 
   useEffect(() => {

@@ -291,6 +291,8 @@ async function main() {
   const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
   const faceTagGalleryId = await makeFaceTagGallery(user.id);
   const faceSeriesGalleryId = await makeFaceSeriesGallery(user.id);
+  // docs/ADMIN-FILTERS.md: read-only, so one for both projects.
+  const filterGalleryId = await makeFilterGallery(user.id);
   // docs/REPLACE-PHOTOS.md: a corrected export replaces a delivered photo — mutated, so per project.
   const replaceGalleryIds = {
     chromium: await makeReplaceGallery(user.id, "chromium"),
@@ -308,6 +310,7 @@ async function main() {
       faceTagGalleryId,
       faceSeriesGalleryId,
       replaceGalleryIds,
+      filterGalleryId,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1051,6 +1054,68 @@ async function makeActivity(ownerId: string) {
     createdAt: new Date(Date.UTC(2025, 0, 1 + day, 12)),
   }));
   await prisma.activityEvent.createMany({ data: [...downloads, ...favorites] });
+}
+
+/** Four photos, each with one thing to filter by (docs/ADMIN-FILTERS.md). */
+async function makeFilterGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Filtry",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-filters-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const names = [
+    "svatba_0001_PPR1001.jpg",
+    "svatba_0002_PPR1002.jpg",
+    "svatba_0003_PPR1003.jpg",
+    "svatba_0004_PPR1004.jpg",
+  ];
+  const ids: string[] = [];
+  for (const [i, name] of names.entries()) {
+    const photo = await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${name}`,
+        fileName: name,
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        crc32: "00000000",
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10, i)),
+        source: i === 3 ? "GUEST" : "OWNER",
+      },
+    });
+    ids.push(photo.id);
+  }
+  const viewer = await prisma.viewer.create({
+    data: { galleryId: gallery.id, anonKey: "e2e-filters-viewer" },
+  });
+  await prisma.favorite.create({ data: { photoId: ids[0]!, viewerId: viewer.id } });
+  await prisma.printSelection.create({
+    data: { photoId: ids[1]!, viewerId: viewer.id, quantity: 2 },
+  });
+  const sofie = await prisma.galleryPerson.create({
+    data: { galleryId: gallery.id, name: "Sofie", couple: true },
+  });
+  await prisma.faceTag.create({
+    data: { photoId: ids[2]!, personId: sofie.id, x: 0.4, y: 0.2, w: 0.1, h: 0.15 },
+  });
+  // The third photo is the most viewed.
+  await prisma.activityEvent.createMany({
+    data: Array.from({ length: 3 }, () => ({
+      galleryId: gallery.id,
+      type: "PHOTO_VIEW" as const,
+      photoId: ids[2]!,
+      viewerId: viewer.id,
+    })),
+  });
+  return gallery.id;
 }
 
 async function makeReplaceGallery(ownerId: string, project: string) {
