@@ -760,7 +760,11 @@ function LightboxPhoto({
           }`}
           priority
         />
-        {overlay}
+        {overlay && (
+          // Scaled with the photo when it is picked, so a spot lands — and is
+          // drawn — where the finger is.
+          <div className={`absolute inset-0 ${selected ? "scale-[0.93]" : ""}`}>{overlay}</div>
+        )}
       </div>
       {showStale && (
         <span

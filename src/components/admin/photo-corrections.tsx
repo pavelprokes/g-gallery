@@ -13,6 +13,24 @@ interface Comment {
   x: number | null;
   y: number | null;
   resolvedAt: Date | null;
+  shareLinkId: string;
+  shareLink: { label: string | null };
+}
+
+/**
+ * Each comment's number as the couple sees it — counted per link, in order —
+ * with the link's letter in front when more than one link wrote on the photo.
+ */
+function numberComments(comments: Comment[]) {
+  const links = [...new Set(comments.map((comment) => comment.shareLinkId))];
+  const counts = new Map<string, number>();
+  return comments.map((comment) => {
+    const n = (counts.get(comment.shareLinkId) ?? 0) + 1;
+    counts.set(comment.shareLinkId, n);
+    const letter =
+      links.length > 1 ? String.fromCharCode(65 + links.indexOf(comment.shareLinkId)) : "";
+    return { comment, label: `${letter}${n}` };
+  });
 }
 
 export function PhotoCorrections({
@@ -29,9 +47,11 @@ export function PhotoCorrections({
   comments: Comment[];
 }) {
   const [pending, startTransition] = useTransition();
-  const spots = comments.flatMap((comment, index) =>
+  const numbered = numberComments(comments);
+  const manyLinks = new Set(comments.map((comment) => comment.shareLinkId)).size > 1;
+  const spots = numbered.flatMap(({ comment, label }) =>
     comment.x !== null && comment.y !== null
-      ? [{ id: comment.id, n: index + 1, x: comment.x, y: comment.y, done: !!comment.resolvedAt }]
+      ? [{ id: comment.id, n: label, x: comment.x, y: comment.y, done: !!comment.resolvedAt }]
       : [],
   );
   return (
@@ -53,7 +73,7 @@ export function PhotoCorrections({
             <span
               key={spot.id}
               aria-hidden
-              className={`absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow ${
+              className={`absolute flex h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white px-0.5 text-[10px] font-bold text-white shadow ${
                 spot.done ? "bg-emerald-600" : "bg-brand-primary"
               }`}
               style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }}
@@ -64,7 +84,7 @@ export function PhotoCorrections({
         </div>
       )}
       <ol className="space-y-1" aria-label={`Připomínky klienta k ${photo.fileName}`}>
-        {comments.map((comment, index) => {
+        {numbered.map(({ comment, label }) => {
           const done = comment.resolvedAt !== null;
           return (
             <li
@@ -76,7 +96,14 @@ export function PhotoCorrections({
               }`}
             >
               <p className="break-words whitespace-pre-wrap">
-                <span className="font-semibold">✎ {index + 1}</span> {comment.body}
+                <span className="font-semibold">✎ {label}</span>
+                {manyLinks && (
+                  <span className="text-admin-muted">
+                    {" "}
+                    ({comment.shareLink.label ?? "odkaz bez popisu"})
+                  </span>
+                )}{" "}
+                {comment.body}
               </p>
               <button
                 type="button"

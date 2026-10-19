@@ -5,6 +5,7 @@ import { idSchema } from "@/lib/id-schema";
 import { resolveShareLink } from "@/lib/share-access";
 import { verifyPassword } from "@/lib/share-token";
 import {
+  CORRECTION_SESSION_MS,
   isPinShaped,
   signCorrectionSession,
   verifyCorrectionSession,
@@ -276,5 +277,8 @@ async function enter(linkId: string, pin: string) {
     where: { id: linkId },
     data: { correctionFailedAttempts: 0, correctionLockedUntil: null },
   });
-  return NextResponse.json(signCorrectionSession(secret(), linkId, reserved.pinHash!));
+  const { session } = signCorrectionSession(secret(), linkId, reserved.pinHash!);
+  // A duration, not a time: a phone whose clock is off would otherwise close
+  // the mode at once or keep it past the server's own expiry.
+  return NextResponse.json({ session, ttlMs: CORRECTION_SESSION_MS });
 }

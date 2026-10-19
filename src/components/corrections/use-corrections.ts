@@ -61,6 +61,15 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
     return () => clearTimeout(timer);
   }, [session, end]);
 
+  const fetchList = useCallback(
+    (key: string): Promise<Correction[] | null> =>
+      fetch(url, { headers: { "x-correction-session": key } })
+        .then((r) => (r.ok ? (r.json() as Promise<{ comments: Correction[] }>) : null))
+        .then((data) => data?.comments ?? null)
+        .catch(() => null),
+    [url],
+  );
+
   const call = useCallback(
     async (method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>) => {
       if (!session) return null;
@@ -71,9 +80,14 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
       }).catch(() => null);
       // A new PIN or an expired key: out of the mode, with a word why.
       if (response?.status === 401) end(true);
+      // Resolved by the photographer meanwhile: show it as such.
+      if (response?.status === 409) {
+        const list = await fetchList(session.key);
+        if (list) setComments(list);
+      }
       return response?.ok ? response : null;
     },
-    [session, url, end],
+    [session, url, end, fetchList],
   );
 
   const enter = useCallback(
@@ -86,16 +100,18 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
       if (!response) return { ok: false, reason: "error" };
       const data = (await response.json().catch(() => ({}))) as {
         session?: string;
-        expiresAt?: number;
+        ttlMs?: number;
         error?: string;
         until?: string;
       };
-      if (response.ok && data.session && data.expiresAt) {
-        const list = await fetch(url, { headers: { "x-correction-session": data.session } })
-          .then((r) => (r.ok ? r.json() : { comments: [] }))
-          .catch(() => ({ comments: [] }));
-        setComments((list as { comments: Correction[] }).comments);
-        setSession({ key: data.session, expiresAt: data.expiresAt });
+      if (response.ok && data.session && data.ttlMs) {
+        // Without the list the couple would see none of their earlier
+        // corrections and write them again: no list, no mode.
+        const list = await fetchList(data.session);
+        if (!list) return { ok: false, reason: "error" };
+        setComments(list);
+        // Timed by this device's own clock from now, with a margin.
+        setSession({ key: data.session, expiresAt: Date.now() + data.ttlMs - 30_000 });
         setExpired(false);
         return { ok: true };
       }
@@ -105,7 +121,7 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
       if (data.error === "wrong_pin") return { ok: false, reason: "wrong_pin" };
       return { ok: false, reason: "error" };
     },
-    [url],
+    [url, fetchList],
   );
 
   const create = useCallback(

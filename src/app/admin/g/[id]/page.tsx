@@ -129,7 +129,15 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           // docs/CORRECTIONS.md — the couple's corrections, oldest first.
           comments: {
             orderBy: { createdAt: "asc" },
-            select: { id: true, body: true, x: true, y: true, resolvedAt: true },
+            select: {
+              id: true,
+              body: true,
+              x: true,
+              y: true,
+              resolvedAt: true,
+              shareLinkId: true,
+              shareLink: { select: { label: true } },
+            },
           },
         },
       },
