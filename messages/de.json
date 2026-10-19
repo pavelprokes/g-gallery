@@ -82,6 +82,14 @@
       {
         "q": "Wie lade ich alle Fotos auf einmal herunter?",
         "a": "Mit dem Button „Alle herunterladen“ erhalten Sie die ganze Galerie als eine ZIP-Datei. Sie wird automatisch erstellt, in der Regel innerhalb einer Stunde nach dem Hochladen des letzten Fotos – bei größeren Galerien dauert es länger. Bis dahin können Sie Fotos einzeln herunterladen."
+      },
+      {
+        "q": "In welcher Sprache ist die Galerie?",
+        "a": "In sieben Sprachen: Tschechisch, Englisch, Französisch, Deutsch, Spanisch, Slowakisch und Polnisch. Die Galerie folgt der Sprache Ihres Handys, und Sie können sie jederzeit in der Fußzeile umstellen. Titel und Beschreibungen der Galerien schreibt der Fotograf, sie können also auf Tschechisch bleiben."
+      },
+      {
+        "q": "Lässt sich aus den Fotos ein Video für Instagram oder TikTok machen?",
+        "a": "Ja. Der Fotograf stellt aus der Galerie ein kurzes Video (15 oder 30 Sekunden) zusammen: im Hochformat 9:16 für Stories, Reels und TikTok oder im Querformat 16:9 für YouTube und Websites. Die Kamera nähert sich dabei langsam den Gesichtern. Der Fotograf kann das Video in die Galerie stellen, wo Sie es herunterladen können. Es ist ohne Ton und ohne Untertitel – Musik fügen Sie direkt in Instagram oder TikTok hinzu."
       }
     ],
     "guestTipsHeading": "Tipps und Tricks zum Fotografieren als Gast",
@@ -99,13 +107,19 @@
     "features": [
       "Ein Link, nichts zu installieren – öffnet sich in jedem gängigen Browser, auf Handy oder Computer.",
       "Ein schnelles Fotoraster und Vollbildansicht, flüssig auch auf einem älteren Handy.",
+      "Sieben Sprachen – Tschechisch, Englisch, Französisch, Deutsch, Spanisch, Slowakisch und Polnisch. Die Galerie folgt der Sprache Ihres Handys; umstellen können Sie sie in der Fußzeile.",
       "Die ganze Galerie mit einem Klick herunterladen (ZIP).",
+      "Videos direkt in der Galerie – den Film des Fotografen spielen Sie auf dem Handy oder Computer ab und laden ihn zusammen mit den Fotos herunter.",
+      "Ein kurzes Video für Social Media – der Fotograf kann aus den Fotos der Galerie ein Hochformat-Video (9:16) für Stories, Reels und TikTok oder ein Querformat-Video (16:9) für YouTube oder eine Website erstellen.",
       "Favoriten und Reaktionen – markieren Sie Ihre Lieblingsfotos.",
+      "Auswahl zum Drucken – markieren Sie die Fotos, die Sie drucken lassen möchten, samt Stückzahl.",
+      "Das Beste des Tages und Kapitel – wenn der Fotograf sie einschaltet, finden Sie oben die schönsten Aufnahmen und springen mit einem Tippen etwa zur Trauung oder zur Feier.",
       "Passwort und Zeitlimit – der Fotograf bestimmt, wer hineinkommt und wie lange.",
       "Offline-Modus – einmal heruntergeladen, bleiben die Fotos auch ohne Empfang sichtbar.",
+      "Auf einem anderen Gerät weitermachen – Favoriten, Reaktionen und Druckauswahl übertragen Sie mit einem Einmalcode vom Handy auf den Computer.",
       "Benachrichtigungen, wenn der Fotograf neue Fotos hinzufügt.",
       "Fotos von Gästen – Gäste laden ihre eigenen Hochzeitsfotos direkt in die Galerie hoch, ohne App, ohne Konto.",
-      "Live-Diashow – neue Gästefotos erscheinen nach etwa einer halben Minute auf dem Bildschirm.",
+      "Live-Diashow – neue Gästefotos erscheinen nach etwa einer halben Minute auf dem Bildschirm; die Fotos des Fotografen nähern sich dabei langsam den Gesichtern.",
       "Mehrere Galerien unter einem wachsenden Link – die Auswahl des Fotografen, das komplette Set und die Gästegalerie, ohne dass ein neuer Link verschickt werden muss."
     ],
     "footerText": "Diese Galerie wird von Ihrem Fotografen betrieben.",

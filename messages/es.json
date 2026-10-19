@@ -82,6 +82,14 @@
       {
         "q": "¿Cómo descargo todas las fotos de una vez?",
         "a": "El botón «Descargar todo» te da la galería entera en un único ZIP. Se genera solo, normalmente en la hora siguiente a la última foto subida; si la galería es grande, puede tardar más. Mientras tanto, puedes descargar las fotos una a una."
+      },
+      {
+        "q": "¿En qué idioma está la galería?",
+        "a": "En siete: checo, inglés, francés, alemán, español, eslovaco y polaco. La galería sigue el idioma de tu móvil y puedes cambiarlo cuando quieras en el pie de página. Los títulos y descripciones de las galerías los escribe el fotógrafo, así que pueden quedarse en checo."
+      },
+      {
+        "q": "¿Se puede hacer con las fotos un vídeo para Instagram o TikTok?",
+        "a": "Sí. El fotógrafo monta con la galería un vídeo corto (15 o 30 segundos): vertical 9:16 para Stories, Reels y TikTok, u horizontal 16:9 para YouTube y webs. La cámara se acerca despacio a las caras. Puede añadir el vídeo a la galería, desde donde lo descargas. No lleva sonido ni subtítulos: la música la añades directamente en Instagram o TikTok."
       }
     ],
     "guestTipsHeading": "Trucos para hacer fotos como invitado",
@@ -99,13 +107,19 @@
     "features": [
       "Un enlace y nada que instalar: se abre en cualquier navegador, en el móvil o en el ordenador.",
       "Una cuadrícula de fotos rápida y vista a pantalla completa, fluida incluso en un móvil antiguo.",
+      "Siete idiomas: checo, inglés, francés, alemán, español, eslovaco y polaco. La galería sigue el idioma de tu móvil y puedes cambiarlo en el pie de página.",
       "Descarga de toda la galería con un clic (ZIP).",
+      "Vídeos dentro de la galería: reproduce la película del fotógrafo en el móvil o el ordenador y descárgala junto con las fotos.",
+      "Un vídeo corto para redes sociales: el fotógrafo puede montar con las fotos de la galería un vídeo vertical (9:16) para Stories, Reels y TikTok, u horizontal (16:9) para YouTube o una web.",
       "Favoritos y reacciones: marca las fotos que más te gustan.",
+      "Selección para imprimir: marca las fotos que quieres imprimir y cuántas copias.",
+      "Lo mejor del día y capítulos: si el fotógrafo los activa, arriba tienes las mejores fotos y con un toque saltas a la ceremonia o al banquete.",
       "Contraseña y límites de tiempo: el fotógrafo decide quién entra y durante cuánto tiempo.",
       "Modo sin conexión: una vez descargadas, las fotos se pueden ver sin cobertura.",
+      "Sigue en otro dispositivo: pasa tus favoritos, reacciones y selección para imprimir del móvil al ordenador con un código de un solo uso.",
       "Avisos cuando el fotógrafo añade fotos nuevas.",
       "Fotos de los invitados: suben sus propias fotos de la boda directamente a la galería, sin app ni cuenta.",
-      "Pase de fotos en directo: las nuevas fotos de los invitados aparecen en pantalla en unos treinta segundos.",
+      "Pase de fotos en directo: las nuevas fotos de los invitados aparecen en pantalla en unos treinta segundos; las fotos del fotógrafo se acercan despacio a las caras.",
       "Varias galerías en un único enlace que crece: una selección, el reportaje completo y la galería de invitados, sin enviar ningún enlace nuevo."
     ],
     "footerText": "Esta galería la gestiona tu fotógrafo.",

@@ -82,6 +82,14 @@
       {
         "q": "Comment télécharger toutes les photos d'un coup ?",
         "a": "Le bouton « Tout télécharger » récupère toute la galerie en un seul ZIP. Il se prépare tout seul, en général dans l'heure qui suit le dernier envoi de photos – plus longtemps pour les grandes galeries. En attendant, vous pouvez télécharger les photos une par une."
+      },
+      {
+        "q": "En quelle langue est la galerie ?",
+        "a": "En sept langues : tchèque, anglais, français, allemand, espagnol, slovaque et polonais. La galerie suit la langue de votre téléphone, et vous pouvez la changer à tout moment en bas de page. Les titres et descriptions des galeries sont rédigés par le photographe et peuvent rester en tchèque."
+      },
+      {
+        "q": "Peut-on faire des photos une vidéo pour Instagram ou TikTok ?",
+        "a": "Oui. Le photographe monte une courte vidéo (15 ou 30 secondes) à partir de la galerie : verticale 9:16 pour les Stories, les Reels et TikTok, ou horizontale 16:9 pour YouTube et les sites web. La caméra se rapproche lentement des visages. Le photographe peut l'ajouter à la galerie, où vous pourrez la télécharger. Elle est sans son ni sous-titres : vous ajoutez la musique directement dans Instagram ou TikTok."
       }
     ],
     "guestTipsHeading": "Trucs et astuces pour photographier en tant qu'invité",
@@ -99,13 +107,19 @@
     "features": [
       "Un seul lien, rien à installer – s'ouvre dans n'importe quel navigateur, sur téléphone ou ordinateur.",
       "Une grille de photos rapide et un affichage plein écran, fluide même sur un téléphone plus ancien.",
+      "Sept langues – tchèque, anglais, français, allemand, espagnol, slovaque et polonais. La galerie suit la langue de votre téléphone ; vous pouvez la changer en bas de page.",
       "Téléchargement de toute la galerie en un clic (ZIP).",
+      "Des vidéos directement dans la galerie – le film du photographe se lit sur mobile comme sur ordinateur et se télécharge avec les photos.",
+      "Une courte vidéo pour les réseaux sociaux – le photographe peut monter, à partir des photos de la galerie, une vidéo verticale (9:16) pour les Stories, les Reels et TikTok, ou horizontale (16:9) pour YouTube ou un site web.",
       "Favoris et réactions – marquez les photos que vous préférez.",
+      "Sélection pour l'impression – marquez les photos à imprimer, avec le nombre d'exemplaires.",
+      "Le meilleur de la journée et les chapitres – lorsque le photographe les active, les plus belles photos vous attendent en haut et un seul geste vous mène à la cérémonie ou au dîner.",
       "Mot de passe et durée limitée – le photographe décide qui accède à la galerie, et pour combien de temps.",
       "Mode hors ligne – une fois téléchargées, les photos restent visibles sans réseau.",
+      "Continuer sur un autre appareil – transférez vos favoris, réactions et sélection pour l'impression du téléphone vers l'ordinateur avec un code à usage unique.",
       "Notifications quand le photographe ajoute de nouvelles photos.",
       "Photos des invités – les invités ajoutent leurs propres photos du mariage directement dans la galerie, sans appli ni compte.",
-      "Diaporama en direct – les nouvelles photos des invités apparaissent à l'écran en une trentaine de secondes environ.",
+      "Diaporama en direct – les nouvelles photos des invités apparaissent à l'écran en une trentaine de secondes environ ; les photos du photographe se rapprochent lentement des visages.",
       "Plusieurs galeries sous un seul lien qui s'enrichit au fil du temps – une sélection, le reportage complet et la galerie des invités, toujours à la même adresse."
     ],
     "footerText": "Cette galerie est gérée par votre photographe.",

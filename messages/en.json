@@ -82,6 +82,14 @@
       {
         "q": "How do I download every photo at once?",
         "a": "The “Download all” button gets the whole gallery as one ZIP. It builds itself, usually within an hour of the last photo being uploaded — longer for bigger galleries. Until then, you can download photos one by one."
+      },
+      {
+        "q": "What language is the gallery in?",
+        "a": "Seven: Czech, English, French, German, Spanish, Slovak and Polish. The gallery follows your phone's language, and you can switch it any time in the footer. Gallery titles and descriptions are written by the photographer, so they may stay in Czech."
+      },
+      {
+        "q": "Can the photos become a video for Instagram or TikTok?",
+        "a": "Yes. The photographer puts together a short video (15 or 30 seconds) from the gallery: vertical 9:16 for Stories, Reels and TikTok, or landscape 16:9 for YouTube and websites. The camera slowly moves in towards the faces. The photographer can add the video to the gallery, where you can download it. It has no sound and no captions, so you can add music right in Instagram or TikTok."
       }
     ],
     "guestTipsHeading": "Tips and tricks for shooting as a guest",
@@ -99,13 +107,19 @@
     "features": [
       "One link, nothing to install — opens in any regular browser, on phone or computer.",
       "A fast photo grid and full-screen viewing, smooth even on an older phone.",
+      "Seven languages — Czech, English, French, German, Spanish, Slovak and Polish. The gallery follows your phone's language; switch it in the footer.",
       "Download the whole gallery in one click (ZIP).",
+      "Videos right in the gallery — play the photographer's film on your phone or computer and download it along with the photos.",
+      "A short video for social media — the photographer can turn the gallery's photos into a vertical video (9:16) for Stories, Reels and TikTok, or a landscape one (16:9) for YouTube or a website.",
       "Favorites and reactions — mark the photos you like best.",
+      "Print selection — mark the photos you'd like printed, with how many copies.",
+      "Best of the day and chapters — when the photographer turns them on, the best shots wait at the top and one tap takes you to the ceremony or the reception.",
       "Password and time limits — the photographer controls who gets in, and for how long.",
       "Offline mode — once downloaded, photos stay viewable without signal.",
+      "Carry on on another device — move your favorites, reactions and print selection from your phone to a computer with a one-time code.",
       "Notifications when the photographer adds new photos.",
       "Photos from guests — guests add their own wedding shots straight into the gallery, no app, no account.",
-      "Live slideshow — new guest photos appear on screen within about half a minute.",
+      "Live slideshow — new guest photos appear on screen within about half a minute; the photographer's photos slowly move in towards the faces.",
       "Multiple galleries under one growing link — a curated selection, the full set, and the guest gallery, all without sending out a new link."
     ],
     "footerText": "This gallery is run by your photographer.",
