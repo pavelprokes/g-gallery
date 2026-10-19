@@ -43,6 +43,9 @@ const fileSchema = z.object({
   // Resuming an interrupted upload: re-presign this existing PENDING row
   // instead of creating another one (see /api/uploads/pending).
   resumePhotoId: z.string().min(1).max(64).optional(),
+  // A corrected export: on confirm its bytes replace this CONFIRMED photo's
+  // (docs/REPLACE-PHOTOS.md). Owner only; ignored on a guest's upload.
+  replacePhotoId: z.string().min(1).max(64).optional(),
 });
 
 const filesSchema = z.array(fileSchema).min(1).max(MAX_BATCH);
@@ -234,6 +237,30 @@ export async function POST(request: Request) {
         ).map((photo) => [photo.id, photo] as const),
   );
 
+  // The photographer's own delivered photos only — the same set the uploader
+  // offered to replace. A target gone since then makes an ordinary new photo.
+  const replaceIds = target.isGuest
+    ? []
+    : files.map((f) => f.replacePhotoId).filter((id): id is string => Boolean(id));
+  const replaceable = new Set(
+    replaceIds.length === 0
+      ? []
+      : (
+          await prisma.photo.findMany({
+            where: {
+              id: { in: replaceIds },
+              galleryId: target.galleryId,
+              status: "CONFIRMED",
+              source: "OWNER",
+              videoObjectKey: null,
+            },
+            select: { id: true },
+          })
+        ).map((photo) => photo.id),
+  );
+
+  const replaceTarget = (id: string | undefined) => (id && replaceable.has(id) ? id : null);
+
   const uploads = await Promise.all(
     files.map(async (file) => {
       const verdict = classifyContentType(file.contentType, { allowVideo });
@@ -244,6 +271,14 @@ export async function POST(request: Request) {
       // it, but a photo row has no MP4 key to re-sign and a video row's
       // `objectKey` is a poster, not the place for a photo's bytes.
       if (file.resumePhotoId && resumed && Boolean(resumed.videoObjectKey) === isVideo) {
+        // The choice made now wins over the one the interrupted run was
+        // started with: "upload as new" must not replace a photo after all.
+        if (!target.isGuest && !isVideo) {
+          await prisma.photo.update({
+            where: { id: file.resumePhotoId },
+            data: { replacesPhotoId: replaceTarget(file.replacePhotoId) },
+          });
+        }
         // The object key is reused verbatim, so a partial PUT is simply
         // overwritten rather than leaving a second copy behind.
         return {
@@ -278,6 +313,7 @@ export async function POST(request: Request) {
           sizeBytes: file.sizeBytes,
           source: target.isGuest ? "GUEST" : "OWNER",
           uploadedByViewerId: target.viewerId,
+          replacesPhotoId: isVideo ? null : replaceTarget(file.replacePhotoId),
         },
         select: { id: true },
       });

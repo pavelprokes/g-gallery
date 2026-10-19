@@ -2,11 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { matchResumeTargets, type PendingUpload } from "@/lib/upload-resume";
-import { FORMS, pluralize } from "@/lib/czech-plural";
+import {
+  matchReplaceTargets,
+  matchResumeTargets,
+  type ExistingPhoto,
+  type PendingUpload,
+} from "@/lib/upload-resume";
+import { czechPlural, FORMS, pluralize } from "@/lib/czech-plural";
 import {
   CANCELLED,
   fetchPendingUploads,
+  fetchReplaceCandidates,
   runUploads,
   UploadRejection,
   type UploadItemState,
@@ -30,6 +36,16 @@ interface Item {
   file: File;
   state: UploadItemState;
   error?: string;
+  /** The photo this corrected export replaces, kept so a retry still does. */
+  replaceId?: string;
+}
+
+/** A selection waiting on "replace these?" (docs/REPLACE-PHOTOS.md). */
+interface Review {
+  files: File[];
+  replaceIds: (string | undefined)[];
+  /** Per file, the delivered name it would replace. */
+  replaces: (string | undefined)[];
 }
 
 interface Stats {
@@ -58,6 +74,10 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const [dragging, setDragging] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [review, setReview] = useState<Review | null>(null);
+  // Between a pick and its start, while the replace candidates load: a second
+  // pick then would start two runs over the same refs.
+  const [preparing, setPreparing] = useState(false);
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -86,8 +106,13 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   }, []);
 
   const start = useCallback(
-    async (files: File[]) => {
-      const initial = files.map((file) => ({ file, state: "pending" as const }));
+    async (files: File[], replaceIds: (string | undefined)[] = []) => {
+      setReview(null);
+      const initial = files.map((file, index) => ({
+        file,
+        state: "pending" as const,
+        replaceId: replaceIds[index],
+      }));
       statesRef.current = initial;
       bytesRef.current = files.map(() => 0);
       setItems(initial);
@@ -109,6 +134,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
         files,
         credentials,
         resumeIds,
+        replaceIds,
         signal: controller.signal,
         onItem: update,
         onBytes: (index, sent) => {
@@ -139,9 +165,28 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       setNotice(
         ignored > 0 ? `Přeskočeno: ${ignored} × ne-fotka (.xmp, RAW, systémové soubory…).` : null,
       );
-      if (photos.length > 0) void start(photos);
+      if (photos.length === 0 || running || preparing || review) return;
+      setPreparing(true);
+      // A corrected export carries the shot's camera name after a new sequence
+      // number; pairing it with the delivered photo is asked about, never
+      // assumed — the old file is deleted (docs/REPLACE-PHOTOS.md).
+      void fetchReplaceCandidates(galleryId).then(({ pending, existing }) => {
+        setPreparing(false);
+        const replaceIds = matchReplaceTargets(
+          photos,
+          existing,
+          matchResumeTargets(photos, pending),
+        );
+        if (!replaceIds.some(Boolean)) return void start(photos);
+        const names = new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName]));
+        setReview({
+          files: photos,
+          replaceIds,
+          replaces: replaceIds.map((id) => (id ? names.get(id) : undefined)),
+        });
+      });
     },
-    [start],
+    [galleryId, preparing, review, running, start],
   );
 
   // Progress painter: overall bytes, smoothed speed, tab title, milestones.
@@ -251,7 +296,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
     onDragOver: (event: React.DragEvent) => {
       if (!hasFiles(event)) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = running ? "none" : "copy";
+      event.dataTransfer.dropEffect = running || preparing || review ? "none" : "copy";
     },
     onDragLeave: () => {
       dragDepth.current = Math.max(dragDepth.current - 1, 0);
@@ -262,7 +307,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       event.preventDefault();
       dragDepth.current = 0;
       setDragging(false);
-      if (running) return;
+      if (running || preparing || review) return;
       // Entries must be read synchronously inside the drop handler — this call
       // does that before its first await.
       void filesFromDrop(event.dataTransfer).then(pick);
@@ -297,7 +342,16 @@ export function Uploader({ galleryId }: { galleryId: string }) {
         </Alert>
       )}
 
-      {!running && (
+      {review && !running && (
+        <ReplaceReview
+          review={review}
+          onReplace={() => void start(review.files, review.replaceIds)}
+          onAsNew={() => void start(review.files)}
+          onCancel={() => setReview(null)}
+        />
+      )}
+
+      {!running && !review && !preparing && (
         <div
           className={`mt-3 flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
             dragging
@@ -454,7 +508,15 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               </Button>
             )}
             {!running && retriable.length > 0 && (
-              <Button size="sm" onClick={() => void start(retriable.map((item) => item.file))}>
+              <Button
+                size="sm"
+                onClick={() =>
+                  void start(
+                    retriable.map((item) => item.file),
+                    retriable.map((item) => item.replaceId),
+                  )
+                }
+              >
                 Nahrát znovu {pluralize(retriable.length, FORMS.photoAccusative)}
               </Button>
             )}
@@ -481,6 +543,63 @@ export function Uploader({ galleryId }: { galleryId: string }) {
         </div>
       )}
     </Card>
+  );
+}
+
+function ReplaceReview({
+  review,
+  onReplace,
+  onAsNew,
+  onCancel,
+}: {
+  review: Review;
+  onReplace: () => void;
+  onAsNew: () => void;
+  onCancel: () => void;
+}) {
+  const matched = review.replaceIds.filter(Boolean).length;
+  const rest = review.files.length - matched;
+  return (
+    <Alert className="mt-3">
+      <p className="font-medium">
+        Opravené fotky? {matched}{" "}
+        {czechPlural(matched, { one: "soubor má", few: "soubory mají", many: "souborů má" })} stejné
+        číslo z fotoaparátu jako fotka v galerii.
+      </p>
+      <p className="mt-1 text-xs">
+        Nahrazená fotka si nechá své místo, čas, srdíčka, značky k tisku i jména u obličejů — vymění
+        se jen soubor a ten starý se smaže.
+        {rest > 0 &&
+          ` ${rest} ${czechPlural(rest, {
+            one: "fotka bez shody se nahraje jako nová",
+            few: "fotky bez shody se nahrají jako nové",
+            many: "fotek bez shody se nahraje jako nové",
+          })}.`}
+      </p>
+      <ul
+        aria-label="Co se nahradí"
+        className="text-admin-muted mt-2 max-h-40 overflow-y-auto text-xs dark:text-neutral-400"
+      >
+        {review.files.map((file, index) =>
+          review.replaces[index] ? (
+            <li key={index} className="truncate">
+              {file.name} → nahradí <span className="font-medium">{review.replaces[index]}</span>
+            </li>
+          ) : null,
+        )}
+      </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" onClick={onReplace}>
+          Nahradit {pluralize(matched, FORMS.photoAccusative)}
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onAsNew}>
+          Nahrát všechny jako nové
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Zrušit
+        </Button>
+      </div>
+    </Alert>
   );
 }
 

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { denialStatus, resolveGuestUpload } from "@/lib/guest-upload-access";
-import { headObject } from "@/lib/r2";
+import { Prisma } from "@/generated/prisma/client";
+import { deleteObject, headObject } from "@/lib/r2";
 import { trackServerEvent } from "@/lib/umami";
 import { thumbKeyFor } from "@/lib/thumbnail";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
@@ -101,6 +102,8 @@ export async function POST(request: Request) {
     galleryId: string;
     objectKey: string;
     videoObjectKey: string | null;
+    replacesPhotoId?: string | null;
+    status?: string;
   } | null;
 
   if ("shareToken" in parsed.data) {
@@ -137,11 +140,23 @@ export async function POST(request: Request) {
 
     photo = await prisma.photo.findFirst({
       where: { id: photoId, gallery: { ownerId: session.user.id } },
-      select: { id: true, galleryId: true, objectKey: true, videoObjectKey: true },
+      select: {
+        id: true,
+        galleryId: true,
+        objectKey: true,
+        videoObjectKey: true,
+        replacesPhotoId: true,
+        status: true,
+      },
     });
   }
 
   if (!photo) return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+  // A replacement already confirmed: its row is a tombstone now (below), and a
+  // retried confirm whose first answer was lost must hear success, not 404.
+  if (photo.status === "FAILED" && photo.replacesPhotoId) {
+    return NextResponse.json({ ok: true, replaced: photo.replacesPhotoId });
+  }
 
   // Ground truth against what the client claims: a client-declared sizeBytes
   // is otherwise trusted outright, and this is the one anonymous write path
@@ -166,6 +181,32 @@ export async function POST(request: Request) {
     // Retryable, and distinct from `size_mismatch`: the client sends the
     // poster again, not the (possibly multi-GB) MP4 that did arrive.
     return NextResponse.json({ error: "poster_missing" }, { status: 409 });
+  }
+
+  if (photo.replacesPhotoId) {
+    const replaced = await replacePhotoBytes(photo, photo.replacesPhotoId, {
+      etag: etag.replaceAll('"', ""),
+      crc32,
+      sizeBytes,
+      // Undefined keeps what the delivered photo had: a browser that could
+      // not measure or read the new file must not wipe what is known.
+      width,
+      height,
+      placeholder: placeholder ?? undefined,
+      thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,
+      xmpRating: xmpRating ?? undefined,
+      xmpLabel: xmpLabel ?? undefined,
+      xmpHighlight: xmpHighlight ?? undefined,
+    });
+    if (replaced === "conflict") {
+      // Another replacement of the same photo landed in between. Retryable:
+      // the next try reads the photo's new key and replaces that one.
+      return NextResponse.json({ error: "replace_conflict" }, { status: 409 });
+    }
+    if (replaced === "replaced") {
+      await markGalleryPhotosChanged(photo.galleryId);
+      return NextResponse.json({ ok: true, replaced: photo.replacesPhotoId });
+    }
   }
 
   // Always set on confirm, so a CONFIRMED photo never sorts on a NULL.
@@ -205,3 +246,88 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * A corrected export (docs/REPLACE-PHOTOS.md): the confirmed bytes move onto
+ * the photo they replace, which keeps its id — favourites, print marks, face
+ * names, chapters, cover — and its name and capture time, so its place in
+ * every order. "missing" when that photo is gone or no longer the
+ * photographer's delivered still; the upload then confirms as an ordinary new
+ * photo rather than losing the file.
+ *
+ * The upload's row stays behind as a FAILED tombstone, its key released, so
+ * a retried confirm still finds it and answers success.
+ */
+async function replacePhotoBytes(
+  upload: { id: string; galleryId: string; objectKey: string },
+  targetId: string,
+  bytes: Pick<
+    Prisma.PhotoUpdateInput,
+    | "etag"
+    | "crc32"
+    | "sizeBytes"
+    | "width"
+    | "height"
+    | "placeholder"
+    | "thumbObjectKey"
+    | "xmpRating"
+    | "xmpLabel"
+    | "xmpHighlight"
+  >,
+): Promise<"replaced" | "missing" | "conflict"> {
+  const [target, pending] = await Promise.all([
+    prisma.photo.findFirst({
+      where: {
+        id: targetId,
+        galleryId: upload.galleryId,
+        status: "CONFIRMED",
+        source: "OWNER",
+        videoObjectKey: null,
+      },
+      select: { id: true, objectKey: true, thumbObjectKey: true },
+    }),
+    prisma.photo.findUnique({ where: { id: upload.id }, select: { mimeType: true } }),
+  ]);
+  if (!target || !pending) return "missing";
+
+  const swapped = await prisma
+    .$transaction(async (tx) => {
+      // The upload's row lets go of its key first: `objectKey` is unique.
+      await tx.photo.update({
+        where: { id: upload.id },
+        data: { status: "FAILED", objectKey: `${upload.objectKey}#replaced`, thumbObjectKey: null },
+      });
+      // Only if the photo still has the key read above — a second replacement
+      // racing this one would otherwise orphan the first one's new object.
+      const { count } = await tx.photo.updateMany({
+        where: { id: target.id, objectKey: target.objectKey },
+        data: {
+          ...bytes,
+          objectKey: upload.objectKey,
+          mimeType: pending.mimeType,
+          // Read from the old pixels: a retouch or a new crop makes them stale.
+          // The admin detects again on demand (docs/SOCIAL-VIDEO.md §4).
+          faces: Prisma.DbNull,
+          checkKeptAt: null,
+        },
+      });
+      if (count !== 1) throw new ReplaceConflict();
+      return true;
+    })
+    .catch((error: unknown) => {
+      if (error instanceof ReplaceConflict) return false;
+      throw error;
+    });
+  if (!swapped) return "conflict";
+
+  // Every object key is new — R2 serves them `immutable` — so the old ones
+  // are deleted, not overwritten. A failure only leaves debris for the sweep.
+  await Promise.allSettled(
+    [target.objectKey, target.thumbObjectKey]
+      .filter((key): key is string => key !== null)
+      .map((key) => deleteObject(key)),
+  );
+  return "replaced";
+}
+
+class ReplaceConflict extends Error {}

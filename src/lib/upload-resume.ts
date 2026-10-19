@@ -50,3 +50,59 @@ export function matchResumeTargets(
 export function countResumed(matches: readonly (string | undefined)[]): number {
   return matches.filter(Boolean).length;
 }
+
+/** A CONFIRMED photo of the photographer's that a corrected export may replace. */
+export interface ExistingPhoto {
+  id: string;
+  fileName: string;
+}
+
+/**
+ * The part of a file name that names the shot, not its place in an export:
+ * `svatba_0412_PPR57923.jpg` → `ppr57923.jpg`. Lightroom's sequence is the
+ * last `_<digits>_` (or `-`) in the name, so a re-export numbered from 1 still
+ * yields the camera's own name — `DSC_1234` too, underscore and all — and a
+ * Photoshop round trip's `-Edit` is the same shot. Null when the name has no
+ * camera name after a sequence (letters and digits both): `2026-09-05_0412`
+ * or `IMG_4821-2` would pair unrelated shots, and a wrong pair deletes a
+ * photo. The extension is part of the key, so a replacement keeps the
+ * delivered file name exactly (docs/REPLACE-PHOTOS.md).
+ */
+export function shotKey(fileName: string): string | null {
+  const lower = fileName.toLowerCase();
+  const extension = (/\.([^.]*)$/.exec(lower)?.[1] ?? "").replace(/^jpeg$/, "jpg");
+  const stem = lower.replace(/\.[^.]*$/, "");
+  const camera = /^.*[_-]\d+[_-](.+)$/.exec(stem)?.[1]?.replace(/[-_ ](edit|upravit)(-\d+)?$/, "");
+  if (!camera || !/[a-z]/.test(camera) || !/\d/.test(camera)) return null;
+  return `${camera}.${extension}`;
+}
+
+/**
+ * Per picked file, the id of the photo it replaces — or undefined. Only a
+ * match that is unique on both sides counts: two photos in the gallery with
+ * one key (two bodies' counters) or two picked files with one key would be a
+ * guess, and a guess here overwrites somebody's photo. A file already resuming
+ * a PENDING row is left to that.
+ */
+export function matchReplaceTargets(
+  files: readonly PickedFile[],
+  existing: readonly ExistingPhoto[],
+  resumeIds: readonly (string | undefined)[] = [],
+): (string | undefined)[] {
+  const unique = <T>(items: readonly T[], keyOf: (item: T) => string | null) => {
+    const seen = new Map<string, T | null>();
+    for (const item of items) {
+      const key = keyOf(item);
+      if (key !== null) seen.set(key, seen.has(key) ? null : item);
+    }
+    return seen;
+  };
+  const photos = unique(existing, (photo) => shotKey(photo.fileName));
+  const picked = unique(files, (file) => shotKey(file.name));
+  return files.map((file, index) => {
+    if (resumeIds[index]) return undefined;
+    const key = shotKey(file.name);
+    if (key === null) return undefined;
+    return picked.get(key) === file ? (photos.get(key)?.id ?? undefined) : undefined;
+  });
+}

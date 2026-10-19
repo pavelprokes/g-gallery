@@ -28,7 +28,12 @@ export async function reconcileGhostUploads(olderThanMs = GHOST_AGE_MS): Promise
   const cutoff = new Date(Date.now() - olderThanMs);
 
   const ghosts = await prisma.photo.findMany({
-    where: { status: "PENDING", createdAt: { lt: cutoff } },
+    where: {
+      createdAt: { lt: cutoff },
+      // …and the tombstone a confirmed replacement leaves for a retried
+      // confirm (docs/REPLACE-PHOTOS.md); its key names no object.
+      OR: [{ status: "PENDING" }, { status: "FAILED", replacesPhotoId: { not: null } }],
+    },
     select: { id: true, objectKey: true, videoObjectKey: true },
   });
 

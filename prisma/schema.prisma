@@ -418,6 +418,11 @@ model Photo {
   /// looked at this photo's flags — closed or soft eyes — and kept it, so the
   /// check stops listing it. Null for every photo nobody has looked at.
   checkKeptAt        DateTime?
+  /// Set only on a PENDING upload of a corrected export: on confirm its bytes
+  /// move onto this CONFIRMED photo, which keeps its id, name, time and place,
+  /// and this row is deleted (docs/REPLACE-PHOTOS.md). Not a relation: a
+  /// target deleted meanwhile just makes the upload an ordinary new photo.
+  replacesPhotoId    String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
