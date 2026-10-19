@@ -50,3 +50,48 @@ export function matchResumeTargets(
 export function countResumed(matches: readonly (string | undefined)[]): number {
   return matches.filter(Boolean).length;
 }
+
+/** A CONFIRMED photo of the photographer's that a corrected export may replace. */
+export interface ExistingPhoto {
+  id: string;
+  fileName: string;
+}
+
+/**
+ * The part of a file name that names the shot, not its place in an export:
+ * `svatba_0412_PPR57923.jpg` → `ppr57923`. Lightroom's sequence is the last
+ * `_<digits>_` (or `-`) in the name, so a re-export numbered from 1 still
+ * yields the camera's own name — `DSC_1234` too, underscore and all. A name
+ * without a sequence is its own key, so the very same name matches as well
+ * (docs/REPLACE-PHOTOS.md).
+ */
+export function shotKey(fileName: string): string {
+  const stem = fileName.replace(/\.[^.]*$/, "").toLowerCase();
+  return /^.*[_-]\d+[_-](.+)$/.exec(stem)?.[1] ?? stem;
+}
+
+/**
+ * Per picked file, the id of the photo it replaces — or undefined. Only a
+ * match that is unique on both sides counts: two photos in the gallery with
+ * one key (two bodies' counters) or two picked files with one key would be a
+ * guess, and a guess here overwrites somebody's photo. A file already resuming
+ * a PENDING row is left to that.
+ */
+export function matchReplaceTargets(
+  files: readonly PickedFile[],
+  existing: readonly ExistingPhoto[],
+  resumeIds: readonly (string | undefined)[] = [],
+): (string | undefined)[] {
+  const unique = <T>(items: readonly T[], key: (item: T) => string) => {
+    const seen = new Map<string, T | null>();
+    for (const item of items) seen.set(key(item), seen.has(key(item)) ? null : item);
+    return seen;
+  };
+  const photos = unique(existing, (photo) => shotKey(photo.fileName));
+  const picked = unique(files, (file) => shotKey(file.name));
+  return files.map((file, index) => {
+    if (resumeIds[index]) return undefined;
+    const key = shotKey(file.name);
+    return picked.get(key) === file ? (photos.get(key)?.id ?? undefined) : undefined;
+  });
+}

@@ -15,7 +15,11 @@ const querySchema = z.union([
     shareToken: z.string().min(1).max(128),
     anonKey: z.string().min(1).max(64).optional(),
   }),
-  z.object({ galleryId: z.string().min(1) }),
+  z.object({
+    galleryId: z.string().min(1),
+    /** Also list the photos a corrected export may replace (docs/REPLACE-PHOTOS.md). */
+    existing: z.literal("1").optional(),
+  }),
 ]);
 
 export async function GET(request: Request) {
@@ -72,5 +76,12 @@ export async function GET(request: Request) {
     select: { id: true, fileName: true, sizeBytes: true },
   });
 
-  return NextResponse.json({ pending });
+  if (!parsed.data.existing) return NextResponse.json({ pending });
+  // Only the photographer's own photos, never a video: a corrected export
+  // replaces what they delivered, not a guest's photo or a film's poster.
+  const existing = await prisma.photo.findMany({
+    where: { galleryId: gallery.id, status: "CONFIRMED", source: "OWNER", videoObjectKey: null },
+    select: { id: true, fileName: true },
+  });
+  return NextResponse.json({ pending, existing });
 }

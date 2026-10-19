@@ -43,6 +43,9 @@ const fileSchema = z.object({
   // Resuming an interrupted upload: re-presign this existing PENDING row
   // instead of creating another one (see /api/uploads/pending).
   resumePhotoId: z.string().min(1).max(64).optional(),
+  // A corrected export: on confirm its bytes replace this CONFIRMED photo's
+  // (docs/REPLACE-PHOTOS.md). Owner only; ignored on a guest's upload.
+  replacePhotoId: z.string().min(1).max(64).optional(),
 });
 
 const filesSchema = z.array(fileSchema).min(1).max(MAX_BATCH);
@@ -234,6 +237,28 @@ export async function POST(request: Request) {
         ).map((photo) => [photo.id, photo] as const),
   );
 
+  // The photographer's own delivered photos only — the same set the uploader
+  // offered to replace. A target gone since then makes an ordinary new photo.
+  const replaceIds = target.isGuest
+    ? []
+    : files.map((f) => f.replacePhotoId).filter((id): id is string => Boolean(id));
+  const replaceable = new Set(
+    replaceIds.length === 0
+      ? []
+      : (
+          await prisma.photo.findMany({
+            where: {
+              id: { in: replaceIds },
+              galleryId: target.galleryId,
+              status: "CONFIRMED",
+              source: "OWNER",
+              videoObjectKey: null,
+            },
+            select: { id: true },
+          })
+        ).map((photo) => photo.id),
+  );
+
   const uploads = await Promise.all(
     files.map(async (file) => {
       const verdict = classifyContentType(file.contentType, { allowVideo });
@@ -278,6 +303,10 @@ export async function POST(request: Request) {
           sizeBytes: file.sizeBytes,
           source: target.isGuest ? "GUEST" : "OWNER",
           uploadedByViewerId: target.viewerId,
+          replacesPhotoId:
+            !isVideo && file.replacePhotoId && replaceable.has(file.replacePhotoId)
+              ? file.replacePhotoId
+              : null,
         },
         select: { id: true },
       });

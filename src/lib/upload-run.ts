@@ -2,6 +2,7 @@
 
 import { classifyContentType } from "@/lib/upload-content-types";
 import { makeThumbnail } from "@/lib/thumbnail";
+import type { ExistingPhoto } from "@/lib/upload-resume";
 import { prepareUploadOffMainThread } from "@/lib/upload-prepare-client";
 import { VIDEO_MAX_BYTES } from "@/lib/video";
 import { prepareVideoUpload, VideoNotUsable, videoProblem } from "@/lib/video-prepare";
@@ -111,6 +112,19 @@ export function fetchPendingUploads(
     .catch(() => []);
 }
 
+/**
+ * The photographer's delivered photos a corrected export may replace
+ * (docs/REPLACE-PHOTOS.md). Empty on any failure: the files then simply
+ * upload as new, which is what happened before this existed.
+ */
+export function fetchReplaceCandidates(galleryId: string): Promise<ExistingPhoto[]> {
+  const params = new URLSearchParams({ galleryId, existing: "1" });
+  return fetch(`/api/uploads/pending?${params}`)
+    .then((response) => (response.ok ? response.json() : { existing: [] }))
+    .then((data: { existing?: ExistingPhoto[] }) => data.existing ?? [])
+    .catch(() => []);
+}
+
 /** Mirrors `PendingUpload` in src/lib/upload-resume.ts. */
 interface PendingRow {
   id: string;
@@ -160,6 +174,7 @@ async function presign(
   files: File[],
   resumeIds: (string | undefined)[],
   signal?: AbortSignal,
+  replaceIds: (string | undefined)[] = [],
 ): Promise<PresignedUpload[]> {
   const response = await fetch("/api/uploads/presign", {
     method: "POST",
@@ -175,6 +190,7 @@ async function presign(
         contentType: f.type || "image/jpeg",
         sizeBytes: f.size,
         resumePhotoId: resumeIds[i],
+        replacePhotoId: replaceIds[i],
       })),
     }),
   });
@@ -404,6 +420,8 @@ export interface UploadRunOptions {
   credentials: UploadCredentials;
   /** Per-file id of a PENDING row to re-use, from `matchResumeTargets`. */
   resumeIds: (string | undefined)[];
+  /** Per-file id of a photo this corrected export replaces (docs/REPLACE-PHOTOS.md). */
+  replaceIds?: (string | undefined)[];
   onItem: (index: number, patch: { state: UploadItemState; error?: string }) => void;
   /** A refusal that ends the run — quota, revoked link, lost session. */
   onFatal: (rejection: UploadRejection) => void;
@@ -428,6 +446,7 @@ export async function runUploads({
   files,
   credentials,
   resumeIds,
+  replaceIds = [],
   onItem,
   onFatal,
   onSkipped,
@@ -510,6 +529,7 @@ export async function runUploads({
       indices.map((index) => files[index]!),
       indices.map((index) => resumeIds[index]),
       signal,
+      indices.map((index) => replaceIds[index]),
     )
       .then((targets) =>
         indices.forEach((index, position) => {

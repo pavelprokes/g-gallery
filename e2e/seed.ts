@@ -291,6 +291,11 @@ async function main() {
   const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
   const faceTagGalleryId = await makeFaceTagGallery(user.id);
   const faceSeriesGalleryId = await makeFaceSeriesGallery(user.id);
+  // docs/REPLACE-PHOTOS.md: a corrected export replaces a delivered photo — mutated, so per project.
+  const replaceGalleryIds = {
+    chromium: await makeReplaceGallery(user.id, "chromium"),
+    "mobile-safari": await makeReplaceGallery(user.id, "mobile-safari"),
+  };
 
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
@@ -302,6 +307,7 @@ async function main() {
       photoCheckGalleryId,
       faceTagGalleryId,
       faceSeriesGalleryId,
+      replaceGalleryIds,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1045,6 +1051,47 @@ async function makeActivity(ownerId: string) {
     createdAt: new Date(Date.UTC(2025, 0, 1 + day, 12)),
   }));
   await prisma.activityEvent.createMany({ data: [...downloads, ...favorites] });
+}
+
+async function makeReplaceGallery(ownerId: string, project: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: `E2E Opravy ${project}`,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-replace-${project}-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  const ids: string[] = [];
+  for (const [i, name] of [
+    "svatba_0001_PPR1001.jpg",
+    "svatba_0002_PPR1002.jpg",
+    "svatba_0003_PPR1003.jpg",
+  ].entries()) {
+    const photo = await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${name}`,
+        fileName: name,
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        crc32: "00000000",
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10, i)),
+      },
+    });
+    ids.push(photo.id);
+  }
+  // A guest's heart on the photo that gets replaced: it must survive.
+  const viewer = await prisma.viewer.create({
+    data: { galleryId: gallery.id, anonKey: `e2e-replace-${project}` },
+  });
+  await prisma.favorite.create({ data: { photoId: ids[1]!, viewerId: viewer.id } });
+  return gallery.id;
 }
 
 async function makePhotoCheckGallery(ownerId: string) {
