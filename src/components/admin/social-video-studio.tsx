@@ -71,8 +71,8 @@ function readDraft(galleryId: string, known: Set<string>): Draft | null {
     if (!raw) return null;
     const draft = JSON.parse(raw) as Draft;
     if (!(draft.aspect in FORMATS) || !LENGTHS.includes(draft.length)) return null;
-    const order = draft.order.filter((id) => known.has(id));
-    return order.length > 0 ? { ...draft, order } : null;
+    // Kept even when empty: deselecting everything is a choice, not "no draft".
+    return { ...draft, order: draft.order.filter((id) => known.has(id)) };
   } catch {
     return null;
   }
@@ -144,6 +144,9 @@ export function SocialVideoStudio({
   // Persisting starts only once the photographer changes something: a
   // suggestion nobody touched is not "in the video" (docs/ADMIN-FILTERS.md).
   const baseline = useRef<string | null>(null);
+  // Set once the restored state has actually rendered: until then the effect
+  // below sees the initial empty state, which is not a change.
+  const synced = useRef(false);
   const pending = useRef<Draft | null>(null);
   const flush = () => {
     const draft = pending.current;
@@ -165,7 +168,7 @@ export function SocialVideoStudio({
     // The newer copy wins: the gallery's may lag a change made on this device.
     const draft =
       [saved, readDraft(galleryId, known)]
-        .filter((d): d is Draft => d !== null && d.order.length > 0)
+        .filter((d): d is Draft => d !== null)
         .sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0))[0] ?? null;
     const start = draft ?? {
       aspect: "9:16" as const,
@@ -185,7 +188,12 @@ export function SocialVideoStudio({
   useEffect(() => {
     const now = JSON.stringify([aspect, length, order]);
     // Before the restore lands, and while nothing has changed since: nothing to keep.
-    if (baseline.current === null || now === baseline.current) return;
+    if (baseline.current === null) return;
+    if (!synced.current) {
+      synced.current = now === baseline.current;
+      return;
+    }
+    if (now === baseline.current) return;
     baseline.current = "changed";
     const draft: Draft = { aspect, length, order, savedAt: Date.now() };
     writeDraft(galleryId, draft);

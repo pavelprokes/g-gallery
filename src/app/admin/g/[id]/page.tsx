@@ -313,7 +313,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
   // The print summary covers what the view shows: narrowed by a person or a
   // chapter, the list, the copy and the download narrow with it.
-  const printScoped = printOnly && isFiltered({ ...view, filters: [] });
+  const printScoped =
+    printOnly && isFiltered({ ...view, filters: view.filters.filter((f) => f !== "print") });
   const printMarkedPhotos = (printOnly ? visiblePhotos : gallery.photos).filter(
     (photo) => (printQuantities.get(photo.id) ?? 0) > 0,
   );
