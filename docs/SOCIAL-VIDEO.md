@@ -24,14 +24,15 @@ as here.
 
 ## 1. Decisions (Pavel, 2026-10-18)
 
-| Question               | Decision                                                                                     |
-| ---------------------- | -------------------------------------------------------------------------------------------- |
-| Where frames are drawn | **In the browser** on the photographer's machine — canvas → WebCodecs → MP4 (§4). No server. |
-| First style            | **Face-aware Ken Burns** (§5). Polaroid and album page later (§8).                           |
-| Formats                | 1080×1920 (9:16) and 1920×1080 (16:9), 30 fps, 15 or 30 s.                                   |
-| Sound, captions        | **None.** Music is added in the social app if wanted.                                        |
-| Who uses it            | The owner, from the admin. Guests and couples never render.                                  |
-| Output                 | Download, and "Add to gallery" as a video item (`docs/VIDEO.md`) — the couple's gift.        |
+| Question               | Decision                                                                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where frames are drawn | **In the browser** on the photographer's machine — canvas → WebCodecs → MP4 (§4). No server.                                                                |
+| First style            | **Face-aware Ken Burns** (§5). Polaroid and album page later (§8).                                                                                          |
+| Formats                | 1080×1920 (9:16) and 1920×1080 (16:9), 30 fps, 15 or 30 s.                                                                                                  |
+| Sound, captions        | **None.** Music is added in the social app if wanted.                                                                                                       |
+| Who uses it            | The owner, from the admin. Guests and couples never render.                                                                                                 |
+| Output                 | Download, and "Add to gallery" as a video item (`docs/VIDEO.md`) — the couple's gift.                                                                       |
+| Offered to couples     | **In every package, both formats** — 9:16 and 16:9 (Pavel, 2026-10-19). Marketing copy in the help page, `public/llms.txt` and `docs/HANDOFF-MAIN-SITE.md`. |
 
 ## 2. The flow
 
