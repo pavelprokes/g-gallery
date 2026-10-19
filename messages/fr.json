@@ -82,6 +82,10 @@
       {
         "q": "Comment télécharger toutes les photos d'un coup ?",
         "a": "Le bouton « Tout télécharger » récupère toute la galerie en un seul ZIP. Il se prépare tout seul, en général dans l'heure qui suit le dernier envoi de photos – plus longtemps pour les grandes galeries. En attendant, vous pouvez télécharger les photos une par une."
+      },
+      {
+        "q": "Peut-on faire des photos une vidéo pour Instagram ou TikTok ?",
+        "a": "Oui. Le photographe monte une courte vidéo (15 ou 30 secondes) à partir de la galerie : verticale 9:16 pour les Stories, les Reels et TikTok, ou horizontale 16:9 pour YouTube et les sites web. La caméra se rapproche lentement des visages. Le photographe peut l'ajouter à la galerie, où vous pourrez la télécharger. Elle est sans son ni sous-titres : vous ajoutez la musique directement dans Instagram ou TikTok."
       }
     ],
     "guestTipsHeading": "Trucs et astuces pour photographier en tant qu'invité",
@@ -100,6 +104,8 @@
       "Un seul lien, rien à installer – s'ouvre dans n'importe quel navigateur, sur téléphone ou ordinateur.",
       "Une grille de photos rapide et un affichage plein écran, fluide même sur un téléphone plus ancien.",
       "Téléchargement de toute la galerie en un clic (ZIP).",
+      "Des vidéos directement dans la galerie – le film du photographe se lit sur mobile comme sur ordinateur et se télécharge avec les photos.",
+      "Une courte vidéo pour les réseaux sociaux – le photographe peut monter, à partir des photos de la galerie, une vidéo verticale (9:16) pour les Stories, les Reels et TikTok, ou horizontale (16:9) pour YouTube ou un site web.",
       "Favoris et réactions – marquez les photos que vous préférez.",
       "Mot de passe et durée limitée – le photographe décide qui accède à la galerie, et pour combien de temps.",
       "Mode hors ligne – une fois téléchargées, les photos restent visibles sans réseau.",

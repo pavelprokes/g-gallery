@@ -7,7 +7,8 @@ nevkládá: web o galerii **mluví a odkazuje na ni**.
 
 Sestaveno 2026-09-27 z kódu a dokumentace `g-gallery` (hlavně `docs/GUEST-GALLERIES.md`,
 `docs/GUEST-GALLERIES-RESEARCH.md`, `docs/PROMO-CARDS.md`). Každá funkce v §4 je ověřená v kódu. Co není
-rozhodnuté, je v §13 jako otázka pro Pavla, ne jako fakt.
+rozhodnuté, je v §13 jako otázka pro Pavla, ne jako fakt. Doplněno 2026-10-19: videa v galerii, video
+pro sociální sítě (9:16 a 16:9), projekce s přiblížením na tváře a sedm jazyků místo tří.
 
 ## Jak s tím pracovat (pro agenta)
 
@@ -59,18 +60,20 @@ Všechno níže je v kódu a v produkci. Řazeno podle toho, co pár zajímá ne
 
 ### Pro pár a hosty, kteří si fotky prohlížejí
 
-| Funkce                          | Jak to říct                                                                               | Pozor                                                                                     |
-| ------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Jeden odkaz, nic se neinstaluje | Otevře se v prohlížeči na mobilu i počítači, bez účtu.                                    | –                                                                                         |
-| Stránka svatby s víc galeriemi  | Za jedním odkazem postupně přibývají galerie od hostů, první výběr i kompletní set.       | Galerie přidává a skrývá fotograf, pár to sám nepřepíná.                                  |
-| Stažení všeho                   | Celá galerie jedním tlačítkem jako ZIP ve vysokém rozlišení.                              | U velkých galerií se ZIP chvíli připravuje a u vícegigabajtových galerie předem upozorní. |
-| Rychlé prohlížení               | Mřížka bez ořezávání fotek, prohlížení na celou obrazovku, plynulé i na starším telefonu. | –                                                                                         |
-| Oblíbené a reakce               | Srdíčko a reakce u fotek. Vidí je i ostatní.                                              | Fotograf je může u galerie vypnout.                                                       |
-| Výběr k tisku                   | Hosté i pár si mohou fotky označit k tisku i s počtem kusů.                               | Samotný tisk ani objednávku galerie neřeší. Je to jen výběr.                              |
-| Pokračovat na jiném zařízení    | Výběr z telefonu jde jednorázovým kódem přenést na počítač.                               | –                                                                                         |
-| Offline                         | Galerii jde uložit do telefonu a prohlížet bez signálu.                                   | –                                                                                         |
-| Heslo a platnost                | Fotograf může galerii dát heslo nebo časově omezit odkaz.                                 | Na galerii pro nahrávání hostů se heslo nedává.                                           |
-| Tři jazyky                      | Čeština, angličtina a francouzština, podle nastavení telefonu. Přepínač v patičce.        | –                                                                                         |
+| Funkce                          | Jak to říct                                                                                                                                                                                                    | Pozor                                                                                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jeden odkaz, nic se neinstaluje | Otevře se v prohlížeči na mobilu i počítači, bez účtu.                                                                                                                                                         | –                                                                                                                                               |
+| Stránka svatby s víc galeriemi  | Za jedním odkazem postupně přibývají galerie od hostů, první výběr i kompletní set.                                                                                                                            | Galerie přidává a skrývá fotograf, pár to sám nepřepíná.                                                                                        |
+| Stažení všeho                   | Celá galerie jedním tlačítkem jako ZIP ve vysokém rozlišení.                                                                                                                                                   | U velkých galerií se ZIP chvíli připravuje a u vícegigabajtových galerie předem upozorní.                                                       |
+| Rychlé prohlížení               | Mřížka bez ořezávání fotek, prohlížení na celou obrazovku, plynulé i na starším telefonu.                                                                                                                      | –                                                                                                                                               |
+| Oblíbené a reakce               | Srdíčko a reakce u fotek. Vidí je i ostatní.                                                                                                                                                                   | Fotograf je může u galerie vypnout.                                                                                                             |
+| Výběr k tisku                   | Hosté i pár si mohou fotky označit k tisku i s počtem kusů.                                                                                                                                                    | Samotný tisk ani objednávku galerie neřeší. Je to jen výběr.                                                                                    |
+| Pokračovat na jiném zařízení    | Výběr z telefonu jde jednorázovým kódem přenést na počítač.                                                                                                                                                    | –                                                                                                                                               |
+| Offline                         | Galerii jde uložit do telefonu a prohlížet bez signálu.                                                                                                                                                        | –                                                                                                                                               |
+| Heslo a platnost                | Fotograf může galerii dát heslo nebo časově omezit odkaz.                                                                                                                                                      | Na galerii pro nahrávání hostů se heslo nedává.                                                                                                 |
+| Sedm jazyků                     | Čeština, angličtina, francouzština, němčina, španělština, slovenština a polština, podle nastavení telefonu. Přepínač v patičce.                                                                                | Překládá se rozhraní galerie. Název a popis galerie přeloží fotograf, jinak zůstanou česky.                                                     |
+| Videa v galerii                 | Film od fotografa se pustí přímo v galerii, na mobilu i na počítači, a stáhne se i se ZIPem fotek.                                                                                                             | Video do galerie dává jen fotograf (§11). Ve výběru „nejlepší fotky dne“ ani v projekci videa nejsou.                                           |
+| Video pro sociální sítě         | Fotograf z fotek galerie sestaví krátké video na výšku (9:16) pro Stories, Reels a TikTok, nebo na šířku (16:9) pro YouTube a web. Kamera se pomalu přibližuje k tvářím. Může ho přidat do galerie jako dárek. | Je to služba fotografa, ne tlačítko pro pár. 15 nebo 30 s, **bez zvuku a bez titulků** (hudbu si pár přidá v Instagramu). Nepsat „automaticky“. |
 
 ### Pro hosty, kteří nahrávají
 
@@ -87,15 +90,17 @@ Všechno níže je v kódu a v produkci. Řazeno podle toho, co pár zajímá ne
 
 ### Na svatbě
 
-| Funkce             | Jak to říct                                                                                  | Pozor                                                                                                                      |
-| ------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Projekce           | Fotky od hostů se promítají na plátno nebo televizi a nové naskočí **zhruba do půl minuty**. | Obnovuje se každých 30 s (nová fotka pak jde na řadu hned, nejhůř tak kolem 40 s), nepsat „v reálném čase“ ani „okamžitě“. |
-| Cedulka s QR kódem | Tiskovou cedulku s QR kódem připraví fotograf.                                               | Jeden hotový design, žádný výběr ze šablon.                                                                                |
+| Funkce             | Jak to říct                                                                                                  | Pozor                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Projekce           | Fotky od hostů se promítají na plátno nebo televizi a nové naskočí **zhruba do půl minuty**.                 | Obnovuje se každých 30 s (nová fotka pak jde na řadu hned, nejhůř tak kolem 40 s), nepsat „v reálném čase“ ani „okamžitě“. |
+| Pohyb v projekci   | Fotky na šířku se na plátně pomalu přibližují k tvářím, ve skupině k novomanželům, když je fotograf označil. | Jen fotky, u kterých fotograf nechal najít tváře (jeho vlastní). Čerstvé fotky od hostů a fotky na výšku stojí.            |
+| Cedulka s QR kódem | Tiskovou cedulku s QR kódem připraví fotograf.                                                               | Jeden hotový design, žádný výběr ze šablon.                                                                                |
 
 ### Co galerie **neumí** (nikde to nenaznačovat)
 
-- **Video od hostů.** Hosté nahrávají jen fotky. (Fotograf může do předávací galerie přidat svůj
-  krátký sestřih, `docs/VIDEO.md` — to je jeho služba, ne funkce pro hosty.)
+- **Video od hostů.** Hosté nahrávají jen fotky. (Videa do galerie přidává jen fotograf: svůj film
+  (`docs/VIDEO.md`) a video pro sociální sítě (`docs/SOCIAL-VIDEO.md`). Obojí je jeho služba, ne
+  funkce pro hosty ani pro pár.)
 - **Hledání podle obličeje** („najdi se“).
 - **Schvalování fotek předem.** Fotky od hostů jsou vidět hned. Nevhodnou fotku smaže fotograf.
 - **Tisk a objednávka fotek.** Galerie umí jen výběr k tisku.
@@ -193,7 +198,8 @@ Doplňující věta: _Odkaz ani QR kód se nemění. Co si hosté uložili na sv
 - **Jméno u fotek:** víte, komu za kterou fotku poděkovat.
 - **Omyl jde vzít zpět:** svoji fotku si host sám smaže.
 - **Fotky z iPhonu i Androidu:** bez převádění.
-- **Tři jazyky:** česky, anglicky a francouzsky, podle telefonu hosta.
+- **Sedm jazyků:** česky, anglicky, francouzsky, německy, španělsky, slovensky a polsky, podle
+  telefonu hosta.
 - **Stažení všeho:** celou galerii jedním tlačítkem.
 
 ### 7.5 Projekce
@@ -219,10 +225,23 @@ Doplňující věta: _Odkaz ani QR kód se nemění. Co si hosté uložili na sv
   přeposlat. Galerii ode mě můžu zamknout heslem.
 - **Kolik fotek můžou hosté nahrát?** Až 150 fotek na hosta a do 25 MB na fotku. Na běžnou svatbu to
   stačí s velkou rezervou.
-- **Jde nahrát i video?** Hosté zatím ne, galerie od hostů je jen na fotky.
+- **Jde nahrát i video?** Hosté zatím ne, galerie od hostů je jen na fotky. Svůj film i video pro sítě
+  do galerie přidávám já.
+- **Uděláte z fotek video na Instagram?** Ano. Z galerie sestavím krátké video na výšku pro Stories,
+  Reels a TikTok, nebo na šířku pro YouTube a web. Najdete ho v galerii ke stažení. Je bez hudby, takže
+  si k němu písničku přidáte rovnou v Instagramu. _(Cena a balíček: §13, bod 8.)_
 - **Může mi někdo nahrát nevhodnou fotku?** Fotky od hostů jsou vidět hned. Když se objeví něco, co tam
   být nemá, napište mi a smažu to. Host může svoje fotky smazat sám.
 - **Co když host nemá signál?** Nahrávání pokračuje, jakmile se připojí a vrátí na stránku.
+
+### 7.7a Video pro sociální sítě (blok na podstránku nebo k balíčku)
+
+- **Nadpis:** Vaše svatba jako krátké video na Stories i YouTube.
+- **Text:** Z fotek v galerii vám sestavím krátké video. Na výšku (9:16) pro Instagram Stories, Reels
+  a TikTok, nebo na šířku (16:9) pro YouTube a web. Kamera se pomalu přibližuje k tvářím, ve skupině
+  přímo k vám dvěma. Video najdete v galerii vedle fotek, stáhnete si ho a hudbu přidáte rovnou
+  v aplikaci.
+- **Drobně:** 15 nebo 30 sekund, bez zvuku a bez titulků.
 
 ### 7.8 Ceník (řádek u balíčku)
 
@@ -286,6 +305,9 @@ theme. Nic nekopíruj z `g-gallery`.
 
 - **Nezačínat slovem „QR kód“.** Nejdřív říct, co pár získá. QR je až způsob.
 - **Neslibovat video od hostů**, hledání obličejů, schvalování fotek předem ani tisk.
+- **Video pro sítě je služba fotografa.** Nepsat, že si ho pár vytvoří sám nebo že vznikne
+  „automaticky“, a neslibovat hudbu ani titulky. Správně: „sestavím vám“, „bez zvuku, hudbu přidáte
+  v aplikaci“.
 - **Nepsat „soukromá galerie“.** Správně je „neveřejná“, „nedá se najít“, „vidí ji ten, kdo má odkaz“.
 - **Nepsat „v reálném čase“ ani „okamžitě“** u projekce. Správně „zhruba do půl minuty“.
 - **Nezveřejňovat ceny ze §5** kromě „součást celodenního focení“, dokud je Pavel nepotvrdí.
@@ -315,6 +337,8 @@ theme. Nic nekopíruj z `g-gallery`.
 5. **Reference:** které svatby a s jakými čísly (počet fotek a hostů) smíme uvést?
 6. **Tykání/vykání** na podstránce: podle zbytku webu?
 7. **Jazyky:** má hlavní web anglickou verzi, na kterou je potřeba podstránku přeložit?
+8. **Video pro sociální sítě:** je součástí balíčku (kterého), nebo se platí zvlášť? Kolik videí
+   (jedno na výšku, jedno na šířku, obě)? Dokud to není rozhodnuté, psát jen „na přání“.
 
 ## 14. Navazující úpravy v `g-gallery` (mimo hlavní web)
 
@@ -326,6 +350,8 @@ Nejsou úkolem agenta hlavního webu. Jsou tu, aby se na ně nezapomnělo. Uděl
 - [x] Kořenová stránka `photos.…` odkazuje na podstránku hlavního webu (`/galerie-pro-hosty`,
       `guestGalleryPageUrl` v `src/app/page.tsx`) a titulek odpovídá roli nápovědy („Nápověda ke svatební
       galerii“).
+- [x] Nápověda `photos.…` uvádí videa v galerii a video pro sociální sítě v seznamu funkcí a ve FAQ
+      (`messages/*.json`, `marketing.features` a `marketing.faq`, všech 7 jazyků, 2026-10-19).
 - [ ] Patička galerie odkazuje na hlavní web bez UTM. Pokud Pavel chce měřit i ji, doplnit UTM (§9).
 
 ## 15. Viditelnost v AI asistentech (GEO)

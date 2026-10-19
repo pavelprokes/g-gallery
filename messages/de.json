@@ -82,6 +82,10 @@
       {
         "q": "Wie lade ich alle Fotos auf einmal herunter?",
         "a": "Mit dem Button „Alle herunterladen“ erhalten Sie die ganze Galerie als eine ZIP-Datei. Sie wird automatisch erstellt, in der Regel innerhalb einer Stunde nach dem Hochladen des letzten Fotos – bei größeren Galerien dauert es länger. Bis dahin können Sie Fotos einzeln herunterladen."
+      },
+      {
+        "q": "Lässt sich aus den Fotos ein Video für Instagram oder TikTok machen?",
+        "a": "Ja. Der Fotograf stellt aus der Galerie ein kurzes Video (15 oder 30 Sekunden) zusammen: im Hochformat 9:16 für Stories, Reels und TikTok oder im Querformat 16:9 für YouTube und Websites. Die Kamera nähert sich dabei langsam den Gesichtern. Der Fotograf kann das Video in die Galerie stellen, wo Sie es herunterladen können. Es ist ohne Ton und ohne Untertitel – Musik fügen Sie direkt in Instagram oder TikTok hinzu."
       }
     ],
     "guestTipsHeading": "Tipps und Tricks zum Fotografieren als Gast",
@@ -100,6 +104,8 @@
       "Ein Link, nichts zu installieren – öffnet sich in jedem gängigen Browser, auf Handy oder Computer.",
       "Ein schnelles Fotoraster und Vollbildansicht, flüssig auch auf einem älteren Handy.",
       "Die ganze Galerie mit einem Klick herunterladen (ZIP).",
+      "Videos direkt in der Galerie – den Film des Fotografen spielen Sie auf dem Handy oder Computer ab und laden ihn zusammen mit den Fotos herunter.",
+      "Ein kurzes Video für Social Media – der Fotograf kann aus den Fotos der Galerie ein Hochformat-Video (9:16) für Stories, Reels und TikTok oder ein Querformat-Video (16:9) für YouTube oder eine Website erstellen.",
       "Favoriten und Reaktionen – markieren Sie Ihre Lieblingsfotos.",
       "Passwort und Zeitlimit – der Fotograf bestimmt, wer hineinkommt und wie lange.",
       "Offline-Modus – einmal heruntergeladen, bleiben die Fotos auch ohne Empfang sichtbar.",

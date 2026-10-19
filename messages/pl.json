@@ -82,6 +82,10 @@
       {
         "q": "Jak pobrać wszystkie zdjęcia naraz?",
         "a": "Przycisk „Pobierz wszystko” pobiera całą galerię jako jeden plik ZIP. Przygotowuje się sam, zwykle w ciągu godziny od wgrania ostatniego zdjęcia — dłużej przy większych galeriach. Do tego czasu możesz pobierać zdjęcia pojedynczo."
+      },
+      {
+        "q": "Czy ze zdjęć da się zrobić film na Instagram albo TikToka?",
+        "a": "Tak. Fotograf układa z galerii krótki film (15 lub 30 sekund): pionowy 9:16 do Stories, Reels i TikToka albo poziomy 16:9 na YouTube i strony. Kamera powoli zbliża się do twarzy. Fotograf może dodać film do galerii, skąd go pobierzesz. Jest bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
       }
     ],
     "guestTipsHeading": "Wskazówki dla gości, którzy robią zdjęcia",
@@ -100,6 +104,8 @@
       "Jeden link, nic do instalowania — otwiera się w każdej zwykłej przeglądarce, na telefonie i na komputerze.",
       "Szybka siatka zdjęć i widok na pełnym ekranie, płynny nawet na starszym telefonie.",
       "Pobieranie całej galerii jednym kliknięciem (ZIP).",
+      "Filmy prosto w galerii — film od fotografa odtworzysz na telefonie i komputerze i pobierzesz razem ze zdjęciami.",
+      "Krótki film do mediów społecznościowych — fotograf może ułożyć ze zdjęć z galerii film pionowy (9:16) do Stories, Reels i TikToka albo poziomy (16:9) na YouTube lub stronę.",
       "Ulubione i reakcje — oznacz zdjęcia, które podobają Ci się najbardziej.",
       "Hasło i limity czasu — fotograf decyduje, kto wejdzie i na jak długo.",
       "Tryb offline — po pobraniu zdjęcia można oglądać bez zasięgu.",

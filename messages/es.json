@@ -82,6 +82,10 @@
       {
         "q": "¿Cómo descargo todas las fotos de una vez?",
         "a": "El botón «Descargar todo» te da la galería entera en un único ZIP. Se genera solo, normalmente en la hora siguiente a la última foto subida; si la galería es grande, puede tardar más. Mientras tanto, puedes descargar las fotos una a una."
+      },
+      {
+        "q": "¿Se puede hacer con las fotos un vídeo para Instagram o TikTok?",
+        "a": "Sí. El fotógrafo monta con la galería un vídeo corto (15 o 30 segundos): vertical 9:16 para Stories, Reels y TikTok, u horizontal 16:9 para YouTube y webs. La cámara se acerca despacio a las caras. Puede añadir el vídeo a la galería, desde donde lo descargas. No lleva sonido ni subtítulos: la música la añades directamente en Instagram o TikTok."
       }
     ],
     "guestTipsHeading": "Trucos para hacer fotos como invitado",
@@ -100,6 +104,8 @@
       "Un enlace y nada que instalar: se abre en cualquier navegador, en el móvil o en el ordenador.",
       "Una cuadrícula de fotos rápida y vista a pantalla completa, fluida incluso en un móvil antiguo.",
       "Descarga de toda la galería con un clic (ZIP).",
+      "Vídeos dentro de la galería: reproduce la película del fotógrafo en el móvil o el ordenador y descárgala junto con las fotos.",
+      "Un vídeo corto para redes sociales: el fotógrafo puede montar con las fotos de la galería un vídeo vertical (9:16) para Stories, Reels y TikTok, u horizontal (16:9) para YouTube o una web.",
       "Favoritos y reacciones: marca las fotos que más te gustan.",
       "Contraseña y límites de tiempo: el fotógrafo decide quién entra y durante cuánto tiempo.",
       "Modo sin conexión: una vez descargadas, las fotos se pueden ver sin cobertura.",

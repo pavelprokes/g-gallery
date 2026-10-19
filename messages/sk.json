@@ -82,6 +82,10 @@
       {
         "q": "Ako stiahnem všetky fotky naraz?",
         "a": "Tlačidlom „Stiahnuť všetko“ stiahnete celú galériu ako ZIP. Pripraví sa sám, zvyčajne do hodiny od posledného nahratia fotiek – čím viac fotiek, tým dlhšie. Dovtedy môžete sťahovať fotky jednu po druhej."
+      },
+      {
+        "q": "Dá sa z fotiek urobiť video na Instagram alebo TikTok?",
+        "a": "Áno. Fotograf z galérie zostaví krátke video (15 alebo 30 sekúnd) na výšku 9:16 pre Stories, Reels a TikTok, alebo na šírku 16:9 pre YouTube a web. Kamera sa v ňom pomaly približuje k tváram. Video môže pridať do galérie, odkiaľ si ho stiahnete. Je bez zvuku a bez titulkov – hudbu si pridáte priamo v Instagrame alebo TikToku."
       }
     ],
     "guestTipsHeading": "Tipy a triky pre fotenie ako hosť",
@@ -100,6 +104,8 @@
       "Jeden odkaz, nič sa neinštaluje – otvoríte ho v bežnom prehliadači na mobile aj na počítači.",
       "Rýchla mriežka fotiek a prezeranie na celú obrazovku, plynulé aj na staršom telefóne.",
       "Stiahnutie celej galérie jedným tlačidlom (ZIP).",
+      "Videá priamo v galérii – film od fotografa si pustíte na mobile aj na počítači a stiahnete ho spolu s fotkami.",
+      "Krátke video na sociálne siete – fotograf môže z fotiek galérie zostaviť video na výšku (9:16) pre Stories, Reels a TikTok aj na šírku (16:9) pre YouTube alebo web.",
       "Obľúbené a reakcie – označte si fotky, ktoré sa vám páčia najviac.",
       "Heslo a časové obmedzenie – fotograf určuje, kto a ako dlho sa do galérie dostane.",
       "Režim offline – raz stiahnuté fotky uvidíte aj bez signálu.",
