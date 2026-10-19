@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   matchResumeTargets,
   replaceCandidates,
-  slotAfter,
+  slotter,
   type ExistingPhoto,
   type PendingUpload,
 } from "@/lib/upload-resume";
@@ -39,7 +39,7 @@ interface Item {
   error?: string;
   /** The photo this corrected export replaces, kept so a retry still does. */
   replaceId?: string;
-  /** The name it is stored under when that is not its own (`slotAfter`). */
+  /** The name it is stored under when that is not its own (`slotter`). */
   uploadName?: string;
 }
 
@@ -48,7 +48,7 @@ interface Review {
   files: File[];
   /** Per file, the delivered photos it could replace (`replaceCandidates`). */
   candidates: string[][];
-  /** Per file, where a new shot goes in file-name order (`slotAfter`). */
+  /** Per file, where a new shot goes in file-name order (`slotter`). */
   slots: ({ name: string; after: string } | null)[];
   names: Map<string, string>;
 }
@@ -186,18 +186,33 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       // assumed — the old file is deleted (docs/REPLACE-PHOTOS.md).
       void fetchReplaceCandidates(galleryId).then(({ pending, existing }) => {
         setPreparing(false);
-        const candidates = replaceCandidates(photos, existing, matchResumeTargets(photos, pending));
         // A new shot with a bare camera name is filed among the delivered
         // ones by its camera number, also asked about first.
-        const slots = photos.map((file) => slotAfter(file.name, existing));
-        if (!candidates.some((ids) => ids.length > 0) && !slots.some(Boolean)) {
+        const slot = slotter(existing);
+        const slots = photos.map((file) => slot(file.name));
+        // An interrupted upload resumes under the name it was stored with —
+        // its own, or the filed one — and goes on replacing what it replaced.
+        const byOwnName = matchResumeTargets(photos, pending);
+        const byFiledName = matchResumeTargets(
+          photos.map((file, index) => ({ name: slots[index]?.name ?? "", size: file.size })),
+          pending,
+        );
+        const resumed = byOwnName.map((id, index) => id ?? byFiledName[index]);
+        const replacing = new Map(pending.map((row) => [row.id, row.replacesPhotoId]));
+        const names = new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName]));
+        const candidates = replaceCandidates(photos, existing, resumed).map((ids, index) => {
+          const was = resumed[index] && replacing.get(resumed[index]);
+          return was && names.has(was) ? [was] : ids;
+        });
+        const filed = slots.map((slot, index) => (byOwnName[index] ? null : slot));
+        if (!candidates.some((ids) => ids.length > 0) && !filed.some(Boolean)) {
           return void start(photos);
         }
         setReview({
           files: photos,
           candidates,
-          slots,
-          names: new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName])),
+          slots: filed,
+          names,
         });
       });
     },
@@ -610,18 +625,13 @@ function ReplaceReview({
         {review.files.map((file, index) => {
           const ids = review.candidates[index]!;
           const slot = review.slots[index];
-          if (ids.length === 1) {
-            return (
-              <li key={index} className="truncate">
-                {file.name} → nahradí{" "}
-                <span className="font-medium">{review.names.get(ids[0]!)}</span>
-              </li>
-            );
-          }
-          if (ids.length > 1) {
+          // Every pair is a choice: one candidate comes pre-selected, but
+          // two bodies' `DSC_0412` are different moments, so each can be
+          // turned down on its own.
+          if (ids.length > 0) {
             return (
               <li key={index} className="flex flex-wrap items-center gap-1">
-                {file.name} → v galerii {ids.length}× —
+                {file.name} →{ids.length > 1 && ` v galerii ${ids.length}× —`}
                 <select
                   aria-label={`Co nahradí ${file.name}`}
                   value={choices[index]}
@@ -632,9 +642,11 @@ function ReplaceReview({
                   }
                   className="rounded border px-1 py-0.5 text-xs dark:bg-neutral-800"
                 >
-                  <option value="" disabled>
-                    vyber, kterou nahradit…
-                  </option>
+                  {ids.length > 1 && (
+                    <option value="" disabled>
+                      vyber, kterou nahradit…
+                    </option>
+                  )}
                   {ids.map((id) => (
                     <option key={id} value={id}>
                       nahradit {review.names.get(id)}
@@ -658,10 +670,12 @@ function ReplaceReview({
             ? "Nahradit a zařadit"
             : replacing > 0
               ? `Nahradit ${pluralize(replacing, FORMS.photoAccusative)}`
-              : "Zařadit a nahrát"}
+              : filing > 0
+                ? "Zařadit a nahrát"
+                : "Nahrát"}
         </Button>
         <Button size="sm" variant="secondary" onClick={onAsNew}>
-          Nahrát všechny jako nové
+          Nahrát beze změn
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Zrušit

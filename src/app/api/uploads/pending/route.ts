@@ -73,7 +73,8 @@ export async function GET(request: Request) {
     // it would only invite them to overwrite it with a different photo.
     where: { galleryId: gallery.id, status: "PENDING", source: "OWNER" },
     orderBy: { createdAt: "asc" },
-    select: { id: true, fileName: true, sizeBytes: true },
+    // A resumed replacement must go on replacing (docs/REPLACE-PHOTOS.md).
+    select: { id: true, fileName: true, sizeBytes: true, replacesPhotoId: true },
   });
 
   if (!parsed.data.existing) return NextResponse.json({ pending });
