@@ -80,52 +80,73 @@ export async function deletePerson(personId: string): Promise<void> {
   if (count === 0) throw new Error("NOT_FOUND");
 }
 
+/** Faces one call names — a series is a handful of shots, a burst a few dozen. */
+const MAX_BATCH = 100;
+
+const tagInput = z.object({
+  personId: idSchema,
+  entries: z
+    .array(z.object({ photoId: idSchema, box: boxSchema }))
+    .min(1)
+    .max(MAX_BATCH),
+});
+
 /**
- * Names the face at `box` on a photo after someone. A face holds one name, and
- * someone is on a photo once: the face's previous name and the person's
- * previous face on this photo are both let go.
+ * Names the face at `box` on each photo after someone. A face holds one name,
+ * and someone is on a photo once: the face's previous name and the person's
+ * previous face on that photo are both let go. Photos of another gallery are
+ * skipped; returns how many were named.
  */
+export async function tagFaces(
+  personId: string,
+  entries: { photoId: string; box: { x: number; y: number; w: number; h: number } }[],
+): Promise<number> {
+  const session = await requireAdmin();
+
+  const input = tagInput.safeParse({ personId, entries });
+  if (!input.success) throw new Error("INVALID_INPUT");
+
+  const person = await prisma.galleryPerson.findFirst({
+    where: { id: input.data.personId, gallery: { ownerId: session.user.id } },
+    select: { id: true, galleryId: true },
+  });
+  if (!person) throw new Error("NOT_FOUND");
+  // Someone from another gallery cannot be named on this one's faces.
+  const photos = await prisma.photo.findMany({
+    where: {
+      id: { in: input.data.entries.map((e) => e.photoId) },
+      galleryId: person.galleryId,
+    },
+    select: { id: true, faceTags: { select: { id: true, x: true, y: true, w: true, h: true } } },
+  });
+  const byId = new Map(photos.map((p) => [p.id, p]));
+
+  const writes = input.data.entries.flatMap(({ photoId, box }) => {
+    const photo = byId.get(photoId);
+    if (!photo) return [];
+    const sameFace = photo.faceTags.filter((t) => iou(t, box) >= TAG_MATCH_IOU).map((t) => t.id);
+    const { x, y, w, h } = box;
+    return [
+      prisma.faceTag.deleteMany({ where: { id: { in: sameFace } } }),
+      prisma.faceTag.upsert({
+        where: { photoId_personId: { photoId, personId: person.id } },
+        create: { photoId, personId: person.id, x, y, w, h },
+        update: { x, y, w, h },
+      }),
+    ];
+  });
+  await prisma.$transaction(writes);
+  return writes.length / 2;
+}
+
+/** Names one face — `tagFaces` for a single photo. */
 export async function tagFace(
   photoId: string,
   personId: string,
   box: { x: number; y: number; w: number; h: number },
 ): Promise<void> {
-  const session = await requireAdmin();
-
-  const input = z
-    .object({ photoId: idSchema, personId: idSchema, box: boxSchema })
-    .safeParse({ photoId, personId, box });
-  if (!input.success) throw new Error("INVALID_INPUT");
-
-  const [photo, person] = await Promise.all([
-    prisma.photo.findFirst({
-      where: { id: input.data.photoId, gallery: { ownerId: session.user.id } },
-      select: {
-        id: true,
-        galleryId: true,
-        faceTags: { select: { id: true, x: true, y: true, w: true, h: true } },
-      },
-    }),
-    prisma.galleryPerson.findFirst({
-      where: { id: input.data.personId, gallery: { ownerId: session.user.id } },
-      select: { id: true, galleryId: true },
-    }),
-  ]);
-  // Someone from another gallery cannot be named on this one's faces.
-  if (!photo || !person || photo.galleryId !== person.galleryId) throw new Error("NOT_FOUND");
-
-  const sameFace = photo.faceTags
-    .filter((t) => iou(t, input.data.box) >= TAG_MATCH_IOU)
-    .map((t) => t.id);
-  const { x, y, w, h } = input.data.box;
-  await prisma.$transaction([
-    prisma.faceTag.deleteMany({ where: { id: { in: sameFace } } }),
-    prisma.faceTag.upsert({
-      where: { photoId_personId: { photoId: photo.id, personId: person.id } },
-      create: { photoId: photo.id, personId: person.id, x, y, w, h },
-      update: { x, y, w, h },
-    }),
-  ]);
+  const named = await tagFaces(personId, [{ photoId, box }]);
+  if (named === 0) throw new Error("NOT_FOUND");
 }
 
 /** Takes someone's name off a photo. */

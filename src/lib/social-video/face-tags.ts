@@ -94,3 +94,66 @@ export function faceTiles(
     }));
   });
 }
+
+/** Shots of one series follow each other this closely — a burst, a pose
+ * repeated, the vows. */
+export const SERIES_GAP_MS = 30_000;
+
+export interface SeriesPhoto {
+  id: string;
+  /** Capture time, epoch ms; null where it is not known — no series then. */
+  takenAt: number | null;
+  width: number;
+  height: number;
+  faces: readonly Face[] | null;
+  tags: readonly TaggedBox[];
+}
+
+/**
+ * The same face, by place, on the neighbouring shots of a series: from the
+ * photo just named, step through the photos either side (in the gallery's
+ * order) while each one was taken within `SERIES_GAP_MS` of the last, has the
+ * same shape, and has an unnamed framed face where the previous one was. Only
+ * where the box stood — a person who moved is not followed, and nothing looks
+ * at the face itself. Photos where the person is already named are skipped.
+ */
+export function seriesMatches(
+  photos: readonly SeriesPhoto[],
+  photoId: string,
+  box: Box,
+  personId: string,
+): { photoId: string; face: Face }[] {
+  const start = photos.findIndex((p) => p.id === photoId);
+  if (start < 0) return [];
+  const out: { photoId: string; face: Face }[] = [];
+  for (const step of [-1, 1]) {
+    let prev = photos[start]!;
+    let at: Box = box;
+    for (let i = start + step; i >= 0 && i < photos.length; i += step) {
+      const photo = photos[i]!;
+      const sameShape = photo.width > photo.height === prev.width > prev.height;
+      const close =
+        photo.takenAt !== null &&
+        prev.takenAt !== null &&
+        Math.abs(photo.takenAt - prev.takenAt) <= SERIES_GAP_MS;
+      if (!photo.faces || !sameShape || !close) break;
+      if (photo.tags.some((t) => t.personId === personId)) break;
+      const framed = framedFaces(photo.faces);
+      const named = matchTags(framed, photo.tags);
+      let best: Face | null = null;
+      let bestOverlap = TAG_MATCH_IOU;
+      for (const [j, face] of framed.entries()) {
+        const overlap = iou(face, at);
+        if (named[j] === null && overlap >= bestOverlap) {
+          best = face;
+          bestOverlap = overlap;
+        }
+      }
+      if (!best) break;
+      out.push({ photoId: photo.id, face: best });
+      prev = photo;
+      at = best;
+    }
+  }
+  return out;
+}

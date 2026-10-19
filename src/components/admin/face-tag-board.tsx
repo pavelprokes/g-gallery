@@ -5,15 +5,18 @@ import { pluralize } from "@/lib/czech-plural";
 import {
   faceTiles,
   MAX_PERSON_NAME,
+  seriesMatches,
   TAG_MATCH_IOU,
+  type Box,
   type FaceTile,
   type TaggedBox,
 } from "@/lib/social-video/face-tags";
-import { iou, type PhotoFaces } from "@/lib/social-video/faces";
+import { iou, type Face, type PhotoFaces } from "@/lib/social-video/faces";
 import {
   createPerson,
   deletePerson,
   tagFace,
+  tagFaces,
   untagFace,
   updatePerson,
   type PersonResult,
@@ -40,8 +43,16 @@ export interface TagPhoto {
   fileName: string;
   width: number;
   height: number;
+  /** Capture time, epoch ms — what tells a series (`seriesMatches`). */
+  takenAt: number | null;
   faces: PhotoFaces | null;
   tags: TaggedBox[];
+}
+
+/** The same face on the next shots of a series, offered after a click. */
+interface Offer {
+  personId: string;
+  matches: { photoId: string; face: Face }[];
 }
 
 type Person = PersonResult;
@@ -50,10 +61,25 @@ type Person = PersonResult;
 const PAGE = 480;
 const TILE = 88;
 const FACE_FORMS = { one: "tvář", few: "tváře", many: "tváří" };
+/** After "na": the locative. */
+const NEIGHBOUR_FORMS = {
+  one: "sousední fotce",
+  few: "sousedních fotkách",
+  many: "sousedních fotkách",
+};
 /** The couple, one click each — the names can be changed afterwards. */
 const COUPLE_PRESETS = ["Nevěsta", "Ženich"];
 
-const tileKey = (tile: FaceTile) => `${tile.photoId}:${tile.face.x}:${tile.face.y}`;
+const faceKey = (photoId: string, face: Box) => `${photoId}:${face.x}:${face.y}`;
+const tileKey = (tile: FaceTile) => faceKey(tile.photoId, tile.face);
+
+/** `tags` with `personId` on `box`: the face loses its old name, the person
+ * their old face on this photo — as the server does it. */
+const withTag = (tags: TaggedBox[], personId: string, box: Box): TaggedBox[] => [
+  ...tags.filter((t) => t.personId !== personId && iou(t, box) < TAG_MATCH_IOU),
+  { personId, ...box },
+];
+const boxOf = ({ x, y, w, h }: Box): Box => ({ x, y, w, h });
 
 export function FaceTagBoard({
   galleryId,
@@ -75,6 +101,7 @@ export function FaceTagBoard({
   const [stay, setStay] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [offer, setOffer] = useState<Offer | null>(null);
 
   const finder = useFaceFinder();
   const withFaces = photos.filter((p) => p.faces).length;
@@ -116,33 +143,71 @@ export function FaceTagBoard({
   const setTags = (photoId: string, tags: TaggedBox[]) =>
     setPhotos((prev) => prev.map((p) => (p.id === photoId ? { ...p, tags } : p)));
 
+  const offered = new Set(offer?.matches.map((m) => faceKey(m.photoId, m.face)));
+
   const toggle = async (tile: FaceTile) => {
     setError(null);
+    setOffer(null);
     if (!active) {
       setError("Nejdřív nahoře vyber, koho označuješ.");
       return;
     }
     const before = byId.get(tile.photoId)?.tags ?? [];
-    const { x, y, w, h } = tile.face;
-    const box = { x, y, w, h };
+    const box = boxOf(tile.face);
     const naming = tile.personId !== active;
-    // As the server does it: the face loses its old name, the person their
-    // old face on this photo.
-    setTags(
-      tile.photoId,
-      naming
-        ? [
-            ...before.filter((t) => t.personId !== active && iou(t, box) < TAG_MATCH_IOU),
-            { personId: active, ...box },
-          ]
-        : before.filter((t) => t.personId !== active),
-    );
+    const after = naming
+      ? withTag(before, active, box)
+      : before.filter((t) => t.personId !== active);
+    setTags(tile.photoId, after);
     if (filter === "untagged") setStay((prev) => new Set(prev).add(tileKey(tile)));
     try {
       if (naming) await tagFace(tile.photoId, active, box);
       else await untagFace(tile.photoId, active);
     } catch {
       setTags(tile.photoId, before);
+      setError("Nepodařilo se to uložit. Zkus to znovu.");
+      return;
+    }
+    if (!naming) return;
+    // The same place on the shots either side of a burst: offered, never
+    // named without a click.
+    const matches = seriesMatches(
+      photos.map((p) => ({
+        ...p,
+        faces: p.faces?.faces ?? null,
+        tags: p.id === tile.photoId ? after : p.tags,
+      })),
+      tile.photoId,
+      box,
+      active,
+    );
+    if (matches.length > 0) setOffer({ personId: active, matches });
+  };
+
+  const acceptOffer = async () => {
+    if (!offer) return;
+    const { personId, matches } = offer;
+    setOffer(null);
+    setError(null);
+    const before = new Map(matches.map((m) => [m.photoId, byId.get(m.photoId)?.tags ?? []]));
+    setPhotos((prev) =>
+      prev.map((p) => {
+        const match = matches.find((m) => m.photoId === p.id);
+        return match ? { ...p, tags: withTag(p.tags, personId, boxOf(match.face)) } : p;
+      }),
+    );
+    if (filter === "untagged") {
+      setStay((prev) => new Set([...prev, ...matches.map((m) => faceKey(m.photoId, m.face))]));
+    }
+    try {
+      await tagFaces(
+        personId,
+        matches.map((m) => ({ photoId: m.photoId, box: boxOf(m.face) })),
+      );
+    } catch {
+      setPhotos((prev) =>
+        prev.map((p) => (before.has(p.id) ? { ...p, tags: before.get(p.id)! } : p)),
+      );
       setError("Nepodařilo se to uložit. Zkus to znovu.");
     }
   };
@@ -348,7 +413,7 @@ export function FaceTagBoard({
                         mine
                           ? "ring-brand-primary ring-3"
                           : "hover:ring-admin-border ring-transparent hover:ring-2"
-                      }`}
+                      } ${offered.has(tileKey(tile)) ? "outline-brand-primary outline-2 outline-dashed" : ""}`}
                     >
                       <FaceZoom photo={photo} face={tile.face} size={TILE - 4} alt="" />
                     </button>
@@ -371,6 +436,27 @@ export function FaceTagBoard({
           </>
         )}
       </section>
+
+      {offer && (
+        <div
+          role="status"
+          className="border-admin-border fixed inset-x-4 bottom-4 z-20 mx-auto flex max-w-xl flex-wrap items-center gap-3 rounded-xl border bg-white p-3 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+        >
+          <p className="min-w-0 flex-1 basis-56 text-sm">
+            Na stejném místě je tvář i na {pluralize(offer.matches.length, NEIGHBOUR_FORMS)} ze
+            série. Označit i tam jako{" "}
+            <strong>{people.find((p) => p.id === offer.personId)?.name}</strong>?
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => void acceptOffer()}>
+              Označit i tam
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setOffer(null)}>
+              Ne
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

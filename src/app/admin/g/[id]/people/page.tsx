@@ -64,6 +64,7 @@ export default async function FaceTagPage(props: PageProps<"/admin/g/[id]/people
       fileName: photo.fileName,
       width: photo.width!,
       height: photo.height!,
+      takenAt: photo.takenAt?.getTime() ?? null,
       // Any build's boxes will do for a name: a tag is matched to the faces
       // by overlap, so it survives the next detection.
       faces: storedFaces(photo.faces),
