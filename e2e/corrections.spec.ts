@@ -128,3 +128,22 @@ test("the photographer reads and resolves them in the admin", async ({
       .getByRole("button", { name: /Vyřízeno ✓/ }),
   ).toBeVisible();
 });
+
+test("parallel wrong PINs cannot get past the lock, and then the right one waits too", async ({
+  request,
+}) => {
+  // Last in the file: it leaves this project's link locked for five minutes.
+  const gallery = galleryFor(test.info().project.name);
+  const url = `/api/g/${gallery.token}/corrections`;
+  const tries = await Promise.all(
+    Array.from({ length: 15 }, (_, i) =>
+      request.post(url, { data: { action: "enter", pin: String(100000 + i) } }),
+    ),
+  );
+  const statuses = tries.map((response) => response.status());
+  // Ten checked at most — every one after the tenth is refused unchecked.
+  expect(statuses.filter((status) => status === 401).length).toBeLessThanOrEqual(9);
+  expect(statuses.filter((status) => status === 429).length).toBeGreaterThanOrEqual(6);
+  const right = await request.post(url, { data: { action: "enter", pin: gallery.pin } });
+  expect(right.status()).toBe(429);
+});

@@ -248,11 +248,15 @@ async function enter(linkId: string, pin: string) {
     if (lockedUntil && lockedUntil > now) return { kind: "locked", until: lockedUntil } as const;
     const expired = link.correctionLockedUntil !== null;
     const attempts = (expired ? 0 : link.correctionFailedAttempts) + 1;
+    // The attempt that reaches the limit locks at once, before its own check
+    // runs: no request after it gets a scrypt verification until the lock has
+    // run out. A right PIN on that very attempt clears it again below.
+    const lock = attempts >= PIN_ATTEMPTS ? new Date(now.getTime() + PIN_LOCKOUT_MS) : null;
     await tx.shareLink.update({
       where: { id: linkId },
-      data: { correctionFailedAttempts: attempts, correctionLockedUntil: null },
+      data: { correctionFailedAttempts: attempts, correctionLockedUntil: lock },
     });
-    return { kind: "reserved", attempts, pinHash: link.correctionPinHash } as const;
+    return { kind: "reserved", lock, pinHash: link.correctionPinHash } as const;
   });
   if (reserved.kind === "locked") {
     return NextResponse.json(
@@ -264,15 +268,9 @@ async function enter(linkId: string, pin: string) {
   const right =
     reserved.pinHash !== null && isPinShaped(pin) && (await verifyPassword(pin, reserved.pinHash));
   if (!right) {
-    if (reserved.attempts < PIN_ATTEMPTS) {
-      return NextResponse.json({ error: "wrong_pin" }, { status: 401 });
-    }
-    const until = new Date(Date.now() + PIN_LOCKOUT_MS);
-    await prisma.shareLink.update({
-      where: { id: linkId },
-      data: { correctionLockedUntil: until },
-    });
-    return NextResponse.json({ error: "locked", until: until.toISOString() }, { status: 429 });
+    return reserved.lock
+      ? NextResponse.json({ error: "locked", until: reserved.lock.toISOString() }, { status: 429 })
+      : NextResponse.json({ error: "wrong_pin" }, { status: 401 });
   }
   await prisma.shareLink.update({
     where: { id: linkId },
