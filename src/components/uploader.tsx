@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  matchReplaceTargets,
   matchResumeTargets,
+  replaceCandidates,
+  slotAfter,
   type ExistingPhoto,
   type PendingUpload,
 } from "@/lib/upload-resume";
@@ -38,14 +39,18 @@ interface Item {
   error?: string;
   /** The photo this corrected export replaces, kept so a retry still does. */
   replaceId?: string;
+  /** The name it is stored under when that is not its own (`slotAfter`). */
+  uploadName?: string;
 }
 
-/** A selection waiting on "replace these?" (docs/REPLACE-PHOTOS.md). */
+/** A selection waiting on "replace / file these?" (docs/REPLACE-PHOTOS.md). */
 interface Review {
   files: File[];
-  replaceIds: (string | undefined)[];
-  /** Per file, the delivered name it would replace. */
-  replaces: (string | undefined)[];
+  /** Per file, the delivered photos it could replace (`replaceCandidates`). */
+  candidates: string[][];
+  /** Per file, where a new shot goes in file-name order (`slotAfter`). */
+  slots: ({ name: string; after: string } | null)[];
+  names: Map<string, string>;
 }
 
 interface Stats {
@@ -106,12 +111,17 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   }, []);
 
   const start = useCallback(
-    async (files: File[], replaceIds: (string | undefined)[] = []) => {
+    async (
+      files: File[],
+      replaceIds: (string | undefined)[] = [],
+      uploadNames: (string | undefined)[] = [],
+    ) => {
       setReview(null);
       const initial = files.map((file, index) => ({
         file,
         state: "pending" as const,
         replaceId: replaceIds[index],
+        uploadName: uploadNames[index],
       }));
       statesRef.current = initial;
       bytesRef.current = files.map(() => 0);
@@ -128,13 +138,17 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       const pending = await fetchPendingUploads(credentials);
       // Computed once for the whole selection: each pending row may be claimed
       // by only one file, which a per-batch match could not guarantee.
-      const resumeIds = matchResumeTargets(files, pending);
+      const resumeIds = matchResumeTargets(
+        files.map((file, index) => ({ name: uploadNames[index] ?? file.name, size: file.size })),
+        pending,
+      );
 
       await runUploads({
         files,
         credentials,
         resumeIds,
         replaceIds,
+        names: uploadNames,
         signal: controller.signal,
         onItem: update,
         onBytes: (index, sent) => {
@@ -172,17 +186,18 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       // assumed — the old file is deleted (docs/REPLACE-PHOTOS.md).
       void fetchReplaceCandidates(galleryId).then(({ pending, existing }) => {
         setPreparing(false);
-        const replaceIds = matchReplaceTargets(
-          photos,
-          existing,
-          matchResumeTargets(photos, pending),
-        );
-        if (!replaceIds.some(Boolean)) return void start(photos);
-        const names = new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName]));
+        const candidates = replaceCandidates(photos, existing, matchResumeTargets(photos, pending));
+        // A new shot with a bare camera name is filed among the delivered
+        // ones by its camera number, also asked about first.
+        const slots = photos.map((file) => slotAfter(file.name, existing));
+        if (!candidates.some((ids) => ids.length > 0) && !slots.some(Boolean)) {
+          return void start(photos);
+        }
         setReview({
           files: photos,
-          replaceIds,
-          replaces: replaceIds.map((id) => (id ? names.get(id) : undefined)),
+          candidates,
+          slots,
+          names: new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName])),
         });
       });
     },
@@ -345,7 +360,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       {review && !running && (
         <ReplaceReview
           review={review}
-          onReplace={() => void start(review.files, review.replaceIds)}
+          onConfirm={(replaceIds, uploadNames) => void start(review.files, replaceIds, uploadNames)}
           onAsNew={() => void start(review.files)}
           onCancel={() => setReview(null)}
         />
@@ -514,6 +529,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
                   void start(
                     retriable.map((item) => item.file),
                     retriable.map((item) => item.replaceId),
+                    retriable.map((item) => item.uploadName),
                   )
                 }
               >
@@ -546,51 +562,103 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   );
 }
 
+/** "nová" in the per-file choice: upload as an extra photo, replace nothing. */
+const AS_NEW = "new";
+
 function ReplaceReview({
   review,
-  onReplace,
+  onConfirm,
   onAsNew,
   onCancel,
 }: {
   review: Review;
-  onReplace: () => void;
+  onConfirm: (replaceIds: (string | undefined)[], uploadNames: (string | undefined)[]) => void;
   onAsNew: () => void;
   onCancel: () => void;
 }) {
-  const matched = review.replaceIds.filter(Boolean).length;
-  const rest = review.files.length - matched;
+  // One candidate is chosen already; several (virtual copies) wait for a pick.
+  const [choices, setChoices] = useState(() =>
+    review.candidates.map((ids) => (ids.length === 1 ? ids[0]! : "")),
+  );
+  const replaceIds = choices.map((choice) => (choice && choice !== AS_NEW ? choice : undefined));
+  const uploadNames = review.slots.map((slot, index) =>
+    replaceIds[index] ? undefined : slot?.name,
+  );
+  const replacing = replaceIds.filter(Boolean).length;
+  const filing = uploadNames.filter(Boolean).length;
+  const undecided = review.candidates.some((ids, index) => ids.length > 1 && !choices[index]);
+  const rest = review.files.length - replacing - filing;
+
   return (
     <Alert className="mt-3">
-      <p className="font-medium">
-        Opravené fotky? {matched}{" "}
-        {czechPlural(matched, { one: "soubor má", few: "soubory mají", many: "souborů má" })} stejné
-        číslo z fotoaparátu jako fotka v galerii.
-      </p>
+      <p className="font-medium">Opravené a nové fotky</p>
       <p className="mt-1 text-xs">
         Nahrazená fotka si nechá své místo, čas, srdíčka, značky k tisku i jména u obličejů — vymění
-        se jen soubor a ten starý se smaže.
+        se jen soubor a ten starý se smaže. Nová fotka se zařadí za fotku s nejbližším nižším číslem
+        z fotoaparátu.
         {rest > 0 &&
           ` ${rest} ${czechPlural(rest, {
-            one: "fotka bez shody se nahraje jako nová",
-            few: "fotky bez shody se nahrají jako nové",
-            many: "fotek bez shody se nahraje jako nové",
+            one: "další se nahraje beze změny",
+            few: "další se nahrají beze změny",
+            many: "dalších se nahraje beze změny",
           })}.`}
       </p>
       <ul
         aria-label="Co se nahradí"
-        className="text-admin-muted mt-2 max-h-40 overflow-y-auto text-xs dark:text-neutral-400"
+        className="text-admin-muted mt-2 max-h-60 space-y-0.5 overflow-y-auto text-xs dark:text-neutral-400"
       >
-        {review.files.map((file, index) =>
-          review.replaces[index] ? (
+        {review.files.map((file, index) => {
+          const ids = review.candidates[index]!;
+          const slot = review.slots[index];
+          if (ids.length === 1) {
+            return (
+              <li key={index} className="truncate">
+                {file.name} → nahradí{" "}
+                <span className="font-medium">{review.names.get(ids[0]!)}</span>
+              </li>
+            );
+          }
+          if (ids.length > 1) {
+            return (
+              <li key={index} className="flex flex-wrap items-center gap-1">
+                {file.name} → v galerii {ids.length}× —
+                <select
+                  aria-label={`Co nahradí ${file.name}`}
+                  value={choices[index]}
+                  onChange={(event) =>
+                    setChoices((prev) =>
+                      prev.map((choice, i) => (i === index ? event.target.value : choice)),
+                    )
+                  }
+                  className="rounded border px-1 py-0.5 text-xs dark:bg-neutral-800"
+                >
+                  <option value="" disabled>
+                    vyber, kterou nahradit…
+                  </option>
+                  {ids.map((id) => (
+                    <option key={id} value={id}>
+                      nahradit {review.names.get(id)}
+                    </option>
+                  ))}
+                  <option value={AS_NEW}>nenahrazovat, přidat jako novou</option>
+                </select>
+              </li>
+            );
+          }
+          return slot ? (
             <li key={index} className="truncate">
-              {file.name} → nahradí <span className="font-medium">{review.replaces[index]}</span>
+              {file.name} → nová, zařadí se za <span className="font-medium">{slot.after}</span>
             </li>
-          ) : null,
-        )}
+          ) : null;
+        })}
       </ul>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" onClick={onReplace}>
-          Nahradit {pluralize(matched, FORMS.photoAccusative)}
+        <Button size="sm" disabled={undecided} onClick={() => onConfirm(replaceIds, uploadNames)}>
+          {replacing > 0 && filing > 0
+            ? "Nahradit a zařadit"
+            : replacing > 0
+              ? `Nahradit ${pluralize(replacing, FORMS.photoAccusative)}`
+              : "Zařadit a nahrát"}
         </Button>
         <Button size="sm" variant="secondary" onClick={onAsNew}>
           Nahrát všechny jako nové

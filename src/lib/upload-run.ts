@@ -180,6 +180,7 @@ async function presign(
   resumeIds: (string | undefined)[],
   signal?: AbortSignal,
   replaceIds: (string | undefined)[] = [],
+  names: (string | undefined)[] = [],
 ): Promise<PresignedUpload[]> {
   const response = await fetch("/api/uploads/presign", {
     method: "POST",
@@ -191,7 +192,7 @@ async function presign(
         ? { displayName: credentials.displayName }
         : {}),
       files: files.map((f, i) => ({
-        fileName: f.name,
+        fileName: names[i] ?? f.name,
         contentType: f.type || "image/jpeg",
         sizeBytes: f.size,
         resumePhotoId: resumeIds[i],
@@ -427,6 +428,8 @@ export interface UploadRunOptions {
   resumeIds: (string | undefined)[];
   /** Per-file id of a photo this corrected export replaces (docs/REPLACE-PHOTOS.md). */
   replaceIds?: (string | undefined)[];
+  /** Per-file name to store instead of the picked one (`slotAfter`, docs/REPLACE-PHOTOS.md). */
+  names?: (string | undefined)[];
   onItem: (index: number, patch: { state: UploadItemState; error?: string }) => void;
   /** A refusal that ends the run — quota, revoked link, lost session. */
   onFatal: (rejection: UploadRejection) => void;
@@ -452,6 +455,7 @@ export async function runUploads({
   credentials,
   resumeIds,
   replaceIds = [],
+  names = [],
   onItem,
   onFatal,
   onSkipped,
@@ -535,6 +539,7 @@ export async function runUploads({
       indices.map((index) => resumeIds[index]),
       signal,
       indices.map((index) => replaceIds[index]),
+      indices.map((index) => names[index]),
     )
       .then((targets) =>
         indices.forEach((index, position) => {
@@ -585,7 +590,14 @@ export async function runUploads({
         } catch (error) {
           if (!(error instanceof SignatureExpired)) throw error;
           // Re-sign the same row (resumePhotoId) — no duplicate photo is created.
-          const [fresh] = await presign(credentials, [files[index]!], [target.photoId], signal);
+          const [fresh] = await presign(
+            credentials,
+            [files[index]!],
+            [target.photoId],
+            signal,
+            [replaceIds[index]],
+            [names[index]],
+          );
           if (!fresh) throw error;
           target = fresh;
           await uploadOne(files[index]!, target, credentials, signal, progress);
