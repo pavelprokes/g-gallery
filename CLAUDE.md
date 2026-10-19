@@ -28,7 +28,7 @@ the key a download delivers, or the lightbox player. On a video row `objectKey` 
 the admin's `/admin/g/[id]/video`, or the
 self-hosted face detection (YuNet in `public/vendor/yunet/`, MediaPipe's blink model under
 `public/vendor/mediapipe/`).
-**`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr, adopted 2026-09-23) —
+**`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
 

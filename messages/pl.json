@@ -84,6 +84,10 @@
         "a": "Przycisk „Pobierz wszystko” pobiera całą galerię jako jeden plik ZIP. Przygotowuje się sam, zwykle w ciągu godziny od wgrania ostatniego zdjęcia — dłużej przy większych galeriach. Do tego czasu możesz pobierać zdjęcia pojedynczo."
       },
       {
+        "q": "W jakim języku jest galeria?",
+        "a": "W siedmiu: czeskim, angielskim, francuskim, niemieckim, hiszpańskim, słowackim i polskim. Galeria dopasowuje się do języka telefonu, a w stopce zmienisz go w każdej chwili. Tytuły i opisy galerii pisze fotograf, więc mogą zostać po czesku."
+      },
+      {
         "q": "Czy ze zdjęć da się zrobić film na Instagram albo TikToka?",
         "a": "Tak. Fotograf układa z galerii krótki film (15 lub 30 sekund): pionowy 9:16 do Stories, Reels i TikToka albo poziomy 16:9 na YouTube i strony. Kamera powoli zbliża się do twarzy. Fotograf może dodać film do galerii, skąd go pobierzesz. Jest bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
       }
@@ -103,15 +107,19 @@
     "features": [
       "Jeden link, nic do instalowania — otwiera się w każdej zwykłej przeglądarce, na telefonie i na komputerze.",
       "Szybka siatka zdjęć i widok na pełnym ekranie, płynny nawet na starszym telefonie.",
+      "Siedem języków — czeski, angielski, francuski, niemiecki, hiszpański, słowacki i polski. Galeria dopasowuje się do języka telefonu, a zmienisz go w stopce.",
       "Pobieranie całej galerii jednym kliknięciem (ZIP).",
       "Filmy prosto w galerii — film od fotografa odtworzysz na telefonie i komputerze i pobierzesz razem ze zdjęciami.",
       "Krótki film do mediów społecznościowych — fotograf może ułożyć ze zdjęć z galerii film pionowy (9:16) do Stories, Reels i TikToka albo poziomy (16:9) na YouTube lub stronę.",
       "Ulubione i reakcje — oznacz zdjęcia, które podobają Ci się najbardziej.",
+      "Wybór do druku — zaznacz zdjęcia do wydruku razem z liczbą odbitek.",
+      "Najlepsze zdjęcia dnia i rozdziały — gdy fotograf je włączy, na górze czeka wybór najlepszych ujęć, a jednym dotknięciem przeskoczysz np. do ceremonii albo przyjęcia.",
       "Hasło i limity czasu — fotograf decyduje, kto wejdzie i na jak długo.",
       "Tryb offline — po pobraniu zdjęcia można oglądać bez zasięgu.",
+      "Kontynuuj na innym urządzeniu — przenieś ulubione, reakcje i wybór do druku z telefonu na komputer jednorazowym kodem.",
       "Powiadomienia, gdy fotograf doda nowe zdjęcia.",
       "Zdjęcia od gości — goście dodają własne ujęcia ze ślubu prosto do galerii, bez aplikacji i bez konta.",
-      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty.",
+      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty, a zdjęcia od fotografa powoli przybliżają się do twarzy.",
       "Kilka galerii pod jednym rosnącym linkiem — wybór najlepszych ujęć, pełny zestaw i galeria gości, bez wysyłania nowego linku."
     ],
     "footerText": "Tę galerię prowadzi Twój fotograf.",

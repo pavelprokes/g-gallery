@@ -66,6 +66,7 @@ Všechno níže je v kódu a v produkci. Řazeno podle toho, co pár zajímá ne
 | Stránka svatby s víc galeriemi  | Za jedním odkazem postupně přibývají galerie od hostů, první výběr i kompletní set.                                                                                                                            | Galerie přidává a skrývá fotograf, pár to sám nepřepíná.                                                                                        |
 | Stažení všeho                   | Celá galerie jedním tlačítkem jako ZIP ve vysokém rozlišení.                                                                                                                                                   | U velkých galerií se ZIP chvíli připravuje a u vícegigabajtových galerie předem upozorní.                                                       |
 | Rychlé prohlížení               | Mřížka bez ořezávání fotek, prohlížení na celou obrazovku, plynulé i na starším telefonu.                                                                                                                      | –                                                                                                                                               |
+| Nejlepší fotky dne a kapitoly   | Nahoře výběr toho nejlepšího, jedním klepnutím skok na obřad nebo hostinu.                                                                                                                                     | Obojí zapíná a skládá fotograf u každé galerie zvlášť.                                                                                          |
 | Oblíbené a reakce               | Srdíčko a reakce u fotek. Vidí je i ostatní.                                                                                                                                                                   | Fotograf je může u galerie vypnout.                                                                                                             |
 | Výběr k tisku                   | Hosté i pár si mohou fotky označit k tisku i s počtem kusů.                                                                                                                                                    | Samotný tisk ani objednávku galerie neřeší. Je to jen výběr.                                                                                    |
 | Pokračovat na jiném zařízení    | Výběr z telefonu jde jednorázovým kódem přenést na počítač.                                                                                                                                                    | –                                                                                                                                               |
@@ -350,8 +351,10 @@ Nejsou úkolem agenta hlavního webu. Jsou tu, aby se na ně nezapomnělo. Uděl
 - [x] Kořenová stránka `photos.…` odkazuje na podstránku hlavního webu (`/galerie-pro-hosty`,
       `guestGalleryPageUrl` v `src/app/page.tsx`) a titulek odpovídá roli nápovědy („Nápověda ke svatební
       galerii“).
-- [x] Nápověda `photos.…` uvádí videa v galerii a video pro sociální sítě v seznamu funkcí a ve FAQ
-      (`messages/*.json`, `marketing.features` a `marketing.faq`, všech 7 jazyků, 2026-10-19).
+- [x] Nápověda `photos.…` uvádí videa v galerii, video pro sociální sítě, sedm jazyků, výběr k tisku,
+      nejlepší fotky dne a kapitoly, přenos na jiné zařízení a pohyb kamery v projekci; FAQ má otázky
+      na video pro sítě a na jazyky (`messages/*.json`, `marketing.features` a `marketing.faq`, všech
+      7 jazyků, 2026-10-19). `public/llms.txt` říká totéž.
 - [ ] Patička galerie odkazuje na hlavní web bez UTM. Pokud Pavel chce měřit i ji, doplnit UTM (§9).
 
 ## 15. Viditelnost v AI asistentech (GEO)
