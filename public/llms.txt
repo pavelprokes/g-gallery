@@ -13,7 +13,7 @@ Gallery contents are private: every gallery is reached only through its own link
 - One link, nothing to install: it opens in a normal browser on a phone or a computer, without an account.
 - Download the whole gallery as one ZIP, the photographer's videos included.
 - The photographer's films play right in the gallery.
-- A short video for social media, made by the photographer from the gallery's photos: vertical 9:16 for Instagram Stories, Reels and TikTok, or landscape 16:9 for YouTube and websites, 15 or 30 seconds. It has no sound and no captions; music is added in the social app. The photographer can put it in the gallery for download.
+- A short video for social media, made by the photographer from the gallery's photos and included in every package, in both versions: vertical 9:16 for Instagram Stories, Reels and TikTok, and landscape 16:9 for YouTube and websites, 15 or 30 seconds. Both are in the gallery for download. They have no sound and no captions; music is added in the social app.
 - Photos from guests: guests scan a QR code and add their own photos, without an app or an account. Guests upload photos only, not videos. GPS location is removed from guests' photos before they are sent.
 - Live slideshow at the wedding: new guest photos appear on the screen within about half a minute; the photographer's photos slowly move in towards the faces.
 - Favorites and reactions, a print selection with the number of copies, and a one-time code to carry them over to another device.
