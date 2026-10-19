@@ -69,18 +69,26 @@ describe("matchResumeTargets", () => {
 
 describe("shotKey", () => {
   it("drops the export's sequence, whatever it restarted from", () => {
-    expect(shotKey("svatba_0412_PPR57923.jpg")).toBe("ppr57923");
-    expect(shotKey("svatba_001_PPR57923.JPG")).toBe("ppr57923");
-    expect(shotKey("kamila-a-petr-2026-09-05_0001_PPR57923.jpg")).toBe("ppr57923");
+    expect(shotKey("svatba_0412_PPR57923.jpg")).toBe("ppr57923.jpg");
+    expect(shotKey("svatba_001_PPR57923.JPEG")).toBe("ppr57923.jpg");
+    expect(shotKey("kamila-a-petr-2026-09-05_0001_PPR57923.jpg")).toBe("ppr57923.jpg");
   });
 
-  it("keeps a camera name that has an underscore of its own", () => {
-    expect(shotKey("svatba_0001_DSC_1234.jpg")).toBe("dsc_1234");
+  it("keeps a camera name with an underscore, and sees through a Photoshop edit", () => {
+    expect(shotKey("svatba_0001_DSC_1234.jpg")).toBe("dsc_1234.jpg");
+    expect(shotKey("svatba_001_PPR57923-Edit.jpg")).toBe("ppr57923.jpg");
+    expect(shotKey("svatba_001_PPR57923-Edit-2.jpg")).toBe("ppr57923.jpg");
   });
 
-  it("is the whole name when there is no sequence", () => {
-    expect(shotKey("IMG_4821.jpg")).toBe("img_4821");
-    expect(shotKey("svatba_0001.jpg")).toBe("svatba_0001");
+  it("will not guess without a camera name after a sequence", () => {
+    expect(shotKey("IMG_4821.jpg")).toBeNull();
+    expect(shotKey("svatba_0001.jpg")).toBeNull();
+    expect(shotKey("2026-09-05_0412.jpg")).toBeNull();
+    expect(shotKey("IMG_4821-2.jpg")).toBeNull();
+  });
+
+  it("keeps the extension apart", () => {
+    expect(shotKey("svatba_1_PPR1.png")).not.toBe(shotKey("svatba_1_PPR1.jpg"));
   });
 });
 

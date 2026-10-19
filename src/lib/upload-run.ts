@@ -117,12 +117,17 @@ export function fetchPendingUploads(
  * (docs/REPLACE-PHOTOS.md). Empty on any failure: the files then simply
  * upload as new, which is what happened before this existed.
  */
-export function fetchReplaceCandidates(galleryId: string): Promise<ExistingPhoto[]> {
+export function fetchReplaceCandidates(
+  galleryId: string,
+): Promise<{ pending: PendingRow[]; existing: ExistingPhoto[] }> {
   const params = new URLSearchParams({ galleryId, existing: "1" });
   return fetch(`/api/uploads/pending?${params}`)
-    .then((response) => (response.ok ? response.json() : { existing: [] }))
-    .then((data: { existing?: ExistingPhoto[] }) => data.existing ?? [])
-    .catch(() => []);
+    .then((response) => (response.ok ? response.json() : {}))
+    .then((data: { pending?: PendingRow[]; existing?: ExistingPhoto[] }) => ({
+      pending: data.pending ?? [],
+      existing: data.existing ?? [],
+    }))
+    .catch(() => ({ pending: [], existing: [] }));
 }
 
 /** Mirrors `PendingUpload` in src/lib/upload-resume.ts. */

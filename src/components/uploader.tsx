@@ -75,6 +75,9 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [review, setReview] = useState<Review | null>(null);
+  // Between a pick and its start, while the replace candidates load: a second
+  // pick then would start two runs over the same refs.
+  const [preparing, setPreparing] = useState(false);
   const filesRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -162,28 +165,28 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       setNotice(
         ignored > 0 ? `Přeskočeno: ${ignored} × ne-fotka (.xmp, RAW, systémové soubory…).` : null,
       );
-      if (photos.length === 0) return;
+      if (photos.length === 0 || running || preparing || review) return;
+      setPreparing(true);
       // A corrected export carries the shot's camera name after a new sequence
       // number; pairing it with the delivered photo is asked about, never
       // assumed — the old file is deleted (docs/REPLACE-PHOTOS.md).
-      void Promise.all([fetchReplaceCandidates(galleryId), fetchPendingUploads(credentials)]).then(
-        ([existing, pending]) => {
-          const replaceIds = matchReplaceTargets(
-            photos,
-            existing,
-            matchResumeTargets(photos, pending),
-          );
-          if (!replaceIds.some(Boolean)) return void start(photos);
-          const names = new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName]));
-          setReview({
-            files: photos,
-            replaceIds,
-            replaces: replaceIds.map((id) => (id ? names.get(id) : undefined)),
-          });
-        },
-      );
+      void fetchReplaceCandidates(galleryId).then(({ pending, existing }) => {
+        setPreparing(false);
+        const replaceIds = matchReplaceTargets(
+          photos,
+          existing,
+          matchResumeTargets(photos, pending),
+        );
+        if (!replaceIds.some(Boolean)) return void start(photos);
+        const names = new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName]));
+        setReview({
+          files: photos,
+          replaceIds,
+          replaces: replaceIds.map((id) => (id ? names.get(id) : undefined)),
+        });
+      });
     },
-    [credentials, galleryId, start],
+    [galleryId, preparing, review, running, start],
   );
 
   // Progress painter: overall bytes, smoothed speed, tab title, milestones.
@@ -293,7 +296,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
     onDragOver: (event: React.DragEvent) => {
       if (!hasFiles(event)) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = running ? "none" : "copy";
+      event.dataTransfer.dropEffect = running || preparing || review ? "none" : "copy";
     },
     onDragLeave: () => {
       dragDepth.current = Math.max(dragDepth.current - 1, 0);
@@ -304,7 +307,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       event.preventDefault();
       dragDepth.current = 0;
       setDragging(false);
-      if (running) return;
+      if (running || preparing || review) return;
       // Entries must be read synchronously inside the drop handler — this call
       // does that before its first await.
       void filesFromDrop(event.dataTransfer).then(pick);
@@ -348,7 +351,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
         />
       )}
 
-      {!running && !review && (
+      {!running && !review && !preparing && (
         <div
           className={`mt-3 flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
             dragging

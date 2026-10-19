@@ -59,15 +59,22 @@ export interface ExistingPhoto {
 
 /**
  * The part of a file name that names the shot, not its place in an export:
- * `svatba_0412_PPR57923.jpg` → `ppr57923`. Lightroom's sequence is the last
- * `_<digits>_` (or `-`) in the name, so a re-export numbered from 1 still
- * yields the camera's own name — `DSC_1234` too, underscore and all. A name
- * without a sequence is its own key, so the very same name matches as well
- * (docs/REPLACE-PHOTOS.md).
+ * `svatba_0412_PPR57923.jpg` → `ppr57923.jpg`. Lightroom's sequence is the
+ * last `_<digits>_` (or `-`) in the name, so a re-export numbered from 1 still
+ * yields the camera's own name — `DSC_1234` too, underscore and all — and a
+ * Photoshop round trip's `-Edit` is the same shot. Null when the name has no
+ * camera name after a sequence (letters and digits both): `2026-09-05_0412`
+ * or `IMG_4821-2` would pair unrelated shots, and a wrong pair deletes a
+ * photo. The extension is part of the key, so a replacement keeps the
+ * delivered file name exactly (docs/REPLACE-PHOTOS.md).
  */
-export function shotKey(fileName: string): string {
-  const stem = fileName.replace(/\.[^.]*$/, "").toLowerCase();
-  return /^.*[_-]\d+[_-](.+)$/.exec(stem)?.[1] ?? stem;
+export function shotKey(fileName: string): string | null {
+  const lower = fileName.toLowerCase();
+  const extension = (/\.([^.]*)$/.exec(lower)?.[1] ?? "").replace(/^jpeg$/, "jpg");
+  const stem = lower.replace(/\.[^.]*$/, "");
+  const camera = /^.*[_-]\d+[_-](.+)$/.exec(stem)?.[1]?.replace(/[-_ ](edit|upravit)(-\d+)?$/, "");
+  if (!camera || !/[a-z]/.test(camera) || !/\d/.test(camera)) return null;
+  return `${camera}.${extension}`;
 }
 
 /**
@@ -82,9 +89,12 @@ export function matchReplaceTargets(
   existing: readonly ExistingPhoto[],
   resumeIds: readonly (string | undefined)[] = [],
 ): (string | undefined)[] {
-  const unique = <T>(items: readonly T[], key: (item: T) => string) => {
+  const unique = <T>(items: readonly T[], keyOf: (item: T) => string | null) => {
     const seen = new Map<string, T | null>();
-    for (const item of items) seen.set(key(item), seen.has(key(item)) ? null : item);
+    for (const item of items) {
+      const key = keyOf(item);
+      if (key !== null) seen.set(key, seen.has(key) ? null : item);
+    }
     return seen;
   };
   const photos = unique(existing, (photo) => shotKey(photo.fileName));
@@ -92,6 +102,7 @@ export function matchReplaceTargets(
   return files.map((file, index) => {
     if (resumeIds[index]) return undefined;
     const key = shotKey(file.name);
+    if (key === null) return undefined;
     return picked.get(key) === file ? (photos.get(key)?.id ?? undefined) : undefined;
   });
 }
