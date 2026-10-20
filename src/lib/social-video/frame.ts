@@ -30,6 +30,9 @@ export interface FrameSlide {
   /** For a `fit` shot: the colour around the whole photo — dark and muted,
    * taken from the photo (`backdropColor`). Black without it. */
   backdrop?: string;
+  /** For a `fit` shot: a tiny copy of the photo, stretched to fill the frame
+   * behind it — blurred by the stretch itself. Wins over `backdrop`. */
+  blurred?: FrameImage;
 }
 
 export interface FramePlan {
@@ -40,6 +43,10 @@ export interface FramePlan {
 
 /** A `fit` slide grows this much over its time — still, but not frozen. */
 const FIT_DRIFT = 0.03;
+/** The blurred copy behind it drifts the other way's worth, a touch more. */
+const BLUR_DRIFT = 0.06;
+/** How much the blurred copy is darkened, so the photo stays the subject. */
+const BLUR_DIM = 0.35;
 
 export function drawFrame(ctx: FrameContext, plan: FramePlan, t: number): void {
   const { width: W, height: H } = plan.format;
@@ -72,9 +79,20 @@ function drawSlide(
     ctx.drawImage(image, cam.x * s, cam.y * s, cam.w * s, cam.h * s, 0, 0, W, H);
     return;
   }
-  // The frame is already black; a colour of the photo, when there is one,
-  // fades in and out with the slide.
-  if (slide.backdrop) {
+  // The frame is already black; the photo's own blurred copy or a colour of
+  // it, when there is one, fades in and out with the slide.
+  if (slide.blurred) {
+    const back = slide.blurred;
+    const cover = Math.max(W / back.width, H / back.height) * (1 + BLUR_DRIFT * ease(progress));
+    const bw = back.width * cover;
+    const bh = back.height * cover;
+    ctx.drawImage(back, (W - bw) / 2, (H - bh) / 2, bw, bh);
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * BLUR_DIM;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = alpha;
+  } else if (slide.backdrop) {
     ctx.fillStyle = slide.backdrop;
     ctx.fillRect(0, 0, W, H);
   }

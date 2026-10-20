@@ -28,9 +28,14 @@ captcha before each upload. Chosen on 2026-10-20 (Pavel): **nothing is uploaded 
 2. **Check**: the face worker (`createFaceFinder`) photo by photo. The faces aim the camera
    (`shotsFor`) and mark photos where someone has their eyes shut (`checkPhoto(...).closed`). A
    worker that cannot start leaves the photos usable, unmarked, with the camera on its faceless aim.
-3. **Preview**: `drawFrame` at 40 % in a `requestAnimationFrame` loop; `SlideImages` keeps only the
+3. **Turned the other way** (Pavel, 2026-10-20): a landscape photo in a 9:16 video, or a portrait
+   one in 16:9 (`isAcross`, more than 10 % off square), is shown whole — a `fit` shot — over a
+   tiny copy of itself stretched to fill the frame and darkened (`SlideImages.blurredOf`,
+   `FrameSlide.blurred`), instead of having the video's shape cut out of it. `shotsFor(...,
+{ fitAcross: true })`; the admin's studio and gift keep cutting, as before.
+4. **Preview**: `drawFrame` at 40 % in a `requestAnimationFrame` loop; `SlideImages` keeps only the
    slides on screen decoded, fetching the prepared blobs by object URL.
-4. **File**: `encodeVideo` — H.264 where the browser has it, VP9 in MP4 otherwise, with a note that
+5. **File**: `encodeVideo` — H.264 where the browser has it, VP9 in MP4 otherwise, with a note that
    VP9 may not play on an iPhone. No sound (music belongs in the social app, licensed there).
 
 The component is `src/components/slideshow/slideshow-maker.tsx`; nothing in it imports from the

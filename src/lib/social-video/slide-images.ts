@@ -18,6 +18,7 @@ export interface SlidePhoto {
 interface Decoded {
   image: ImageBitmap;
   backdrop: string | null;
+  blurred: HTMLCanvasElement | null;
 }
 
 /** A photo's bytes from the CDN. CORS, so the canvas it is drawn on stays
@@ -30,6 +31,9 @@ export async function fetchPhotoBytes(url: string): Promise<Blob> {
 
 /** The side of the square a photo is shrunk to for its backdrop colour. */
 const BACKDROP_SAMPLE = 16;
+/** The longer side of the copy stretched behind a `fit` slide — small enough
+ * that stretching it to the frame is the blur. */
+const BLURRED_EDGE = 36;
 
 export class SlideImages {
   private readonly blobs = new Map<string, Promise<Blob>>();
@@ -55,7 +59,7 @@ export class SlideImages {
       decoded = this.fetch(photo)
         .then((blob) => createImageBitmap(blob))
         .then((image) => {
-          const entry = { image, backdrop: null };
+          const entry: Decoded = { image, backdrop: null, blurred: null };
           this.ready.set(photo.id, entry);
           return entry;
         });
@@ -98,6 +102,25 @@ export class SlideImages {
       entry.backdrop = backdropColor(averageColor(pixels));
     }
     return entry.backdrop;
+  }
+
+  /** The tiny copy stretched behind a `fit` slide (`FrameSlide.blurred`), made on first use. */
+  blurredOf(id: string): HTMLCanvasElement | null {
+    const entry = this.ready.get(id);
+    if (!entry) return null;
+    if (entry.blurred === null) {
+      const k = BLURRED_EDGE / Math.max(entry.image.width, entry.image.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(entry.image.width * k));
+      canvas.height = Math.max(1, Math.round(entry.image.height * k));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(entry.image, 0, 0, canvas.width, canvas.height);
+      entry.blurred = canvas;
+    }
+    return entry.blurred;
   }
 
   /** Forgets one photo entirely — removed from the video. */

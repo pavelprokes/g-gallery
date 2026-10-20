@@ -115,7 +115,7 @@ export function SlideshowMaker() {
     [count, length, mode],
   );
   const shots = useMemo(
-    () => shotsFor(ordered, faces, format, timeline),
+    () => shotsFor(ordered, faces, format, timeline, { fitAcross: true }),
     [ordered, faces, format, timeline],
   );
   const flagged = useMemo(
@@ -224,7 +224,7 @@ export function SlideshowMaker() {
           width: p.width,
           height: p.height,
           shot: shots[i]!,
-          backdrop: shots[i]!.kind === "fit" ? (images.backdropOf(p.id) ?? undefined) : undefined,
+          blurred: shots[i]!.kind === "fit" ? (images.blurredOf(p.id) ?? undefined) : undefined,
         })),
       };
     },
