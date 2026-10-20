@@ -81,3 +81,61 @@ export function landingJsonLd({
     ],
   };
 }
+
+/**
+ * Structured data for the public slideshow maker (docs/SLIDESHOW-MAKER.md §6):
+ * the tool as a free WebApplication, its page as an FAQPage holding the same
+ * questions the page shows, both published by the business the help page
+ * describes.
+ */
+export function slideshowJsonLd({
+  locale,
+  url,
+  title,
+  description,
+  faq,
+}: {
+  locale: Locale;
+  url: string;
+  title: string;
+  description: string;
+  faq: FaqEntry[];
+}) {
+  const inLanguage = LOCALE_TAGS[locale];
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "FAQPage",
+        "@id": `${url}#webpage`,
+        url,
+        name: title,
+        description,
+        inLanguage,
+        isPartOf: { "@id": `${SITE_ORIGIN}/#website` },
+        publisher: { "@id": BUSINESS_ID },
+        author: { "@id": PERSON_ID },
+        mainEntity: faq.map(({ q, a }) => ({
+          "@type": "Question",
+          name: q,
+          acceptedAnswer: { "@type": "Answer", text: a },
+        })),
+      },
+      {
+        "@type": "WebApplication",
+        "@id": `${url}#app`,
+        url,
+        name: title,
+        description,
+        inLanguage,
+        applicationCategory: "MultimediaApplication",
+        operatingSystem: "Any",
+        browserRequirements: "Requires a current browser with WebCodecs (Chrome, Edge, Safari).",
+        isAccessibleForFree: true,
+        offers: { "@type": "Offer", price: "0", priceCurrency: "CZK" },
+        publisher: { "@id": BUSINESS_ID },
+        author: { "@id": PERSON_ID },
+      },
+    ],
+  };
+}
