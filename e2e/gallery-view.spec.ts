@@ -134,6 +134,16 @@ test.describe("share gallery viewer", () => {
     await expect(page).not.toHaveURL(new RegExp(`foto=${first}`));
     const photoLink = page.url();
 
+    // "Sdílet fotku" hands on exactly that address — copied on a desktop.
+    if (test.info().project.name === "chromium") {
+      await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+      await page.getByRole("button", { name: "Sdílet fotku" }).click();
+      await expect(
+        page.getByRole("status").filter({ hasText: "Odkaz na fotku je zkopírovaný" }),
+      ).toHaveCount(1);
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(photoLink);
+    }
+
     // A reload keeps the photo open, on the same photo.
     await page.reload();
     await expect(page.getByRole("dialog")).toBeVisible();

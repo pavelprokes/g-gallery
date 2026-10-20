@@ -52,7 +52,7 @@
     "heading": "2. Regarder les photos",
     "intro": "La galerie s’ouvre sur une vue d’ensemble de toutes les photos. Les suivantes se chargent toutes seules à mesure que vous faites défiler vers le bas.",
     "detailHeading": "Une photo en plein écran",
-    "detailLead": "Touchez une photo et elle s’ouvre en plein écran. L’adresse de la page désigne alors cette photo précise : vous pouvez la copier et l’envoyer à quelqu’un. La personne qui ouvre le lien arrive directement dessus.",
+    "detailLead": "Touchez une photo et elle s’ouvre en plein écran. Vous voulez l’envoyer à quelqu’un ? Touchez <share></share> « Partager la photo » dans la barre du bas : sur un téléphone, le menu de partage s’ouvre (WhatsApp, par exemple) ; sur un ordinateur, le lien est copié. La personne qui l’ouvre arrive directement sur cette photo.",
     "phoneTerm": "Sur un téléphone",
     "phone": [
       "Faites glisser votre doigt sur le côté pour passer à la photo suivante.",

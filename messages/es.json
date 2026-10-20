@@ -91,7 +91,7 @@
       },
       {
         "q": "¿Se puede hacer con las fotos un vídeo para Instagram o TikTok?",
-        "a": "Sí. En cada boda, el fotógrafo monta con la galería un vídeo corto (15 o 30 segundos) en dos versiones: vertical 9:16 para Stories, Reels y TikTok y horizontal 16:9 para YouTube y webs. La cámara se acerca despacio a las caras. Las dos versiones están en la galería para que las descargues. No llevan sonido ni subtítulos: la música la añades directamente en Instagram o TikTok."
+        "a": "Sí. En cada boda, el fotógrafo monta con la galería un vídeo corto (15 o 30 segundos) en dos versiones: vertical 9:16 para Stories, Reels y TikTok y horizontal 16:9 para YouTube y webs. Las dos versiones están en la galería para que las descargues. No llevan sonido ni subtítulos: la música la añades directamente en Instagram o TikTok."
       }
     ],
     "guestTipsHeading": "Trucos para hacer fotos como invitado",
@@ -109,6 +109,7 @@
     "features": [
       "Un enlace y nada que instalar: se abre en cualquier navegador, en el móvil o en el ordenador.",
       "Una cuadrícula de fotos rápida y vista a pantalla completa, fluida incluso en un móvil antiguo.",
+      "Compartir una sola foto: con un botón envías un enlace directo a la foto que estás viendo, y la vista previa del mensaje muestra justo esa foto.",
       "Siete idiomas: checo, inglés, francés, alemán, español, eslovaco y polaco. La galería sigue el idioma de tu móvil y puedes cambiarlo en el pie de página.",
       "Descarga de toda la galería con un clic (ZIP).",
       "Vídeos dentro de la galería: reproduce la película del fotógrafo en el móvil o el ordenador y descárgala junto con las fotos.",
@@ -121,7 +122,7 @@
       "Sigue en otro dispositivo: pasa tus favoritos, reacciones y selección para imprimir del móvil al ordenador con un código de un solo uso.",
       "Avisos cuando el fotógrafo añade fotos nuevas.",
       "Fotos de los invitados: suben sus propias fotos de la boda directamente a la galería, sin app ni cuenta.",
-      "Pase de fotos en directo: las nuevas fotos de los invitados aparecen en pantalla en unos treinta segundos; las fotos del fotógrafo se acercan despacio a las caras.",
+      "Pase de fotos en directo: las nuevas fotos de los invitados aparecen en pantalla en unos treinta segundos.",
       "Varias galerías en un único enlace que crece: una selección, el reportaje completo y la galería de invitados, sin enviar ningún enlace nuevo."
     ],
     "footerText": "Esta galería la gestiona tu fotógrafo.",
@@ -202,6 +203,8 @@
     "select": "Seleccionar",
     "preparingDownload": "Preparando la descarga",
     "downloadOriginal": "Descargar original",
+    "sharePhoto": "Compartir foto",
+    "photoLinkCopied": "Enlace a la foto copiado",
     "privacyNotice": "Contamos las visitas de forma anónima, solo a través de este navegador y sin guardar la dirección IP.",
     "optOut": "No contarme",
     "optedOutNotice": "Tus visitas no se están contando.",

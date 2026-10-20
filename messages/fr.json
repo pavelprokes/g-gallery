@@ -91,7 +91,7 @@
       },
       {
         "q": "Peut-on faire des photos une vidéo pour Instagram ou TikTok ?",
-        "a": "Oui. Pour chaque mariage, le photographe monte à partir de la galerie une courte vidéo (15 ou 30 secondes) en deux versions : verticale 9:16 pour les Stories, les Reels et TikTok, et horizontale 16:9 pour YouTube et les sites web. La caméra se rapproche lentement des visages. Les deux versions vous attendent dans la galerie, prêtes à télécharger. Elles sont sans son ni sous-titres : vous ajoutez la musique directement dans Instagram ou TikTok."
+        "a": "Oui. Pour chaque mariage, le photographe monte à partir de la galerie une courte vidéo (15 ou 30 secondes) en deux versions : verticale 9:16 pour les Stories, les Reels et TikTok, et horizontale 16:9 pour YouTube et les sites web. Les deux versions vous attendent dans la galerie, prêtes à télécharger. Elles sont sans son ni sous-titres : vous ajoutez la musique directement dans Instagram ou TikTok."
       }
     ],
     "guestTipsHeading": "Trucs et astuces pour photographier en tant qu'invité",
@@ -109,6 +109,7 @@
     "features": [
       "Un seul lien, rien à installer – s'ouvre dans n'importe quel navigateur, sur téléphone ou ordinateur.",
       "Une grille de photos rapide et un affichage plein écran, fluide même sur un téléphone plus ancien.",
+      "Partager une seule photo – un bouton envoie un lien direct vers la photo que vous regardez, et l’aperçu du message affiche justement celle-ci.",
       "Sept langues – tchèque, anglais, français, allemand, espagnol, slovaque et polonais. La galerie suit la langue de votre téléphone ; vous pouvez la changer en bas de page.",
       "Téléchargement de toute la galerie en un clic (ZIP).",
       "Des vidéos directement dans la galerie – le film du photographe se lit sur mobile comme sur ordinateur et se télécharge avec les photos.",
@@ -121,7 +122,7 @@
       "Continuer sur un autre appareil – transférez vos favoris, réactions et sélection pour l'impression du téléphone vers l'ordinateur avec un code à usage unique.",
       "Notifications quand le photographe ajoute de nouvelles photos.",
       "Photos des invités – les invités ajoutent leurs propres photos du mariage directement dans la galerie, sans appli ni compte.",
-      "Diaporama en direct – les nouvelles photos des invités apparaissent à l'écran en une trentaine de secondes environ ; les photos du photographe se rapprochent lentement des visages.",
+      "Diaporama en direct – les nouvelles photos des invités apparaissent à l'écran en une trentaine de secondes environ.",
       "Plusieurs galeries sous un seul lien qui s'enrichit au fil du temps – une sélection, le reportage complet et la galerie des invités, toujours à la même adresse."
     ],
     "footerText": "Cette galerie est gérée par votre photographe.",
@@ -202,6 +203,8 @@
     "select": "Sélectionner",
     "preparingDownload": "Préparation du téléchargement",
     "downloadOriginal": "Télécharger l'original",
+    "sharePhoto": "Partager la photo",
+    "photoLinkCopied": "Lien vers la photo copié",
     "privacyNotice": "Nous comptons les visites de façon anonyme, uniquement via ce navigateur – sans adresse IP.",
     "optOut": "Ne pas me compter",
     "optedOutNotice": "Vos visites ne sont pas comptées.",

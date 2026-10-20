@@ -91,7 +91,7 @@
       },
       {
         "q": "Dá sa z fotiek urobiť video na Instagram alebo TikTok?",
-        "a": "Áno. Ku každej svadbe fotograf z galérie zostaví krátke video (15 alebo 30 sekúnd) v dvoch verziách: na výšku 9:16 pre Stories, Reels a TikTok a na šírku 16:9 pre YouTube a web. Kamera sa v ňom pomaly približuje k tváram. Obe verzie nájdete v galérii na stiahnutie. Sú bez zvuku a bez titulkov – hudbu si pridáte priamo v Instagrame alebo TikToku."
+        "a": "Áno. Ku každej svadbe fotograf z galérie zostaví krátke video (15 alebo 30 sekúnd) v dvoch verziách: na výšku 9:16 pre Stories, Reels a TikTok a na šírku 16:9 pre YouTube a web. Obe verzie nájdete v galérii na stiahnutie. Sú bez zvuku a bez titulkov – hudbu si pridáte priamo v Instagrame alebo TikToku."
       }
     ],
     "guestTipsHeading": "Tipy a triky pre fotenie ako hosť",
@@ -109,6 +109,7 @@
     "features": [
       "Jeden odkaz, nič sa neinštaluje – otvoríte ho v bežnom prehliadači na mobile aj na počítači.",
       "Rýchla mriežka fotiek a prezeranie na celú obrazovku, plynulé aj na staršom telefóne.",
+      "Zdieľanie jednej fotky – tlačidlom pošlete odkaz priamo na fotku, ktorú si práve prezeráte, a v náhľade správy sa zobrazí práve ona.",
       "Sedem jazykov – čeština, angličtina, francúzština, nemčina, španielčina, slovenčina a poľština. Galéria sa prispôsobí jazyku telefónu, prepnúť ho môžete v pätičke.",
       "Stiahnutie celej galérie jedným tlačidlom (ZIP).",
       "Videá priamo v galérii – film od fotografa si pustíte na mobile aj na počítači a stiahnete ho spolu s fotkami.",
@@ -121,7 +122,7 @@
       "Pokračovanie na inom zariadení – obľúbené, reakcie aj výber na tlač prenesiete z telefónu do počítača jednorazovým kódom.",
       "Upozornenie na nové fotky, keď ich fotograf pridá.",
       "Fotky od hostí – hostia pridávajú vlastné zábery zo svadby priamo do galérie, bez aplikácie a bez účtu.",
-      "Živá projekcia – nové fotky od hostí sa objavujú na plátne zhruba do pol minúty, fotky od fotografa sa pritom pomaly približujú k tváram.",
+      "Živá projekcia – nové fotky od hostí sa objavujú na plátne zhruba do pol minúty.",
       "Viac galérií pod jedným odkazom, ktorý postupne rastie – výber, kompletný set aj galéria od hostí, a stále rovnaká adresa."
     ],
     "footerText": "Túto galériu prevádzkuje váš fotograf.",
@@ -202,6 +203,8 @@
     "select": "Vybrať",
     "preparingDownload": "Pripravujem stiahnutie",
     "downloadOriginal": "Stiahnuť originál",
+    "sharePhoto": "Zdieľať fotku",
+    "photoLinkCopied": "Odkaz na fotku je skopírovaný",
     "privacyNotice": "Návštevy počítame anonymne, len cez tento prehliadač – bez IP adresy.",
     "optOut": "Nepočítať ma",
     "optedOutNotice": "Vaše návštevy sa nepočítajú.",

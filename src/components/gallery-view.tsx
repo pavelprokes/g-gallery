@@ -113,6 +113,7 @@ import {
   PencilIcon,
   PrinterIcon,
   ProjectorIcon,
+  ShareIcon,
 } from "@/components/ui/icons";
 import { useCorrections } from "@/components/corrections/use-corrections";
 import {
@@ -2353,6 +2354,35 @@ function GalleryViewInner({
   const closeLightbox = useCallback(() => window.history.back(), []);
 
   /**
+   * "Sdílet fotku": the address already names the open photo (`?foto=`,
+   * docs/PHOTO-LINKS.md), so that is what is shared. A phone opens its own
+   * share sheet (WhatsApp, Messages…); elsewhere the link is copied and the
+   * button says so for a moment.
+   */
+  const [linkCopiedFor, setLinkCopiedFor] = useState<string | null>(null);
+  const sharePhoto = useCallback(
+    async (photoId: string) => {
+      const url = window.location.href;
+      if (typeof navigator.share === "function" && matchMedia("(pointer: coarse)").matches) {
+        try {
+          await navigator.share({ title, url });
+        } catch {
+          // Dismissed, or the sheet refused: nothing to undo.
+        }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        setLinkCopiedFor(photoId);
+        setTimeout(() => setLinkCopiedFor((id) => (id === photoId ? null : id)), 2000);
+      } catch {
+        // No clipboard (an insecure context): the address bar still has it.
+      }
+    },
+    [title],
+  );
+
+  /**
    * The address names the photo on screen (`?foto=`, docs/PHOTO-LINKS.md), so
    * it can be sent on. Written into the lightbox's own history entry —
    * replaced as the viewer browses, never pushed, so Back still closes the
@@ -3343,6 +3373,22 @@ function GalleryViewInner({
                 <DownloadIcon className="h-5 w-5" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => void sharePhoto(active.id)}
+              aria-label={t("sharePhoto")}
+              title={t("sharePhoto")}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+            >
+              {linkCopiedFor === active.id ? (
+                <CheckIcon className="h-5 w-5" />
+              ) : (
+                <ShareIcon className="h-5 w-5" />
+              )}
+            </button>
+            <span className="sr-only" role="status">
+              {linkCopiedFor === active.id ? t("photoLinkCopied") : ""}
+            </span>
           </div>
           {panelOpen && (
             <CorrectionsPanel

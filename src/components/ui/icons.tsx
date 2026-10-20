@@ -128,6 +128,24 @@ export function DownloadIcon({ className = DEFAULT_SIZE }: IconProps) {
   );
 }
 
+/** Sharing a photo's link — a box with an arrow leaving it, the iOS share glyph guests know. */
+export function ShareIcon({ className = DEFAULT_SIZE }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 15V3m0 0-4 4m4-4 4 4M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2" />
+    </svg>
+  );
+}
+
 /** Live projection ("Projekce") — a screen on a stand. */
 export function ProjectorIcon({ className = DEFAULT_SIZE }: IconProps) {
   return (

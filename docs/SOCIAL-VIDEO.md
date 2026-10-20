@@ -85,6 +85,10 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
 
 ## 4. Face data
 
+**Never in public copy** (Pavel, 2026-10-20): the help page, the guide, `public/llms.txt`, the main
+site's handoff — none of them says that faces are found, how or why. A camera that "slowly moves in
+and out" is as far as public copy goes.
+
 ### Detection
 
 [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) from OpenCV Zoo,
@@ -123,8 +127,12 @@ WebGPU backend is the next step if a 400-photo gallery takes too long (§9.5).
 
 ### The whole gallery
 
-**Najít tváře** on the video page (Pavel, 2026-10-18: on a click only, never on its own) searches
-every photo without current faces — a gallery uploaded before this existed, or after a `model`
+**On their own since 2026-10-20** (Pavel changed the 2026-10-18 "on a click only"): the gallery's
+admin page searches every photo without current faces as soon as it holds any — right after an
+upload, which refreshes the page — in the face worker, with **Pozastavit** / **Pokračovat** for the
+visit (`src/components/admin/gallery-face-scan.tsx`). The projection's camera, the video's
+suggestion and the photo check then know the people without anyone clicking. **Najít tváře** on the
+video page still searches the same set by hand: every photo without current faces — a gallery uploaded before this existed, or after a `model`
 bump (§Storage). `src/lib/social-video/face-scan.ts`:
 
 - fetches each photo at the size a 9:16 render would (`sourceWidth`, the default format), so a

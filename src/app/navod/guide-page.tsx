@@ -16,6 +16,7 @@ import {
   PlusIcon,
   PrinterIcon,
   ProjectorIcon,
+  ShareIcon,
 } from "@/components/ui/icons";
 import { previewMetadata } from "@/lib/og-image";
 import { GUIDE_LANGUAGE_NAMES, GUIDE_PATHS, type GuideLocale } from "@/lib/guide-path";
@@ -242,6 +243,11 @@ export function GuidePage({ locale }: { locale: GuideLocale }) {
         <ProjectorIcon className="size-3.5" />
       </InlineGlyph>
     ),
+    share: () => (
+      <InlineGlyph label={tGallery("sharePhoto")}>
+        <ShareIcon className="size-3.5" />
+      </InlineGlyph>
+    ),
   };
 
   const linkClasses =
@@ -335,7 +341,9 @@ export function GuidePage({ locale }: { locale: GuideLocale }) {
 
       {/* 2 — Browsing */}
       <GuideSection id={anchor.browse} heading={t("browse.heading")} intro={t("browse.intro")}>
-        <SubHeading lead={t("browse.detailLead")}>{t("browse.detailHeading")}</SubHeading>
+        <SubHeading lead={t.rich("browse.detailLead", glyphs)}>
+          {t("browse.detailHeading")}
+        </SubHeading>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Card className="bg-brand-tint dark:bg-neutral-900">
             <h4 className="text-brand-ink font-semibold dark:text-neutral-100">

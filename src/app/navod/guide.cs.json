@@ -52,7 +52,7 @@
     "heading": "2. Prohlížení fotek",
     "intro": "Galerie se otevře jako přehled všech fotek. Další se načítají samy, jak posouváš dolů.",
     "detailHeading": "Fotka přes celou obrazovku",
-    "detailLead": "Klepni na kteroukoli fotku a otevře se přes celou obrazovku. Adresa stránky přitom ukazuje právě tuhle fotku, takže ji můžeš zkopírovat a poslat. Kdo odkaz otevře, uvidí rovnou ji.",
+    "detailLead": "Klepni na kteroukoli fotku a otevře se přes celou obrazovku. Chceš ji někomu poslat? Klepni dole v liště na <share></share> „Sdílet fotku“: na telefonu se otevře sdílení (třeba do WhatsAppu), na počítači se odkaz zkopíruje. Kdo ho otevře, uvidí rovnou tuhle fotku.",
     "phoneTerm": "Na telefonu",
     "phone": [
       "Přejetím prstem do strany přejdeš na další fotku.",

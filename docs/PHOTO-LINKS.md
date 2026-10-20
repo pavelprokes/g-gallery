@@ -23,6 +23,13 @@ photo on screen, so it can be copied and sent ("look at this one").
 - Forward onto a closed lightbox's entry takes the parameter off rather than naming a photo that
   is not on screen.
 
+## The share button
+
+"Sdílet fotku" in the lightbox's toolbar (2026-10-20) shares the address as it stands, `?foto=`
+included: on a coarse pointer through `navigator.share` (the phone's own sheet), elsewhere by
+copying it, the button turning into a tick for two seconds with a status line for screen readers.
+A dismissed sheet or a missing clipboard does nothing — the address bar still holds the link.
+
 ## Opening a link
 
 - Same mechanics as a highlight's jump (docs/HIGHLIGHTS.md): pages are pulled until the photo is in

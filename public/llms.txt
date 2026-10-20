@@ -1,21 +1,23 @@
 # Svatební galerie – Pavel Prokeš
 
-> Private online wedding galleries by Pavel Prokeš, a wedding photographer based in Prague, Czech Republic. Couples and their guests open a gallery from a link or QR code, view and download the photos and the photographer's videos, and — when the couple allows it — add their own photos from the wedding. The only public page is a short help page, in seven languages: Czech, English, French, German, Spanish, Slovak and Polish.
+> Private online wedding galleries by Pavel Prokeš, a wedding photographer based in Prague, Czech Republic. Couples and their guests open a gallery from a link or QR code, view and download the photos and the photographer's videos, and — when the couple allows it — add their own photos from the wedding. The public pages are a short help page and a step-by-step guide, both in seven languages: Czech, English, French, German, Spanish, Slovak and Polish.
 
 Gallery contents are private: every gallery is reached only through its own link, sometimes with a password, and is not listed or indexed. Questions about booking, prices or the photographer's work belong to the main site.
 
 ## Help
 
 - [Wedding gallery help](https://photos.svatebni-fotograf-cechy.cz/): where to get the gallery link or QR code, what to do without the password, why a link stops working, offline viewing, downloading everything at once, videos for social media and the gallery's languages.
+- [Step-by-step guide](https://photos.svatebni-fotograf-cechy.cz/guide) (Czech: [/navod](https://photos.svatebni-fotograf-cechy.cz/navod); also /guide/de, /guide/fr, /guide/es, /guide/sk, /guide/pl): opening the gallery for the first time, browsing, choosing photos for print, favourites, downloading, asking for a retouch, guest uploads, offline viewing, privacy and troubleshooting.
 
 ## What a gallery offers
 
 - One link, nothing to install: it opens in a normal browser on a phone or a computer, without an account.
 - Download the whole gallery as one ZIP, the photographer's videos included.
+- Share a single photo: a button in the full-screen view sends a link that opens on that photo, and the message preview shows it.
 - The photographer's films play right in the gallery.
 - A short video for social media, made by the photographer from the gallery's photos and included in every package, in both versions: vertical 9:16 for Instagram Stories, Reels and TikTok, and landscape 16:9 for YouTube and websites, 15 or 30 seconds. Both are in the gallery for download. They have no sound and no captions; music is added in the social app.
 - Photos from guests: guests scan a QR code and add their own photos, without an app or an account. Guests upload photos only, not videos. GPS location is removed from guests' photos before they are sent.
-- Live slideshow at the wedding: new guest photos appear on the screen within about half a minute; the photographer's photos slowly move in towards the faces.
+- Live slideshow at the wedding: new guest photos appear on the screen within about half a minute.
 - Favorites and reactions, a print selection with the number of copies, and a one-time code to carry them over to another device.
 - Best of the day and chapters (ceremony, reception…) when the photographer turns them on.
 - Offline mode: a gallery saved once stays viewable without signal.

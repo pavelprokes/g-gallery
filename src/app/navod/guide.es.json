@@ -52,7 +52,7 @@
     "heading": "2. Ver las fotos",
     "intro": "La galería se abre con la vista general de todas las fotos. A medida que bajas, se van cargando más solas.",
     "detailHeading": "Una foto a pantalla completa",
-    "detailLead": "Toca cualquier foto y se abrirá a pantalla completa. La dirección de la página muestra entonces justo esa foto, así que puedes copiarla y enviársela a alguien. Quien abra el enlace irá directamente a ella.",
+    "detailLead": "Toca cualquier foto y se abrirá a pantalla completa. ¿Quieres mandársela a alguien? Toca <share></share> «Compartir foto» en la barra de abajo: en el móvil se abre el menú para compartir (por ejemplo, WhatsApp) y en el ordenador se copia el enlace. Quien lo abra irá directamente a esa foto.",
     "phoneTerm": "En el móvil",
     "phone": [
       "Desliza el dedo hacia un lado para pasar a la siguiente foto.",
