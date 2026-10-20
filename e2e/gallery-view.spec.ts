@@ -108,6 +108,63 @@ test.describe("share gallery viewer", () => {
     await expect(page).toHaveURL(new RegExp(`/g/${seed.token}/${seed.slug}$`));
   });
 
+  test("the address names the open photo, and a photo's link opens it", async ({ page }) => {
+    const galleryUrl = new RegExp(`/g/${seed.token}/${seed.slug}$`);
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    const grid = page.getByRole("list", { name: "Fotky v galerii" });
+    await expect(grid.locator('button[aria-label^="Otevřít"]').first()).toBeVisible();
+
+    // Writing the address is History API only (Next documents it as syncing
+    // the router, no navigation): no server round trip, no reload.
+    const serverRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document" || request.headers()["rsc"]) {
+        serverRequests.push(request.url());
+      }
+    });
+    await page.evaluate(() => Object.assign(window, { __samePage: true }));
+
+    await grid.locator('button[aria-label^="Otevřít"]').first().click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page).toHaveURL(/\?foto=[A-Za-z0-9_-]+$/);
+    const first = new URL(page.url()).searchParams.get("foto");
+
+    await page.getByRole("button", { name: "Další" }).click();
+    await expect(page.getByText(`2 / ${seed.photoCount}`)).toBeVisible();
+    await expect(page).not.toHaveURL(new RegExp(`foto=${first}`));
+    const photoLink = page.url();
+
+    // Browsing replaces the entry: one Back closes the lightbox.
+    await page.goBack();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page).toHaveURL(galleryUrl);
+    expect(await page.evaluate(() => "__samePage" in window)).toBe(true);
+    expect(serverRequests).toEqual([]);
+
+    // Sent on: the link opens on that photo, and previews with it in a chat.
+    await page.goto(photoLink);
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByText(`2 / ${seed.photoCount}`)).toBeVisible();
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      /1200.*630.*\/photo-1\.jpg/,
+    );
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+      "content",
+      /\?foto=[A-Za-z0-9_-]+$/,
+    );
+    // Back from it is the gallery, not the photo again.
+    await page.goBack();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page).toHaveURL(galleryUrl);
+
+    // A photo that is not here opens nothing, and the dead link is not kept.
+    await page.goto(`/g/${seed.token}/${seed.slug}?foto=nonexistent`);
+    await expect(grid.locator('button[aria-label^="Otevřít"]').first()).toBeVisible();
+    await expect(page).toHaveURL(galleryUrl);
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+  });
+
   test("arrow keys move the roving tab stop across the grid", async ({ page }) => {
     await page.goto(`/g/${seed.token}/${seed.slug}`);
     const grid = page.getByRole("list", { name: "Fotky v galerii" });

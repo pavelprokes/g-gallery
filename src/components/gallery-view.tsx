@@ -67,6 +67,7 @@ import { PromoTile } from "@/components/promo-tile";
 import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
 import { GalleryHighlights } from "@/components/gallery-highlights";
 import type { GalleryHighlight } from "@/lib/gallery-highlights";
+import { photoParam, withPhotoParam } from "@/lib/photo-link";
 import {
   clampPan,
   clampScale,
@@ -291,7 +292,12 @@ function flashTile(el: HTMLElement) {
 function replaceHash(hash: string) {
   if (window.location.hash === hash) return;
   const { pathname, search } = window.location;
-  window.history.replaceState(null, "", `${pathname}${search}${hash}`);
+  replaceUrl(`${pathname}${search}${hash}`);
+}
+
+/** Swaps the whole URL in place, with the same `null` state as `replaceHash`. */
+function replaceUrl(url: string) {
+  window.history.replaceState(null, "", url);
 }
 
 /** Height of the sticky chapter bar — also the virtualizer's scroll padding,
@@ -2335,12 +2341,79 @@ function GalleryViewInner({
   useEffect(() => {
     function onPopState() {
       setLightboxIndex(null);
+      // Forward onto a closed lightbox's entry: the photo it named is not
+      // on screen, so the address must not say it is.
+      if (photoParam(window.location.search))
+        replaceUrl(withPhotoParam(window.location.href, null));
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   const closeLightbox = useCallback(() => window.history.back(), []);
+
+  /**
+   * The address names the photo on screen (`?foto=`, docs/PHOTO-LINKS.md), so
+   * it can be sent on. Written into the lightbox's own history entry —
+   * replaced as the viewer browses, never pushed, so Back still closes the
+   * lightbox in one step and lands on the gallery's address without a photo.
+   */
+  useEffect(() => {
+    if (!isLightboxOpen || !activeId) return;
+    const href = withPhotoParam(window.location.href, activeId);
+    if (href !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState({ galleryLightbox: true }, "", href);
+    }
+  }, [isLightboxOpen, activeId]);
+
+  /**
+   * Arriving on a photo's link opens that photo. The same mechanics as a
+   * highlight's jump: pages are pulled until it is in the grid, the grid takes
+   * one instant scroll to its row (so closing the lightbox lands there), and
+   * the lightbox opens on it. The parameter comes off the gallery's own entry
+   * first, so Back from the photo is the gallery, not the photo again. A photo
+   * that is gone (deleted, or never in this gallery) opens nothing; the
+   * parameter is still taken off, so a dead link is not passed on.
+   */
+  const [openingPhoto, setOpeningPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = photoParam(window.location.search);
+    if (!id) return;
+    const frame = requestAnimationFrame(() => setOpeningPhoto(id));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!openingPhoto) return;
+    const index = photos.findIndex((photo) => photo.id === openingPhoto);
+    if (index < 0 && hasNextPage) {
+      if (!isFetchingNextPage) void fetchNextPage();
+      return;
+    }
+    if (index >= 0 && rows.length === 0) return;
+    replaceUrl(withPhotoParam(window.location.href, null));
+    const rowIndex = index >= 0 ? nav.rowIndexForPhoto.get(index) : undefined;
+    if (rowIndex !== undefined) rowVirtualizer.scrollToIndex(rowIndex, { align: "center" });
+    const frame = requestAnimationFrame(() => {
+      if (index >= 0) {
+        setRovingIndex(index);
+        openPhoto(index);
+      }
+      setOpeningPhoto(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    openingPhoto,
+    photos,
+    rows.length,
+    nav,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    rowVirtualizer,
+    openPhoto,
+  ]);
 
   /**
    * Keeps the URL on the chapter being read, so the address bar is always a
