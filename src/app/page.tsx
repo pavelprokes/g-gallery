@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
+import { MAIN_SITE_URL } from "@/lib/site-url";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
 import { guidePath } from "@/lib/guide-path";
 import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
-import { SLIDESHOW_PATHS } from "@/lib/slideshow-path";
-import slideshowCs from "./video-z-fotek/slideshow.cs.json";
+import { slideshowHomeLink } from "@/lib/slideshow-home-link";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
@@ -49,8 +49,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
-
 /**
  * The main site's sales page for the guest gallery — this page stays the guests' help
  * (docs/HANDOFF-MAIN-SITE.md §10). The main site has cs and en only, so Slovak (which reads Czech) gets cs and every other language en.
@@ -83,6 +81,7 @@ export default async function Home() {
   const guestTips = t.raw("guestTips") as string[];
   const features = t.raw("features") as string[];
   const howItWorksSteps = t.raw("howItWorksSteps") as StepEntry[];
+  const slideshow = slideshowHomeLink(locale);
 
   const jsonLd = landingJsonLd({
     locale,
@@ -114,18 +113,14 @@ export default async function Home() {
             {t("guideLink")} →
           </a>
           <ul className="mt-6 space-y-2 text-sm">
-            {/* Czech only until the maker speaks the other languages (docs/SLIDESHOW-MAKER.md). */}
-            {(locale === "cs" || CZECH_READING_LOCALES.includes(locale)) && (
-              <li>
-                <a
-                  href={SLIDESHOW_PATHS.cs}
-                  hrefLang="cs"
-                  className="hover:text-brand-primary text-neutral-600 underline underline-offset-4 dark:text-neutral-400"
-                >
-                  {slideshowCs.page.homeLink}
-                </a>
-              </li>
-            )}
+            <li>
+              <a
+                href={slideshow.href}
+                className="hover:text-brand-primary text-neutral-600 underline underline-offset-4 dark:text-neutral-400"
+              >
+                {slideshow.label}
+              </a>
+            </li>
             <li>
               <a
                 href={guestGalleryPageUrl(locale)}
@@ -298,7 +293,7 @@ export default async function Home() {
             {t("footerLinkText")}
           </a>
         </p>
-        <SiteFooterIdentity className="mt-4 text-xs" variant="full" />
+        <SiteFooterIdentity className="mt-4 text-xs" variant="full" current="help" />
       </footer>
     </main>
   );

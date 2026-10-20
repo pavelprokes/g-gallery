@@ -5,7 +5,7 @@ import { SLIDESHOW_PATHS } from "@/lib/slideshow-path";
 
 /**
  * `/`, the client guide (`/navod`, `/guide`, `/guide/<code>`) and the slideshow maker
- * (`/video-z-fotek`) are the only pages in this app
+ * (`/video-z-fotek` and its translations, `SLIDESHOW_PATHS`) are the only pages in this app
  * meant to be found by search — everything else is per-user private content (`/g/*`, `/s/*`), auth-gated (`/admin/*`,
  * `/sign-in`), or an API route, and each of those sets its own `noindex`
  * rather than appearing here.
@@ -28,6 +28,10 @@ const guideLanguages = Object.fromEntries(
   Object.entries(GUIDE_PATHS).map(([locale, path]) => [locale, `${SITE_ORIGIN}${path}`]),
 );
 
+const slideshowLanguages = Object.fromEntries(
+  Object.entries(SLIDESHOW_PATHS).map(([locale, path]) => [locale, `${SITE_ORIGIN}${path}`]),
+);
+
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
@@ -43,11 +47,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
       alternates: { languages: guideLanguages },
     })),
-    ...Object.values(SLIDESHOW_PATHS).map((path) => ({
-      url: `${SITE_ORIGIN}${path}`,
+    ...Object.values(slideshowLanguages).map((url) => ({
+      url,
       lastModified: SLIDESHOW_LAST_MODIFIED,
       changeFrequency: "monthly" as const,
       priority: 0.8,
+      alternates: {
+        languages: { ...slideshowLanguages, "x-default": slideshowLanguages.en! },
+      },
     })),
   ];
 }

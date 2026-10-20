@@ -7,3 +7,6 @@
  * request's own host, since a printed QR code has no "current request" to read.
  */
 export const SITE_ORIGIN = "https://photos.svatebni-fotograf-cechy.cz";
+
+/** The photographer's main site — portfolio, prices, booking. One place, so every link to it agrees. */
+export const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";

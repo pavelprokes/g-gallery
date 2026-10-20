@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createTranslator, NextIntlClientProvider } from "next-intl";
 import Image from "next/image";
 import type { ComponentType } from "react";
+import { MAIN_SITE_URL } from "@/lib/site-url";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { Card } from "@/components/ui/card";
 import {
@@ -64,7 +65,6 @@ import {
  * src/i18n/request.ts always loads the request's own locale, so the latter
  * returns the viewer's language whatever locale is asked for.
  */
-const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 const SECTION_KEYS = [
   "start",
@@ -647,7 +647,7 @@ export function GuidePage({ locale }: { locale: GuideLocale }) {
       <footer className="border-brand-border/60 border-t pt-8 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-500">
         {/* A Client Component reading its own provider — scoped to the page's language too. */}
         <NextIntlClientProvider locale={locale} messages={{ siteFooter: messages.siteFooter }}>
-          <SiteFooterIdentity className="text-xs" guideLink={false} />
+          <SiteFooterIdentity className="text-xs" current="guide" />
         </NextIntlClientProvider>
       </footer>
     </main>

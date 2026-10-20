@@ -1,0 +1,134 @@
+{
+  "page": {
+    "pageTitle": "Vidéo photos de mariage gratuite – diaporama Instagram et YouTube",
+    "pageDescription": "Créez gratuitement une vidéo de vos photos de mariage : 3 à 60 photos, en 9:16 pour les Reels et TikTok ou en 16:9 pour YouTube. Rien n’est mis en ligne.",
+    "homeLink": "Créer une vidéo de vos photos de mariage",
+    "kicker": "Offert par un photographe de mariage",
+    "heroTitle": "Une vidéo de vos photos de mariage en quelques minutes",
+    "heroLead": "Ajoutez les photos de votre mariage, choisissez le format et la durée, puis téléchargez la vidéo MP4 terminée. Chaque photo s’anime d’un lent zoom avant ou arrière, et les photos s’enchaînent en fondu. Sans inscription, sans filigrane, rien à installer.",
+    "privacyBadge": "Vos photos restent sur votre appareil – elles ne sont envoyées nulle part.",
+    "startCta": "Créer ma vidéo",
+    "toolHeading": "Créez votre vidéo",
+    "howHeading": "Comment ça marche",
+    "how": [
+      {
+        "title": "Ajoutez vos photos",
+        "body": "Choisissez de 3 à 60 photos sur votre téléphone ou votre ordinateur. La page les vérifie et les prépare – comptez quelques secondes par photo."
+      },
+      {
+        "title": "Choisissez le format, la durée et le rythme",
+        "body": "À la verticale en 9:16 pour les Reels Instagram, les Stories et TikTok, ou à l’horizontale en 16:9 pour YouTube et le web. La durée s’adapte au nombre de photos ; le rythme peut être calme ou dynamique."
+      },
+      {
+        "title": "Regardez l’aperçu et téléchargez le MP4",
+        "body": "L’aperçu montre exactement ce que contiendra la vidéo. Il suffit ensuite d’un geste pour obtenir un fichier MP4, prêt à partager."
+      }
+    ],
+    "featuresHeading": "Ce que vous obtenez",
+    "features": [
+      "Toutes les photos que vous ajoutez y figurent – aucune ne se perd en route.",
+      "Les photos défilent dans l’ordre de prise de vue, ou selon le nom du fichier.",
+      "Deux formats : 9:16 à la verticale (1080 × 1920) et 16:9 à l’horizontale (1920 × 1080).",
+      "Une durée de quelques secondes à trois minutes, selon le nombre de photos.",
+      "Un rythme calme pour la cérémonie et les portraits, dynamique pour la soirée et les montages qui bougent.",
+      "Des mouvements de caméra tout en douceur et des fondus enchaînés, comme dans les films de mariage.",
+      "La page vous signale une photo qui risquerait de gâcher la vidéo, pour que vous puissiez la retirer.",
+      "La vidéo est sans son : ajoutez la musique directement dans Instagram ou TikTok, où elle est disponible en toute légalité."
+    ],
+    "privacyHeading": "Vos photos ne quittent pas votre appareil",
+    "privacyBody": "Tout se passe directement dans votre navigateur : la vérification des photos, l’aperçu et la création de la vidéo. Rien n’est envoyé sur un serveur et nous ne conservons rien – dès que vous fermez la page, les photos disparaissent. Pendant la préparation, les informations cachées dans les photos sont aussi effacées, comme le lieu où elles ont été prises.",
+    "limitsHeading": "Quelles photos, quels appareils",
+    "limits": [
+      "De 3 à 60 photos au format JPEG, PNG ou WebP (enregistrez d’abord en JPEG les photos d’iPhone au format HEIC, ou transférez-les par AirDrop ou par e-mail).",
+      "Chaque photo : au moins 1000 px sur le petit côté, 62 mégapixels et 40 Mo au maximum.",
+      "Idéalement dans une version récente de Chrome, Edge ou Safari. C’est plus rapide sur un ordinateur que sur un téléphone.",
+      "La création prend à peu près autant de temps que dure la vidéo – en attendant, laissez la page ouverte."
+    ],
+    "weddingHeading": "Vous préparez votre mariage ?",
+    "weddingBody": "Cet outil a été conçu pour les couples que photographie Pavel Prokeš, photographe de mariage à Prague. Chaque couple reçoit de sa part une courte vidéo pour les réseaux sociaux, en version verticale et horizontale, prête directement dans sa galerie en ligne – avec toutes les photos à télécharger et celles prises par les invités le jour J.",
+    "weddingCta": "Découvrir les mariages de Pavel",
+    "galleryLink": "Comment fonctionne la galerie de mariage",
+    "faqHeading": "Questions fréquentes",
+    "faq": [
+      {
+        "q": "Est-ce vraiment gratuit ?",
+        "a": "Oui. Pas d’inscription, pas de filigrane et aucune limite au nombre de vidéos. L’outil est proposé par Pavel Prokeš, photographe de mariage, en cadeau aux couples et à leurs invités."
+      },
+      {
+        "q": "Mes photos sont-elles envoyées quelque part ?",
+        "a": "Non. Les photos sont traitées uniquement dans votre navigateur et ne sont envoyées à aucun serveur. Quand vous fermez la page, il n’en reste rien."
+      },
+      {
+        "q": "Pourquoi la vidéo n’a-t-elle pas de musique ?",
+        "a": "Une musique intégrée à la vidéo pourrait poser un problème de droits d’auteur sur Instagram, TikTok ou YouTube. Ajoutez-la plutôt dans l’application, où elle est disponible en toute légalité."
+      },
+      {
+        "q": "Combien de photos puis-je utiliser, et combien de temps dure la vidéo ?",
+        "a": "De 3 à 60 photos. Elles figurent toujours toutes dans la vidéo : la durée dépend donc de leur nombre et du rythme choisi – la page ne vous propose que des durées qui ont du sens."
+      },
+      {
+        "q": "Pourquoi ça ne marche pas sur mon téléphone ?",
+        "a": "Créer la vidéo demande un navigateur récent et suffisamment de mémoire. Essayez une version récente de Chrome ou de Safari, moins de photos, ou un ordinateur."
+      },
+      {
+        "q": "Quel format choisir ?",
+        "a": "9:16 à la verticale pour les Reels Instagram, les Stories et TikTok ; 16:9 à l’horizontale pour YouTube, le web ou une projection pendant le mariage."
+      }
+    ]
+  },
+  "tool": {
+    "pickPhotos": "Choisir des photos",
+    "addPhotos": "Ajouter d’autres photos",
+    "dropHint": "ou glissez-les ici · 3 à 60 photos · JPEG, PNG, WebP",
+    "preparingTool": "Préparation de l’outil…",
+    "preparing": "Préparation des photos : {done} sur {total}",
+    "checking": "Vérification des photos : {done} sur {total}",
+    "photoCount": "{count, plural, one {# photo} many {# photos} other {# photos}}",
+    "needMore": "Ajoutez encore {count, plural, one {# photo} many {# photos} other {# photos}} – il en faut au moins {min} pour la vidéo.",
+    "full": "La vidéo ne peut pas contenir plus de {max} photos.",
+    "skipped": "{count, plural, one {# photo n’a pas pu être ajoutée} many {# photos n’ont pas pu être ajoutées} other {# photos n’ont pas pu être ajoutées}} – la limite est de {max}.",
+    "rejectedHeading": "Ces photos ne peuvent pas être utilisées :",
+    "problem": {
+      "type": "ni JPEG, ni PNG, ni WebP",
+      "tooSmallFile": "fichier trop petit",
+      "tooLargeFile": "fichier de plus de 40 Mo",
+      "tooFewPixels": "moins de 1000 px sur le petit côté",
+      "tooManyPixels": "plus de 62 mégapixels",
+      "unreadable": "impossible à ouvrir"
+    },
+    "remove": "Retirer {name}",
+    "flagged": "À vérifier",
+    "flaggedHint": "Quelqu’un a peut-être cligné des yeux sur cette photo.",
+    "flaggedCount": "{count, plural, one {# photo est signalée} many {# photos sont signalées} other {# photos sont signalées}} – jetez-y un œil avant de créer la vidéo.",
+    "removeFlagged": "Retirer les photos signalées",
+    "orderLabel": "Ordre",
+    "orderTime": "Par heure de prise de vue",
+    "orderName": "Par nom de fichier",
+    "aspectLabel": "Format de la vidéo",
+    "aspectVertical": "9:16 vertical",
+    "aspectVerticalHint": "Reels, Stories, TikTok",
+    "aspectHorizontal": "16:9 horizontal",
+    "aspectHorizontalHint": "YouTube, web",
+    "modeLabel": "Rythme",
+    "modeNormal": "Calme",
+    "modeNormalHint": "cérémonie, portraits",
+    "modeDynamic": "Dynamique",
+    "modeDynamicHint": "soirée, montage rythmé",
+    "lengthLabel": "Durée",
+    "seconds": "{seconds} s",
+    "minutes": "{minutes} min",
+    "previewLabel": "Aperçu de la vidéo",
+    "play": "Lire",
+    "pause": "Pause",
+    "create": "Créer la vidéo",
+    "rendering": "Création de la vidéo : {percent} %",
+    "cancel": "Annuler",
+    "download": "Télécharger la vidéo (MP4)",
+    "doneNote": "C’est prêt ! La vidéo dure {seconds} s et n’a pas de son – ajoutez la musique dans l’application où vous la partagerez.",
+    "vp9Note": "Ce navigateur ne prend pas en charge le format H.264 : la vidéo sera au format VP9. Elle risque de ne pas se lire sur iPhone – par précaution, créez-la dans Chrome ou Safari sur un ordinateur.",
+    "unsupported": "Ce navigateur ne permet pas de créer la vidéo. Ouvrez la page dans une version récente de Chrome, Edge ou Safari.",
+    "renderFailed": "La vidéo n’a pas pu être créée. Réessayez avec moins de photos, ou sur un ordinateur.",
+    "checkUnavailable": "La vérification des photos ne fonctionne pas ici – vous pouvez quand même créer la vidéo.",
+    "startOver": "Recommencer"
+  }
+}

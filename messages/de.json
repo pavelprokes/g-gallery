@@ -16,7 +16,11 @@
     "website": "svatebni-fotograf-cechy.cz",
     "copyright": "© {year} Pavel Prokeš. Alle Rechte vorbehalten.",
     "builtBy": "Diese Website hat Pavel Prokeš selbst gebaut.",
-    "guide": "Anleitung zur Galerie"
+    "guide": "Anleitung zur Galerie",
+    "links": "Links",
+    "help": "Hilfe zur Galerie",
+    "slideshow": "Kostenloses Video aus Hochzeitsfotos",
+    "photographer": "Pavel Prokeš, Hochzeitsfotograf"
   },
   "manifest": {
     "name": "Hochzeitsfoto-Galerie",

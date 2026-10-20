@@ -1,0 +1,134 @@
+{
+  "page": {
+    "pageTitle": "Free wedding photo video maker – slideshow for Instagram Reels",
+    "pageDescription": "Turn your wedding photos into a free video: add 3 to 60 photos, pick 9:16 for Reels and TikTok or 16:9 for YouTube, and download an MP4. Nothing is uploaded.",
+    "homeLink": "Make a free video from your wedding photos",
+    "kicker": "Free, from a wedding photographer",
+    "heroTitle": "A video from your wedding photos in minutes",
+    "heroLead": "Add your wedding photos, choose the shape and length, and download a finished MP4. The camera slowly drifts in and out on each photo, and one photo fades gently into the next. No sign-up, no watermark and nothing to install.",
+    "privacyBadge": "Your photos stay on your device – nothing is uploaded.",
+    "startCta": "Make a video",
+    "toolHeading": "Make your video",
+    "howHeading": "How it works",
+    "how": [
+      {
+        "title": "Add your photos",
+        "body": "Choose 3 to 60 photos from your phone or computer. The page checks them and gets them ready – it takes a few seconds per photo."
+      },
+      {
+        "title": "Choose the shape, length and pace",
+        "body": "Portrait 9:16 for Instagram Reels, Stories and TikTok, or landscape 16:9 for YouTube and websites. The length adapts to how many photos you have, and the pace can be calm or lively."
+      },
+      {
+        "title": "Watch the preview and download the MP4",
+        "body": "The preview shows exactly what will be in the video. One tap turns it into an MP4 file you can share straight away."
+      }
+    ],
+    "featuresHeading": "What your video gets",
+    "features": [
+      "Every photo you add is always in it – none get left out.",
+      "Photos play in the order they were taken, or by file name.",
+      "Two shapes: 9:16 portrait (1080 × 1920) and 16:9 landscape (1920 × 1080).",
+      "Anything from a few seconds to three minutes, depending on how many photos you have.",
+      "A calm pace for the ceremony and portraits, a lively one for the party and quick highlights.",
+      "Slow camera movement and soft fades, just like in a wedding film.",
+      "It points out any photo that might spoil the video, so you can leave it out.",
+      "The video has no sound – add music right in Instagram or TikTok, where it's licensed for you to use."
+    ],
+    "privacyHeading": "Your photos don't go anywhere",
+    "privacyBody": "Everything happens right in your browser: checking the photos, the preview and making the video. Nothing is uploaded to any server and we keep nothing – when you close the page, your photos go with it. Hidden details, such as where a photo was taken, are also removed while it's being prepared.",
+    "limitsHeading": "Which photos and devices work",
+    "limits": [
+      "3 to 60 photos in JPEG, PNG or WebP. (iPhone photos in HEIC format: save them as JPEG first, or send them to yourself via AirDrop or email.)",
+      "Each photo at least 1000 px on its shorter side, and no more than 62 megapixels or 40 MB.",
+      "Works best in an up-to-date Chrome, Edge or Safari. It's quicker on a computer than on a phone.",
+      "Making the video takes about as long as the video itself – keep the page open until it's done."
+    ],
+    "weddingHeading": "Planning your wedding?",
+    "weddingBody": "This tool was made for couples photographed by Pavel Prokeš, a wedding photographer from Prague. Every couple he works with gets a short video for social media, in both portrait and landscape, ready and waiting in their online gallery – together with all their photos to download and the photos their guests took on the day.",
+    "weddingCta": "See Pavel's weddings",
+    "galleryLink": "How the wedding gallery works",
+    "faqHeading": "Frequently asked questions",
+    "faq": [
+      {
+        "q": "Is it really free?",
+        "a": "Yes. No sign-up, no watermark and no limit on how many videos you make. The tool is run by wedding photographer Pavel Prokeš as a gift to couples and their guests."
+      },
+      {
+        "q": "Are my photos uploaded anywhere?",
+        "a": "No. Your photos are processed only in your browser and are never sent to a server. Close the page and nothing is left behind."
+      },
+      {
+        "q": "Why is there no music?",
+        "a": "Music in the video could run into copyright problems on Instagram, TikTok or YouTube. Add it in the app instead, where it's licensed for you to use."
+      },
+      {
+        "q": "How many photos can I use, and how long will the video be?",
+        "a": "3 to 60 photos. Every one of them is always in the video, so the length depends on how many there are and the pace you choose – the page only offers lengths that make sense."
+      },
+      {
+        "q": "Why won't it work on my phone?",
+        "a": "Making the video needs a recent browser and plenty of memory. Try an up-to-date Chrome or Safari, fewer photos, or a computer."
+      },
+      {
+        "q": "Which shape should I choose?",
+        "a": "9:16 portrait for Instagram Reels, Stories and TikTok; 16:9 landscape for YouTube, a website or showing on a screen at the wedding."
+      }
+    ]
+  },
+  "tool": {
+    "pickPhotos": "Choose photos",
+    "addPhotos": "Add more photos",
+    "dropHint": "or drag them here · 3 to 60 photos · JPEG, PNG, WebP",
+    "preparingTool": "Getting ready…",
+    "preparing": "Preparing photos: {done} of {total}",
+    "checking": "Checking photos: {done} of {total}",
+    "photoCount": "{count, plural, one {# photo} other {# photos}}",
+    "needMore": "Add {count, plural, one {# more photo} other {# more photos}} – the video needs at least {min}.",
+    "full": "A video can't hold more than {max} photos.",
+    "skipped": "{count, plural, one {# photo didn't fit} other {# photos didn't fit}} – the limit is {max}.",
+    "rejectedHeading": "These photos can't be used:",
+    "problem": {
+      "type": "it isn't a JPEG, PNG or WebP",
+      "tooSmallFile": "the file is too small",
+      "tooLargeFile": "the file is over 40 MB",
+      "tooFewPixels": "the shorter side is under 1000 px",
+      "tooManyPixels": "it's over 62 megapixels",
+      "unreadable": "it can't be opened"
+    },
+    "remove": "Remove {name}",
+    "flagged": "Take a look",
+    "flaggedHint": "Someone may have blinked in this photo.",
+    "flaggedCount": "{count, plural, one {# photo is marked} other {# photos are marked}} – have a look before you make the video.",
+    "removeFlagged": "Remove marked photos",
+    "orderLabel": "Order",
+    "orderTime": "By time taken",
+    "orderName": "By file name",
+    "aspectLabel": "Video shape",
+    "aspectVertical": "9:16 portrait",
+    "aspectVerticalHint": "Reels, Stories, TikTok",
+    "aspectHorizontal": "16:9 landscape",
+    "aspectHorizontalHint": "YouTube, websites",
+    "modeLabel": "Pace",
+    "modeNormal": "Calm",
+    "modeNormalHint": "ceremony, portraits",
+    "modeDynamic": "Lively",
+    "modeDynamicHint": "party, highlights",
+    "lengthLabel": "Length",
+    "seconds": "{seconds} s",
+    "minutes": "{minutes} min",
+    "previewLabel": "Video preview",
+    "play": "Play",
+    "pause": "Pause",
+    "create": "Make video",
+    "rendering": "Making your video: {percent}%",
+    "cancel": "Cancel",
+    "download": "Download video (MP4)",
+    "doneNote": "All done. Your video is {seconds} seconds long and has no sound – add music in the app you share it from.",
+    "vp9Note": "This browser can't make H.264 video, so yours will be in VP9 format. It may not play on an iPhone – to be safe, make it in Chrome or Safari on a computer.",
+    "unsupported": "This browser can't make the video. Open the page in an up-to-date Chrome, Edge or Safari.",
+    "renderFailed": "The video couldn't be made. Try again with fewer photos, or on a computer.",
+    "checkUnavailable": "The photo check doesn't work here – you can still make the video.",
+    "startOver": "Start over"
+  }
+}
