@@ -7,6 +7,7 @@ import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
 import { guidePath } from "@/lib/guide-path";
 import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
+import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
 
@@ -105,24 +106,29 @@ export default async function Home() {
             {t("heroTitle")}
           </h1>
           <p className="mt-4 max-w-prose text-neutral-600 dark:text-neutral-400">{t("heroLead")}</p>
-          <a
-            href={guestGalleryPageUrl(locale)}
-            className="text-brand-primary hover:text-brand-primary-dark mt-6 block w-fit text-sm font-medium underline underline-offset-4"
-          >
-            {t("forYourWedding")}
+          {/* One primary action: whoever lands here holds a gallery link and
+              wants to know how to use it. The rest is quieter on purpose. */}
+          <a href={guidePath(locale)} className={`mt-6 ${buttonClasses("primary", "lg")}`}>
+            {t("guideLink")} →
           </a>
-          <a
-            href={guidePath(locale)}
-            className="text-brand-primary hover:text-brand-primary-dark mt-3 block w-fit text-sm font-medium underline underline-offset-4"
-          >
-            {t("guideLink")}
-          </a>
-          <a
-            href={MAIN_SITE_URL}
-            className="text-brand-primary hover:text-brand-primary-dark mt-3 inline-block text-sm font-medium underline underline-offset-4"
-          >
-            {t("backToMainSite")}
-          </a>
+          <ul className="mt-6 space-y-2 text-sm">
+            <li>
+              <a
+                href={guestGalleryPageUrl(locale)}
+                className="hover:text-brand-primary text-neutral-600 underline underline-offset-4 dark:text-neutral-400"
+              >
+                {t("forYourWedding")}
+              </a>
+            </li>
+            <li>
+              <a
+                href={MAIN_SITE_URL}
+                className="hover:text-brand-primary text-neutral-600 underline underline-offset-4 dark:text-neutral-400"
+              >
+                {t("backToMainSite")}
+              </a>
+            </li>
+          </ul>
         </div>
         <Image
           src="/iphone-mockup.webp"
