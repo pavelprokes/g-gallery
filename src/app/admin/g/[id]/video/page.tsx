@@ -6,6 +6,10 @@ import { HIGHLIGHT_CANDIDATE_SELECT, toHighlightCandidate } from "@/lib/gallery-
 import { CHAPTER_START_SELECT, chapterStartOf, positionOf } from "@/lib/photo-order";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
 import { currentFaces } from "@/lib/social-video/faces";
+import { likedScore } from "@/lib/social-video/suggest";
+import { photoCounts } from "@/lib/activity";
+import { printTotals } from "@/lib/print-selections";
+import { reactionTotals } from "@/lib/reactions";
 import { galleryVideoCrumbs } from "@/lib/admin-breadcrumbs";
 import { SocialVideoStudio, type StudioPhoto } from "@/components/admin/social-video-studio";
 import { Alert } from "@/components/ui/alert";
@@ -55,11 +59,20 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
             where: { person: { couple: true } },
             select: { x: true, y: true, w: true, h: true },
           },
+          _count: { select: { favorites: true } },
         },
       },
     },
   });
   if (!gallery) notFound();
+
+  // What the guests took to (docs/SOCIAL-VIDEO.md §3) — the same tallies the
+  // gallery's own admin page shows.
+  const [viewers, reactions, prints] = await Promise.all([
+    photoCounts(gallery.id),
+    reactionTotals(gallery.id),
+    printTotals(gallery.id),
+  ]);
 
   const order = gallery.photoOrder;
   const photos: StudioPhoto[] = gallery.photos
@@ -76,6 +89,12 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
         height: photo.height,
         faces: currentFaces(photo.faces),
         coupleTags: photo.faceTags,
+        liked: likedScore({
+          favorites: photo._count.favorites,
+          reactions: reactions.get(photo.id) ?? 0,
+          printCopies: prints.get(photo.id) ?? 0,
+          uniqueViewers: viewers.get(photo.id)?.uniqueViewers ?? 0,
+        }),
       },
     }));
 

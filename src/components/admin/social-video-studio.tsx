@@ -136,8 +136,10 @@ export function SocialVideoStudio({
   );
 
   const suggest = useCallback(
-    (forAspect: Aspect, forLength: Length) =>
-      suggestPhotos(candidatesNow(), chapterStarts, FORMATS[forAspect], photoCountFor(forLength)),
+    (forAspect: Aspect, forLength: Length, avoid?: ReadonlySet<string>) =>
+      suggestPhotos(candidatesNow(), chapterStarts, FORMATS[forAspect], photoCountFor(forLength), {
+        avoid,
+      }),
     [candidatesNow, chapterStarts],
   );
 
@@ -511,8 +513,22 @@ export function SocialVideoStudio({
   const toggle = (id: string) => {
     setOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
-  const reSuggest = (nextAspect = aspect, nextLength = length) =>
+  // Every photo "Jiný výběr" has shown since the last plain suggestion, so
+  // each press reaches further; once the day has nothing new, it starts over.
+  const shown = useRef<Set<string>>(new Set());
+  const reSuggest = (nextAspect = aspect, nextLength = length) => {
+    shown.current = new Set();
     setOrder(suggest(nextAspect, nextLength));
+  };
+  const suggestAnother = () => {
+    for (const id of order) shown.current.add(id);
+    let next = suggest(aspect, length, shown.current);
+    if (next.every((id) => order.includes(id))) {
+      shown.current = new Set(order);
+      next = suggest(aspect, length, shown.current);
+    }
+    setOrder(next);
+  };
 
   const seconds = timeline.duration;
   const stripItems = order.flatMap((id) => {
@@ -563,6 +579,9 @@ export function SocialVideoStudio({
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => reSuggest()}>
                 Navrhnout znovu
+              </Button>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={suggestAnother}>
+                Jiný výběr
               </Button>
               <Button
                 size="sm"
