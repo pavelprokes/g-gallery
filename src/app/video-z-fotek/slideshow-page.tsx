@@ -8,7 +8,7 @@ import { CheckCircleIcon } from "@/components/ui/icons";
 import { guidePath } from "@/lib/guide-path";
 import { slideshowJsonLd, type FaqEntry } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
-import { SITE_ORIGIN } from "@/lib/site-url";
+import { MAIN_SITE_URL, SITE_ORIGIN } from "@/lib/site-url";
 import { SLIDESHOW_PATHS, type SlideshowLocale } from "@/lib/slideshow-path";
 import cs from "../../../messages/cs.json";
 import de from "../../../messages/de.json";
@@ -32,7 +32,6 @@ import slideshowSk from "./slideshow.sk.json";
  * page, as the guide's does (src/app/navod/guide-page.tsx), and the language
  * comes from the address alone.
  */
-const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 const MESSAGES = {
   cs: { ...cs, slideshowMaker: slideshowCs },
@@ -65,11 +64,6 @@ const ENGLISH_ANCHORS: Record<SectionKey, string> = {
   wedding: "wedding",
   faq: "questions",
 };
-
-/** The link to the maker on the home page, in the viewer's language. */
-export function slideshowHomeLink(locale: SlideshowLocale): { href: string; label: string } {
-  return { href: SLIDESHOW_PATHS[locale], label: MESSAGES[locale].slideshowMaker.page.homeLink };
-}
 
 function pageTranslator(locale: SlideshowLocale) {
   return createTranslator({

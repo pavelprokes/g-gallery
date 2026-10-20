@@ -52,7 +52,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: SLIDESHOW_LAST_MODIFIED,
       changeFrequency: "monthly" as const,
       priority: 0.8,
-      alternates: { languages: slideshowLanguages },
+      alternates: {
+        languages: { ...slideshowLanguages, "x-default": slideshowLanguages.en! },
+      },
     })),
   ];
 }

@@ -147,18 +147,20 @@ export function SlideshowMaker({ fileStem }: { fileStem: string }) {
     const files = [...list].filter((f) => f.type.startsWith("image/") || f.type === "");
     const fits = room(photosRef.current.length, files.length);
     setSkipped(files.length - fits);
-    if (fits === 0 && files.length > 0) {
+    setRejected([]);
+    setError(null);
+    setNotice(null);
+    const notImages = list.length - files.length;
+    if (fits === 0) {
       trackEvent("slideshow-photos-added", {
         added: 0,
         rejected: 0,
         skipped: files.length,
+        notImages,
         total: photosRef.current.length,
       });
+      return;
     }
-    setRejected([]);
-    setError(null);
-    setNotice(null);
-    if (fits === 0) return;
     clearResult();
 
     const taken = files.slice(0, fits);
@@ -185,6 +187,7 @@ export function SlideshowMaker({ fileStem }: { fileStem: string }) {
       added: ready.length,
       rejected: refused.length,
       skipped: files.length - fits,
+      notImages,
       total: photosRef.current.length + ready.length,
       ...problems,
     });

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import Image from "next/image";
+import { MAIN_SITE_URL } from "@/lib/site-url";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
 import { guidePath } from "@/lib/guide-path";
 import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
-import { slideshowHomeLink } from "./video-z-fotek/slideshow-page";
+import { slideshowHomeLink } from "@/lib/slideshow-home-link";
 import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircleIcon, DownloadIcon } from "@/components/ui/icons";
@@ -47,8 +48,6 @@ export async function generateMetadata(): Promise<Metadata> {
     ...preview,
   };
 }
-
-const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 /**
  * The main site's sales page for the guest gallery — this page stays the guests' help

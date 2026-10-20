@@ -1,11 +1,10 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { MAIN_SITE_URL } from "@/lib/site-url";
 import { isLocale } from "@/i18n/locales";
 import { guidePath } from "@/lib/guide-path";
 import { SLIDESHOW_PATHS } from "@/lib/slideshow-path";
-
-const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 /** The public pages, so a footer can say which one it sits on. */
 export type FooterPage = "help" | "guide" | "slideshow";
@@ -52,6 +51,8 @@ export function SiteFooterIdentity({
               <a
                 href={link.href}
                 aria-current={link.page === current ? "page" : undefined}
+                // The main site opens beside the gallery, as the identity link below does.
+                {...(link.page === "photographer" ? { target: "_blank", rel: "noreferrer" } : {})}
                 className="inline-block py-1 underline underline-offset-4 aria-[current=page]:font-semibold aria-[current=page]:no-underline"
               >
                 {link.label}

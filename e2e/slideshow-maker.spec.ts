@@ -98,7 +98,8 @@ test.describe("slideshow maker", () => {
       const context = await browser.newContext({ locale });
       const page = await context.newPage();
       await page.goto("/");
-      await expect(page.locator(`main a[href="${path}"]`).first()).toBeVisible();
+      // The hero list, not the footer, which links every page anyway.
+      await expect(page.locator(`main > header a[href="${path}"]`)).toBeVisible();
       await context.close();
     }
   });
