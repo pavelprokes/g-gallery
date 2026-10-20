@@ -11,6 +11,8 @@ export interface PendingUpload {
   id: string;
   fileName: string;
   sizeBytes: number | null;
+  /** The photo an interrupted replacement was going to replace. */
+  replacesPhotoId?: string | null;
 }
 
 /** Enough of File to match on, so this stays testable outside a browser. */
@@ -57,37 +59,52 @@ export interface ExistingPhoto {
   fileName: string;
 }
 
+/** An export's sequence and what follows it: `svatba_0412_` + `PPR57923`. */
+const SEQUENCED = /^(.*[_-]\d+[_-])(.+)$/;
+/** A Photoshop round trip's suffix — the same shot. */
+const EDITED = /[-_ ](edit|upravit)(-\d+)?$/;
+const stemOf = (fileName: string) => fileName.replace(/\.[^.]*$/, "");
+
+/** A file's stem, lowercased and without a Photoshop round trip's suffix. */
+const shotStem = (fileName: string) => stemOf(fileName).toLowerCase().replace(EDITED, "");
+
+/** Whether the name carries an export sequence before the camera's name. */
+export function isSequenced(fileName: string): boolean {
+  return SEQUENCED.test(shotStem(fileName));
+}
+
+/**
+ * The camera's name for the shot, or null: what follows the export's sequence
+ * (`svatba_0412_PPR57923`), or a bare name (`PPR57923`, an export without a
+ * sequence — Pavel's fix set, 2026-10-19). It needs letters and digits both,
+ * so `IMG_4821-2` (a bare `2` after a sequence) or `2026-09-05_0412` names no
+ * shot. A name that is a sequence alone (`svatba_0001`) does get a key, but a
+ * pair with it is never pre-selected (`planPick`): a second batch numbered
+ * from 1 would otherwise pair with unrelated photos.
+ */
+function cameraOf(fileName: string): string | null {
+  const stem = shotStem(fileName);
+  const core = SEQUENCED.exec(stem)?.[2] ?? stem;
+  return /[a-z]/.test(core) && /\d/.test(core) ? core : null;
+}
+
 /**
  * The part of a file name that names the shot, not its place in an export:
- * `svatba_0412_PPR57923.jpg` → `ppr57923.jpg`, and a bare `PPR57923.jpg` (an
- * export without a sequence, Pavel 2026-10-19) is the same shot. Lightroom's
- * sequence is the last `_<digits>_` (or `-`) in the name, so a re-export
- * numbered from 1 still yields the camera's own name — `DSC_1234` too,
- * underscore and all — and a Photoshop round trip's `-Edit` is the same shot.
- * A key needs letters and digits both: what follows a sequence in
- * `2026-09-05_0412` or `IMG_4821-2` is a bare number, which would pair
- * unrelated shots, so such a name only ever matches itself, and one with no
- * letters at all matches nothing. The extension is part of the key, so a
- * replacement keeps the delivered file name exactly (docs/REPLACE-PHOTOS.md).
+ * `svatba_0412_PPR57923.jpg` and `DSC_1234-Edit.jpg` are `ppr57923.jpg` and
+ * `dsc_1234.jpg`. The extension is part of the key, so a replacement keeps the
+ * delivered file name exactly (docs/REPLACE-PHOTOS.md).
  */
 export function shotKey(fileName: string): string | null {
-  const lower = fileName.toLowerCase();
-  const extension = (/\.([^.]*)$/.exec(lower)?.[1] ?? "").replace(/^jpeg$/, "jpg");
-  const shot = (name: string | undefined) => {
-    const core = name?.replace(/[-_ ](edit|upravit)(-\d+)?$/, "");
-    return core && /[a-z]/.test(core) && /\d/.test(core) ? core : null;
-  };
-  const stem = lower.replace(/\.[^.]*$/, "");
-  const camera = shot(/^.*[_-]\d+[_-](.+)$/.exec(stem)?.[1]) ?? shot(stem);
-  return camera ? `${camera}.${extension}` : null;
+  const camera = cameraOf(fileName);
+  if (!camera) return null;
+  const extension = (/\.([^.]*)$/.exec(fileName.toLowerCase())?.[1] ?? "").replace(/^jpeg$/, "jpg");
+  return `${camera}.${extension}`;
 }
 
 /**
  * Per picked file, every delivered photo it could replace — empty when none.
- * One candidate is a pair; several (Lightroom virtual copies, two bodies'
- * counters) are the photographer's choice, never a guess, because a wrong
- * pair deletes a photo. Two picked files with one key pair with nothing, and
- * a file already resuming a PENDING row is left to that.
+ * Two picked files with one key pair with nothing, and a file resuming a
+ * PENDING row is left to that row.
  */
 export function replaceCandidates(
   files: readonly PickedFile[],
@@ -111,51 +128,130 @@ export function replaceCandidates(
   });
 }
 
-/** The unambiguous pairs only: per picked file, the photo it replaces. */
-export function matchReplaceTargets(
-  files: readonly PickedFile[],
-  existing: readonly ExistingPhoto[],
-  resumeIds: readonly (string | undefined)[] = [],
-): (string | undefined)[] {
-  return replaceCandidates(files, existing, resumeIds).map((ids) =>
-    ids.length === 1 ? ids[0] : undefined,
-  );
-}
-
-const SEQUENCED = /^(.*[_-]\d+[_-])(.+)$/;
+const counterOf = (camera: string | null) => {
+  const match = camera ? /^(.*?)(\d+)$/.exec(camera) : null;
+  return match ? { body: match[1]!, n: Number(match[2]) } : null;
+};
 
 /**
- * A new shot exported with its bare camera name (`PPR56518.jpg`) into a
- * gallery delivered with an export sequence would sort before every
- * `svatba_…` photo. It goes after the same camera's nearest lower number
- * instead, under that photo's sequence: `svatba_0384_PPR56518.jpg` follows
- * `svatba_0384_PPR56511.jpg` in file-name order (docs/REPLACE-PHOTOS.md).
- * Null when the name already carries a sequence or nothing of that camera
- * comes before it.
+ * Where new shots go (docs/REPLACE-PHOTOS.md). One exported with its bare
+ * camera name (`PPR56518.jpg`) into a gallery delivered with a sequence would
+ * sort before every `svatba_…` photo; it is stored under the sequence of the
+ * same camera's nearest lower number instead — `svatba_0384_PPR56518.jpg`
+ * after `svatba_0384_PPR56511.jpg`. Null for a name with its own sequence and
+ * when nothing of that camera comes before it.
  *
  * ponytail: camera counter, not capture time — exact within one body and
- * clock-proof, but a counter that wrapped (9999 → 0001) lands wrong. Capture
- * time would need the EXIF read before presign.
+ * clock-proof, but two bodies sharing a prefix (`DSC_`) or a counter that
+ * wrapped (9999 → 0001) land wrong. Capture time would need EXIF before presign.
  */
-export function slotAfter(
-  fileName: string,
+export function slotter(
   existing: readonly ExistingPhoto[],
-): { name: string; after: string } | null {
-  const stemOf = (name: string) => name.replace(/\.[^.]*$/, "");
-  const counter = (camera: string) => {
-    const match = /^(.*?)(\d+)$/.exec(camera.toLowerCase());
-    return match ? { body: match[1], n: Number(match[2]) } : null;
+): (fileName: string) => { name: string; after: string } | null {
+  // Parsed once: the review runs this for every picked file.
+  const delivered = existing.flatMap((photo) => {
+    const prefix = SEQUENCED.exec(shotStem(photo.fileName))?.[1];
+    const counter = counterOf(cameraOf(photo.fileName));
+    if (!prefix || !counter) return [];
+    // The delivered name's own case, not the lowercased match.
+    return [
+      { prefix: photo.fileName.slice(0, prefix.length), ...counter, fileName: photo.fileName },
+    ];
+  });
+  return (fileName) => {
+    if (isSequenced(fileName)) return null;
+    const own = counterOf(cameraOf(fileName));
+    if (!own) return null;
+    let best: (typeof delivered)[number] | null = null;
+    for (const photo of delivered) {
+      if (photo.body !== own.body || photo.n >= own.n) continue;
+      if (!best || photo.n > best.n) best = photo;
+    }
+    return best && { name: best.prefix + fileName, after: best.fileName };
   };
-  if (SEQUENCED.test(stemOf(fileName))) return null;
-  const own = counter(stemOf(fileName));
-  if (!own) return null;
-  let best: { prefix: string; n: number; after: string } | null = null;
-  for (const photo of existing) {
-    const match = SEQUENCED.exec(stemOf(photo.fileName));
-    const theirs = match ? counter(match[2]!) : null;
-    if (!theirs || theirs.body !== own.body || theirs.n >= own.n) continue;
-    if (!best || theirs.n > best.n)
-      best = { prefix: match![1]!, n: theirs.n, after: photo.fileName };
+}
+
+/** What the review offers for one picked file (`planPick`). */
+export interface PickPlan {
+  /** Delivered photos it could replace; empty when none. */
+  candidates: string[];
+  /**
+   * The pair to pre-select: a single candidate whose delivered name carries a
+   * sequence. Any other pair waits for the photographer's pick.
+   */
+  preselect?: string;
+  /** Where it goes as a new shot (`slotter`), when it does not replace. */
+  slot: { name: string; after: string } | null;
+  /** The PENDING row an interrupted run left for it. */
+  resumeId?: string;
+  /** A name it must keep whatever is chosen: the one its resumed row was filed under. */
+  keepName?: string;
+  /** It resumes a replacement whose photo has been deleted since. */
+  lostTarget: boolean;
+}
+
+/**
+ * Everything the uploader's review needs for a pick, in one pure place so it
+ * is testable. An interrupted run is resumed under the name it was stored with
+ * — the file's own, or the filed one — each row claimed once, and goes on
+ * replacing what it was replacing.
+ */
+export function planPick(
+  files: readonly PickedFile[],
+  pending: readonly PendingUpload[],
+  existing: readonly ExistingPhoto[],
+): PickPlan[] {
+  const slot = slotter(existing);
+  const slots = files.map((file) => slot(file.name));
+  const rows = new Map<string, PendingUpload[]>();
+  for (const row of pending) {
+    if (row.sizeBytes === null) continue;
+    const key = `${row.fileName} ${row.sizeBytes}`;
+    rows.set(key, [...(rows.get(key) ?? []), row]);
   }
-  return best && { name: best.prefix + fileName, after: best.after };
+  const claim = (name: string | undefined, size: number) =>
+    name === undefined ? undefined : rows.get(`${name} ${size}`)?.shift();
+  // Own names first, for every file, then filed names: a file that already
+  // carries the filed name must not lose its row to the bare one.
+  const own = files.map((file) => claim(file.name, file.size));
+  const resumed = files.map((file, index) =>
+    own[index]
+      ? { row: own[index], filed: false }
+      : (() => {
+          const filed = claim(slots[index]?.name, file.size);
+          return filed ? { row: filed, filed: true } : undefined;
+        })(),
+  );
+  const names = new Map(existing.map((photo) => [photo.id, photo.fileName]));
+  const candidates = replaceCandidates(
+    files,
+    existing,
+    resumed.map((entry) => entry?.row.id),
+  );
+  return files.map((_, index) => {
+    const entry = resumed[index];
+    const was = entry?.row.replacesPhotoId ?? undefined;
+    if (entry && was) {
+      return names.has(was)
+        ? {
+            candidates: [was],
+            preselect: was,
+            slot: null,
+            resumeId: entry.row.id,
+            lostTarget: false,
+          }
+        : { candidates: [], slot: null, resumeId: entry.row.id, lostTarget: true };
+    }
+    const ids = entry ? [] : candidates[index]!;
+    const sure = ids.length === 1 && isSequenced(names.get(ids[0]!) ?? "");
+    return {
+      candidates: ids,
+      preselect: sure ? ids[0] : undefined,
+      // A row resumed under its own name keeps it; one filed keeps that.
+      slot: entry && !entry.filed ? null : slots[index]!,
+      resumeId: entry?.row.id,
+      keepName: entry?.filed ? slots[index]!.name : undefined,
+      lostTarget: false,
+    };
+  });
 }

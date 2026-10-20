@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   matchResumeTargets,
-  replaceCandidates,
-  slotAfter,
+  planPick,
   type ExistingPhoto,
   type PendingUpload,
+  type PickPlan,
 } from "@/lib/upload-resume";
 import { czechPlural, FORMS, pluralize } from "@/lib/czech-plural";
 import {
@@ -39,17 +39,15 @@ interface Item {
   error?: string;
   /** The photo this corrected export replaces, kept so a retry still does. */
   replaceId?: string;
-  /** The name it is stored under when that is not its own (`slotAfter`). */
+  /** The name it is stored under when that is not its own (`slotter`). */
   uploadName?: string;
 }
 
 /** A selection waiting on "replace / file these?" (docs/REPLACE-PHOTOS.md). */
 interface Review {
   files: File[];
-  /** Per file, the delivered photos it could replace (`replaceCandidates`). */
-  candidates: string[][];
-  /** Per file, where a new shot goes in file-name order (`slotAfter`). */
-  slots: ({ name: string; after: string } | null)[];
+  /** Per file, what can happen to it (`planPick`). */
+  plans: PickPlan[];
   names: Map<string, string>;
 }
 
@@ -186,17 +184,15 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       // assumed — the old file is deleted (docs/REPLACE-PHOTOS.md).
       void fetchReplaceCandidates(galleryId).then(({ pending, existing }) => {
         setPreparing(false);
-        const candidates = replaceCandidates(photos, existing, matchResumeTargets(photos, pending));
-        // A new shot with a bare camera name is filed among the delivered
-        // ones by its camera number, also asked about first.
-        const slots = photos.map((file) => slotAfter(file.name, existing));
-        if (!candidates.some((ids) => ids.length > 0) && !slots.some(Boolean)) {
+        // Pairs, new shots filed by camera number, and resumed rows — all
+        // decided in src/lib/upload-resume.ts, all asked about first.
+        const plans = planPick(photos, pending, existing);
+        if (!plans.some((plan) => plan.candidates.length > 0 || plan.slot || plan.lostTarget)) {
           return void start(photos);
         }
         setReview({
           files: photos,
-          candidates,
-          slots,
+          plans,
           names: new Map(existing.map((photo: ExistingPhoto) => [photo.id, photo.fileName])),
         });
       });
@@ -361,7 +357,14 @@ export function Uploader({ galleryId }: { galleryId: string }) {
         <ReplaceReview
           review={review}
           onConfirm={(replaceIds, uploadNames) => void start(review.files, replaceIds, uploadNames)}
-          onAsNew={() => void start(review.files)}
+          // A resumed row filed under another name keeps it, or it is not resumed.
+          onAsNew={() =>
+            void start(
+              review.files,
+              [],
+              review.plans.map((plan) => plan.keepName),
+            )
+          }
           onCancel={() => setReview(null)}
         />
       )}
@@ -576,18 +579,30 @@ function ReplaceReview({
   onAsNew: () => void;
   onCancel: () => void;
 }) {
-  // One candidate is chosen already; several (virtual copies) wait for a pick.
-  const [choices, setChoices] = useState(() =>
-    review.candidates.map((ids) => (ids.length === 1 ? ids[0]! : "")),
-  );
+  // A sure pair is chosen already; any other waits for the photographer.
+  const [choices, setChoices] = useState(() => review.plans.map((plan) => plan.preselect ?? ""));
   const replaceIds = choices.map((choice) => (choice && choice !== AS_NEW ? choice : undefined));
-  const uploadNames = review.slots.map((slot, index) =>
-    replaceIds[index] ? undefined : slot?.name,
+  const uploadNames = review.plans.map(
+    (plan, index) => plan.keepName ?? (replaceIds[index] ? undefined : plan.slot?.name),
   );
   const replacing = replaceIds.filter(Boolean).length;
-  const filing = uploadNames.filter(Boolean).length;
-  const undecided = review.candidates.some((ids, index) => ids.length > 1 && !choices[index]);
-  const rest = review.files.length - replacing - filing;
+  const filing = review.plans.filter((plan, index) => !replaceIds[index] && plan.slot).length;
+  const undecided = review.plans.some(
+    (plan, index) => plan.candidates.length > 0 && !choices[index],
+  );
+  const listed = review.plans.filter(
+    (plan) => plan.candidates.length > 0 || plan.slot || plan.lostTarget,
+  ).length;
+  const rest = review.files.length - listed;
+  // Where a file goes when it does not replace: said, never a surprise.
+  const destination = (plan: PickPlan) =>
+    plan.slot ? (
+      <>
+        nová, zařadí se za <span className="font-medium">{plan.slot.after}</span>
+      </>
+    ) : (
+      "nová, pod svým názvem"
+    );
 
   return (
     <Alert className="mt-3">
@@ -608,20 +623,15 @@ function ReplaceReview({
         className="text-admin-muted mt-2 max-h-60 space-y-0.5 overflow-y-auto text-xs dark:text-neutral-400"
       >
         {review.files.map((file, index) => {
-          const ids = review.candidates[index]!;
-          const slot = review.slots[index];
-          if (ids.length === 1) {
-            return (
-              <li key={index} className="truncate">
-                {file.name} → nahradí{" "}
-                <span className="font-medium">{review.names.get(ids[0]!)}</span>
-              </li>
-            );
-          }
-          if (ids.length > 1) {
+          const plan = review.plans[index]!;
+          const ids = plan.candidates;
+          // Every pair is a choice: a sure one comes pre-selected, but two
+          // bodies' `DSC_0412` are different moments, so each can be turned
+          // down on its own.
+          if (ids.length > 0) {
             return (
               <li key={index} className="flex flex-wrap items-center gap-1">
-                {file.name} → v galerii {ids.length}× —
+                {file.name} →{ids.length > 1 && ` v galerii ${ids.length}× —`}
                 <select
                   aria-label={`Co nahradí ${file.name}`}
                   value={choices[index]}
@@ -632,9 +642,11 @@ function ReplaceReview({
                   }
                   className="rounded border px-1 py-0.5 text-xs dark:bg-neutral-800"
                 >
-                  <option value="" disabled>
-                    vyber, kterou nahradit…
-                  </option>
+                  {!plan.preselect && (
+                    <option value="" disabled>
+                      {ids.length > 1 ? "vyber, kterou nahradit…" : "nahradit, nebo přidat?"}
+                    </option>
+                  )}
                   {ids.map((id) => (
                     <option key={id} value={id}>
                       nahradit {review.names.get(id)}
@@ -642,12 +654,20 @@ function ReplaceReview({
                   ))}
                   <option value={AS_NEW}>nenahrazovat, přidat jako novou</option>
                 </select>
+                {choices[index] === AS_NEW && <span>→ {destination(plan)}</span>}
               </li>
             );
           }
-          return slot ? (
+          if (plan.lostTarget) {
+            return (
+              <li key={index} className="truncate">
+                {file.name} → fotka, kterou měl nahradit, už v galerii není: {destination(plan)}
+              </li>
+            );
+          }
+          return plan.slot ? (
             <li key={index} className="truncate">
-              {file.name} → nová, zařadí se za <span className="font-medium">{slot.after}</span>
+              {file.name} → {destination(plan)}
             </li>
           ) : null;
         })}
@@ -658,10 +678,12 @@ function ReplaceReview({
             ? "Nahradit a zařadit"
             : replacing > 0
               ? `Nahradit ${pluralize(replacing, FORMS.photoAccusative)}`
-              : "Zařadit a nahrát"}
+              : filing > 0
+                ? "Zařadit a nahrát"
+                : "Nahrát"}
         </Button>
         <Button size="sm" variant="secondary" onClick={onAsNew}>
-          Nahrát všechny jako nové
+          Nahrát beze změn
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Zrušit

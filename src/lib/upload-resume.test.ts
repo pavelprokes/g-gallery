@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   countResumed,
-  matchReplaceTargets,
   matchResumeTargets,
+  planPick,
   replaceCandidates,
   shotKey,
-  slotAfter,
+  slotter,
   type PendingUpload,
 } from "./upload-resume";
 
@@ -79,18 +79,18 @@ describe("shotKey", () => {
   it("keeps a camera name with an underscore, and sees through a Photoshop edit", () => {
     expect(shotKey("svatba_0001_DSC_1234.jpg")).toBe("dsc_1234.jpg");
     expect(shotKey("svatba_001_PPR57923-Edit.jpg")).toBe("ppr57923.jpg");
-    expect(shotKey("svatba_001_PPR57923-Edit-2.jpg")).toBe("ppr57923.jpg");
+    expect(shotKey("PPR57923-Edit-2.jpg")).toBe("ppr57923.jpg");
   });
 
-  it("takes a bare camera name as the shot", () => {
+  it("takes a bare camera name, edited or not", () => {
     expect(shotKey("PPR55013.jpg")).toBe("ppr55013.jpg");
-    expect(shotKey("IMG_4821.jpg")).toBe("img_4821.jpg");
+    expect(shotKey("DSC_1234-Edit.jpg")).toBe("dsc_1234.jpg");
+    expect(shotKey("svatba_0001_DSC_1234-Edit.jpg")).toBe("dsc_1234.jpg");
   });
 
   it("never keys on a bare number", () => {
     expect(shotKey("2026-09-05_0412.jpg")).toBeNull();
-    // A virtual copy's "-2" is not a shot: the name only matches itself.
-    expect(shotKey("IMG_4821-2.jpg")).toBe("img_4821-2.jpg");
+    expect(shotKey("IMG_4821-2.jpg")).toBeNull();
   });
 
   it("keeps the extension apart", () => {
@@ -98,69 +98,116 @@ describe("shotKey", () => {
   });
 });
 
-describe("matchReplaceTargets", () => {
+describe("replaceCandidates", () => {
   const existing = [
     { id: "a", fileName: "svatba_0001_PPR1001.jpg" },
     { id: "b", fileName: "svatba_0002_PPR1002.jpg" },
   ];
   const file = (name: string) => ({ name, size: 1 });
 
-  it("pairs a bare camera-named export with its delivered photo", () => {
-    expect(matchReplaceTargets([file("PPR1001.jpg")], existing)).toEqual(["a"]);
-  });
-
-  it("pairs a corrected export with the photo it replaces", () => {
+  it("pairs a corrected export, bare or re-numbered, with its photo", () => {
     expect(
-      matchReplaceTargets(
-        [file("svatba_001_PPR1002.jpg"), file("svatba_002_PPR9999.jpg")],
-        existing,
-      ),
-    ).toEqual(["b", undefined]);
+      replaceCandidates([file("PPR1001.jpg"), file("svatba_001_PPR1002.jpg")], existing),
+    ).toEqual([["a"], ["b"]]);
+    expect(replaceCandidates([file("svatba_002_PPR9999.jpg")], existing)).toEqual([[]]);
   });
 
-  it("refuses to guess between two photos or two files with one key", () => {
-    const twoBodies = [...existing, { id: "c", fileName: "svatba_0003_PPR1001.jpg" }];
-    expect(matchReplaceTargets([file("x_1_PPR1001.jpg")], twoBodies)).toEqual([undefined]);
-    expect(
-      matchReplaceTargets([file("x_1_PPR1002.jpg"), file("y_7_PPR1002.jpg")], existing),
-    ).toEqual([undefined, undefined]);
-  });
-
-  it("leaves a file that resumes a pending row alone", () => {
-    expect(matchReplaceTargets([file("x_1_PPR1001.jpg")], existing, ["p1"])).toEqual([undefined]);
-  });
-});
-
-describe("replaceCandidates", () => {
   it("offers every virtual copy of a shot to choose from", () => {
     const copies = [
       { id: "colour", fileName: "svatba_0215_PPR55013.jpg" },
       { id: "bw", fileName: "svatba_0216_PPR55013.jpg" },
     ];
-    expect(replaceCandidates([{ name: "PPR55013.jpg", size: 1 }], copies)).toEqual([
-      ["colour", "bw"],
-    ]);
+    expect(replaceCandidates([file("PPR55013.jpg")], copies)).toEqual([["colour", "bw"]]);
+  });
+
+  it("pairs nothing for two picked files with one key, or a resumed file", () => {
+    expect(
+      replaceCandidates([file("x_1_PPR1002.jpg"), file("PPR1002-Edit.jpg")], existing),
+    ).toEqual([[], []]);
+    expect(replaceCandidates([file("PPR1001.jpg")], existing, ["p1"])).toEqual([[]]);
   });
 });
 
-describe("slotAfter", () => {
-  const delivered = [
+describe("slotter", () => {
+  const slot = slotter([
     { id: "a", fileName: "svatba_0384_PPR56511.jpg" },
-    { id: "b", fileName: "svatba_0385_PPR56600.jpg" },
+    { id: "b", fileName: "svatba_0385_PPR56600-Edit.jpg" },
     { id: "c", fileName: "svatba_0386_DSC_0100.jpg" },
-  ];
+  ]);
 
   it("files a new shot under the same camera's nearest lower number", () => {
-    expect(slotAfter("PPR56518.jpg", delivered)).toEqual({
+    expect(slot("PPR56518.jpg")).toEqual({
       name: "svatba_0384_PPR56518.jpg",
       after: "svatba_0384_PPR56511.jpg",
     });
-    expect(slotAfter("DSC_0200.jpg", delivered)?.name).toBe("svatba_0386_DSC_0200.jpg");
+    expect(slot("PPR56700-Edit.jpg")?.after).toBe("svatba_0385_PPR56600-Edit.jpg");
+    expect(slot("DSC_0200.jpg")?.name).toBe("svatba_0386_DSC_0200.jpg");
   });
 
-  it("leaves a sequenced name, or a shot before everything, alone", () => {
-    expect(slotAfter("svatba_001_PPR56518.jpg", delivered)).toBeNull();
-    expect(slotAfter("PPR10000.jpg", delivered)).toBeNull();
-    expect(slotAfter("IMG_0001.jpg", delivered)).toBeNull();
+  it("leaves a sequenced name, a delivered number, or a shot before everything alone", () => {
+    expect(slot("svatba_001_PPR56518.jpg")).toBeNull();
+    expect(slot("PPR56511-Edit.jpg")).toBeNull();
+    expect(slot("PPR10000.jpg")).toBeNull();
+    expect(slot("IMG_0001.jpg")).toBeNull();
+  });
+});
+
+describe("planPick", () => {
+  const existing = [
+    { id: "a", fileName: "svatba_0384_PPR56511.jpg" },
+    { id: "b", fileName: "svatba_0385_PPR56600.jpg" },
+    { id: "bare", fileName: "PPR70000.jpg" },
+    { id: "seq", fileName: "svatba_0001.jpg" },
+  ];
+  const file = (name: string) => ({ name, size: 7 });
+
+  it("pre-selects only a pair whose delivered name carries a sequence", () => {
+    const [sure, bare, bySequence] = planPick(
+      [file("PPR56600.jpg"), file("PPR70000.jpg"), file("svatba_0001.jpg")],
+      [],
+      existing,
+    );
+    expect(sure).toMatchObject({ candidates: ["b"], preselect: "b" });
+    // Offered, but a choice: a camera-named delivery, or a second batch
+    // numbered from 1, may be a different shot.
+    expect(bare).toMatchObject({ candidates: ["bare"], preselect: undefined });
+    expect(bySequence).toMatchObject({ candidates: ["seq"], preselect: undefined });
+  });
+
+  it("still files a declined pair next to its twin", () => {
+    expect(planPick([file("PPR56600.jpg")], [], existing)[0]!.slot?.name).toBe(
+      "svatba_0384_PPR56600.jpg",
+    );
+  });
+
+  it("resumes a filed upload under its filed name, once", () => {
+    const pending = [
+      { id: "p", fileName: "svatba_0384_PPR56518.jpg", sizeBytes: 7, replacesPhotoId: null },
+    ];
+    const [a, b] = planPick(
+      [file("PPR56518.jpg"), file("svatba_0384_PPR56518.jpg")],
+      pending,
+      existing,
+    );
+    // The file named so claims the row first; the bare one is a new upload.
+    expect(b).toMatchObject({ resumeId: "p", keepName: undefined });
+    expect(a).toMatchObject({ resumeId: undefined, slot: { name: "svatba_0384_PPR56518.jpg" } });
+    expect(planPick([file("PPR56518.jpg")], pending, existing)[0]).toMatchObject({
+      resumeId: "p",
+      keepName: "svatba_0384_PPR56518.jpg",
+    });
+  });
+
+  it("goes on replacing what an interrupted run replaced, or says it cannot", () => {
+    const pending = [{ id: "p", fileName: "PPR56600.jpg", sizeBytes: 7, replacesPhotoId: "b" }];
+    expect(planPick([file("PPR56600.jpg")], pending, existing)[0]).toMatchObject({
+      candidates: ["b"],
+      preselect: "b",
+      resumeId: "p",
+    });
+    const gone = [{ ...pending[0]!, replacesPhotoId: "deleted" }];
+    expect(planPick([file("PPR56600.jpg")], gone, existing)[0]).toMatchObject({
+      lostTarget: true,
+    });
   });
 });

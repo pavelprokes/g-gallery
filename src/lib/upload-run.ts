@@ -135,6 +135,7 @@ interface PendingRow {
   id: string;
   fileName: string;
   sizeBytes: number | null;
+  replacesPhotoId?: string | null;
 }
 
 /** Query string for the pending-uploads lookup, which is a GET. */
@@ -428,7 +429,7 @@ export interface UploadRunOptions {
   resumeIds: (string | undefined)[];
   /** Per-file id of a photo this corrected export replaces (docs/REPLACE-PHOTOS.md). */
   replaceIds?: (string | undefined)[];
-  /** Per-file name to store instead of the picked one (`slotAfter`, docs/REPLACE-PHOTOS.md). */
+  /** Per-file name to store instead of the picked one (`slotter`, docs/REPLACE-PHOTOS.md). */
   names?: (string | undefined)[];
   onItem: (index: number, patch: { state: UploadItemState; error?: string }) => void;
   /** A refusal that ends the run — quota, revoked link, lost session. */

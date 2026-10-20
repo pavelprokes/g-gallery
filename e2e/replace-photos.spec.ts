@@ -43,7 +43,10 @@ test("a corrected export replaces its photo and a new shot is filed by number", 
     .setInputFiles([file("PPR1002.jpg"), file("PPR1500.jpg")]);
 
   const pairs = page.getByRole("list", { name: "Co se nahradí" });
-  await expect(pairs).toContainText("PPR1002.jpg → nahradí svatba_0002_PPR1002.jpg");
+  // Pre-selected, but a choice: each pair can be turned down on its own.
+  await expect(page.getByLabel("Co nahradí PPR1002.jpg").locator("option:checked")).toHaveText(
+    "nahradit svatba_0002_PPR1002.jpg",
+  );
   await expect(pairs).toContainText("PPR1500.jpg → nová, zařadí se za svatba_0003_PPR1003.jpg");
   await page.getByRole("button", { name: "Nahradit a zařadit" }).click();
   await expect(page.getByText("2/2 nahráno")).toBeVisible({ timeout: 45_000 });
