@@ -242,3 +242,14 @@ test("a gallery's faces are searched without a click", async ({ page }) => {
     page.getByRole("status").filter({ hasText: /Hledám tváře|Tváře jsou hledané/ }),
   ).toBeVisible({ timeout: 30_000 });
 });
+
+test('"Dárkové video" starts the gift on arrival, and says why a browser cannot', async ({
+  page,
+}) => {
+  await page.goto(`/admin/g/${seed.galleryId}`);
+  await page.getByRole("link", { name: "Dárkové video" }).click();
+  // Playwright's Chromium encodes no H.264 — the gift says so instead of failing silently.
+  await expect(page.getByText(/neumí H\.264/)).toBeVisible({ timeout: 30_000 });
+  // Taken off the address, so a reload does not make the gift twice.
+  await expect(page).toHaveURL(new RegExp(`/admin/g/${seed.galleryId}/video$`));
+});

@@ -428,13 +428,11 @@ async function loadHighlights(
  * flagged `stale`, is strictly better than hiding the one feature the link was
  * sent for: the viewer gets everything except the last few photos.
  *
- * BUILDING used to be excluded on the theory that `zipObjectKey` names "a
- * multipart upload still being assembled". It does name that upload — but an
- * in-flight R2 multipart upload does not disturb the object already at the
- * key; the previous archive is served, unchanged, until `complete()` swaps it
- * (verified against the production bucket on a scratch key, 2026-09-02). The
- * old rule cost every gallery its download button for the entire length of
- * every rebuild, and cost a gallery whose build failed its button *forever*.
+ * Each build writes its own key (`_archive-{buildId}.zip`), and only the
+ * zip-callback of a completed build points `zipObjectKey` at it — the kickoff
+ * leaves the row on the archive being served. Pointing it at the new key at
+ * kickoff linked every rebuild, and forever any failed one, at an object that
+ * did not exist yet: "Stáhnout vše" answered 404 (2026-10-20).
  *
  * A gallery that has never completed a build has nothing to serve, and the UI
  * says so ("Připravujeme archiv") rather than linking at a key that 404s.

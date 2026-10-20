@@ -523,6 +523,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             <a href={`/admin/g/${gallery.id}/video`} className={buttonClasses("secondary", "md")}>
               Video pro sítě
             </a>
+            {/* docs/SOCIAL-VIDEO.md §2 — both versions into the gallery, no editing. */}
+            <a
+              href={`/admin/g/${gallery.id}/video?gift=1`}
+              className={buttonClasses("secondary", "md")}
+            >
+              Dárkové video
+            </a>
             {/* docs/SOCIAL-VIDEO.md §4 — closed and soft eyes, before the couple sees them. */}
             <a href={`/admin/g/${gallery.id}/check`} className={buttonClasses("secondary", "md")}>
               Kontrola fotek

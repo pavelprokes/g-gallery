@@ -5,17 +5,16 @@ import type { TimelinePosition } from "@/lib/gallery-chapters";
 import { pluralize } from "@/lib/czech-plural";
 import { slugify } from "@/lib/gallery-slug";
 import { placeholderStyle } from "@/lib/placeholder";
-import { directShots, FORMATS, planShot, type Aspect } from "@/lib/social-video/camera";
+import { FORMATS, type Aspect } from "@/lib/social-video/camera";
 import { chooseCodec, encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
-import { focusFaces } from "@/lib/social-video/face-tags";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
+import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
 import { suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
 import {
   buildTimeline,
   LENGTHS,
-  moveSeconds,
   photoCountFor,
   slidesAt,
   type Length,
@@ -239,24 +238,16 @@ export function SocialVideoStudio({
       }),
     [order, byId, format],
   );
-  const shots = useMemo(() => {
-    const seconds = moveSeconds(timeline);
-    return directShots(
-      slidePhotos.map((p, i) =>
-        planShot(
-          {
-            width: p.width,
-            height: p.height,
-            // On the couple, where the photographer named them (§4, "Who is who").
-            faces: focusFaces(faces[p.id]?.faces ?? [], byId.get(p.id)?.candidate.coupleTags ?? []),
-          },
-          format,
-          seconds[i] ?? seconds.at(-1) ?? 3,
-        ),
+  const shots = useMemo(
+    () =>
+      shotsFor(
+        slidePhotos.map((p) => ({ ...p, coupleTags: byId.get(p.id)?.candidate.coupleTags })),
+        faces,
+        format,
+        timeline,
       ),
-      slidePhotos.map((p) => faces[p.id]?.faces.length ?? 0),
-    );
-  }, [slidePhotos, faces, format, timeline, byId]);
+    [slidePhotos, faces, format, timeline, byId],
+  );
 
   // ---- Photos in memory: one store per format (the fetch size differs) ----
   // Closing only clears the store's caches, so a store React reuses after a
