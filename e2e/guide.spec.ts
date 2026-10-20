@@ -147,6 +147,23 @@ test.describe("client guide", () => {
     }
   });
 
+  test("the password gate points a stuck guest to the guide", async ({ browser }) => {
+    const { gatedToken } = JSON.parse(
+      fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8"),
+    ) as { gatedToken: string };
+    for (const [locale, expected] of [
+      ["cs-CZ", "/navod"],
+      ["fr-FR", "/guide/fr"],
+    ] as const) {
+      const context = await browser.newContext({ locale });
+      const page = await context.newPage();
+      await page.goto(`/g/${gatedToken}`);
+      await expect(page.locator('input[type="password"]')).toBeVisible();
+      await expect(page.locator(`a[href="${expected}"]`)).toHaveCount(1);
+      await context.close();
+    }
+  });
+
   test("does not scroll sideways on a phone", async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 360, height: 740 } });
     const page = await context.newPage();
