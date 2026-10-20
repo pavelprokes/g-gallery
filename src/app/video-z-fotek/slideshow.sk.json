@@ -1,0 +1,134 @@
+{
+  "page": {
+    "pageTitle": "Video zo svadobných fotiek zadarmo – slideshow na Reels aj YouTube",
+    "pageDescription": "Vytvorte si zadarmo video zo svadobných fotiek: vložte 3 až 60 fotiek, zvoľte 9:16 pre Reels a TikTok alebo 16:9 pre YouTube a stiahnite MP4. Nič sa nenahráva.",
+    "homeLink": "Video zo svadobných fotiek zadarmo – vytvorte si ho sami",
+    "kicker": "Zadarmo od svadobného fotografa",
+    "heroTitle": "Video zo svadobných fotiek za pár minút",
+    "heroLead": "Vložte fotky zo svadby, zvoľte tvar a dĺžku videa a stiahnite si hotové MP4. Pri každej fotke sa záber pomaly približuje alebo vzďaľuje a fotky sa jemne prelínajú jedna do druhej. Bez registrácie, bez vodoznaku a bez inštalácie.",
+    "privacyBadge": "Fotky zostávajú iba vo vašom zariadení – nikam sa nenahrávajú.",
+    "startCta": "Vytvoriť video",
+    "toolHeading": "Vytvorte si video",
+    "howHeading": "Ako to funguje",
+    "how": [
+      {
+        "title": "Vložte fotky",
+        "body": "Vyberte 3 až 60 fotiek z telefónu alebo počítača. Stránka ich skontroluje a pripraví – pri každej fotke to trvá pár sekúnd."
+      },
+      {
+        "title": "Zvoľte tvar, dĺžku a tempo",
+        "body": "Na výšku 9:16 pre Instagram Reels, Stories a TikTok, alebo na šírku 16:9 pre YouTube a web. Dĺžka sa prispôsobí počtu fotiek a tempo môže byť pokojné alebo dynamické."
+      },
+      {
+        "title": "Pozrite si náhľad a stiahnite MP4",
+        "body": "Náhľad ukáže presne to, čo bude vo videu. Jedným ťuknutím z neho vznikne súbor MP4, ktorý môžete hneď zdieľať."
+      }
+    ],
+    "featuresHeading": "Čo video ponúka",
+    "features": [
+      "Vždy sú v ňom všetky fotky, ktoré vložíte – žiadna sa nestratí.",
+      "Fotky idú za sebou podľa času fotenia alebo podľa názvu súboru.",
+      "Dva tvary: 9:16 na výšku (1080 × 1920) a 16:9 na šírku (1920 × 1080).",
+      "Dĺžka od pár sekúnd až po tri minúty podľa toho, koľko máte fotiek.",
+      "Pokojné tempo na obrad a portréty, dynamické na zábavu a rýchly zostrih.",
+      "Pomalý pohyb záberu a jemné prelínanie, aké poznáte zo svadobných filmov.",
+      "Upozorní vás na fotku, ktorá by mohla video pokaziť, aby ste ju mohli vyradiť.",
+      "Video je bez zvuku – hudbu pridáte priamo v Instagrame alebo TikToku, kde je k dispozícii legálne."
+    ],
+    "privacyHeading": "Vaše fotky nikam neodchádzajú",
+    "privacyBody": "Všetko sa deje priamo vo vašom prehliadači: kontrola fotiek, náhľad aj výroba videa. Na žiadny server sa nič nenahráva a nič neukladáme – keď stránku zatvoríte, fotky z nej zmiznú. Pri príprave sa z fotiek odstránia aj skryté údaje, napríklad poloha, kde vznikli.",
+    "limitsHeading": "Aké fotky a zariadenia",
+    "limits": [
+      "3 až 60 fotiek vo formáte JPEG, PNG alebo WebP (fotky z iPhonu vo formáte HEIC najprv uložte ako JPEG alebo si ich pošlite cez AirDrop či e-mailom).",
+      "Každá fotka musí mať aspoň 1000 px na kratšej strane, najviac 62 megapixelov a 40 MB.",
+      "Najlepšie v aktuálnom Chrome, Edge alebo Safari. Na počítači to ide rýchlejšie ako na telefóne.",
+      "Výroba videa trvá zhruba tak dlho, ako je video dlhé – stránku zatiaľ nechajte otvorenú."
+    ],
+    "weddingHeading": "Chystáte svadbu?",
+    "weddingBody": "Tento nástroj vznikol pre páry, ktoré fotí Pavel Prokeš, svadobný fotograf z Prahy. Každý pár od neho dostane krátke video na sociálne siete – na výšku aj na šírku, pripravené priamo v online galérii spolu so všetkými fotkami na stiahnutie a s fotkami od hostí zo svadobného dňa.",
+    "weddingCta": "Pozrite si Pavlove svadby",
+    "galleryLink": "Ako funguje svadobná galéria",
+    "faqHeading": "Časté otázky",
+    "faq": [
+      {
+        "q": "Je to naozaj zadarmo?",
+        "a": "Áno. Žiadna registrácia, žiadny vodoznak a žiadny limit na počet videí. Nástroj prevádzkuje svadobný fotograf Pavel Prokeš ako darček pre páry aj ich hostí."
+      },
+      {
+        "q": "Nahrávajú sa moje fotky niekam?",
+        "a": "Nie. Fotky sa spracujú iba vo vašom prehliadači a na žiadny server sa neposielajú. Keď stránku zatvoríte, nič z nich nezostane."
+      },
+      {
+        "q": "Prečo video nemá hudbu?",
+        "a": "Hudba vo videu by na Instagrame, TikToku alebo YouTube mohla naraziť na autorské práva. Pridajte si ju až v aplikácii, kde je k dispozícii legálne."
+      },
+      {
+        "q": "Koľko fotiek môžem použiť a aké dlhé bude video?",
+        "a": "3 až 60 fotiek. Vo videu sú vždy všetky, takže dĺžka závisí od ich počtu a zvoleného tempa – stránka ponúkne iba dĺžky, ktoré dávajú zmysel."
+      },
+      {
+        "q": "Prečo mi to na telefóne nejde?",
+        "a": "Výroba videa potrebuje novší prehliadač a dosť pamäte. Skúste aktuálny Chrome alebo Safari, menej fotiek alebo počítač."
+      },
+      {
+        "q": "Aký tvar zvoliť?",
+        "a": "9:16 na výšku pre Instagram Reels, Stories a TikTok, 16:9 na šírku pre YouTube, web alebo premietanie na svadbe."
+      }
+    ]
+  },
+  "tool": {
+    "pickPhotos": "Vybrať fotky",
+    "addPhotos": "Pridať ďalšie fotky",
+    "dropHint": "alebo ich sem pretiahnite · 3 až 60 fotiek · JPEG, PNG, WebP",
+    "preparingTool": "Pripravujem nástroj…",
+    "preparing": "Spracúvam fotky: {done} z {total}",
+    "checking": "Kontrolujem fotky: {done} z {total}",
+    "photoCount": "{count, plural, one {# fotka} few {# fotky} many {# fotky} other {# fotiek}}",
+    "needMore": "Pridajte ešte {count, plural, one {# fotku} few {# fotky} many {# fotky} other {# fotiek}} – video potrebuje aspoň {min}.",
+    "full": "Viac ako {max} fotiek sa do videa nezmestí.",
+    "skipped": "{count, plural, one {# fotka sa nezmestila} few {# fotky sa nezmestili} many {# fotky sa nezmestilo} other {# fotiek sa nezmestilo}} – limit je {max}.",
+    "rejectedHeading": "Tieto fotky sa nedajú použiť:",
+    "problem": {
+      "type": "nie je JPEG, PNG ani WebP",
+      "tooSmallFile": "súbor je príliš malý",
+      "tooLargeFile": "súbor má viac ako 40 MB",
+      "tooFewPixels": "kratšia strana má menej ako 1000 px",
+      "tooManyPixels": "má viac ako 62 megapixelov",
+      "unreadable": "nedá sa otvoriť"
+    },
+    "remove": "Odobrať {name}",
+    "flagged": "Skontrolujte",
+    "flaggedHint": "Na tejto fotke možno niekto žmurkol.",
+    "flaggedCount": "{count, plural, one {# fotka je označená} few {# fotky sú označené} many {# fotky je označených} other {# fotiek je označených}} – pozrite si ich, skôr ako video vytvoríte.",
+    "removeFlagged": "Odobrať označené",
+    "orderLabel": "Poradie",
+    "orderTime": "Podľa času fotenia",
+    "orderName": "Podľa názvu súboru",
+    "aspectLabel": "Tvar videa",
+    "aspectVertical": "9:16 na výšku",
+    "aspectVerticalHint": "Reels, Stories, TikTok",
+    "aspectHorizontal": "16:9 na šírku",
+    "aspectHorizontalHint": "YouTube, web",
+    "modeLabel": "Tempo",
+    "modeNormal": "Pokojné",
+    "modeNormalHint": "obrad, portréty",
+    "modeDynamic": "Dynamické",
+    "modeDynamicHint": "zábava, zostrih",
+    "lengthLabel": "Dĺžka",
+    "seconds": "{seconds} s",
+    "minutes": "{minutes} min",
+    "previewLabel": "Náhľad videa",
+    "play": "Prehrať",
+    "pause": "Pozastaviť",
+    "create": "Vytvoriť video",
+    "rendering": "Vytváram video: {percent} %",
+    "cancel": "Zrušiť",
+    "download": "Stiahnuť video (MP4)",
+    "doneNote": "Hotovo. Video má {seconds} s a je bez zvuku – hudbu pridajte v aplikácii, v ktorej ho budete zdieľať.",
+    "vp9Note": "Tento prehliadač nepodporuje formát H.264, takže video bude vo formáte VP9. Na iPhone sa nemusí prehrať – pre istotu ho vytvorte v Chrome alebo Safari na počítači.",
+    "unsupported": "V tomto prehliadači sa video vytvoriť nedá. Otvorte stránku v aktuálnom Chrome, Edge alebo Safari.",
+    "renderFailed": "Video sa nepodarilo vytvoriť. Skúste to znova s menším počtom fotiek alebo na počítači.",
+    "checkUnavailable": "Kontrola fotiek tu nefunguje – video sa dá vytvoriť aj tak.",
+    "startOver": "Začať odznova"
+  }
+}

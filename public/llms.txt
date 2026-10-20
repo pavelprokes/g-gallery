@@ -1,6 +1,6 @@
 # Svatební galerie – Pavel Prokeš
 
-> Private online wedding galleries by Pavel Prokeš, a wedding photographer based in Prague, Czech Republic. Couples and their guests open a gallery from a link or QR code, view and download the photos and the photographer's videos, and — when the couple allows it — add their own photos from the wedding. The public pages are a short help page and a step-by-step guide, both in seven languages: Czech, English, French, German, Spanish, Slovak and Polish.
+> Private online wedding galleries by Pavel Prokeš, a wedding photographer based in Prague, Czech Republic. Couples and their guests open a gallery from a link or QR code, view and download the photos and the photographer's videos, and — when the couple allows it — add their own photos from the wedding. The public pages are a short help page, a step-by-step guide and a free slideshow maker, all in seven languages: Czech, English, French, German, Spanish, Slovak and Polish.
 
 Gallery contents are private: every gallery is reached only through its own link, sometimes with a password, and is not listed or indexed. Questions about booking, prices or the photographer's work belong to the main site.
 
@@ -11,7 +11,7 @@ Gallery contents are private: every gallery is reached only through its own link
 
 ## Free tool
 
-- [Video ze svatebních fotek](https://photos.svatebni-fotograf-cechy.cz/video-z-fotek) (Czech): a free slideshow maker. Anyone adds 3 to 60 photos (JPEG, PNG or WebP) and downloads an MP4 without sound: vertical 9:16 (1080 × 1920) for Instagram Reels, Stories and TikTok, or landscape 16:9 (1920 × 1080) for YouTube. Every photo is in the video; the length follows the number of photos and a calm or dynamic pace. It runs entirely in the browser: the photos are not uploaded or stored anywhere. No account and no watermark. Works best in a current Chrome, Edge or Safari.
+- [Video from your wedding photos](https://photos.svatebni-fotograf-cechy.cz/video-from-photos) (Czech: [/video-z-fotek](https://photos.svatebni-fotograf-cechy.cz/video-z-fotek); also /video-aus-fotos, /diaporama-video, /video-con-fotos, /video-z-fotiek, /film-ze-zdjec): a free slideshow maker. Anyone adds 3 to 60 photos (JPEG, PNG or WebP) and downloads an MP4 without sound: vertical 9:16 (1080 × 1920) for Instagram Reels, Stories and TikTok, or landscape 16:9 (1920 × 1080) for YouTube. Every photo is in the video; a photo turned the other way from the video is shown whole. The length follows the number of photos and a calm or dynamic pace. It runs entirely in the browser: the photos are not uploaded or stored anywhere. No account and no watermark. Works best in a current Chrome, Edge or Safari.
 
 ## What a gallery offers
 

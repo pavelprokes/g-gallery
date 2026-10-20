@@ -40,7 +40,69 @@ async function jpegs(page: Page, count: number, width: number, height: number) {
   }));
 }
 
+const PATHS = {
+  cs: "/video-z-fotek",
+  en: "/video-from-photos",
+  fr: "/diaporama-video",
+  de: "/video-aus-fotos",
+  es: "/video-con-fotos",
+  sk: "/video-z-fotiek",
+  pl: "/film-ze-zdjec",
+} as const;
+
 test.describe("slideshow maker", () => {
+  for (const [lang, path] of Object.entries(PATHS)) {
+    test(`speaks ${lang} at ${path}, whatever the browser's language`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator("main")).toHaveAttribute("lang", lang);
+      await expect(page.getByRole("heading", { level: 1 })).not.toBeEmpty();
+      await expect(page.locator('input[type="file"]')).toBeAttached();
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+        "href",
+        new RegExp(`${path}$`),
+      );
+      for (const [other, otherPath] of Object.entries(PATHS)) {
+        await expect(page.locator(`link[rel="alternate"][hreflang="${other}"]`)).toHaveAttribute(
+          "href",
+          new RegExp(`${otherPath}$`),
+        );
+      }
+      await expect(page.locator('link[rel="alternate"][hreflang="x-default"]')).toHaveAttribute(
+        "href",
+        /\/video-from-photos$/,
+      );
+    });
+  }
+
+  test("every public page ends with the same footer links, its own marked", async ({ page }) => {
+    for (const [path, current] of [
+      ["/", "/"],
+      ["/navod", "/navod"],
+      [PATHS.cs, PATHS.cs],
+    ] as const) {
+      await page.goto(path);
+      const nav = page.getByRole("navigation", { name: "Odkazy" });
+      await expect(nav.getByRole("link")).toHaveCount(4);
+      for (const href of ["/", "/navod", PATHS.cs, "https://svatebni-fotograf-cechy.cz/"]) {
+        await expect(nav.locator(`a[href="${href}"]`)).toHaveCount(1);
+      }
+      await expect(nav.locator('a[aria-current="page"]')).toHaveAttribute("href", current);
+    }
+  });
+
+  test("the home page links the maker in the viewer's language", async ({ browser }) => {
+    for (const [locale, path] of [
+      ["cs-CZ", PATHS.cs],
+      ["de-DE", PATHS.de],
+    ] as const) {
+      const context = await browser.newContext({ locale });
+      const page = await context.newPage();
+      await page.goto("/");
+      await expect(page.locator(`main a[href="${path}"]`).first()).toBeVisible();
+      await context.close();
+    }
+  });
+
   test("is an indexable page with its structured data", async ({ page }) => {
     await page.goto("/video-z-fotek");
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
@@ -53,7 +115,7 @@ test.describe("slideshow maker", () => {
     expect(graph["@graph"].map((n) => n["@type"])).toEqual(["FAQPage", "WebApplication"]);
 
     const sitemap = await (await page.request.get("/sitemap.xml")).text();
-    expect(sitemap).toContain("/video-z-fotek");
+    for (const path of Object.values(PATHS)) expect(sitemap).toContain(path);
   });
 
   test("refuses small photos, then makes a video from the rest", async ({ page }) => {

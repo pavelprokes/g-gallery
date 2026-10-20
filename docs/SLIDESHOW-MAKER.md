@@ -1,8 +1,8 @@
 # Slideshow maker — a free video from anyone's photos
 
 Built 2026-10-20 at Pavel's request: a public page that turns a visitor's own photos into a short
-video for social media, marketed with the wedding photography. Czech first (`/video-z-fotek`); the
-other six languages follow once the Czech page is settled.
+video for social media, marketed with the wedding photography. Czech first (`/video-z-fotek`), the other six languages on
+2026-10-20, each at an address in its own words (`SLIDESHOW_PATHS`).
 
 ## 1. Decision: everything in the visitor's browser
 
@@ -72,5 +72,31 @@ have blinked" as its hint; that is the only place the eye check surfaces (Pavel 
 ## 6. SEO and GEO
 
 Indexable, in the sitemap, canonical `/video-z-fotek`, `FAQPage` + `WebApplication` JSON-LD from the
-same copy the page shows (`slideshowJsonLd`), and a section in `public/llms.txt`. New languages are
-added to `SLIDESHOW_PATHS` (`src/lib/slideshow-path.ts`); the sitemap follows it.
+same copy the page shows (`slideshowJsonLd`), and a section in `public/llms.txt`. One page per
+language at `SLIDESHOW_PATHS` (`src/lib/slideshow-path.ts`) — cs `/video-z-fotek`, en
+`/video-from-photos`, fr `/diaporama-video`, de `/video-aus-fotos`, es `/video-con-fotos`, sk
+`/video-z-fotiek`, pl `/film-ze-zdjec` — with hreflang (x-default English) and sitemap alternates
+following the map. The copy is `slideshow.<code>.json` beside the page; the home page links the
+viewer's own language. Addresses are frozen once published (CLAUDE.md, renames never change a URL).
+
+## 7. Analytics (Umami)
+
+Page views come from the site-wide tracker (`src/components/umami.tsx`); the maker adds events from
+the browser through `trackEvent` (`src/lib/umami-client.ts`), grouped by Umami into the visit's
+session. Counts and choices only — never file names or anything from the photos.
+
+| Event                         | Data                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `slideshow-photos-added`      | `added`, `rejected`, `skipped`, `total`, and a count per refusal (`tooFewPixels`, …)                             |
+| `slideshow-check-unavailable` | —                                                                                                                |
+| `slideshow-video-created`     | `aspect`, `mode`, `length`, `photos`, `codec`, `seconds`, `renderSeconds`, `megabytes`, `flagged`, `inThisVisit` |
+| `slideshow-video-downloaded`  | `aspect`, `mode`, `length`, `photos`, `codec`, `seconds`                                                         |
+| `slideshow-video-failed`      | `aspect`, `mode`, `length`, `photos`, `codec`                                                                    |
+| `slideshow-video-cancelled`   | the same                                                                                                         |
+| `slideshow-video-unsupported` | `aspect`, `mode`, `length`, `photos` — the browser cannot encode at all                                          |
+
+## 8. The shared footer
+
+Every public footer (`SiteFooterIdentity`: home, guide, this page, galleries, hubs, dead ends) starts
+with the same list — help, guide, slideshow maker, the photographer — in the viewer's language, the
+current page marked (`current`).

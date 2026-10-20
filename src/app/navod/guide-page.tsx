@@ -647,7 +647,7 @@ export function GuidePage({ locale }: { locale: GuideLocale }) {
       <footer className="border-brand-border/60 border-t pt-8 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-500">
         {/* A Client Component reading its own provider — scoped to the page's language too. */}
         <NextIntlClientProvider locale={locale} messages={{ siteFooter: messages.siteFooter }}>
-          <SiteFooterIdentity className="text-xs" guideLink={false} />
+          <SiteFooterIdentity className="text-xs" current="guide" />
         </NextIntlClientProvider>
       </footer>
     </main>

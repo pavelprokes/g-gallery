@@ -26,6 +26,7 @@ import {
 } from "@/lib/slideshow/intake";
 import { ACCEPTED_TYPES, MAX_PHOTOS, MIN_PHOTOS, room } from "@/lib/slideshow/limits";
 import { formatFor, keptLength, lengthOptions, PACINGS, type Mode } from "@/lib/slideshow/pacing";
+import { trackEvent } from "@/lib/umami-client";
 
 type Order = "time" | "name";
 
@@ -44,6 +45,8 @@ interface Result {
   url: string;
   fileName: string;
   seconds: number;
+  /** What the download event reports. */
+  event: Record<string, string | number>;
 }
 
 /** The preview is drawn at this share of the video's size. */
@@ -57,7 +60,7 @@ let nextId = 0;
 const action = (...args: Parameters<typeof buttonClasses>) =>
   `${buttonClasses(...args)} disabled:cursor-not-allowed disabled:opacity-55`;
 
-export function SlideshowMaker() {
+export function SlideshowMaker({ fileStem }: { fileStem: string }) {
   const t = useTranslations("slideshowMaker.tool");
   const [photos, setPhotos] = useState<PreparedPhoto[]>([]);
   const [faces, setFaces] = useState<Record<string, PhotoFaces | null>>({});
@@ -79,6 +82,7 @@ export function SlideshowMaker() {
   const photosRef = useRef<PreparedPhoto[]>([]);
   const resultRef = useRef<Result | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const videosMade = useRef(0);
 
   useEffect(() => {
     photosRef.current = photos;
@@ -143,6 +147,14 @@ export function SlideshowMaker() {
     const files = [...list].filter((f) => f.type.startsWith("image/") || f.type === "");
     const fits = room(photosRef.current.length, files.length);
     setSkipped(files.length - fits);
+    if (fits === 0 && files.length > 0) {
+      trackEvent("slideshow-photos-added", {
+        added: 0,
+        rejected: 0,
+        skipped: files.length,
+        total: photosRef.current.length,
+      });
+    }
     setRejected([]);
     setError(null);
     setNotice(null);
@@ -167,6 +179,15 @@ export function SlideshowMaker() {
     );
     setRejected(refused);
     setPhotos((prev) => [...prev, ...ready]);
+    const problems: Record<string, number> = {};
+    for (const r of refused) problems[r.problem] = (problems[r.problem] ?? 0) + 1;
+    trackEvent("slideshow-photos-added", {
+      added: ready.length,
+      rejected: refused.length,
+      skipped: files.length - fits,
+      total: photosRef.current.length + ready.length,
+      ...problems,
+    });
 
     // The check runs photo by photo in a worker; the photos are usable
     // before it ends, and a photo it could not read is simply not marked.
@@ -182,6 +203,7 @@ export function SlideshowMaker() {
         console.warn("[g-gallery/slideshow] photo check unavailable", cause);
         failed = true;
         setNotice(t("checkUnavailable"));
+        trackEvent("slideshow-check-unavailable");
       }
     }
     setStatus({ kind: "idle" });
@@ -281,8 +303,10 @@ export function SlideshowMaker() {
     setError(null);
     clearResult();
     const codec: EncodeCodec | null = await chooseCodec(format.width, format.height);
+    const picked = { aspect, mode, length, photos: count };
     if (!codec) {
       setError(t("unsupported"));
+      trackEvent("slideshow-video-unsupported", picked);
       return;
     }
     setNotice(codec === "vp9" ? t("vp9Note") : null);
@@ -290,6 +314,7 @@ export function SlideshowMaker() {
     abortRef.current = controller;
     setStatus({ kind: "rendering", share: 0 });
     let windowKey = "";
+    const started = performance.now();
     try {
       const blob = await encodeVideo({
         width: format.width,
@@ -309,15 +334,29 @@ export function SlideshowMaker() {
         },
       });
       const tag = aspect === "9:16" ? "9x16" : "16x9";
+      videosMade.current += 1;
+      trackEvent("slideshow-video-created", {
+        ...picked,
+        codec,
+        seconds: Math.round(timeline.duration),
+        renderSeconds: Math.round((performance.now() - started) / 1000),
+        megabytes: Math.round(blob.size / 1e5) / 10,
+        flagged: flagged.size,
+        inThisVisit: videosMade.current,
+      });
       setResult({
         url: URL.createObjectURL(blob),
-        fileName: `video-z-fotek-${tag}-${Math.round(timeline.duration)}s.mp4`,
+        fileName: `${fileStem}-${tag}-${Math.round(timeline.duration)}s.mp4`,
         seconds: Math.round(timeline.duration),
+        event: { ...picked, codec, seconds: Math.round(timeline.duration) },
       });
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (controller.signal.aborted) {
+        trackEvent("slideshow-video-cancelled", { ...picked, codec });
+      } else {
         console.error("[g-gallery/slideshow] render failed", cause);
         setError(t("renderFailed"));
+        trackEvent("slideshow-video-failed", { ...picked, codec });
       }
     } finally {
       abortRef.current = null;
@@ -618,6 +657,7 @@ export function SlideshowMaker() {
                   <a
                     href={result.url}
                     download={result.fileName}
+                    onClick={() => trackEvent("slideshow-video-downloaded", result.event)}
                     className={`${buttonClasses("primary", "lg")} justify-self-start`}
                   >
                     {t("download")}

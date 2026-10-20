@@ -11,7 +11,19 @@ import { previewMetadata } from "@/lib/og-image";
 import { SITE_ORIGIN } from "@/lib/site-url";
 import { SLIDESHOW_PATHS, type SlideshowLocale } from "@/lib/slideshow-path";
 import cs from "../../../messages/cs.json";
+import de from "../../../messages/de.json";
+import en from "../../../messages/en.json";
+import es from "../../../messages/es.json";
+import fr from "../../../messages/fr.json";
+import pl from "../../../messages/pl.json";
+import sk from "../../../messages/sk.json";
 import slideshowCs from "./slideshow.cs.json";
+import slideshowDe from "./slideshow.de.json";
+import slideshowEn from "./slideshow.en.json";
+import slideshowEs from "./slideshow.es.json";
+import slideshowFr from "./slideshow.fr.json";
+import slideshowPl from "./slideshow.pl.json";
+import slideshowSk from "./slideshow.sk.json";
 
 /**
  * The public slideshow maker's page (docs/SLIDESHOW-MAKER.md): the tool
@@ -24,7 +36,40 @@ const MAIN_SITE_URL = "https://svatebni-fotograf-cechy.cz/";
 
 const MESSAGES = {
   cs: { ...cs, slideshowMaker: slideshowCs },
+  en: { ...en, slideshowMaker: slideshowEn },
+  fr: { ...fr, slideshowMaker: slideshowFr },
+  de: { ...de, slideshowMaker: slideshowDe },
+  es: { ...es, slideshowMaker: slideshowEs },
+  sk: { ...sk, slideshowMaker: slideshowSk },
+  pl: { ...pl, slideshowMaker: slideshowPl },
 } satisfies Record<SlideshowLocale, unknown>;
+
+type SectionKey = "tool" | "how" | "features" | "privacy" | "limits" | "wedding" | "faq";
+
+/** Section anchors: the Czech ones were published first and are kept; every other language uses the English set. */
+const CZECH_ANCHORS: Record<SectionKey, string> = {
+  tool: "vytvorit",
+  how: "jak-to-funguje",
+  features: "co-umi",
+  privacy: "soukromi",
+  limits: "fotky-a-zarizeni",
+  wedding: "svatba",
+  faq: "otazky",
+};
+const ENGLISH_ANCHORS: Record<SectionKey, string> = {
+  tool: "create",
+  how: "how-it-works",
+  features: "features",
+  privacy: "privacy",
+  limits: "photos-and-devices",
+  wedding: "wedding",
+  faq: "questions",
+};
+
+/** The link to the maker on the home page, in the viewer's language. */
+export function slideshowHomeLink(locale: SlideshowLocale): { href: string; label: string } {
+  return { href: SLIDESHOW_PATHS[locale], label: MESSAGES[locale].slideshowMaker.page.homeLink };
+}
 
 function pageTranslator(locale: SlideshowLocale) {
   return createTranslator({
@@ -41,7 +86,10 @@ export function slideshowMetadata(locale: SlideshowLocale): Metadata {
   return {
     title: { absolute: title },
     description,
-    alternates: { canonical: SLIDESHOW_PATHS[locale], languages: { ...SLIDESHOW_PATHS } },
+    alternates: {
+      canonical: SLIDESHOW_PATHS[locale],
+      languages: { ...SLIDESHOW_PATHS, "x-default": SLIDESHOW_PATHS.en },
+    },
     robots: { index: true, follow: true },
     ...previewMetadata({
       title,
@@ -60,6 +108,7 @@ interface Step {
 
 export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
   const messages = MESSAGES[locale];
+  const anchor = locale === "cs" ? CZECH_ANCHORS : ENGLISH_ANCHORS;
   const t = pageTranslator(locale);
   const faq = t.raw("faq") as FaqEntry[];
   const jsonLd = slideshowJsonLd({
@@ -95,22 +144,22 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
       </header>
 
       <section
-        aria-labelledby="vytvorit"
+        aria-labelledby={anchor.tool}
         className="border-brand-border/60 mt-8 rounded-2xl border p-4 sm:p-6 dark:border-neutral-800"
       >
-        <h2 id="vytvorit" className={`${heading} mb-4`}>
+        <h2 id={anchor.tool} className={`${heading} mb-4`}>
           {t("toolHeading")}
         </h2>
         <NextIntlClientProvider
           locale={locale}
           messages={{ slideshowMaker: { tool: messages.slideshowMaker.tool } }}
         >
-          <SlideshowMaker />
+          <SlideshowMaker fileStem={SLIDESHOW_PATHS[locale].slice(1)} />
         </NextIntlClientProvider>
       </section>
 
-      <section aria-labelledby="jak-to-funguje" className="mt-14">
-        <h2 id="jak-to-funguje" className={heading}>
+      <section aria-labelledby={anchor.how} className="mt-14">
+        <h2 id={anchor.how} className={heading}>
           {t("howHeading")}
         </h2>
         <ol className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -128,8 +177,8 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
         </ol>
       </section>
 
-      <section aria-labelledby="co-umi" className="mt-14">
-        <h2 id="co-umi" className={heading}>
+      <section aria-labelledby={anchor.features} className="mt-14">
+        <h2 id={anchor.features} className={heading}>
           {t("featuresHeading")}
         </h2>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -145,15 +194,15 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
         </ul>
       </section>
 
-      <section aria-labelledby="soukromi" className="mt-14">
-        <h2 id="soukromi" className={heading}>
+      <section aria-labelledby={anchor.privacy} className="mt-14">
+        <h2 id={anchor.privacy} className={heading}>
           {t("privacyHeading")}
         </h2>
         <p className={lead}>{t("privacyBody")}</p>
       </section>
 
-      <section aria-labelledby="fotky-a-zarizeni" className="mt-14">
-        <h2 id="fotky-a-zarizeni" className={heading}>
+      <section aria-labelledby={anchor.limits} className="mt-14">
+        <h2 id={anchor.limits} className={heading}>
           {t("limitsHeading")}
         </h2>
         <ul className="mt-4 list-disc space-y-2 pl-5 text-neutral-700 dark:text-neutral-300">
@@ -163,9 +212,9 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
         </ul>
       </section>
 
-      <section aria-labelledby="svatba" className="mt-14">
+      <section aria-labelledby={anchor.wedding} className="mt-14">
         <Card className="bg-brand-tint dark:bg-neutral-900">
-          <h2 id="svatba" className={heading}>
+          <h2 id={anchor.wedding} className={heading}>
             {t("weddingHeading")}
           </h2>
           <p className={lead}>{t("weddingBody")}</p>
@@ -180,8 +229,8 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
         </Card>
       </section>
 
-      <section aria-labelledby="otazky" className="mt-14">
-        <h2 id="otazky" className={heading}>
+      <section aria-labelledby={anchor.faq} className="mt-14">
+        <h2 id={anchor.faq} className={heading}>
           {t("faqHeading")}
         </h2>
         <div className="mt-4 divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -198,7 +247,7 @@ export function SlideshowPage({ locale }: { locale: SlideshowLocale }) {
 
       <footer className="border-brand-border/60 mt-16 border-t pt-8 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-500">
         <NextIntlClientProvider locale={locale} messages={{ siteFooter: messages.siteFooter }}>
-          <SiteFooterIdentity className="text-xs" />
+          <SiteFooterIdentity className="text-xs" current="slideshow" />
         </NextIntlClientProvider>
       </footer>
     </main>

@@ -16,7 +16,11 @@
     "website": "svatebni-fotograf-cechy.cz",
     "copyright": "© {year} Pavel Prokeš. Všetky práva vyhradené.",
     "builtBy": "Túto stránku si sám naprogramoval Pavel Prokeš.",
-    "guide": "Návod ku galérii"
+    "guide": "Návod ku galérii",
+    "links": "Odkazy",
+    "help": "Pomoc ku galérii",
+    "slideshow": "Video zo svadobných fotiek zadarmo",
+    "photographer": "Svadobný fotograf Pavel Prokeš"
   },
   "manifest": {
     "name": "Svadobná fotogaléria",

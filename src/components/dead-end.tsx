@@ -28,7 +28,7 @@ export function GuestScreen({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
       <Card className="w-full max-w-sm p-8 text-center">{children}</Card>
-      <SiteFooterIdentity className="text-caption max-w-sm text-center text-neutral-500 dark:text-neutral-400" />
+      <SiteFooterIdentity className="text-caption max-w-sm text-center text-neutral-500 dark:text-neutral-400 [&_ul]:justify-center" />
     </main>
   );
 }
