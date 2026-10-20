@@ -18,6 +18,8 @@ export interface ResolvedShareLink {
   /** Guests holding this link may add photos (docs/GUEST-GALLERIES.md §6). */
   allowUpload: boolean;
   allowPrintSelection: boolean;
+  /** The corrections mode is offered on this link (docs/CORRECTIONS.md). */
+  allowCorrections: boolean;
   hasPassword: boolean;
   /** Cosmetic URL segment, frozen at creation (docs/TODO.md §6). */
   slug: string | null;
@@ -32,6 +34,7 @@ interface ShareLinkRecord {
   allowReactions: boolean;
   allowUpload: boolean;
   allowPrintSelection: boolean;
+  allowCorrections: boolean;
   passwordHash: string | null;
   expiresAt: Date | null;
   revokedAt: Date | null;
@@ -76,6 +79,7 @@ const LINK_FIELDS = {
   allowReactions: true,
   allowUpload: true,
   allowPrintSelection: true,
+  allowCorrections: true,
   passwordHash: true,
   expiresAt: true,
   revokedAt: true,
@@ -151,6 +155,7 @@ function toResolved(link: ShareLinkRecord): ResolvedShareLink {
     allowReactions: link.allowReactions,
     allowUpload: link.allowUpload,
     allowPrintSelection: link.allowPrintSelection,
+    allowCorrections: link.allowCorrections,
     hasPassword: link.passwordHash !== null,
     slug: link.slug,
     photoOrder: link.gallery.photoOrder,
@@ -175,7 +180,11 @@ export async function resolveShareLink(token: string): Promise<ShareAccess> {
     return { ok: false, reason: "PASSWORD_REQUIRED" };
   }
 
-  return { ok: true, shareLink: toResolved(link) };
+  const resolved = toResolved(link);
+  // The corrections mode is the couple's, on the link they were handed — never
+  // through a wedding page's card, which every guest can open (docs/CORRECTIONS.md).
+  if (splitEventToken(token)) resolved.allowCorrections = false;
+  return { ok: true, shareLink: resolved };
 }
 
 /**

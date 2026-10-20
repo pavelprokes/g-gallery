@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} — opens {cta} in a new window"
+  },
+  "corrections": {
+    "toolbar": "Edit requests",
+    "toolbarTitle": "Edit requests – tell the photographer what to retouch",
+    "pinTitle": "PIN for edit requests",
+    "pinHint": "Your photographer sent you a 6-digit PIN with the gallery. You enter it every time you open this mode.",
+    "pinSubmit": "Enter",
+    "pinWrong": "That PIN doesn't match. Please try again.",
+    "pinLocked": "Too many attempts. Try again in {minutes} min.",
+    "cancel": "Cancel",
+    "barTitle": "Edit requests",
+    "barCount": "{count, plural, =0 {none yet} one {# photo with a request} other {# photos with a request}}",
+    "exit": "Done",
+    "expired": "Edit requests closed. Enter the PIN again to add more.",
+    "badge": "{count, plural, one {# request} other {# requests}}",
+    "panelTitle": "Requests for this photo",
+    "empty": "Nothing for this photo yet. Write what to change.",
+    "newLabel": "New request",
+    "placeholder": "E.g. retouch the stain on the dress",
+    "markSpot": "Mark the spot",
+    "placing": "Tap the photo…",
+    "placeHint": "Tap the spot in the photo the request is about.",
+    "removeSpot": "Remove the spot",
+    "add": "Add",
+    "edit": "Edit",
+    "editLabel": "Edit request {n}",
+    "save": "Save",
+    "delete": "Delete",
+    "confirmDelete": "Delete it?",
+    "resolved": "Done ✓",
+    "error": "Couldn't save. Please try again.",
+    "privacy": "Only you and the photographer see these, not your guests."
   }
 }

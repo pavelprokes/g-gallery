@@ -14,7 +14,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../src/lib/db";
-import { generateShareToken, hashShareToken } from "../src/lib/share-token";
+import { generateShareToken, hashPassword, hashShareToken } from "../src/lib/share-token";
 import { gallerySlug } from "../src/lib/gallery-slug";
 import { refreshWovenOrder } from "../src/lib/woven-order-db";
 import { FACES_MODEL, type Face } from "../src/lib/social-video/faces";
@@ -291,6 +291,11 @@ async function main() {
   const photoCheckGalleryId = await makePhotoCheckGallery(user.id);
   const faceTagGalleryId = await makeFaceTagGallery(user.id);
   const faceSeriesGalleryId = await makeFaceSeriesGallery(user.id);
+  // docs/CORRECTIONS.md: written to in the spec, so one per project.
+  const correctionGalleries = {
+    chromium: await makeCorrectionGallery(user.id, "chromium"),
+    "mobile-safari": await makeCorrectionGallery(user.id, "mobile-safari"),
+  };
   // docs/ADMIN-FILTERS.md: read-only, so one for both projects.
   const filterGalleryId = await makeFilterGallery(user.id);
   // docs/REPLACE-PHOTOS.md: a corrected export replaces a delivered photo — mutated, so per project.
@@ -311,6 +316,7 @@ async function main() {
       faceSeriesGalleryId,
       replaceGalleryIds,
       filterGalleryId,
+      correctionGalleries,
       selectGalleryIds,
       galleryId: gallery.id,
       token,
@@ -1054,6 +1060,67 @@ async function makeActivity(ownerId: string) {
     createdAt: new Date(Date.UTC(2025, 0, 1 + day, 12)),
   }));
   await prisma.activityEvent.createMany({ data: [...downloads, ...favorites] });
+}
+
+/** The PIN every seeded corrections link opens with (docs/CORRECTIONS.md). */
+const E2E_CORRECTION_PIN = "482913";
+
+/**
+ * Three photos, one link with the corrections mode behind a known PIN and one
+ * without it (docs/CORRECTIONS.md).
+ */
+async function makeCorrectionGallery(ownerId: string, project: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: `E2E Připomínky ${project}`,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-corrections-${project}-${Date.now()}`,
+      photoOrder: "FILE_NAME",
+    },
+  });
+  for (const [i, name] of [
+    "svatba_0001_PPR1.jpg",
+    "svatba_0002_PPR2.jpg",
+    "svatba_0003_PPR3.jpg",
+  ].entries()) {
+    await prisma.photo.create({
+      data: {
+        galleryId: gallery.id,
+        objectKey: `${gallery.storagePrefix}/${name}`,
+        fileName: name,
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: 900_000,
+        crc32: "00000000",
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10, i)),
+      },
+    });
+  }
+  const slug = gallerySlug(gallery.title, null);
+  const link = async (allowCorrections: boolean) => {
+    const token = generateShareToken();
+    await prisma.shareLink.create({
+      data: {
+        galleryId: gallery.id,
+        tokenHash: hashShareToken(token),
+        slug,
+        allowCorrections,
+        correctionPinHash: allowCorrections ? await hashPassword(E2E_CORRECTION_PIN) : null,
+      },
+    });
+    return token;
+  };
+  return {
+    galleryId: gallery.id,
+    token: await link(true),
+    plainToken: await link(false),
+    slug,
+    pin: E2E_CORRECTION_PIN,
+  };
 }
 
 /** Four photos, each with one thing to filter by (docs/ADMIN-FILTERS.md). */

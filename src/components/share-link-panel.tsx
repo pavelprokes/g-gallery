@@ -3,8 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/format-date";
-import { createShareLink, revokeShareLink, updateShareLinkPermissions } from "@/app/admin/actions";
-import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
+import {
+  createShareLink,
+  regenerateCorrectionPin,
+  revokeShareLink,
+  updateShareLinkPermissions,
+} from "@/app/admin/actions";
+import { CopyableLink, CopyButton, UnrecoverableLink } from "@/components/copy-button";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -20,6 +25,8 @@ const PERMISSIONS = [
   { name: "allowReactions", label: "Srdíčka a reakce", summary: "reakce" },
   { name: "allowPrintSelection", label: "Označování do tisku", summary: "výběr do tisku" },
   { name: "allowUpload", label: "Hosté smí nahrávat", summary: "hosté nahrávají" },
+  // docs/CORRECTIONS.md — only whoever also has the link's PIN.
+  { name: "allowCorrections", label: "Připomínky (PIN)", summary: "připomínky s PINem" },
 ] as const;
 
 type PermissionName = (typeof PERMISSIONS)[number]["name"];
@@ -41,6 +48,7 @@ const PRESETS = [
       allowReactions: true,
       allowPrintSelection: false,
       allowUpload: false,
+      allowCorrections: false,
     },
   },
   {
@@ -53,6 +61,8 @@ const PRESETS = [
       allowReactions: true,
       allowPrintSelection: true,
       allowUpload: false,
+      // The PIN is handed over with the delivery (docs/CORRECTIONS.md).
+      allowCorrections: true,
     },
   },
   {
@@ -68,6 +78,7 @@ const PRESETS = [
       // their own — leaving uploads on would invite exactly the crops this
       // preset exists to keep out.
       allowUpload: false,
+      allowCorrections: false,
     },
   },
 ] as const;
@@ -85,6 +96,9 @@ interface ShareLinkRow {
   allowReactions: boolean;
   allowPrintSelection: boolean;
   allowUpload: boolean;
+  allowCorrections: boolean;
+  /** The corrections PIN, decrypted server-side; null when unreadable or never set. */
+  correctionPin: string | null;
   createdAt: Date;
   /** Path built server-side from the decrypted token; null when unreadable. */
   url: string | null;
@@ -298,6 +312,34 @@ export function ShareLinkPanel({
                     </Button>
                   </form>
                 </details>
+              )}
+              {!link.revokedAt && link.allowCorrections && (
+                // Handed to the couple at delivery (docs/CORRECTIONS.md).
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-caption">
+                    PIN pro připomínky:{" "}
+                    {link.correctionPin ? (
+                      <code className="text-body font-semibold tracking-widest">
+                        {link.correctionPin}
+                      </code>
+                    ) : (
+                      "nejde zobrazit — vygeneruj nový"
+                    )}
+                  </span>
+                  {link.correctionPin && (
+                    <CopyButton
+                      value={`PIN pro připomínky k fotkám: ${link.correctionPin}`}
+                      label="Kopírovat PIN"
+                    />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void regenerateCorrectionPin(link.id)}
+                  >
+                    Nový PIN
+                  </Button>
+                </div>
               )}
               {!link.revokedAt && link.allowUpload && !link.passwordHash && !hostedByEvent && (
                 <Link

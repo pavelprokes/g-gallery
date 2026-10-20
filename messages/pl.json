@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} — otwiera {cta} w nowym oknie"
+  },
+  "corrections": {
+    "toolbar": "Poprawki",
+    "toolbarTitle": "Prośby o poprawki – napisz, co poprawić na zdjęciach",
+    "pinTitle": "PIN do poprawek",
+    "pinHint": "Fotograf wysłał Ci 6-cyfrowy PIN razem z galerią. Wpisujesz go przy każdym wejściu w ten tryb.",
+    "pinSubmit": "Wejdź",
+    "pinWrong": "PIN się nie zgadza. Spróbuj ponownie.",
+    "pinLocked": "Za dużo prób. Spróbuj ponownie za {minutes} min.",
+    "cancel": "Anuluj",
+    "barTitle": "Prośby o poprawki",
+    "barCount": "{count, plural, =0 {na razie brak} one {# zdjęcie z prośbą} few {# zdjęcia z prośbą} many {# zdjęć z prośbą} other {# zdjęcia z prośbą}}",
+    "exit": "Zakończ",
+    "expired": "Tryb poprawek się zakończył. Aby dodać kolejne, wpisz PIN ponownie.",
+    "badge": "{count, plural, one {# prośba} few {# prośby} many {# próśb} other {# prośby}}",
+    "panelTitle": "Prośby do tego zdjęcia",
+    "empty": "Do tego zdjęcia jeszcze nic. Napisz, co poprawić.",
+    "newLabel": "Nowa prośba",
+    "placeholder": "Np. wyretuszować plamę na sukni",
+    "markSpot": "Zaznacz miejsce",
+    "placing": "Dotknij zdjęcia…",
+    "placeHint": "Dotknij miejsca na zdjęciu, którego dotyczy prośba.",
+    "removeSpot": "Usuń zaznaczenie",
+    "add": "Dodaj",
+    "edit": "Edytuj",
+    "editLabel": "Edytuj prośbę {n}",
+    "save": "Zapisz",
+    "delete": "Usuń",
+    "confirmDelete": "Na pewno usunąć?",
+    "resolved": "Poprawione ✓",
+    "error": "Nie udało się zapisać. Spróbuj ponownie.",
+    "privacy": "Widzisz je tylko Ty i fotograf, goście nie."
   }
 }

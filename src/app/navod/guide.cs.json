@@ -1,6 +1,6 @@
 {
   "pageTitle": "Jak pracovat s galerií – návod pro klienty",
-  "pageDescription": "Návod krok za krokem: výběr fotek k tisku, oblíbené fotky, stahování, fotky od hostů, prohlížení bez signálu a co dělat, když něco nejde.",
+  "pageDescription": "Návod krok za krokem: výběr fotek k tisku, oblíbené fotky, stahování, připomínky k úpravám, fotky od hostů, prohlížení bez signálu a co dělat, když něco nejde.",
   "kicker": "Návod pro klienty",
   "heroTitle": "Jak pracovat se svou galerií",
   "heroLead": "Galerii zvládneš v telefonu i na počítači. Nic se neinstaluje a nikam se nepřihlašuješ – stačí odkaz, který ti fotograf poslal. Tady najdeš krok za krokem všechno, co se ti při práci s ní může hodit.",
@@ -183,8 +183,25 @@
       }
     ]
   },
+  "corrections": {
+    "heading": "5. Připomínky a úpravy fotek",
+    "intro": "Chceš na některé fotce něco upravit – vyretušovat skvrnu, srovnat horizont, ubrat lampu ze záběru? Napiš to fotografovi rovnou k fotce. Režim připomínek je jen pro vás dva: otevírá se šestimístným PINem, který ti fotograf dal při předání galerie.",
+    "stepsTitle": "Jak napsat připomínku",
+    "enterTitle": "Zapni režim připomínek",
+    "enterBody": "Nahoře v galerii klepni na <pencil></pencil> Připomínky a zadej PIN. Ptáme se na něj při každém vstupu – kdo má jen odkaz, připomínky nenapíše ani neuvidí.",
+    "openTitle": "Otevři fotku",
+    "openBody": "Na telefonu se připomínky ukážou ve spodní části obrazovky, na počítači vpravo vedle fotky. Mezi fotkami listuješ jako obvykle.",
+    "writeTitle": "Napiš, co upravit",
+    "writeBody": "Pár slov stačí, třeba „vyretušovat skvrnu na šatech“. Tlačítkem Označit místo a ťuknutím do fotky ukážeš přesné místo – na fotce se objeví číslo, stejné jako u připomínky.",
+    "editHeading": "Úprava a smazání",
+    "editBody": "Dokud fotograf připomínku nevyřídí, můžeš ji kdykoli upravit nebo smazat. Ukládá se hned, na konci nic neodesíláš.",
+    "doneHeading": "Opraveno ✓",
+    "doneBody": "Když fotograf opravenou fotku nahraje, u připomínky se objeví Opraveno ✓ a v galerii uvidíš novou verzi na stejném místě. Srdíčka i výběr k tisku u ní zůstanou.",
+    "badgeNote": "Fotky s připomínkou poznáš v přehledu podle čísla s tužkou. Režim ukončíš tlačítkem Ukončit, zavřením stránky, nebo skončí sám po dvou hodinách.",
+    "missing": "Tlačítko Připomínky nevidíš? Fotograf je u tohohle odkazu nezapnul – stačí mu napsat."
+  },
   "guests": {
-    "heading": "5. Fotky od hostů",
+    "heading": "6. Fotky od hostů",
     "intro": "Když to fotograf zapne, můžou do galerie přidávat fotky i hosté – bez aplikace a bez registrace. Stačí jim odkaz nebo QR kód.",
     "addTitle": "Klepni na „Přidat fotky“",
     "addBody": "Tlačítko je dole na obrazovce. Vybereš fotky z telefonu, nebo přes „Vyfotit“ rovnou vyfotíš novou.",
@@ -215,7 +232,7 @@
     "hubBody": "Fotograf může všechny galerie z jedné svatby spojit pod jeden odkaz. Uvidíš je jako velké dlaždice a pod nimi galerii od hostů. Odkaz zůstává stejný, i když další galerie přibývají. Zpátky na přehled se dostaneš odkazem s názvem svatby nahoře."
   },
   "offline": {
-    "heading": "6. Prohlížení bez signálu",
+    "heading": "7. Prohlížení bez signálu",
     "intro": "Jedeš na chalupu nebo do letadla? Fotky si můžeš předem uložit do zařízení a prohlížet je i bez internetu.",
     "scrollTitle": "Sjeď na konec galerie",
     "scrollBody": "Uloží se jen fotky, které už galerie načetla. U velké galerie proto nejdřív sjeď úplně dolů.",
@@ -230,7 +247,7 @@
     ]
   },
   "privacy": {
-    "heading": "7. Jméno a soukromí",
+    "heading": "8. Jméno a soukromí",
     "intro": "Galerie nepotřebuje účet ani e-mail. Pozná tě jen podle prohlížeče, ve kterém ji otevřeš. Jméno vyplňovat nemusíš – když ho ale vyplníš, uvidí ho:",
     "terms": [
       {
@@ -256,11 +273,15 @@
     "optOutWarning": "Rozmysli si to, vrátit to nejde. Fotky, které máš v galerii od sebe, v ní zůstanou, jen je už nepůjde smazat. A dávat srdíčka ani vybírat fotky k tisku už v tomhle prohlížeči nepůjde."
   },
   "trouble": {
-    "heading": "8. Když něco nejde",
+    "heading": "9. Když něco nejde",
     "items": [
       {
         "title": "Galerie chce heslo.",
         "body": "Heslo ti fotograf poslal spolu s odkazem. Pozor na velká a malá písmena. Po pěti špatných pokusech se galerie na 15 minut zamkne. Správné heslo si prohlížeč pamatuje 30 dní."
+      },
+      {
+        "title": "PIN pro připomínky nefunguje.",
+        "body": "Zkontroluj, že zadáváš všech šest číslic z předávací zprávy. Po deseti špatných pokusech se zadávání na 5 minut zamkne. Když fotograf vygeneruje nový PIN, starý přestane platit – napiš mu o něj."
       },
       {
         "title": "„Odkaz už neplatí“",
@@ -280,7 +301,7 @@
       },
       {
         "title": "Chybí tlačítko, o kterém je tu řeč.",
-        "body": "Stahování, srdíčka, výběr k tisku i přidávání fotek zapíná fotograf zvlášť pro každý odkaz – hosté tak můžou mít jiné možnosti než vy. Když něco nevidíš, není to chyba. Napiš mu a domluvíte se."
+        "body": "Stahování, srdíčka, výběr k tisku, připomínky i přidávání fotek zapíná fotograf zvlášť pro každý odkaz – hosté tak můžou mít jiné možnosti než vy. Když něco nevidíš, není to chyba. Napiš mu a domluvíte se."
       }
     ]
   },

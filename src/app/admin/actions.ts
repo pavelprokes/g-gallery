@@ -18,6 +18,7 @@ import { deleteObject, presignDownload } from "@/lib/r2";
 import { printTotals } from "@/lib/print-selections";
 import { printEntries } from "@/lib/print-export";
 import { encryptToken } from "@/lib/token-cipher";
+import { generateCorrectionPin } from "@/lib/correction-session";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
@@ -79,6 +80,8 @@ const shareLinkPermissionsSchema = z.object({
    * into the gallery's R2 prefix, so it is never a side effect of anything.
    */
   allowUpload: z.coerce.boolean().optional(),
+  /** The corrections mode behind a PIN (docs/CORRECTIONS.md). */
+  allowCorrections: z.coerce.boolean().optional(),
 });
 
 const createShareLinkSchema = shareLinkPermissionsSchema.extend({
@@ -95,7 +98,14 @@ function readPermissions(formData: FormData) {
     allowReactions: formData.get("allowReactions") ? true : undefined,
     allowPrintSelection: formData.get("allowPrintSelection") ? true : undefined,
     allowUpload: formData.get("allowUpload") ? true : undefined,
+    allowCorrections: formData.get("allowCorrections") ? true : undefined,
   };
+}
+
+/** A new PIN for the corrections mode, as stored: hash to verify, cipher to show. */
+async function newCorrectionPin() {
+  const pin = generateCorrectionPin();
+  return { correctionPinHash: await hashPassword(pin), correctionPinCipher: encryptToken(pin) };
 }
 
 /**
@@ -142,6 +152,8 @@ export async function createShareLink(
       allowReactions: parsed.data.allowReactions ?? false,
       allowPrintSelection: parsed.data.allowPrintSelection ?? false,
       allowUpload: parsed.data.allowUpload ?? false,
+      allowCorrections: parsed.data.allowCorrections ?? false,
+      ...(parsed.data.allowCorrections ? await newCorrectionPin() : {}),
       slug,
     },
   });
@@ -167,7 +179,7 @@ export async function updateShareLinkPermissions(shareLinkId: string, formData: 
 
   const link = await prisma.shareLink.findFirst({
     where: { id: shareLinkId, gallery: { ownerId: session.user.id } },
-    select: { id: true, galleryId: true },
+    select: { id: true, galleryId: true, correctionPinHash: true },
   });
   if (!link) throw new Error("NOT_FOUND");
 
@@ -178,9 +190,35 @@ export async function updateShareLinkPermissions(shareLinkId: string, formData: 
       allowReactions: parsed.data.allowReactions ?? false,
       allowPrintSelection: parsed.data.allowPrintSelection ?? false,
       allowUpload: parsed.data.allowUpload ?? false,
+      allowCorrections: parsed.data.allowCorrections ?? false,
+      // The first time the mode is switched on, the link gets its PIN; later
+      // switches keep it, so a PIN already handed over stays valid.
+      ...(parsed.data.allowCorrections && !link.correctionPinHash ? await newCorrectionPin() : {}),
     },
   });
 
+  revalidatePath(`/admin/g/${link.galleryId}`);
+}
+
+/**
+ * A new PIN for a link's corrections mode (docs/CORRECTIONS.md) — when the old
+ * one went somewhere it should not have. Every open session ends with it.
+ */
+export async function regenerateCorrectionPin(shareLinkId: string) {
+  const session = await requireAdmin();
+  const link = await prisma.shareLink.findFirst({
+    where: { id: idSchema.parse(shareLinkId), gallery: { ownerId: session.user.id } },
+    select: { id: true, galleryId: true },
+  });
+  if (!link) throw new Error("NOT_FOUND");
+  await prisma.shareLink.update({
+    where: { id: link.id },
+    data: {
+      ...(await newCorrectionPin()),
+      correctionFailedAttempts: 0,
+      correctionLockedUntil: null,
+    },
+  });
   revalidatePath(`/admin/g/${link.galleryId}`);
 }
 

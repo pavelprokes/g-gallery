@@ -355,5 +355,37 @@
   },
   "promo": {
     "cardAriaLabel": "{headline} – öffnet {cta} in einem neuen Fenster"
+  },
+  "corrections": {
+    "toolbar": "Änderungswünsche",
+    "toolbarTitle": "Änderungswünsche – schreiben Sie, was retuschiert werden soll",
+    "pinTitle": "PIN für Änderungswünsche",
+    "pinHint": "Ihr Fotograf hat Ihnen mit der Galerie eine 6-stellige PIN geschickt. Sie wird bei jedem Öffnen dieses Modus abgefragt.",
+    "pinSubmit": "Öffnen",
+    "pinWrong": "Die PIN stimmt nicht. Bitte versuchen Sie es erneut.",
+    "pinLocked": "Zu viele Versuche. Bitte in {minutes} Min. erneut versuchen.",
+    "cancel": "Abbrechen",
+    "barTitle": "Änderungswünsche",
+    "barCount": "{count, plural, =0 {noch keine} one {# Foto mit Wunsch} other {# Fotos mit Wunsch}}",
+    "exit": "Beenden",
+    "expired": "Der Modus wurde beendet. Für weitere Wünsche die PIN erneut eingeben.",
+    "badge": "{count, plural, one {# Wunsch} other {# Wünsche}}",
+    "panelTitle": "Wünsche zu diesem Foto",
+    "empty": "Zu diesem Foto noch nichts. Schreiben Sie, was geändert werden soll.",
+    "newLabel": "Neuer Wunsch",
+    "placeholder": "Z. B. den Fleck auf dem Kleid retuschieren",
+    "markSpot": "Stelle markieren",
+    "placing": "Tippen Sie ins Foto…",
+    "placeHint": "Tippen Sie auf die Stelle im Foto, um die es geht.",
+    "removeSpot": "Markierung entfernen",
+    "add": "Hinzufügen",
+    "edit": "Bearbeiten",
+    "editLabel": "Wunsch {n} bearbeiten",
+    "save": "Speichern",
+    "delete": "Löschen",
+    "confirmDelete": "Wirklich löschen?",
+    "resolved": "Erledigt ✓",
+    "error": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
+    "privacy": "Nur Sie und der Fotograf sehen diese Wünsche, Ihre Gäste nicht."
   }
 }

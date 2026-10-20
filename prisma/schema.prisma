@@ -439,6 +439,7 @@ model Photo {
   coverOf         Gallery[]        @relation("GalleryCover")
   featuredIn      Gallery[]        @relation("GalleryFeaturedVideo")
   faceTags        FaceTag[]
+  comments        PhotoComment[]
 
   @@index([galleryId, status])
   /// Timeline ordering for the guest gallery and the ZIP entry order.
@@ -456,45 +457,58 @@ model Photo {
 }
 
 model ShareLink {
-  id                   String    @id @default(cuid())
-  galleryId            String
-  gallery              Gallery   @relation("GalleryShareLinks", fields: [galleryId], references: [id], onDelete: Cascade)
+  id                       String    @id @default(cuid())
+  galleryId                String
+  gallery                  Gallery   @relation("GalleryShareLinks", fields: [galleryId], references: [id], onDelete: Cascade)
   /// SHA-256 of the 128-bit share token — the only thing access resolves by
-  tokenHash            String    @unique
+  tokenHash                String    @unique
   /// The same token, AES-256-GCM encrypted for display in the admin
   /// (src/lib/token-cipher.ts). Never resolves anything; null when
   /// TOKEN_ENCRYPTION_KEY is unset or the row predates it, which just means
   /// the link can no longer be shown.
-  tokenCipher          String?
-  label                String?
+  tokenCipher              String?
+  label                    String?
   /// scrypt hash "salt:key"; null = no password
-  passwordHash         String?
-  expiresAt            DateTime?
-  revokedAt            DateTime?
-  allowDownload        Boolean   @default(true)
-  allowReactions       Boolean   @default(true)
+  passwordHash             String?
+  expiresAt                DateTime?
+  revokedAt                DateTime?
+  allowDownload            Boolean   @default(true)
+  allowReactions           Boolean   @default(true)
   /// Guests may mark photos for print with a quantity (1-99). Same risk profile
   /// as allowReactions — a per-viewer mark, not a write of new content — so it
   /// defaults on rather than off like allowUpload.
-  allowPrintSelection  Boolean   @default(true)
+  allowPrintSelection      Boolean   @default(true)
   /// Guests holding this link may add photos to the gallery
   /// (docs/GUEST-GALLERIES.md §6). Off by default: every link that existed
   /// before this column was read-only, and silently widening one would be the
   /// worst possible default for a feature that opens an anonymous write path.
-  allowUpload          Boolean   @default(false)
+  allowUpload              Boolean   @default(false)
+  /// The corrections mode (docs/CORRECTIONS.md): whoever holds this link and
+  /// its 6-digit PIN may comment on photos. Off by default — the PIN is
+  /// handed to the couple at delivery, never to a link's every guest.
+  allowCorrections         Boolean   @default(false)
+  /// scrypt hash of the PIN (verification) and the PIN itself AES-encrypted
+  /// like `tokenCipher`, so the admin can show it again. Both null until the
+  /// mode is first switched on; a new PIN invalidates every open session.
+  correctionPinHash        String?
+  correctionPinCipher      String?
+  /// Wrong PINs in a row and the lockout they trigger, as for the password.
+  correctionFailedAttempts Int       @default(0)
+  correctionLockedUntil    DateTime?
   /// Consecutive wrong-password unlock attempts; resets to 0 on success (anti-brute-force)
-  failedUnlockAttempts Int       @default(0)
+  failedUnlockAttempts     Int       @default(0)
   /// Set once failedUnlockAttempts hits the threshold; unlock is refused (no scrypt call) until this passes
-  unlockLockedUntil    DateTime?
+  unlockLockedUntil        DateTime?
   /// Readable URL hint frozen at creation from title+eventDate (docs/TODO.md §6) —
   /// cosmetic only, never resolves anything; tokenHash is still the sole authority.
   /// Null on links created before this existed — `/g/{token}` alone still works.
-  slug                 String?
-  createdAt            DateTime  @default(now())
+  slug                     String?
+  createdAt                DateTime  @default(now())
 
   viewers      Viewer[]
+  comments     PhotoComment[]
   /// Galleries whose wedding-page card points at this link.
-  eventCardFor Gallery[] @relation("EventCardLink")
+  eventCardFor Gallery[]      @relation("EventCardLink")
 
   @@index([galleryId])
   @@schema("g_gallery")
@@ -603,6 +617,8 @@ enum ActivityType {
   /// (docs/PROMO-CARDS.md). Without it the card is placed blind — there is no
   /// way to tell a card that works from one nobody notices.
   PROMO_CLICK
+  /// A correction written in the corrections mode (docs/CORRECTIONS.md).
+  CORRECTION
 
   @@schema("g_gallery")
 }
@@ -853,5 +869,27 @@ model FaceTag {
   /// Someone is on a photo once: naming them on another face moves the tag.
   @@unique([photoId, personId])
   @@index([personId])
+  @@schema("g_gallery")
+}
+
+/// A correction the couple asked for on a photo, in the corrections mode
+/// (docs/CORRECTIONS.md). Only holders of the link's PIN read or write them;
+/// guests never see one. `x`/`y` (0–1 of the photo) mark the spot, optional.
+model PhotoComment {
+  id          String    @id @default(cuid())
+  photoId     String
+  photo       Photo     @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  shareLinkId String
+  shareLink   ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  body        String
+  x           Float?
+  y           Float?
+  /// Set by the photographer; a resolved comment is read-only for the couple.
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([photoId])
+  @@index([shareLinkId])
   @@schema("g_gallery")
 }

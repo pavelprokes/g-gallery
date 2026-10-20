@@ -17,6 +17,7 @@ const photo = (over: Partial<PhotoFacts>): PhotoFacts => ({
   favorites: 0,
   reactions: 0,
   print: 0,
+  comments: 0,
   views: 0,
   viewers: 0,
   highlight: false,

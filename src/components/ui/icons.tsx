@@ -294,3 +294,22 @@ export function PlayIcon({ className = DEFAULT_SIZE }: IconProps) {
     </svg>
   );
 }
+
+/** A pencil — the corrections mode (docs/CORRECTIONS.md). */
+export function PencilIcon({ className = DEFAULT_SIZE }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  );
+}
