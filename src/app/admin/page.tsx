@@ -244,6 +244,7 @@ export default async function AdminPage() {
                       <OpenGalleryLink
                         href={`/s/${token}/${event.slug}`}
                         size="sm"
+                        variant="secondary"
                         label="Otevřít svatbu"
                       />
                       <div className="min-w-0 flex-1">
@@ -310,7 +311,7 @@ export default async function AdminPage() {
               <ViewStats series={series} max={galleryMax} label={gallery.title} />
               {openUrl && (
                 <div className="relative z-10 shrink-0">
-                  <OpenGalleryLink href={openUrl} size="sm" />
+                  <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />
                 </div>
               )}
             </li>

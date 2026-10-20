@@ -124,7 +124,6 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
         }
         actions={
           <>
-            {eventUrl && <OpenGalleryLink href={eventUrl} label="Otevřít svatbu" />}
             <EventSettings
               eventId={event.id}
               title={event.title}
@@ -137,6 +136,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                 Do koše
               </Button>
             </form>
+            {eventUrl && <OpenGalleryLink href={eventUrl} label="Otevřít svatbu" />}
           </>
         }
       />
@@ -227,7 +227,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                       <Badge tone={visible ? "success" : "muted"}>
                         {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
                       </Badge>
-                      {openUrl && <OpenGalleryLink href={openUrl} size="sm" />}
+                      {openUrl && <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />}
                     </div>
                   </div>
                 </div>

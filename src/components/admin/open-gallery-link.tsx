@@ -9,17 +9,20 @@ export function OpenGalleryLink({
   href,
   size = "md",
   label = "Otevřít galerii",
+  variant = "primary",
 }: {
   href: string;
   size?: "sm" | "md";
   label?: string;
+  /** Primary only in a page's header — one primary per page; rows in a list are secondary. */
+  variant?: "primary" | "secondary";
 }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={buttonClasses("primary", size)}
+      className={buttonClasses(variant, size)}
     >
       {label} ↗
     </a>

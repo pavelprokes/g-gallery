@@ -499,7 +499,6 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         subtitle={`${GALLERY_STATUS[gallery.status].label} · ${pluralize(gallery.photos.length, FORMS.photo)}`}
         actions={
           <>
-            {guestUrl && <OpenGalleryLink href={guestUrl} />}
             {/* docs/SOCIAL-VIDEO.md — a Reel or a gift from this gallery's photos. */}
             <a href={`/admin/g/${gallery.id}/video`} className={buttonClasses("secondary", "md")}>
               Video pro sítě
@@ -516,7 +515,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             {openCorrections > 0 && (
               <a
                 href={`/admin/g/${gallery.id}?f=comments`}
-                className={buttonClasses("primary", "md")}
+                className={buttonClasses("secondary", "md")}
               >
                 Připomínky ({openCorrections})
               </a>
@@ -537,6 +536,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               <UnpublishGalleryButton galleryId={gallery.id} />
             )}
             {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
+            {/* The page's one primary action, last so it sits top right. */}
+            {guestUrl && <OpenGalleryLink href={guestUrl} />}
           </>
         }
       />
