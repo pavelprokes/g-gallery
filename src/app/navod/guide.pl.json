@@ -1,0 +1,352 @@
+{
+  "pageTitle": "Poradnik do galerii – jak oglądać, wybierać i pobierać zdjęcia",
+  "pageDescription": "Poradnik krok po kroku dla początkujących: jak otworzyć galerię z e-maila, oglądać zdjęcia, wybrać je do wydruku, pobrać i poprosić fotografa o poprawki.",
+  "kicker": "Poradnik do galerii",
+  "heroTitle": "Jak korzystać z galerii",
+  "heroLead": "Fotograf przysłał Ci link e-mailem albo w wiadomości? Tutaj znajdziesz krok po kroku wszystko, co możesz zrobić w galerii. Niczego nie instalujesz i nigdzie się nie logujesz – wystarczy telefon albo komputer i ten link.",
+  "otherLanguages": "Ten poradnik w innych językach:",
+  "tocHeading": "Co chcesz zrobić?",
+  "tocLead": "Wybierz, w czym potrzebujesz pomocy. Jesteś tu pierwszy raz? Zacznij od pierwszego punktu.",
+  "toc": {
+    "start": "Otworzyć galerię po raz pierwszy",
+    "browse": "Obejrzeć zdjęcia",
+    "print": "Wybrać zdjęcia do wydruku",
+    "favorites": "Oznaczyć ulubione zdjęcia",
+    "download": "Pobrać zdjęcia",
+    "corrections": "Poprosić o poprawkę zdjęcia",
+    "guests": "Dodać własne zdjęcia ze ślubu",
+    "offline": "Oglądać zdjęcia bez internetu",
+    "privacy": "Imię i prywatność",
+    "trouble": "Coś nie działa"
+  },
+  "start": {
+    "heading": "1. Pierwszy raz w galerii",
+    "intro": "Jeśli otwierasz galerię po raz pierwszy, zacznij tutaj. To zajmie minutę.",
+    "openTitle": "Dotknij linku",
+    "openBody": "Znajdź e-mail albo wiadomość od fotografa i dotknij linku. Galeria otworzy się w przeglądarce – w Safari, Chrome albo w tej, której używasz na co dzień. Niczego nie pobierasz, nie instalujesz i nie zakładasz konta.",
+    "passwordTitle": "Wpisz hasło, jeśli galeria o nie poprosi",
+    "passwordBody": "Niektóre galerie są chronione hasłem. Znajdziesz je w tej samej wiadomości co link. Przeglądarka zapamięta je potem na 30 dni.",
+    "lookTitle": "Rozejrzyj się",
+    "lookBody": "Na górze jest nazwa galerii i kilka przycisków, a pod nimi wszystkie zdjęcia obok siebie. Kolejne zdjęcia wczytują się, gdy przewijasz w dół. Dotknij dowolnego zdjęcia, a powiększy się na cały ekran.",
+    "keepTitle": "Zachowaj link",
+    "keepBody": "Na pewno zechcesz wrócić do galerii. Zachowaj wiadomość z linkiem albo dodaj stronę do zakładek. Na telefonie możesz ją też dodać do ekranu głównego jako ikonę przez „Udostępnij”.",
+    "termsHeading": "Co jest czym",
+    "termsLead": "Te trzy słowa często zobaczysz w poradniku:",
+    "terms": [
+      {
+        "term": "Przegląd",
+        "body": "Wszystkie zdjęcia z galerii obok siebie. To widzisz zaraz po otwarciu linku."
+      },
+      {
+        "term": "Podgląd zdjęcia",
+        "body": "Jedno zdjęcie na cały ekran. Otwiera się, gdy dotkniesz zdjęcia w przeglądzie."
+      },
+      {
+        "term": "Pasek",
+        "body": "Rząd przycisków na dole podglądu zdjęcia – serduszko, drukarka, pobieranie i inne."
+      }
+    ],
+    "buttonsNote": "Nie widzisz przycisku, o którym mowa w poradniku? Fotograf włącza pobieranie, wybór do wydruku, serduszka i poprawki osobno dla każdej galerii. Jeśli czegoś brakuje, nic się nie zepsuło – po prostu nie jest to włączone w Twojej galerii."
+  },
+  "browse": {
+    "heading": "2. Oglądanie zdjęć",
+    "intro": "Galeria otwiera się jako przegląd wszystkich zdjęć. Kolejne wczytują się same, gdy przewijasz w dół.",
+    "detailHeading": "Zdjęcie na cały ekran",
+    "detailLead": "Dotknij dowolnego zdjęcia, a otworzy się na cały ekran. Adres strony pokazuje wtedy właśnie to zdjęcie, więc możesz go skopiować i komuś wysłać. Kto otworzy link, od razu je zobaczy.",
+    "phoneTerm": "Na telefonie",
+    "phone": [
+      "Przesuń palcem w bok, aby przejść do następnego zdjęcia.",
+      "Rozsuń dwa palce albo dotknij dwukrotnie, aby powiększyć zdjęcie.",
+      "Jedno dotknięcie chowa przyciski, żeby było widać samo zdjęcie. Kolejne je przywraca.",
+      "Zamkniesz zdjęcie, przesuwając palcem w dół, krzyżykiem w lewym górnym rogu albo przyciskiem Wstecz."
+    ],
+    "desktopTerm": "Na komputerze",
+    "desktop": [
+      "Między zdjęciami przechodzisz strzałkami przy krawędziach ekranu albo strzałkami na klawiaturze.",
+      "Zdjęcie zamkniesz krzyżykiem w lewym górnym rogu albo klawiszem Esc."
+    ],
+    "chaptersHeading": "Rozdziały",
+    "chaptersBody": "Jeśli fotograf podzielił galerię na części – na przykład Przygotowania, Ślub i Wesele – na górze zobaczysz rząd etykiet. Dotknij etykiety, a od razu przeskoczysz do tej części. Adres strony przy tym się zmienia, więc możesz wysłać link prosto do wybranego rozdziału.",
+    "highlightsHeading": "Najlepsze chwile dnia",
+    "highlightsBody": "Nad przeglądem może być wybór najpiękniejszych zdjęć przygotowany przez fotografa. Dotknij zdjęcia z wyboru, a przeniesiesz się na jego miejsce w galerii. Zdjęcie na chwilę dostanie ramkę, żeby łatwo było je znaleźć.",
+    "slideshowHeading": "Pokaz",
+    "slideshowBody": "Przycisk <projector></projector> „Pokaz” na górze wyświetla zdjęcia na cały ekran, jedno po drugim. Przydaje się na telewizorze albo projektorze, na przykład gdy pokazujecie zdjęcia rodzinie. Zatrzymasz go, dotykając w dowolnym miejscu albo klawiszem Esc.",
+    "slideshowNote": "Pokaz wyświetla zdjęcia, które galeria już wczytała. W dużej galerii najpierw przewiń więc do samego końca.",
+    "newPhotos": "Gdy fotograf doda coś do galerii, w przeglądzie nie pojawi się to samo. Wystarczy odświeżyć stronę."
+  },
+  "print": {
+    "heading": "3. Wybór zdjęć do wydruku",
+    "intro": "Zdjęcia, które chcesz mieć na papierze, oznaczasz prosto w galerii. Nie musisz niczego wypisywać ani wysyłać e-mailem – fotograf zobaczy Twój wybór u siebie. Zdjęcia możesz oznaczać na dwa sposoby i swobodnie je zmieniać.",
+    "grid": {
+      "title": "W przeglądzie zdjęć",
+      "lead": "Szybki sposób, gdy przeglądasz całą galerię.",
+      "showTitle": "Pokaż drukarki",
+      "showPhone": "Na telefonie dotknij przycisku <marking></marking> na górze, obok nazwy galerii. Na każdym zdjęciu w prawym górnym rogu pojawi się wtedy mała drukarka.",
+      "showDesktop": "Na komputerze wystarczy najechać myszką na zdjęcie, a drukarka pokaże się sama.",
+      "tapTitle": "Dotknij drukarki",
+      "tapBody": "Dotknij <printer></printer> na zdjęciu, które chcesz wydrukować. Tak oznaczysz je do wydruku w jednej odbitce."
+    },
+    "detail": {
+      "title": "W podglądzie zdjęcia",
+      "lead": "Gdy najpierw chcesz dobrze przyjrzeć się zdjęciu.",
+      "openTitle": "Dotknij zdjęcia",
+      "openBody": "Otworzy się na cały ekran.",
+      "tapTitle": "Dotknij drukarki",
+      "tapBody": "Znajdziesz ją na pasku na dole: <printer></printer>. Tak oznaczysz zdjęcie do wydruku w jednej odbitce.",
+      "nextTitle": "Przejdź do następnego zdjęcia",
+      "nextBody": "Przesuń palcem w bok albo użyj strzałek i oznaczaj dalej tak samo."
+    },
+    "quantity": {
+      "heading": "Ile odbitek?",
+      "lead": "Po pierwszym dotknięciu drukarka zmienia się w licznik. Działa tak samo w przeglądzie i w podglądzie zdjęcia.",
+      "plus": "<plus></plus> dodaje kolejną odbitkę tego samego zdjęcia. Na przykład trzy – dla Was, dla rodziców i dla babci.",
+      "minus": "<minus></minus> odejmuje jedną odbitkę. Gdy odejmiesz ostatnią, oznaczenie zniknie i wróci zwykła drukarka.",
+      "max": "Jednego zdjęcia możesz zamówić nawet 99 odbitek.",
+      "others": "Gdy przez ten sam link wybiera kilka osób, obok licznika zobaczysz szarą liczbę, na przykład (+2). To odbitki, których chcą inni. Twoja liczba się przez to nie zmienia.",
+      "demoLabel": "Przykład: zdjęcie oznaczone do wydruku w trzech odbitkach, a inni chcą jeszcze dwóch."
+    },
+    "summary": {
+      "heading": "Podsumowanie na górze",
+      "lead": "Podczas wybierania na górze zostaje pasek, z którego od razu widać, ile już masz.",
+      "demoLabel": "Przykład podsumowania wyboru do wydruku",
+      "photosTerm": "Zdjęcia",
+      "photosBody": "Ile różnych zdjęć masz w wyborze.",
+      "piecesTerm": "Odbitki",
+      "piecesBody": "Ile to razem wydruków – niektóre zdjęcia możesz chcieć mieć kilka razy.",
+      "everyoneTerm": "Łącznie ze wszystkimi",
+      "everyoneBody": "Suma dla wszystkich, którzy wybierają przez ten sam link co Ty. Pokazuje się tylko wtedy, gdy wybiera więcej osób.",
+      "savedTerm": "Zapisano",
+      "savedBody": "Twój wybór jest bezpiecznie zapisany. Nie ma tu przycisku „Wyślij” i nie jest potrzebny."
+    },
+    "tipsHeading": "Warto wiedzieć",
+    "tips": [
+      {
+        "title": "Serduszko to nie wydruk.",
+        "body": "Serduszkiem dodajesz zdjęcie do ulubionych. Do wydruku fotograf weźmie je tylko wtedy, gdy dotkniesz przy nim drukarki."
+      },
+      {
+        "title": "Gdy skończysz wybierać, daj znać fotografowi.",
+        "body": "Widzi Twój wybór na bieżąco, ale nie wie, kiedy jest gotowy. Wystarczy krótka wiadomość."
+      },
+      {
+        "title": "Podaj swoje imię.",
+        "body": "Przy pierwszym oznaczeniu galeria zapyta, jak masz na imię. Dzięki temu fotograf wie, czyj jest który wybór. Możesz to też spokojnie pominąć."
+      },
+      {
+        "title": "Brak zasięgu? Nic nie szkodzi.",
+        "body": "W pociągu albo na działce zobaczysz komunikat, że zmiany czekają. Zapiszą się same, gdy znów będziesz online."
+      },
+      {
+        "title": "W ogóle nie widzisz drukarki?",
+        "body": "Fotograf nie włączył wyboru do wydruku dla tego linku. Napisz do niego, a na pewno się dogadacie."
+      }
+    ],
+    "visibility": {
+      "heading": "Kto widzi Twój wybór",
+      "lead": "Wybór do wydruku to nie prywatny notes – to zamówienie, które może składać kilka osób naraz. Dlatego warto wiedzieć, kto co widzi.",
+      "photographerTerm": "Fotograf",
+      "photographerBody": "Widzi wszystko: które zdjęcia, ile odbitek i od kogo, jeśli podasz imię.",
+      "sameLinkTerm": "Każdy, kto ma ten sam link co Ty",
+      "sameLinkBody": "Na przykład partner albo rodzice, jeśli prześlecie im link. Przy zdjęciu widzą tylko szarą liczbę odbitek, których chcą inni, i ogólne podsumowanie. Nie widzą, kto co wybrał.",
+      "guestsTerm": "Goście ze strony wesela",
+      "guestsBody": "Mają własny link, więc w ogóle nie widzą Twojego wyboru – a Ty nie widzisz ich.",
+      "hint": "Dlatego link do swojej galerii wysyłaj tylko tym, z którymi chcesz wspólnie wybierać."
+    },
+    "devices": {
+      "heading": "Zaczynasz na telefonie, kończysz w domu",
+      "lead": "Galeria pamięta Twój wybór w przeglądarce, w której go robisz – bez konta i hasła. Aby kontynuować na innym urządzeniu, przenosisz go krótkim kodem.",
+      "step1Title": "Na pierwszym urządzeniu poproś o kod",
+      "step1Body": "Przewiń na sam dół, pod zdjęcia, i dotknij „Kontynuuj na innym urządzeniu”. Pojawi się ośmioznakowy kod, na przykład K7P2-M9XQ.",
+      "step2Title": "Na drugim urządzeniu otwórz tę samą galerię",
+      "step2Body": "Użyj tego samego linku co wcześniej – na przykład z e-maila albo wiadomości od fotografa.",
+      "step3Title": "Wpisz kod",
+      "step3Body": "Na samym dole kliknij „Mam kod”, przepisz go i potwierdź przyciskiem „Przenieś”. Strona się odświeży i Twój wybór będzie na miejscu.",
+      "notes": [
+        "Kod jest ważny 15 minut i działa tylko raz. Jeśli nie zdążysz, po prostu wygeneruj nowy.",
+        "Wielkość liter i myślnik nie mają znaczenia.",
+        "Przenosi się wszystko: wybór do wydruku, serduszka, reakcje i imię.",
+        "Od tej chwili oba urządzenia mają jeden wspólny wybór. To, co dodasz na komputerze, zobaczysz w telefonie po odświeżeniu strony.",
+        "Wpisz kod, zanim zaczniesz cokolwiek oznaczać na drugim urządzeniu. To, co oznaczysz tam wcześniej, zostanie u fotografa jako osobny wybór, którego nie da się już zmienić."
+      ],
+      "togetherHint": "Wybieracie we dwoje? Nie musicie niczego przenosić – każde z Was może wybierać na swoim telefonie, a wybory się sumują. Kodem możecie za to zrobić jeden wspólny wybór na obu telefonach."
+    }
+  },
+  "favorites": {
+    "heading": "4. Ulubione zdjęcia i reakcje",
+    "intro": "Serduszkiem oznaczasz zdjęcia, które najbardziej Ci się podobają. Przydaje się na przykład przy wyborze zdjęć do albumu albo gdy chcesz pokazać je rodzinie w jednym miejscu.",
+    "howHeading": "Jak dać zdjęciu serduszko",
+    "phone": "Na telefonie otwórz zdjęcie i dotknij <heart></heart> na pasku na dole. Możesz też dotknąć przycisku <marking></marking> na górze, a serduszka pojawią się bezpośrednio na zdjęciach w przeglądzie.",
+    "desktop": "Na komputerze najedź myszką na zdjęcie – serduszko jest w prawym dolnym rogu.",
+    "filterHeading": "Tylko ulubione",
+    "filterBody": "Gdy masz pierwsze ulubione zdjęcie, na górze pojawi się przycisk z serduszkiem i liczbą. Dotknij go, a zobaczysz tylko swoje ulubione. Kolejne dotknięcie znów pokaże wszystkie zdjęcia.",
+    "countBody": "Liczba przy serduszku pokazuje, ile osób ma to zdjęcie w ulubionych. Nikt nie widzi, kto dokładnie.",
+    "reactionsHeading": "Reakcje",
+    "reactionsBody": "W podglądzie zdjęcia obok serduszka znajdziesz też pięć emotikonów: ❤️ serce, 😮 wow, 😂 śmiech, 🥲 wzruszenie i 👏 brawa. Każdemu zdjęciu możesz dać jedną reakcję. Kolejnym dotknięciem ją usuniesz albo zmienisz na inną. W przeglądzie zobaczysz potem przy zdjęciu, jak zareagowali na nie inni.",
+    "devicesNote": "Serduszka i reakcje galeria pamięta tak samo jak wybór do wydruku – w przeglądarce, w której je dajesz. Na inne urządzenie przeniesiesz je kodem, zobacz <a>Zaczynasz na telefonie, kończysz w domu</a>.",
+    "missing": "W ogóle nie widzisz serduszek? Fotograf nie włączył ich dla tego linku."
+  },
+  "download": {
+    "heading": "5. Pobieranie zdjęć",
+    "intro": "Zdjęcia możesz pobrać w pełnej jakości – pojedynczo, tylko wybrane albo całą galerię naraz.",
+    "oneTitle": "Jedno zdjęcie",
+    "oneOpenTitle": "Otwórz zdjęcie",
+    "oneOpenBody": "Dotknij go w przeglądzie.",
+    "oneTapTitle": "Dotknij strzałki w dół",
+    "oneTapBody": "Znajdziesz ją na pasku na dole: <download></download>. Pobierze się oryginał w pełnej jakości.",
+    "someTitle": "Tylko wybrane",
+    "someSelectTitle": "Zaznacz zdjęcia",
+    "someSelectPhone": "Na telefonie przytrzymaj palec na zdjęciu, aż się zaznaczy. Kolejne dodajesz już zwykłym dotknięciem.",
+    "someSelectDesktop": "Na komputerze najedź myszką na zdjęcie i kliknij kółko <check></check> w lewym górnym rogu. Z wciśniętym Shiftem zaznaczysz naraz wszystkie zdjęcia między ostatnio zaznaczonym a tym, które klikniesz.",
+    "someDownloadTitle": "Pobierz je",
+    "someDownloadBody": "Dotknij na górze przycisku „Pobierz” z liczbą zaznaczonych zdjęć. Kilka zdjęć pobierze się jako jeden plik ZIP. Zaznaczenie wyczyścisz krzyżykiem obok.",
+    "allTitle": "Całą galerię",
+    "allTapTitle": "Dotknij „Pobierz wszystko”",
+    "allTapBody": "Przycisk jest na górze i pokazuje też rozmiar. Pobierze się jeden plik ZIP ze wszystkimi zdjęciami.",
+    "tipsHeading": "Warto wiedzieć",
+    "tips": [
+      {
+        "title": "Co to jest ZIP?",
+        "body": "Jeden plik, w którym zdjęcia są spakowane razem. Na komputerze otworzysz go dwukrotnym kliknięciem, na iPhonie w aplikacji Pliki, a na Androidzie w menedżerze plików."
+      },
+      {
+        "title": "Całą galerię najlepiej pobieraj na komputerze i przez Wi-Fi.",
+        "body": "To może być nawet kilka gigabajtów. Przy dużych galeriach galeria zapyta Cię jeszcze przed rozpoczęciem pobierania."
+      },
+      {
+        "title": "Widzisz „Przygotowuję archiwum”?",
+        "body": "Plik ze wszystkimi zdjęciami dopiero się tworzy. W tym czasie możesz pobrać tylko wybrane zdjęcia albo wrócić za chwilę."
+      },
+      {
+        "title": "„Zaznacz wszystkie wczytane”",
+        "body": "zaznacza tylko zdjęcia, które galeria już wczytała. Aby pobrać całą galerię, użyj „Pobierz wszystko”."
+      },
+      {
+        "title": "Nie widzisz żadnego przycisku pobierania?",
+        "body": "Fotograf nie włączył pobierania dla tego linku. Napisz do niego."
+      }
+    ]
+  },
+  "corrections": {
+    "heading": "6. Poprawki zdjęć i prośby",
+    "intro": "Chcesz coś zmienić na którymś zdjęciu – wyretuszować plamę, wyprostować horyzont, usunąć lampę z kadru? Napisz to fotografowi bezpośrednio przy zdjęciu, nie musisz niczego opisywać w e-mailu. Prośby o poprawki są tylko dla Was dwojga: otwiera je sześciocyfrowy PIN, który fotograf wysłał Ci razem z galerią.",
+    "stepsTitle": "Jak napisać prośbę",
+    "enterTitle": "Włącz tryb poprawek",
+    "enterBody": "Na górze galerii dotknij <pencil></pencil> Poprawki i wpisz PIN. Pytamy o niego przy każdym wejściu – kto ma tylko link, nie napisze ani nie zobaczy próśb.",
+    "openTitle": "Otwórz zdjęcie",
+    "openBody": "Na telefonie prośby pokazują się w dolnej części ekranu, na komputerze po prawej stronie zdjęcia. Między zdjęciami przechodzisz jak zwykle.",
+    "writeTitle": "Napisz, co poprawić",
+    "writeBody": "Wystarczy kilka słów, na przykład „wyretuszować plamę na sukni”. Przyciskiem Zaznacz miejsce i dotknięciem zdjęcia wskażesz dokładne miejsce – na zdjęciu pojawi się numer, taki sam jak przy prośbie.",
+    "editHeading": "Zmiana i usuwanie",
+    "editBody": "Dopóki fotograf nie zajmie się prośbą, możesz ją w każdej chwili zmienić albo usunąć. Zapisuje się od razu, na końcu niczego nie wysyłasz.",
+    "doneHeading": "Poprawione ✓",
+    "doneBody": "Gdy fotograf wgra poprawione zdjęcie, przy prośbie pojawi się Poprawione ✓, a w galerii zobaczysz nową wersję w tym samym miejscu. Serduszka i wybór do wydruku zostają przy niej.",
+    "badgeNote": "Zdjęcia z prośbą rozpoznasz w przeglądzie po numerze z ołówkiem. Tryb zakończysz przyciskiem Zakończ, zamykając stronę, albo skończy się sam po dwóch godzinach.",
+    "missing": "Nie widzisz przycisku Poprawki? Fotograf nie włączył go dla tego linku – wystarczy do niego napisać."
+  },
+  "guests": {
+    "heading": "7. Zdjęcia od gości",
+    "intro": "Gdy fotograf to włączy, zdjęcia do galerii mogą dodawać też goście – bez aplikacji i bez rejestracji. Wystarczy im link albo kod QR.",
+    "addTitle": "Dotknij „Dodaj zdjęcia”",
+    "addBody": "Przycisk jest na dole ekranu. Wybierz zdjęcia z telefonu albo przez „Zrób zdjęcie” od razu zrób nowe.",
+    "nameTitle": "Wpisz swoje imię",
+    "nameBody": "Za pierwszym razem galeria zapyta, jak masz na imię. Imię pojawi się przy Twoich zdjęciach, żeby Młodzi wiedzieli, komu podziękować. Możesz też kontynuować bez imienia.",
+    "waitTitle": "Poczekaj, aż zdjęcia się wgrają",
+    "waitBody": "Podczas wgrywania ekran pozostaje włączony. Jeśli coś je przerwie, reszta wyśle się, gdy znów otworzysz galerię.",
+    "tipsHeading": "Warto wiedzieć",
+    "tips": [
+      {
+        "title": "Zdjęcie dodane przez pomyłkę możesz usunąć.",
+        "body": "Otwórz je i dotknij „Usuń moje zdjęcie” w lewym górnym rogu. Działa to na urządzeniu, z którego zdjęcie zostało dodane, albo na innym, które połączysz z nim kodem."
+      },
+      {
+        "title": "Zdjęcia z iPhone’a działają bez problemu.",
+        "body": "Przeglądarka sama wyśle je w popularnym formacie. Galeria nie przyjmuje filmów, a jedno zdjęcie może mieć najwyżej 25 MB."
+      },
+      {
+        "title": "Jedna osoba może dodać do 150 zdjęć.",
+        "body": "To w zupełności wystarczy na całe wesele, a galeria pozostaje przejrzysta."
+      },
+      {
+        "title": "Imię zmienisz",
+        "body": "linkiem „Zmień” na dole, przy przycisku „Dodaj zdjęcia”. Zmieni się przy wszystkich Twoich zdjęciach w galerii."
+      }
+    ],
+    "hubHeading": "Strona wesela z kilkoma galeriami",
+    "hubBody": "Fotograf może połączyć wszystkie galerie z jednego ślubu pod jednym linkiem. Zobaczysz je jako duże kafelki, a pod nimi galerię od gości. Link zostaje ten sam, nawet gdy przybywają kolejne galerie. Do przeglądu wrócisz linkiem z nazwą wesela na górze."
+  },
+  "offline": {
+    "heading": "8. Oglądanie bez internetu",
+    "intro": "Jedziesz na działkę albo lecisz samolotem? Zdjęcia możesz wcześniej zapisać na urządzeniu i oglądać je nawet bez internetu.",
+    "scrollTitle": "Przewiń do końca galerii",
+    "scrollBody": "Zapiszą się tylko zdjęcia, które galeria już wczytała. W dużej galerii najpierw przewiń więc na sam dół.",
+    "tapTitle": "Dotknij „Offline” na górze",
+    "tapBody": "Zobaczysz, ile zdjęć się zapisze i ile zajmą miejsca. Jeśli masz coś oznaczone, możesz zapisać tylko swoje ulubione i zdjęcia do wydruku.",
+    "saveTitle": "Wybierz „Zapisz do użytku offline”",
+    "saveBody": "Gdy zobaczysz „Galeria jest dostępna offline”, gotowe.",
+    "tips": [
+      "Zapisują się pomniejszone zdjęcia dopasowane do Twojego ekranu, a nie oryginały. Do wydruku albo na pamiątkę zdjęcia pobierz.",
+      "iPhone sam usuwa zapisane zdjęcia, jeśli przez mniej więcej tydzień ich nie otworzysz. Wystarczy wtedy zapisać je ponownie.",
+      "Zapisane zdjęcia usuniesz w tym samym oknie przyciskiem „Usuń z urządzenia”."
+    ]
+  },
+  "privacy": {
+    "heading": "9. Imię i prywatność",
+    "intro": "Galeria nie potrzebuje konta ani e-maila. Rozpoznaje Cię tylko po przeglądarce, w której ją otwierasz. Nie musisz podawać imienia – ale jeśli je podasz, zobaczą je:",
+    "terms": [
+      {
+        "term": "Inni w galerii",
+        "body": "Na górze galerii są inicjały osób, które niedawno ją oglądały i podały imię. Pełne imię pokaże się po najechaniu na nie myszką."
+      },
+      {
+        "term": "Ci, którzy oglądają razem z Tobą",
+        "body": "Gdy macie galerię otwartą w tym samym czasie, inni zobaczą, że właśnie oglądasz."
+      },
+      {
+        "term": "Przy Twoich zdjęciach",
+        "body": "Przy zdjęciach, które dodasz, widać, od kogo są."
+      },
+      {
+        "term": "Fotograf",
+        "body": "Widzi, czyj jest który wybór do wydruku."
+      }
+    ],
+    "countsNote": "Przy serduszkach, reakcjach i wyborze do wydruku inni widzą tylko liczby, a nie imiona.",
+    "optOutHeading": "Nie licz mnie",
+    "optOutBody": "Galeria liczy odwiedziny anonimowo i bez adresów IP. Jeśli nie chcesz, żeby Twoje odwiedziny były w ogóle liczone, dotknij „Nie licz mnie” na samym dole. Twoje imię zniknie wtedy ze wszystkich galerii.",
+    "optOutWarning": "Zastanów się dobrze – tego nie da się cofnąć. Zdjęcia, które dodano z tej przeglądarki, zostaną w galerii, ale nie będzie już można ich usunąć. W tej przeglądarce nie dasz też już serduszek ani nie wybierzesz zdjęć do wydruku."
+  },
+  "trouble": {
+    "heading": "10. Gdy coś nie działa",
+    "items": [
+      {
+        "title": "Galeria prosi o hasło.",
+        "body": "Fotograf wysłał Ci je razem z linkiem. Zwróć uwagę na wielkie i małe litery. Po pięciu błędnych próbach galeria zablokuje się na 15 minut. Poprawne hasło przeglądarka pamięta przez 30 dni."
+      },
+      {
+        "title": "PIN do poprawek nie działa.",
+        "body": "Sprawdź, czy wpisujesz wszystkie sześć cyfr z wiadomości, w której fotograf przekazał galerię. Po dziesięciu błędnych próbach wpisywanie zablokuje się na 5 minut. Gdy fotograf wygeneruje nowy PIN, stary przestaje działać – poproś go o nowy."
+      },
+      {
+        "title": "„Ten link już nie działa”",
+        "body": "Link wygasł. Napisz do fotografa, a wyśle Ci nowy."
+      },
+      {
+        "title": "„Ten link donikąd nie prowadzi”",
+        "body": "Prawdopodobnie skopiowała się tylko część adresu. Otwórz link jeszcze raz prosto z oryginalnej wiadomości albo zeskanuj kod QR."
+      },
+      {
+        "title": "„Ostatnie oznaczenie nie zostało zapisane”",
+        "body": "Sprawdź połączenie i spróbuj ponownie."
+      },
+      {
+        "title": "Nie widzisz nowych zdjęć.",
+        "body": "Odśwież stronę."
+      },
+      {
+        "title": "Brakuje przycisku, o którym mowa w poradniku.",
+        "body": "Pobieranie, serduszka, wybór do wydruku, poprawki i dodawanie zdjęć fotograf włącza osobno dla każdego linku – goście mogą więc mieć inne możliwości niż Wy. Jeśli czegoś nie widzisz, nic się nie zepsuło. Napisz do fotografa, a na pewno się dogadacie."
+      }
+    ]
+  },
+  "help": "Nadal nie wiesz, co zrobić? <a>Napisz do fotografa</a> – chętnie pomoże."
+}

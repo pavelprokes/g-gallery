@@ -1,0 +1,352 @@
+{
+  "pageTitle": "Hochzeitsfotos ansehen, auswählen und herunterladen – Anleitung",
+  "pageDescription": "Schritt für Schritt, auch für Einsteiger: die Galerie aus der E-Mail öffnen, Fotos ansehen, für den Druck auswählen, herunterladen und Retuschen wünschen.",
+  "kicker": "Anleitung zur Galerie",
+  "heroTitle": "So nutzen Sie Ihre Galerie",
+  "heroLead": "Hat Ihnen Ihr Fotograf einen Link per E-Mail oder Nachricht geschickt? Hier finden Sie Schritt für Schritt alles, was Sie mit der Galerie machen können. Sie müssen nichts installieren und sich nirgends anmelden – ein Handy oder Computer und dieser Link genügen.",
+  "otherLanguages": "Diese Anleitung in anderen Sprachen:",
+  "tocHeading": "Was möchten Sie tun?",
+  "tocLead": "Wählen Sie aus, wobei Sie Hilfe brauchen. Zum ersten Mal hier? Dann beginnen Sie am besten mit dem ersten Punkt.",
+  "toc": {
+    "start": "Die Galerie zum ersten Mal öffnen",
+    "browse": "Fotos ansehen",
+    "print": "Fotos für den Druck auswählen",
+    "favorites": "Favoriten markieren",
+    "download": "Fotos herunterladen",
+    "corrections": "Um eine Änderung an einem Foto bitten",
+    "guests": "Eigene Fotos von der Hochzeit hinzufügen",
+    "offline": "Fotos ohne Internet ansehen",
+    "privacy": "Ihr Name und Ihre Privatsphäre",
+    "trouble": "Etwas funktioniert nicht"
+  },
+  "start": {
+    "heading": "1. Zum ersten Mal in der Galerie",
+    "intro": "Wenn Sie die Galerie noch nie geöffnet haben, beginnen Sie hier. Es dauert nur eine Minute.",
+    "openTitle": "Tippen Sie auf den Link",
+    "openBody": "Suchen Sie die E-Mail oder Nachricht Ihres Fotografen und tippen Sie auf den Link. Die Galerie öffnet sich in Ihrem Browser – in Safari, Chrome oder dem, den Sie sonst auch benutzen. Sie laden nichts herunter, installieren nichts und müssen sich nirgends registrieren.",
+    "passwordTitle": "Geben Sie das Passwort ein, falls die Galerie danach fragt",
+    "passwordBody": "Manche Galerien sind mit einem Passwort geschützt. Sie finden es in derselben Nachricht wie den Link. Ihr Browser merkt es sich dann 30 Tage lang.",
+    "lookTitle": "Schauen Sie sich um",
+    "lookBody": "Oben stehen der Name der Galerie und ein paar Buttons, darunter alle Fotos nebeneinander. Weitere Fotos werden geladen, während Sie nach unten scrollen. Tippen Sie auf ein beliebiges Foto, um es im Vollbild zu sehen.",
+    "keepTitle": "Heben Sie den Link gut auf",
+    "keepBody": "Sie werden bestimmt wieder in die Galerie schauen wollen. Bewahren Sie die Nachricht mit dem Link auf oder setzen Sie ein Lesezeichen. Auf dem Handy können Sie die Seite über „Teilen“ auch als Symbol zum Home-Bildschirm hinzufügen.",
+    "termsHeading": "Was ist was",
+    "termsLead": "Diese drei Begriffe begegnen Ihnen in der Anleitung oft:",
+    "terms": [
+      {
+        "term": "Übersicht",
+        "body": "Alle Fotos der Galerie nebeneinander. Das sehen Sie, sobald Sie den Link öffnen."
+      },
+      {
+        "term": "Fotoansicht",
+        "body": "Ein einzelnes Foto im Vollbild. Sie öffnet sich, wenn Sie in der Übersicht auf ein Foto tippen."
+      },
+      {
+        "term": "Leiste",
+        "body": "Die Reihe von Buttons unten in der Fotoansicht – Herz, Drucker, Herunterladen und mehr."
+      }
+    ],
+    "buttonsNote": "Sie sehen einen Button nicht, von dem hier die Rede ist? Ihr Fotograf schaltet Herunterladen, Druckauswahl, Herzen und Änderungswünsche für jede Galerie einzeln ein. Wenn etwas fehlt, ist nichts kaputt – es ist bei Ihrer Galerie einfach nicht eingeschaltet."
+  },
+  "browse": {
+    "heading": "2. Fotos ansehen",
+    "intro": "Die Galerie öffnet sich als Übersicht aller Fotos. Weitere werden von selbst geladen, während Sie nach unten scrollen.",
+    "detailHeading": "Ein Foto im Vollbild",
+    "detailLead": "Tippen Sie auf ein beliebiges Foto, und es öffnet sich im Vollbild. Die Adresse der Seite zeigt dann genau dieses Foto – Sie können sie also kopieren und weiterschicken. Wer den Link öffnet, landet direkt bei diesem Foto.",
+    "phoneTerm": "Auf dem Handy",
+    "phone": [
+      "Wischen Sie zur Seite, um zum nächsten Foto zu kommen.",
+      "Ziehen Sie zwei Finger auseinander oder tippen Sie doppelt, um hineinzuzoomen.",
+      "Tippen Sie einmal, um die Buttons auszublenden und nur das Foto zu sehen. Ein weiteres Tippen holt sie zurück.",
+      "Schließen können Sie das Foto, indem Sie nach unten wischen, mit dem Kreuz oben links oder mit der Zurück-Taste."
+    ],
+    "desktopTerm": "Am Computer",
+    "desktop": [
+      "Blättern Sie mit den Pfeilen am Bildschirmrand oder mit den Pfeiltasten Ihrer Tastatur.",
+      "Schließen Sie das Foto mit dem Kreuz oben links oder mit der Esc-Taste."
+    ],
+    "chaptersHeading": "Kapitel",
+    "chaptersBody": "Wenn Ihr Fotograf die Galerie in Teile gegliedert hat – etwa Getting Ready, Trauung und Feier –, sehen Sie oben eine Reihe von Schildchen. Tippen Sie auf eines, um direkt zu diesem Teil zu springen. Die Adresse der Seite ändert sich dabei, sodass Sie einen Link direkt zu einem bestimmten Kapitel verschicken können.",
+    "highlightsHeading": "Das Beste des Tages",
+    "highlightsBody": "Über der Übersicht kann eine Auswahl der schönsten Fotos stehen, die Ihr Fotograf zusammengestellt hat. Tippen Sie auf ein Foto daraus, um an seine Stelle in der Galerie zu springen. Das Foto bekommt kurz einen Rahmen, damit Sie es leicht finden.",
+    "slideshowHeading": "Diashow",
+    "slideshowBody": "Der Button <projector></projector> „Diashow“ oben zeigt die Fotos im Vollbild, eines nach dem anderen. Praktisch für den Fernseher oder eine Leinwand, etwa wenn Sie die Fotos der Familie zeigen. Beenden können Sie sie mit einem Tippen irgendwohin oder mit der Esc-Taste.",
+    "slideshowNote": "Die Diashow zeigt die Fotos, die die Galerie schon geladen hat. Scrollen Sie bei einer großen Galerie deshalb zuerst ganz nach unten.",
+    "newPhotos": "Wenn Ihr Fotograf etwas zur Galerie hinzufügt, erscheint es nicht von selbst in der Übersicht. Laden Sie die Seite einfach neu."
+  },
+  "print": {
+    "heading": "3. Fotos für den Druck auswählen",
+    "intro": "Die Fotos, die Sie auf Papier haben möchten, markieren Sie direkt in der Galerie. Sie müssen keine Liste schreiben und nichts per E-Mail schicken – Ihr Fotograf sieht Ihre Auswahl bei sich. Es gibt zwei Wege zum Markieren, und Sie können jederzeit zwischen ihnen wechseln.",
+    "grid": {
+      "title": "In der Übersicht",
+      "lead": "Schnell, wenn Sie die ganze Galerie durchgehen.",
+      "showTitle": "Blenden Sie die Drucker ein",
+      "showPhone": "Auf dem Handy tippen Sie oben neben dem Namen der Galerie auf den Button <marking></marking>. Bei jedem Foto erscheint dann oben rechts ein kleiner Drucker.",
+      "showDesktop": "Am Computer fahren Sie einfach mit der Maus über ein Foto, und der Drucker erscheint von selbst.",
+      "tapTitle": "Tippen Sie auf den Drucker",
+      "tapBody": "Tippen Sie bei dem Foto, das Sie drucken lassen möchten, auf <printer></printer>. Damit ist es mit einem Abzug für den Druck markiert."
+    },
+    "detail": {
+      "title": "In der Fotoansicht",
+      "lead": "Wenn Sie sich das Foto erst einmal in Ruhe ansehen möchten.",
+      "openTitle": "Tippen Sie auf das Foto",
+      "openBody": "Es öffnet sich im Vollbild.",
+      "tapTitle": "Tippen Sie auf den Drucker",
+      "tapBody": "Sie finden ihn unten in der Leiste: <printer></printer>. Damit ist das Foto mit einem Abzug für den Druck markiert.",
+      "nextTitle": "Weiter zum nächsten Foto",
+      "nextBody": "Wischen Sie zur Seite oder nutzen Sie die Pfeile und markieren Sie genauso weiter."
+    },
+    "quantity": {
+      "heading": "Wie viele Abzüge?",
+      "lead": "Nach dem ersten Tippen wird aus dem Drucker ein Zähler. Er funktioniert in der Übersicht und in der Fotoansicht genau gleich.",
+      "plus": "<plus></plus> fügt einen weiteren Abzug desselben Fotos hinzu. Zum Beispiel drei – einen für Sie, einen für die Eltern und einen für die Oma.",
+      "minus": "<minus></minus> nimmt einen Abzug weg. Wenn Sie auch den letzten wegnehmen, verschwindet die Markierung, und der einfache Drucker ist wieder da.",
+      "max": "Von einem Foto können Sie bis zu 99 Abzüge bestellen.",
+      "others": "Wenn mehrere Personen über denselben Link auswählen, sehen Sie neben dem Zähler eine graue Zahl, etwa (+2). Das sind die Abzüge, die die anderen von diesem Foto möchten. An Ihrer eigenen Anzahl ändert das nichts.",
+      "demoLabel": "Beispiel: ein Foto mit drei Abzügen für den Druck markiert, andere möchten zwei weitere."
+    },
+    "summary": {
+      "heading": "Die Zusammenfassung oben",
+      "lead": "Während Sie auswählen, bleibt oben eine Leiste stehen, an der Sie sofort sehen, wie viel Sie schon haben.",
+      "demoLabel": "Beispiel für die Zusammenfassung der Druckauswahl",
+      "photosTerm": "Fotos",
+      "photosBody": "Wie viele verschiedene Fotos Sie ausgewählt haben.",
+      "piecesTerm": "Abzüge",
+      "piecesBody": "Wie viele Abzüge das zusammen sind – manche Fotos möchten Sie vielleicht mehrmals.",
+      "everyoneTerm": "Von allen zusammen",
+      "everyoneBody": "Die Summe für alle, die über denselben Link auswählen wie Sie. Sie erscheint nur, wenn mehr als eine Person auswählt.",
+      "savedTerm": "Gespeichert",
+      "savedBody": "Ihre Auswahl ist sicher gespeichert. Einen „Senden“-Button gibt es nicht – und er ist auch nicht nötig."
+    },
+    "tipsHeading": "Gut zu wissen",
+    "tips": [
+      {
+        "title": "Ein Herz ist kein Druckauftrag.",
+        "body": "Mit dem Herz speichern Sie ein Foto bei Ihren Favoriten. Für den Druck berücksichtigt es Ihr Fotograf nur, wenn Sie beim Foto auf den Drucker tippen."
+      },
+      {
+        "title": "Geben Sie Ihrem Fotografen Bescheid, wenn Sie fertig sind.",
+        "body": "Er sieht Ihre Auswahl laufend, weiß aber nicht, wann sie vollständig ist. Eine kurze Nachricht genügt."
+      },
+      {
+        "title": "Geben Sie Ihren Namen an.",
+        "body": "Wenn Sie zum ersten Mal etwas markieren, fragt die Galerie nach Ihrem Namen. So weiß Ihr Fotograf, welche Auswahl von wem ist. Sie können das aber auch überspringen."
+      },
+      {
+        "title": "Kein Empfang? Kein Problem.",
+        "body": "Im Zug oder auf dem Land sehen Sie einen Hinweis, dass Änderungen warten. Sie werden von selbst gespeichert, sobald Sie wieder online sind."
+      },
+      {
+        "title": "Sie sehen gar keinen Drucker?",
+        "body": "Dann hat Ihr Fotograf die Druckauswahl für diesen Link nicht eingeschaltet. Schreiben Sie ihm einfach, dann finden Sie gemeinsam eine Lösung."
+      }
+    ],
+    "visibility": {
+      "heading": "Wer Ihre Auswahl sieht",
+      "lead": "Die Druckauswahl ist kein privates Notizbuch – sie ist eine Bestellung, die auch mehrere Personen gemeinsam zusammenstellen können. Deshalb ist es gut zu wissen, wer was sieht.",
+      "photographerTerm": "Ihr Fotograf",
+      "photographerBody": "Sieht alles: welche Fotos, wie viele Abzüge und von wem – sofern Sie Ihren Namen angeben.",
+      "sameLinkTerm": "Alle mit demselben Link wie Sie",
+      "sameLinkBody": "Zum Beispiel Ihr Partner oder Ihre Eltern, wenn Sie ihnen den Link weiterleiten. Bei jedem Foto sehen sie nur die graue Zahl der Abzüge, die die anderen möchten, und die Gesamtsumme. Wer was ausgewählt hat, sehen sie nicht.",
+      "guestsTerm": "Gäste von der Hochzeitsseite",
+      "guestsBody": "Sie haben einen eigenen Link und sehen Ihre Auswahl deshalb gar nicht – und Sie ihre auch nicht.",
+      "hint": "Schicken Sie den Link zu Ihrer Galerie also nur an Menschen, mit denen Sie gemeinsam auswählen möchten."
+    },
+    "devices": {
+      "heading": "Auf dem Handy anfangen, zu Hause weitermachen",
+      "lead": "Die Galerie merkt sich Ihre Auswahl in dem Browser, in dem Sie sie treffen – ohne Konto und ohne Passwort. Um auf einem anderen Gerät weiterzumachen, übertragen Sie sie mit einem kurzen Code.",
+      "step1Title": "Holen Sie sich auf dem ersten Gerät einen Code",
+      "step1Body": "Scrollen Sie ganz nach unten unter die Fotos und tippen Sie auf „Auf einem anderen Gerät fortfahren“. Es erscheint ein achtstelliger Code, etwa K7P2-M9XQ.",
+      "step2Title": "Öffnen Sie auf dem zweiten Gerät dieselbe Galerie",
+      "step2Body": "Nutzen Sie denselben Link wie vorher – zum Beispiel aus der E-Mail oder Nachricht Ihres Fotografen.",
+      "step3Title": "Geben Sie den Code ein",
+      "step3Body": "Klicken Sie ganz unten auf „Ich habe einen Code“, tippen Sie ihn ab und bestätigen Sie mit „Übertragen“. Die Seite lädt neu, und Ihre Auswahl ist da.",
+      "notes": [
+        "Der Code ist 15 Minuten gültig und funktioniert nur einmal. Wenn es nicht rechtzeitig klappt, erstellen Sie einfach einen neuen.",
+        "Groß- und Kleinschreibung sowie der Bindestrich spielen keine Rolle.",
+        "Alles wird übertragen: Ihre Druckauswahl, Herzen, Reaktionen und Ihr Name.",
+        "Ab dann teilen sich beide Geräte eine gemeinsame Auswahl. Was Sie am Computer hinzufügen, sehen Sie nach dem Neuladen auch auf dem Handy.",
+        "Geben Sie den Code ein, bevor Sie auf dem zweiten Gerät etwas markieren. Was Sie dort vorher markieren, bleibt bei Ihrem Fotografen als eigene Auswahl bestehen, die Sie nicht mehr ändern können."
+      ],
+      "togetherHint": "Sie wählen zu zweit aus? Dann müssen Sie nichts übertragen – jeder kann auf seinem eigenen Handy auswählen, und die Auswahlen werden zusammengezählt. Oder Sie nutzen den Code, um auf beiden Handys eine gemeinsame Auswahl zu haben."
+    }
+  },
+  "favorites": {
+    "heading": "4. Favoriten und Reaktionen",
+    "intro": "Mit dem Herz markieren Sie die Fotos, die Ihnen am besten gefallen. Praktisch, um Fotos für ein Album auszusuchen oder sie der Familie gesammelt zu zeigen.",
+    "howHeading": "So geben Sie einem Foto ein Herz",
+    "phone": "Auf dem Handy öffnen Sie das Foto und tippen unten in der Leiste auf <heart></heart>. Oder Sie tippen oben auf den Button <marking></marking>, dann erscheinen die Herzen direkt auf den Fotos in der Übersicht.",
+    "desktop": "Am Computer fahren Sie mit der Maus über ein Foto – das Herz ist unten rechts.",
+    "filterHeading": "Nur Favoriten",
+    "filterBody": "Sobald Sie Ihren ersten Favoriten haben, erscheint oben ein Button mit einem Herz und einer Zahl. Tippen Sie darauf, um nur Ihre Favoriten zu sehen; ein weiteres Tippen zeigt wieder alle Fotos.",
+    "countBody": "Die Zahl neben dem Herz zeigt, wie viele Personen das Foto bei ihren Favoriten haben. Wer genau, sieht niemand.",
+    "reactionsHeading": "Reaktionen",
+    "reactionsBody": "In der Fotoansicht finden Sie neben dem Herz auch fünf Emojis: ❤️ Herz, 😮 Wow, 😂 Lachen, 🥲 Gerührt und 👏 Applaus. Jedem Foto können Sie eine Reaktion geben. Tippen Sie noch einmal, um sie zu entfernen oder gegen eine andere zu tauschen. In der Übersicht sehen Sie dann bei jedem Foto, wie die anderen reagiert haben.",
+    "devicesNote": "Herzen und Reaktionen merkt sich die Galerie genau wie Ihre Druckauswahl – in dem Browser, in dem Sie sie vergeben. Auf ein anderes Gerät übertragen Sie sie mit einem Code, siehe <a>Auf dem Handy anfangen, zu Hause weitermachen</a>.",
+    "missing": "Sie sehen gar keine Herzen? Dann hat Ihr Fotograf sie für diesen Link nicht eingeschaltet."
+  },
+  "download": {
+    "heading": "5. Fotos herunterladen",
+    "intro": "Sie können die Fotos in voller Qualität herunterladen – einzeln, nur ausgewählte oder die ganze Galerie auf einmal.",
+    "oneTitle": "Ein einzelnes Foto",
+    "oneOpenTitle": "Öffnen Sie das Foto",
+    "oneOpenBody": "Tippen Sie in der Übersicht darauf.",
+    "oneTapTitle": "Tippen Sie auf den Pfeil nach unten",
+    "oneTapBody": "Sie finden ihn unten in der Leiste: <download></download>. Das Original wird in voller Qualität heruntergeladen.",
+    "someTitle": "Nur ausgewählte",
+    "someSelectTitle": "Wählen Sie die Fotos aus",
+    "someSelectPhone": "Auf dem Handy halten Sie den Finger auf einem Foto, bis es ausgewählt ist. Weitere fügen Sie dann mit einem normalen Tippen hinzu.",
+    "someSelectDesktop": "Am Computer fahren Sie mit der Maus über ein Foto und klicken oben links auf den Kreis <check></check>. Mit gedrückter Umschalttaste wählen Sie auf einmal alle Fotos zwischen dem zuletzt ausgewählten und dem angeklickten aus.",
+    "someDownloadTitle": "Laden Sie sie herunter",
+    "someDownloadBody": "Tippen Sie oben auf den Button mit der Anzahl der ausgewählten Fotos, etwa „3 Fotos herunterladen (ZIP)“. Mehrere Fotos werden als eine einzige ZIP-Datei heruntergeladen. Die Auswahl heben Sie mit dem Kreuz daneben auf.",
+    "allTitle": "Die ganze Galerie",
+    "allTapTitle": "Tippen Sie auf „Alle herunterladen“",
+    "allTapBody": "Der Button ist oben und zeigt auch die Größe an. Es wird eine ZIP-Datei mit allen Fotos heruntergeladen.",
+    "tipsHeading": "Gut zu wissen",
+    "tips": [
+      {
+        "title": "Was ist eine ZIP-Datei?",
+        "body": "Eine einzige Datei, in der die Fotos zusammengepackt sind. Am Computer öffnen Sie sie mit einem Doppelklick, auf dem iPhone in der App „Dateien“ und auf Android im Dateimanager."
+      },
+      {
+        "title": "Laden Sie die ganze Galerie am besten am Computer und über WLAN herunter.",
+        "body": "Das können auch mehrere Gigabyte sein. Bei großen Galerien fragt die Galerie vor dem Download noch einmal bei Ihnen nach."
+      },
+      {
+        "title": "Sie sehen „Archiv wird vorbereitet“?",
+        "body": "Die Datei mit allen Fotos wird gerade erst zusammengestellt. Bis dahin können Sie nur ausgewählte Fotos herunterladen – oder Sie schauen in einer Weile wieder vorbei."
+      },
+      {
+        "title": "„Alle geladenen auswählen“",
+        "body": "wählt nur die Fotos aus, die die Galerie schon geladen hat. Für die ganze Galerie nutzen Sie „Alle herunterladen“."
+      },
+      {
+        "title": "Sie sehen keinen Button zum Herunterladen?",
+        "body": "Dann hat Ihr Fotograf das Herunterladen für diesen Link nicht eingeschaltet. Schreiben Sie ihm einfach."
+      }
+    ]
+  },
+  "corrections": {
+    "heading": "6. Änderungswünsche zu Fotos",
+    "intro": "Möchten Sie an einem Foto etwas ändern lassen – einen Fleck wegretuschieren, den Horizont gerade richten, eine Lampe aus dem Bild nehmen? Schreiben Sie es Ihrem Fotografen direkt zum Foto, statt es umständlich in einer E-Mail zu beschreiben. Die Änderungswünsche bleiben unter Ihnen beiden: Sie öffnen sich mit der sechsstelligen PIN, die Ihnen Ihr Fotograf zusammen mit der Galerie geschickt hat.",
+    "stepsTitle": "So schreiben Sie einen Wunsch",
+    "enterTitle": "Öffnen Sie die Änderungswünsche",
+    "enterBody": "Tippen Sie oben in der Galerie auf <pencil></pencil> „Änderungswünsche“ und geben Sie die PIN ein. Sie wird jedes Mal abgefragt – wer nur den Link hat, kann Wünsche weder schreiben noch sehen.",
+    "openTitle": "Öffnen Sie das Foto",
+    "openBody": "Auf dem Handy erscheinen die Wünsche im unteren Teil des Bildschirms, am Computer rechts neben dem Foto. Zwischen den Fotos blättern Sie wie gewohnt.",
+    "writeTitle": "Schreiben Sie, was geändert werden soll",
+    "writeBody": "Ein paar Worte genügen, etwa „Fleck auf dem Kleid wegretuschieren“. Mit „Stelle markieren“ und einem Tippen ins Foto zeigen Sie die genaue Stelle – auf dem Foto erscheint eine Zahl, dieselbe wie bei Ihrem Wunsch.",
+    "editHeading": "Ändern und löschen",
+    "editBody": "Solange Ihr Fotograf einen Wunsch noch nicht erledigt hat, können Sie ihn jederzeit ändern oder löschen. Alles wird sofort gespeichert, am Ende müssen Sie nichts abschicken.",
+    "doneHeading": "Erledigt ✓",
+    "doneBody": "Sobald Ihr Fotograf das korrigierte Foto hochlädt, steht beim Wunsch „Erledigt ✓“, und Sie sehen die neue Version an derselben Stelle in der Galerie. Herzen und Druckauswahl bleiben dabei erhalten.",
+    "badgeNote": "In der Übersicht erkennen Sie Fotos mit einem Wunsch an einer Zahl mit Stift. Den Modus verlassen Sie mit „Beenden“ oder indem Sie die Seite schließen – nach zwei Stunden endet er von selbst.",
+    "missing": "Sie sehen den Button „Änderungswünsche“ nicht? Dann hat Ihr Fotograf ihn für diesen Link nicht eingeschaltet – schreiben Sie ihm einfach."
+  },
+  "guests": {
+    "heading": "7. Fotos von Gästen",
+    "intro": "Wenn Ihr Fotograf es einschaltet, können auch Gäste Fotos zur Galerie hinzufügen – ohne App und ohne Anmeldung. Sie brauchen nur den Link oder einen QR-Code.",
+    "addTitle": "Tippen Sie auf „Fotos hinzufügen“",
+    "addBody": "Der Button ist unten auf dem Bildschirm. Wählen Sie Fotos von Ihrem Handy aus oder machen Sie mit „Foto aufnehmen“ gleich ein neues.",
+    "nameTitle": "Geben Sie Ihren Namen ein",
+    "nameBody": "Beim ersten Mal fragt die Galerie nach Ihrem Namen. Er erscheint bei Ihren Fotos, damit das Brautpaar weiß, wem es danken kann. Sie können auch ohne Namen weitermachen.",
+    "waitTitle": "Warten Sie, bis die Fotos hochgeladen sind",
+    "waitBody": "Der Bildschirm bleibt während des Hochladens an. Wird es unterbrochen, wird der Rest nachgeschickt, sobald Sie die Galerie wieder öffnen.",
+    "tipsHeading": "Gut zu wissen",
+    "tips": [
+      {
+        "title": "Ein versehentlich hinzugefügtes Foto lässt sich löschen.",
+        "body": "Öffnen Sie es und tippen Sie oben links auf „Mein Foto löschen“. Das geht auf dem Gerät, von dem es hinzugefügt wurde, oder auf einem anderen, das Sie per Code damit verbinden."
+      },
+      {
+        "title": "Fotos vom iPhone funktionieren problemlos.",
+        "body": "Der Browser schickt sie von selbst in einem gängigen Format. Videos nimmt die Galerie nicht an, und ein Foto darf höchstens 25 MB groß sein."
+      },
+      {
+        "title": "Jede Person kann bis zu 150 Fotos hinzufügen.",
+        "body": "Das reicht locker für eine ganze Hochzeit, und die Galerie bleibt übersichtlich."
+      },
+      {
+        "title": "Ihren Namen ändern Sie",
+        "body": "unten beim Button „Fotos hinzufügen“ über den Link „Ändern“. Er ändert sich bei allen Ihren Fotos in der Galerie."
+      }
+    ],
+    "hubHeading": "Eine Hochzeitsseite mit mehreren Galerien",
+    "hubBody": "Ihr Fotograf kann alle Galerien einer Hochzeit unter einem Link zusammenfassen. Sie sehen sie als große Kacheln, darunter die Galerie der Gäste. Der Link bleibt derselbe, auch wenn weitere Galerien dazukommen. Zurück zur Übersicht kommen Sie über den Link mit dem Namen der Hochzeit ganz oben."
+  },
+  "offline": {
+    "heading": "8. Fotos ohne Internet ansehen",
+    "intro": "Sie fahren aufs Land oder sitzen bald im Flugzeug? Sie können die Fotos vorher auf Ihrem Gerät speichern und sie auch ohne Internet ansehen.",
+    "scrollTitle": "Scrollen Sie bis ans Ende der Galerie",
+    "scrollBody": "Gespeichert werden nur die Fotos, die die Galerie schon geladen hat. Scrollen Sie bei einer großen Galerie deshalb zuerst ganz nach unten.",
+    "tapTitle": "Tippen Sie oben auf „Offline“",
+    "tapBody": "Sie sehen, wie viele Fotos gespeichert werden und wie viel Platz sie brauchen. Wenn Sie Fotos markiert haben, können Sie auch nur Ihre Favoriten und die Fotos für den Druck speichern.",
+    "saveTitle": "Wählen Sie „Offline verfügbar machen“",
+    "saveBody": "Sobald Sie „Galerie ist offline verfügbar“ sehen, ist alles fertig.",
+    "tips": [
+      "Gespeichert werden verkleinerte Fotos für Ihren Bildschirm, nicht die Originale. Zum Drucken oder Aufbewahren laden Sie die Fotos bitte herunter.",
+      "Ein iPhone löscht gespeicherte Fotos von selbst, wenn Sie sie etwa eine Woche lang nicht geöffnet haben. Speichern Sie sie dann einfach noch einmal.",
+      "Die gespeicherten Fotos löschen Sie im selben Fenster mit „Vom Gerät entfernen“."
+    ]
+  },
+  "privacy": {
+    "heading": "9. Ihr Name und Ihre Privatsphäre",
+    "intro": "Die Galerie braucht weder Konto noch E-Mail-Adresse. Sie erkennt Sie nur an dem Browser, in dem Sie sie öffnen. Ihren Namen müssen Sie nicht angeben – wenn Sie es aber tun, sehen ihn:",
+    "terms": [
+      {
+        "term": "Andere in der Galerie",
+        "body": "Oben in der Galerie stehen die Initialen der Personen, die sie sich kürzlich angesehen und ihren Namen angegeben haben. Der volle Name erscheint, wenn man mit der Maus darüberfährt."
+      },
+      {
+        "term": "Wer gerade mit Ihnen schaut",
+        "body": "Wenn Sie die Galerie gleichzeitig mit anderen geöffnet haben, sehen diese, dass Sie gerade da sind."
+      },
+      {
+        "term": "Bei Ihren Fotos",
+        "body": "Bei Fotos, die Sie hinzufügen, steht, von wem sie sind."
+      },
+      {
+        "term": "Ihr Fotograf",
+        "body": "Sieht, welche Druckauswahl von wem ist."
+      }
+    ],
+    "countsNote": "Bei Herzen, Reaktionen und der Druckauswahl sehen die anderen nur Zahlen, keine Namen.",
+    "optOutHeading": "Nicht mitzählen",
+    "optOutBody": "Die Galerie zählt Besuche anonym und ohne IP-Adressen. Wenn Sie möchten, dass Ihre Besuche gar nicht gezählt werden, tippen Sie ganz unten auf „Nicht mitzählen“. Ihr Name verschwindet dann aus allen Galerien.",
+    "optOutWarning": "Überlegen Sie es sich gut – das lässt sich nicht rückgängig machen. Fotos, die Sie hinzugefügt haben, bleiben in der Galerie, aber Sie können sie nicht mehr löschen. Und in diesem Browser können Sie dann keine Herzen mehr vergeben und keine Fotos mehr für den Druck auswählen."
+  },
+  "trouble": {
+    "heading": "10. Wenn etwas nicht klappt",
+    "items": [
+      {
+        "title": "Die Galerie fragt nach einem Passwort.",
+        "body": "Ihr Fotograf hat es Ihnen zusammen mit dem Link geschickt. Achten Sie auf Groß- und Kleinschreibung. Nach fünf falschen Versuchen wird die Galerie für 15 Minuten gesperrt. Das richtige Passwort merkt sich Ihr Browser 30 Tage lang."
+      },
+      {
+        "title": "Die PIN für die Änderungswünsche funktioniert nicht.",
+        "body": "Prüfen Sie, ob Sie alle sechs Ziffern aus der Nachricht eingeben, mit der Sie die Galerie bekommen haben. Nach zehn falschen Versuchen wird die Eingabe für 5 Minuten gesperrt. Wenn Ihr Fotograf eine neue PIN erstellt, gilt die alte nicht mehr – fragen Sie ihn danach."
+      },
+      {
+        "title": "„Dieser Link funktioniert nicht mehr“",
+        "body": "Der Link ist abgelaufen. Schreiben Sie Ihrem Fotografen, dann schickt er Ihnen einen neuen."
+      },
+      {
+        "title": "„Dieser Link führt ins Leere“",
+        "body": "Wahrscheinlich wurde nur ein Teil der Adresse kopiert. Öffnen Sie den Link noch einmal direkt aus der ursprünglichen Nachricht oder scannen Sie den QR-Code."
+      },
+      {
+        "title": "„Ihre letzte Markierung wurde nicht gespeichert“",
+        "body": "Prüfen Sie Ihre Verbindung und versuchen Sie es noch einmal."
+      },
+      {
+        "title": "Sie sehen keine neuen Fotos.",
+        "body": "Laden Sie die Seite neu."
+      },
+      {
+        "title": "Ein Button, von dem hier die Rede ist, fehlt.",
+        "body": "Herunterladen, Herzen, Druckauswahl, Änderungswünsche und das Hinzufügen von Fotos schaltet Ihr Fotograf für jeden Link einzeln ein – Gäste können also andere Möglichkeiten haben als Sie. Wenn Sie etwas nicht sehen, ist nichts kaputt. Schreiben Sie ihm einfach, dann finden Sie gemeinsam eine Lösung."
+      }
+    ]
+  },
+  "help": "Kommen Sie trotzdem nicht weiter? <a>Schreiben Sie Ihrem Fotografen</a> – er hilft Ihnen gern."
+}

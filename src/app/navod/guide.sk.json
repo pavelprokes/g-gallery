@@ -1,0 +1,352 @@
+{
+  "pageTitle": "Návod ku galérii – ako prezerať, vyberať a sťahovať svadobné fotky",
+  "pageDescription": "Návod krok za krokom aj pre úplných začiatočníkov: ako otvoriť galériu z e-mailu, prezerať fotky, vybrať ich na tlač, stiahnuť a poslať fotografovi pripomienku.",
+  "kicker": "Návod ku galérii",
+  "heroTitle": "Ako na vašu galériu",
+  "heroLead": "Dostali ste od fotografa odkaz e-mailom alebo v správe? Tu nájdete krok za krokom všetko, čo s galériou môžete robiť. Nič sa neinštaluje a nikam sa neprihlasujete – stačí telefón alebo počítač a ten odkaz.",
+  "otherLanguages": "Návod aj v ďalších jazykoch:",
+  "tocHeading": "Čo chcete urobiť?",
+  "tocLead": "Vyberte, s čím potrebujete pomôcť. Ste tu prvýkrát? Začnite prvým bodom.",
+  "toc": {
+    "start": "Otvoriť galériu prvýkrát",
+    "browse": "Prezerať fotky",
+    "print": "Vybrať fotky na tlač",
+    "favorites": "Označiť obľúbené fotky",
+    "download": "Stiahnuť fotky",
+    "corrections": "Poprosiť o úpravu fotky",
+    "guests": "Pridať svoje fotky zo svadby",
+    "offline": "Prezerať bez internetu",
+    "privacy": "Meno a súkromie",
+    "trouble": "Niečo nefunguje"
+  },
+  "start": {
+    "heading": "1. Prvýkrát v galérii",
+    "intro": "Ak ste galériu ešte neotvárali, začnite tu. Zaberie to minútu.",
+    "openTitle": "Ťuknite na odkaz",
+    "openBody": "Nájdite e-mail alebo správu od fotografa a ťuknite na odkaz. Galéria sa otvorí v prehliadači – v Safari, Chrome alebo v tom, ktorý bežne používate. Nič nesťahujete, neinštalujete ani sa neregistrujete.",
+    "passwordTitle": "Zadajte heslo, ak si ho galéria vypýta",
+    "passwordBody": "Niektoré galérie sú chránené heslom. Nájdete ho v tej istej správe ako odkaz. Prehliadač si ho potom 30 dní pamätá.",
+    "lookTitle": "Rozhliadnite sa",
+    "lookBody": "Hore je názov galérie a zopár tlačidiel, pod tým všetky fotky vedľa seba. Fotky sa načítavajú postupne, ako sa posúvate nadol. Ťuknutím na ktorúkoľvek fotku ju zväčšíte na celú obrazovku.",
+    "keepTitle": "Uložte si odkaz",
+    "keepBody": "Ku galérii sa budete chcieť vrátiť. Nechajte si správu s odkazom alebo si stránku pridajte medzi záložky. Na telefóne ju cez „Zdieľať“ môžete pridať aj na plochu ako ikonu.",
+    "termsHeading": "Čo je čo",
+    "termsLead": "Tieto tri pojmy v návode uvidíte často:",
+    "terms": [
+      {
+        "term": "Prehľad",
+        "body": "Všetky fotky galérie vedľa seba. To je to, čo uvidíte hneď po otvorení odkazu."
+      },
+      {
+        "term": "Detail fotky",
+        "body": "Jedna fotka na celú obrazovku. Otvorí sa ťuknutím na fotku v prehľade."
+      },
+      {
+        "term": "Lišta",
+        "body": "Rad tlačidiel dole v detaile fotky – srdiečko, tlačiareň, stiahnutie a ďalšie."
+      }
+    ],
+    "buttonsNote": "Nevidíte niektoré tlačidlo, o ktorom sa tu píše? Fotograf zapína sťahovanie, výber na tlač, srdiečka aj pripomienky zvlášť pre každú galériu. Keď niečo chýba, nie je to chyba – len to pri vašej galérii nie je zapnuté."
+  },
+  "browse": {
+    "heading": "2. Prezeranie fotiek",
+    "intro": "Galéria sa otvorí ako prehľad všetkých fotiek. Ďalšie sa načítavajú samy, ako sa posúvate nadol.",
+    "detailHeading": "Fotka na celú obrazovku",
+    "detailLead": "Ťuknite na ktorúkoľvek fotku a otvorí sa na celú obrazovku. Adresa stránky pritom ukazuje práve túto fotku, takže ju môžete skopírovať a poslať. Kto odkaz otvorí, uvidí rovno ju.",
+    "phoneTerm": "Na telefóne",
+    "phone": [
+      "Potiahnutím prstom nabok prejdete na ďalšiu fotku.",
+      "Roztiahnutím dvoch prstov alebo dvojitým ťuknutím si fotku priblížite.",
+      "Jedným ťuknutím skryjete ovládanie, aby ste videli iba fotku. Ďalším ťuknutím ho vrátite.",
+      "Zavriete ju potiahnutím prstom nadol, krížikom vľavo hore alebo tlačidlom Späť."
+    ],
+    "desktopTerm": "Na počítači",
+    "desktop": [
+      "Listujete šípkami na okrajoch obrazovky alebo šípkami na klávesnici.",
+      "Fotku zavriete krížikom vľavo hore alebo klávesom Esc."
+    ],
+    "chaptersHeading": "Kapitoly",
+    "chaptersBody": "Keď fotograf galériu rozdelí na časti – napríklad Prípravy, Obrad a Hostina –, uvidíte hore rad štítkov. Ťuknutím na štítok skočíte rovno na danú časť. Adresa stránky sa pritom mení, takže môžete poslať odkaz priamo na konkrétnu kapitolu.",
+    "highlightsHeading": "To najlepšie z celého dňa",
+    "highlightsBody": "Nad prehľadom môže byť výber najkrajších fotiek, ktorý pripravil fotograf. Ťuknutím na fotku z výberu sa posuniete na jej miesto v galérii. Fotka sa na chvíľu orámuje, aby ste ju ľahko našli.",
+    "slideshowHeading": "Projekcia",
+    "slideshowBody": "Tlačidlo <projector></projector> „Projekcia“ hore spustí fotky na celú obrazovku, jednu po druhej. Hodí sa na televízor alebo plátno, napríklad keď fotky ukazujete rodine. Ukončíte ju ťuknutím kamkoľvek alebo klávesom Esc.",
+    "slideshowNote": "Projekcia ukazuje fotky, ktoré už galéria načítala. Pri veľkej galérii preto najprv zíďte až na koniec.",
+    "newPhotos": "Keď fotograf do galérie niečo pridá, v prehľade sa to samo neobjaví. Stačí stránku znova načítať."
+  },
+  "print": {
+    "heading": "3. Výber fotiek na tlač",
+    "intro": "Fotky, ktoré chcete mať na papieri, si označíte priamo v galérii. Nemusíte nič vypisovať ani posielať e-mailom – fotograf váš výber uvidí u seba. Označovať môžete dvoma spôsobmi a pokojne ich aj striedať.",
+    "grid": {
+      "title": "V prehľade fotiek",
+      "lead": "Rýchle, keď prechádzate celú galériu.",
+      "showTitle": "Zobrazte si tlačiarne",
+      "showPhone": "Na telefóne ťuknite hore vedľa názvu galérie na tlačidlo <marking></marking>. Pri každej fotke sa potom vpravo hore objaví malá tlačiareň.",
+      "showDesktop": "Na počítači stačí prejsť myšou nad fotku a tlačiareň sa ukáže sama.",
+      "tapTitle": "Ťuknite na tlačiareň",
+      "tapBody": "Ťuknite na <printer></printer> pri fotke, ktorú chcete vytlačiť. Tým ju označíte na tlač v jednom kuse."
+    },
+    "detail": {
+      "title": "V detaile fotky",
+      "lead": "Keď si fotku chcete najprv poriadne prezrieť.",
+      "openTitle": "Ťuknite na fotku",
+      "openBody": "Otvorí sa na celú obrazovku.",
+      "tapTitle": "Ťuknite na tlačiareň",
+      "tapBody": "Nájdete ju dole v lište: <printer></printer>. Tým fotku označíte na tlač v jednom kuse.",
+      "nextTitle": "Pokračujte ďalšou fotkou",
+      "nextBody": "Potiahnite prstom nabok alebo použite šípky a označujte rovnako ďalej."
+    },
+    "quantity": {
+      "heading": "Koľko kusov?",
+      "lead": "Po prvom ťuknutí sa tlačiareň zmení na počítadlo. Funguje rovnako v prehľade aj v detaile fotky.",
+      "plus": "<plus></plus> pridá ďalšiu kópiu tej istej fotky. Napríklad tri kusy – pre vás, pre rodičov a pre babku.",
+      "minus": "<minus></minus> jednu kópiu uberie. Keď uberiete aj tú poslednú, označenie zmizne a vráti sa obyčajná tlačiareň.",
+      "max": "Jednu fotku môžete chcieť až 99×.",
+      "others": "Keď cez ten istý odkaz vyberá viac ľudí, uvidíte vedľa počítadla sivé číslo, napríklad (+2). To sú kusy, ktoré k fotke chcú ostatní. Váš počet sa tým nemení.",
+      "demoLabel": "Ukážka: fotka označená na tlač v troch kusoch, ostatní k nej chcú ďalšie dva."
+    },
+    "summary": {
+      "heading": "Súhrn hore",
+      "lead": "Pri vyberaní vám hore zostáva lišta, z ktorej hneď vidíte, koľko toho máte.",
+      "demoLabel": "Ukážka súhrnu výberu na tlač",
+      "photosTerm": "Fotky",
+      "photosBody": "Koľko rôznych fotiek máte vybraných.",
+      "piecesTerm": "Kusy (ks)",
+      "piecesBody": "Koľko výtlačkov to je spolu – niektoré fotky môžete chcieť viackrát.",
+      "everyoneTerm": "Spolu všetci",
+      "everyoneBody": "Súčet za všetkých, ktorí vyberajú cez ten istý odkaz ako vy. Ukáže sa, iba keď vyberá viac ľudí.",
+      "savedTerm": "Uložené",
+      "savedBody": "Výber je bezpečne uložený. Nijaké tlačidlo „Odoslať“ tu nie je a ani nie je potrebné."
+    },
+    "tipsHeading": "Dobré vedieť",
+    "tips": [
+      {
+        "title": "Srdiečko nie je tlač.",
+        "body": "Srdiečkom si fotku uložíte medzi obľúbené. Na tlač ju fotograf zaradí, iba keď pri nej ťuknete na tlačiareň."
+      },
+      {
+        "title": "Keď budete mať vybraté, dajte fotografovi vedieť.",
+        "body": "Výber vidí priebežne, ale nespozná, kedy je hotový. Stačí krátka správa."
+      },
+      {
+        "title": "Vyplňte svoje meno.",
+        "body": "Pri prvom označení sa vás galéria opýta, ako sa voláte. Fotograf potom vie, ktorý výber patrí komu. Pokojne to môžete aj preskočiť."
+      },
+      {
+        "title": "Bez signálu to nevadí.",
+        "body": "Vo vlaku alebo na chalupe uvidíte upozornenie, že zmeny čakajú. Uložia sa samy, len čo budete znova online."
+      },
+      {
+        "title": "Nevidíte tlačiareň vôbec?",
+        "body": "Výber na tlač fotograf pri tomto odkaze nezapol. Napíšte mu a dohodnete sa."
+      }
+    ],
+    "visibility": {
+      "heading": "Kto váš výber uvidí",
+      "lead": "Výber na tlač nie je súkromný zápisník – je to objednávka, ktorú skladá aj viac ľudí naraz. Preto je dobré vedieť, kto čo vidí.",
+      "photographerTerm": "Fotograf",
+      "photographerBody": "Vidí všetko: ktoré fotky, koľko kusov a od koho, ak vyplníte meno.",
+      "sameLinkTerm": "Ktokoľvek s rovnakým odkazom ako vy",
+      "sameLinkBody": "Napríklad partner alebo rodičia, ktorým odkaz prepošlete. Pri fotke vidia iba sivé číslo, koľko kusov chcú ostatní, a celkový súhrn. Kto čo vybral, nevidia.",
+      "guestsTerm": "Hostia zo svadobnej stránky",
+      "guestsBody": "Majú vlastný odkaz, takže váš výber nevidia vôbec – a vy nevidíte ten ich.",
+      "hint": "Odkaz na svoju galériu preto posielajte iba tým, s ktorými chcete výber skladať."
+    },
+    "devices": {
+      "heading": "Začínate na telefóne, pokračujete doma",
+      "lead": "Galéria si váš výber pamätá v prehliadači, v ktorom ho robíte – bez účtu a hesla. Keď chcete pokračovať na inom zariadení, prenesiete ho krátkym kódom.",
+      "step1Title": "Na prvom zariadení si vypýtajte kód",
+      "step1Body": "Zíďte úplne nadol pod fotky a ťuknite na „Pokračovať na inom zariadení“. Ukáže sa kód s ôsmimi znakmi, napríklad K7P2-M9XQ.",
+      "step2Title": "Na druhom zariadení otvorte tú istú galériu",
+      "step2Body": "Použite ten istý odkaz ako predtým – napríklad z e-mailu alebo správy od fotografa.",
+      "step3Title": "Zadajte kód",
+      "step3Body": "Úplne dole kliknite na „Mám kód“, prepíšte ho a potvrďte tlačidlom „Preniesť“. Stránka sa obnoví a váš výber je tam.",
+      "notes": [
+        "Kód platí 15 minút a dá sa použiť iba raz. Keď to nestihnete, nechajte si vytvoriť nový.",
+        "Na veľkých a malých písmenách ani na pomlčke nezáleží.",
+        "Prenesie sa všetko: výber na tlač, srdiečka, reakcie aj meno.",
+        "Odvtedy obe zariadenia pracujú s jedným výberom. Čo pridáte na počítači, uvidíte po obnovení stránky aj v telefóne.",
+        "Kód zadajte skôr, ako na druhom zariadení začnete niečo označovať. Čo tam označíte predtým, zostane fotografovi ako samostatný výber a ten sa už upraviť nedá."
+      ],
+      "togetherHint": "Vyberáte vo dvojici? Nemusíte nič prenášať – každý môže vyberať zo svojho telefónu a výbery sa sčítajú. Kódom si naopak môžete urobiť jeden spoločný výber na oboch telefónoch."
+    }
+  },
+  "favorites": {
+    "heading": "4. Obľúbené fotky a reakcie",
+    "intro": "Srdiečkom si označíte fotky, ktoré sa vám páčia najviac. Hodí sa to napríklad pri výbere do albumu alebo keď ich chcete rodine ukázať pokope.",
+    "howHeading": "Ako dať fotke srdiečko",
+    "phone": "Na telefóne otvorte fotku a ťuknite na <heart></heart> dole v lište. Alebo hore zapnite tlačidlo <marking></marking> a srdiečka sa objavia priamo na fotkách v prehľade.",
+    "desktop": "Na počítači prejdite myšou nad fotku, srdiečko je vpravo dole.",
+    "filterHeading": "Iba obľúbené",
+    "filterBody": "Hneď ako máte prvú obľúbenú fotku, objaví sa hore tlačidlo so srdiečkom a počtom. Ťuknutím zobrazíte iba svoje obľúbené, ďalším ťuknutím zasa všetky fotky.",
+    "countBody": "Číslo pri srdiečku ukazuje, koľko ľudí má fotku medzi obľúbenými. Kto konkrétne, to ostatní nevidia.",
+    "reactionsHeading": "Reakcie",
+    "reactionsBody": "V detaile fotky nájdete vedľa srdiečka aj päť smajlíkov: ❤️ srdce, 😮 úžas, 😂 smiech, 🥲 dojatie a 👏 potlesk. Ku každej fotke môžete dať jednu reakciu. Ďalším ťuknutím ju zrušíte alebo vymeníte za inú. V prehľade potom pri fotke uvidíte, ako na ňu reagovali ostatní.",
+    "devicesNote": "Srdiečka a reakcie si galéria pamätá rovnako ako výber na tlač – v prehliadači, v ktorom ich dávate. Na iné zariadenie ich prenesiete kódom, pozri <a>Začínate na telefóne, pokračujete doma</a>.",
+    "missing": "Nevidíte srdiečka vôbec? Fotograf ich pri tomto odkaze nezapol."
+  },
+  "download": {
+    "heading": "5. Sťahovanie fotiek",
+    "intro": "Fotky si môžete stiahnuť v plnej kvalite – po jednej, iba vybrané alebo celú galériu naraz.",
+    "oneTitle": "Jednu fotku",
+    "oneOpenTitle": "Otvorte fotku",
+    "oneOpenBody": "Ťuknite na ňu v prehľade.",
+    "oneTapTitle": "Ťuknite na šípku nadol",
+    "oneTapBody": "Nájdete ju dole v lište: <download></download>. Stiahne sa originál v plnej kvalite.",
+    "someTitle": "Iba vybrané",
+    "someSelectTitle": "Označte fotky",
+    "someSelectPhone": "Na telefóne podržte prst na fotke, kým sa neoznačí. Ďalšie potom pridávate obyčajným ťuknutím.",
+    "someSelectDesktop": "Na počítači prejdite myšou nad fotku a kliknite na krúžok <check></check> vľavo hore. So Shiftom označíte naraz všetky fotky medzi naposledy označenou a tou, na ktorú kliknete.",
+    "someDownloadTitle": "Stiahnite ich",
+    "someDownloadBody": "Hore ťuknite na tlačidlo „Stiahnuť“ s počtom fotiek. Viac fotiek sa stiahne ako jeden súbor ZIP. Výber zrušíte krížikom vedľa.",
+    "allTitle": "Celú galériu",
+    "allTapTitle": "Ťuknite na „Stiahnuť všetko“",
+    "allTapBody": "Tlačidlo je hore a ukazuje aj veľkosť. Stiahne sa jeden súbor ZIP so všetkými fotkami.",
+    "tipsHeading": "Dobré vedieť",
+    "tips": [
+      {
+        "title": "Čo je ZIP?",
+        "body": "Jeden súbor, v ktorom sú fotky zbalené spolu. Na počítači ho otvoríte dvojklikom, na iPhone v aplikácii Súbory a na Androide v správcovi súborov."
+      },
+      {
+        "title": "Celú galériu radšej sťahujte na počítači a cez Wi-Fi.",
+        "body": "Býva to aj niekoľko gigabajtov. Pri veľkých galériách sa vás galéria pred stiahnutím ešte opýta."
+      },
+      {
+        "title": "Vidíte „Pripravujeme archív“?",
+        "body": "Súbor so všetkými fotkami sa ešte len zostavuje. Zatiaľ si môžete stiahnuť iba vybrané fotky alebo sa o chvíľu vráťte."
+      },
+      {
+        "title": "„Vybrať všetko načítané“",
+        "body": "označí iba fotky, ktoré už galéria načítala. Na celú galériu použite „Stiahnuť všetko“."
+      },
+      {
+        "title": "Nevidíte nijaké tlačidlo na stiahnutie?",
+        "body": "Fotograf ho pri tomto odkaze nezapol. Napíšte mu."
+      }
+    ]
+  },
+  "corrections": {
+    "heading": "6. Úpravy fotiek a pripomienky",
+    "intro": "Chcete na niektorej fotke niečo upraviť – vyretušovať škvrnu, vyrovnať horizont, odstrániť lampu zo záberu? Napíšte to fotografovi rovno k fotke, nemusíte nič opisovať v e-maile. Pripomienky sú iba pre vás dvoch: otvárajú sa šesťmiestnym PIN-om, ktorý vám fotograf poslal spolu s galériou.",
+    "stepsTitle": "Ako napísať pripomienku",
+    "enterTitle": "Zapnite režim pripomienok",
+    "enterBody": "Hore v galérii ťuknite na <pencil></pencil> Pripomienky a zadajte PIN. Pýtame sa naň pri každom vstupe – kto má iba odkaz, pripomienky nenapíše ani neuvidí.",
+    "openTitle": "Otvorte fotku",
+    "openBody": "Na telefóne sa pripomienky ukážu v spodnej časti obrazovky, na počítači vpravo vedľa fotky. Medzi fotkami listujete ako zvyčajne.",
+    "writeTitle": "Napíšte, čo upraviť",
+    "writeBody": "Stačí pár slov, napríklad „vyretušovať škvrnu na šatách“. Tlačidlom Označiť miesto a ťuknutím do fotky ukážete presné miesto – na fotke sa objaví číslo, rovnaké ako pri pripomienke.",
+    "editHeading": "Úprava a zmazanie",
+    "editBody": "Kým fotograf pripomienku nevybaví, môžete ju kedykoľvek upraviť alebo zmazať. Ukladá sa hneď, na konci nič neodosielate.",
+    "doneHeading": "Opravené ✓",
+    "doneBody": "Keď fotograf opravenú fotku nahrá, pri pripomienke sa objaví Opravené ✓ a v galérii uvidíte novú verziu na tom istom mieste. Srdiečka aj výber na tlač pri nej zostanú.",
+    "badgeNote": "Fotky s pripomienkou spoznáte v prehľade podľa čísla s ceruzkou. Režim ukončíte tlačidlom Ukončiť, zatvorením stránky, alebo sa skončí sám po dvoch hodinách.",
+    "missing": "Tlačidlo Pripomienky nevidíte? Fotograf ich pri tomto odkaze nezapol – stačí mu napísať."
+  },
+  "guests": {
+    "heading": "7. Fotky od hostí",
+    "intro": "Keď to fotograf zapne, môžu do galérie pridávať fotky aj hostia – bez aplikácie a bez registrácie. Stačí im odkaz alebo QR kód.",
+    "addTitle": "Ťuknite na „Pridať fotky“",
+    "addBody": "Tlačidlo je dole na obrazovke. Vyberiete fotky z telefónu alebo cez „Odfotiť“ rovno odfotíte novú.",
+    "nameTitle": "Napíšte svoje meno",
+    "nameBody": "Prvýkrát sa vás galéria opýta, ako sa voláte. Meno sa objaví pri vašich fotkách, aby novomanželia vedeli, komu poďakovať. Môžete pokračovať aj bez mena.",
+    "waitTitle": "Počkajte, kým sa fotky nahrajú",
+    "waitBody": "Displej počas nahrávania zostane rozsvietený. Keď sa to preruší, zvyšok sa dopošle, keď galériu znova otvoríte.",
+    "tipsHeading": "Dobré vedieť",
+    "tips": [
+      {
+        "title": "Fotku pridanú omylom môžete zmazať.",
+        "body": "Otvorte ju a vľavo hore ťuknite na „Zmazať moju fotku“. Dá sa to zo zariadenia, z ktorého ste ju pridali, alebo z iného, ktoré s ním prepojíte kódom."
+      },
+      {
+        "title": "Fotky z iPhonu fungujú bez problémov.",
+        "body": "Prehliadač ich sám pošle v bežnom formáte. Videá galéria neprijíma a jedna fotka môže mať najviac 25 MB."
+      },
+      {
+        "title": "Jeden človek môže pridať až 150 fotiek.",
+        "body": "Na celú svadbu to bohato stačí a galéria tak zostane prehľadná."
+      },
+      {
+        "title": "Meno zmeníte",
+        "body": "dole pri tlačidle „Pridať fotky“ odkazom „Zmeniť“. Zmení sa pri všetkých vašich fotkách v galérii."
+      }
+    ],
+    "hubHeading": "Svadobná stránka s viacerými galériami",
+    "hubBody": "Fotograf môže všetky galérie z jednej svadby spojiť pod jeden odkaz. Uvidíte ich ako veľké dlaždice a pod nimi galériu od hostí. Odkaz zostáva rovnaký, aj keď ďalšie galérie pribúdajú. Späť na prehľad sa dostanete odkazom s názvom svadby hore."
+  },
+  "offline": {
+    "heading": "8. Prezeranie bez internetu",
+    "intro": "Idete na chalupu alebo letíte lietadlom? Fotky si môžete vopred uložiť do zariadenia a prezerať si ich aj bez internetu.",
+    "scrollTitle": "Zíďte na koniec galérie",
+    "scrollBody": "Uložia sa iba fotky, ktoré už galéria načítala. Pri veľkej galérii preto najprv zíďte úplne nadol.",
+    "tapTitle": "Ťuknite hore na „Offline“",
+    "tapBody": "Uvidíte, koľko fotiek sa uloží a koľko miesta zaberú. Keď máte niečo označené, môžete uložiť iba svoje obľúbené a fotky na tlač.",
+    "saveTitle": "Zvoľte „Sprístupniť offline“",
+    "saveBody": "Keď uvidíte „Galéria je dostupná offline“, je hotovo.",
+    "tips": [
+      "Ukladajú sa zmenšené fotky pre vašu obrazovku, nie originály. Na tlač alebo do archívu si fotky stiahnite.",
+      "iPhone uložené fotky zhruba po týždni bez otvorenia sám uvoľní. Potom ich stačí uložiť znova.",
+      "Uložené fotky zmažete v tom istom okne tlačidlom „Odstrániť zo zariadenia“."
+    ]
+  },
+  "privacy": {
+    "heading": "9. Meno a súkromie",
+    "intro": "Galéria nepotrebuje účet ani e-mail. Spozná vás iba podľa prehliadača, v ktorom ju otvoríte. Meno vypĺňať nemusíte – ak ho však vyplníte, uvidia ho:",
+    "terms": [
+      {
+        "term": "Ostatní v galérii",
+        "body": "Hore v galérii sú iniciály ľudí, ktorí si ju nedávno prezreli a vyplnili meno. Celé meno sa ukáže, keď nad ne prejdete myšou."
+      },
+      {
+        "term": "Kto sa pozerá s vami",
+        "body": "Keď máte galériu otvorenú v rovnakom čase, ostatní uvidia, že sa práve pozeráte."
+      },
+      {
+        "term": "Pri vašich fotkách",
+        "body": "Pri fotkách, ktoré pridáte, sa ukáže, od koho sú."
+      },
+      {
+        "term": "Fotograf",
+        "body": "Vidí, komu patrí ktorý výber na tlač."
+      }
+    ],
+    "countsNote": "Pri srdiečkach, reakciách a výbere na tlač vidia ostatní iba počty, nie mená.",
+    "optOutHeading": "Nepočítať ma",
+    "optOutBody": "Galéria počíta návštevy anonymne a bez IP adresy. Ak nechcete, aby sa vaše návštevy vôbec počítali, ťuknite úplne dole na „Nepočítať ma“. Vaše meno potom zmizne zo všetkých galérií.",
+    "optOutWarning": "Dobre si to rozmyslite, vrátiť sa to nedá. Fotky, ktoré ste do galérie pridali, v nej zostanú, len ich už nebude možné zmazať. A dávať srdiečka ani vyberať fotky na tlač už v tomto prehliadači nepôjde."
+  },
+  "trouble": {
+    "heading": "10. Keď niečo nejde",
+    "items": [
+      {
+        "title": "Galéria pýta heslo.",
+        "body": "Heslo vám fotograf poslal spolu s odkazom. Pozor na veľké a malé písmená. Po piatich nesprávnych pokusoch sa galéria na 15 minút zamkne. Správne heslo si prehliadač pamätá 30 dní."
+      },
+      {
+        "title": "PIN na pripomienky nefunguje.",
+        "body": "Skontrolujte, či zadávate všetkých šesť číslic z odovzdávacej správy. Po desiatich nesprávnych pokusoch sa zadávanie na 5 minút zamkne. Keď fotograf vygeneruje nový PIN, starý prestane platiť – napíšte mu oň."
+      },
+      {
+        "title": "„Odkaz už neplatí“",
+        "body": "Platnosť odkazu sa skončila. Napíšte fotografovi a pošle vám nový."
+      },
+      {
+        "title": "„Tento odkaz nikam nevedie“",
+        "body": "Pravdepodobne sa skopírovala iba časť adresy. Otvorte odkaz znova priamo z pôvodnej správy alebo naskenujte QR kód."
+      },
+      {
+        "title": "„Vaše posledné označenie sa neuložilo“",
+        "body": "Skontrolujte pripojenie a skúste to znova."
+      },
+      {
+        "title": "Nevidíte nové fotky.",
+        "body": "Načítajte stránku znova."
+      },
+      {
+        "title": "Chýba tlačidlo, o ktorom sa tu píše.",
+        "body": "Sťahovanie, srdiečka, výber na tlač, pripomienky aj pridávanie fotiek zapína fotograf zvlášť pre každý odkaz – hostia tak môžu mať iné možnosti ako vy. Keď niečo nevidíte, nie je to chyba. Napíšte mu a dohodnete sa."
+      }
+    ]
+  },
+  "help": "Stále si neviete rady? <a>Napíšte fotografovi</a>, rád vám pomôže."
+}
