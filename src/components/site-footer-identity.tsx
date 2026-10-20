@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { isLocale } from "@/i18n/locales";
+import { guidePath } from "@/lib/guide-path";
 
 /**
  * Legal identity block — name, contact, copyright year, on every public
@@ -13,11 +15,15 @@ import { useTranslations } from "next-intl";
 export function SiteFooterIdentity({
   className = "",
   variant = "minimal",
+  guideLink = true,
 }: {
   className?: string;
   variant?: "full" | "minimal";
+  /** The client guide (/navod, /guide) in the viewer's language — off on the guide itself. */
+  guideLink?: boolean;
 }) {
   const t = useTranslations("siteFooter");
+  const locale = useLocale();
 
   return (
     <div className={className}>
@@ -42,6 +48,14 @@ export function SiteFooterIdentity({
         >
           {t("website")}
         </a>
+        {guideLink && (
+          <>
+            <br />
+            <a href={guidePath(isLocale(locale) ? locale : "en")} className="underline">
+              {t("guide")}
+            </a>
+          </>
+        )}
       </p>
       {/* suppressHydrationWarning: the only way this mismatches server output
           is a request straddling midnight on New Year's Eve — harmless, and

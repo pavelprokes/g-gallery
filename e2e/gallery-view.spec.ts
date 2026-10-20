@@ -134,6 +134,14 @@ test.describe("share gallery viewer", () => {
     await expect(page).not.toHaveURL(new RegExp(`foto=${first}`));
     const photoLink = page.url();
 
+    // A reload keeps the photo open, on the same photo.
+    await page.reload();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByText(`2 / ${seed.photoCount}`)).toBeVisible();
+    await expect(page).toHaveURL(photoLink);
+    await page.evaluate(() => Object.assign(window, { __samePage: true }));
+    serverRequests.length = 0;
+
     // Browsing replaces the entry: one Back closes the lightbox.
     await page.goBack();
     await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -163,6 +171,14 @@ test.describe("share gallery viewer", () => {
     await expect(grid.locator('button[aria-label^="Otevřít"]').first()).toBeVisible();
     await expect(page).toHaveURL(galleryUrl);
     await expect(page.getByRole("dialog")).not.toBeVisible();
+  });
+
+  test("the footer links to the guide", async ({ page }) => {
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    await expect(page.getByRole("link", { name: "Návod ke galerii" })).toHaveAttribute(
+      "href",
+      "/navod",
+    );
   });
 
   test("arrow keys move the roving tab stop across the grid", async ({ page }) => {

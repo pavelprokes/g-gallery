@@ -1,0 +1,352 @@
+{
+  "pageTitle": "Gallery guide – how to view, choose and download your wedding photos",
+  "pageDescription": "A step-by-step guide for complete beginners: opening the gallery from an email, browsing photos, choosing them for print, downloading them and asking the photographer for a retouch.",
+  "kicker": "Gallery guide",
+  "heroTitle": "How to use your gallery",
+  "heroLead": "Did your photographer send you a link by email or message? This guide walks you through everything you can do with the gallery, step by step. There is nothing to install and no account to create – all you need is a phone or a computer and that link.",
+  "otherLanguage": "Česká verze",
+  "tocHeading": "What would you like to do?",
+  "tocLead": "Pick what you need help with. First time here? Start with the first one.",
+  "toc": {
+    "start": "Open the gallery for the first time",
+    "browse": "Look through the photos",
+    "print": "Choose photos for print",
+    "favorites": "Mark your favourites",
+    "download": "Download photos",
+    "corrections": "Ask for a photo to be edited",
+    "guests": "Add your own photos from the wedding",
+    "offline": "View photos without internet",
+    "privacy": "Your name and privacy",
+    "trouble": "Something isn't working"
+  },
+  "start": {
+    "heading": "1. Your first visit",
+    "intro": "If you have never opened the gallery before, start here. It takes a minute.",
+    "openTitle": "Tap the link",
+    "openBody": "Find the email or message from your photographer and tap the link. The gallery opens in your browser – Safari, Chrome or whichever one you normally use. You don't download, install or sign up for anything.",
+    "passwordTitle": "Enter the password if the gallery asks for one",
+    "passwordBody": "Some galleries are protected by a password. You'll find it in the same message as the link. Your browser then remembers it for 30 days.",
+    "lookTitle": "Have a look around",
+    "lookBody": "At the top is the gallery's name and a few buttons; below them, all the photos side by side. More photos load as you scroll down. Tap any photo to see it full screen.",
+    "keepTitle": "Keep the link",
+    "keepBody": "You'll want to come back to the gallery. Keep the message with the link, or bookmark the page. On a phone you can also add it to your home screen as an icon using “Share”.",
+    "termsHeading": "What's what",
+    "termsLead": "You'll see these three words often in this guide:",
+    "terms": [
+      {
+        "term": "Overview",
+        "body": "All the gallery's photos side by side. This is what you see as soon as you open the link."
+      },
+      {
+        "term": "Photo view",
+        "body": "One photo full screen. It opens when you tap a photo in the overview."
+      },
+      {
+        "term": "Toolbar",
+        "body": "The row of buttons at the bottom of the photo view – the heart, the printer, download and more."
+      }
+    ],
+    "buttonsNote": "Can't see a button this guide mentions? Your photographer switches downloads, print selection, hearts and edit requests on separately for each gallery. If something is missing, nothing is broken – it just isn't switched on for your gallery."
+  },
+  "browse": {
+    "heading": "2. Looking through the photos",
+    "intro": "The gallery opens as an overview of all the photos. More load by themselves as you scroll down.",
+    "detailHeading": "A photo full screen",
+    "detailLead": "Tap any photo and it opens full screen. The page's address then shows that very photo, so you can copy it and send it to someone. Whoever opens the link goes straight to it.",
+    "phoneTerm": "On a phone",
+    "phone": [
+      "Swipe sideways to go to the next photo.",
+      "Spread two fingers or double-tap to zoom in.",
+      "Tap once to hide the buttons and see just the photo. Tap again to bring them back.",
+      "Close it by swiping down, with the cross at the top left, or with the Back button."
+    ],
+    "desktopTerm": "On a computer",
+    "desktop": [
+      "Move between photos with the arrows at the edges of the screen or the arrow keys on your keyboard.",
+      "Close the photo with the cross at the top left or the Esc key."
+    ],
+    "chaptersHeading": "Chapters",
+    "chaptersBody": "If your photographer has split the gallery into parts – say Getting ready, Ceremony and Reception – you'll see a row of labels at the top. Tap one to jump straight to that part. The page's address changes as you go, so you can send a link to a particular chapter.",
+    "highlightsHeading": "The best of the day",
+    "highlightsBody": "Above the overview there may be a selection of the loveliest photos, picked by your photographer. Tap one to move to its place in the gallery. The photo gets a frame for a moment so you can spot it easily.",
+    "slideshowHeading": "Slideshow",
+    "slideshowBody": "The <projector></projector> “Slideshow” button at the top plays the photos full screen, one after another. Handy on a TV or projector, for example when showing the photos to family. Stop it by tapping anywhere or pressing Esc.",
+    "slideshowNote": "The slideshow shows the photos the gallery has already loaded. In a large gallery, scroll all the way to the bottom first.",
+    "newPhotos": "When your photographer adds something to the gallery, it won't appear in the overview by itself. Just reload the page."
+  },
+  "print": {
+    "heading": "3. Choosing photos for print",
+    "intro": "You mark the photos you want on paper right in the gallery. No need to write a list or send an email – your photographer sees your choice on their side. There are two ways to mark photos, and you can switch between them freely.",
+    "grid": {
+      "title": "In the overview",
+      "lead": "Quick when you're going through the whole gallery.",
+      "showTitle": "Show the printers",
+      "showPhone": "On a phone, tap the <marking></marking> button at the top, next to the gallery's name. A small printer then appears at the top right of every photo.",
+      "showDesktop": "On a computer, just move your mouse over a photo and the printer appears by itself.",
+      "tapTitle": "Tap the printer",
+      "tapBody": "Tap <printer></printer> on the photo you want printed. That marks it for print as one copy."
+    },
+    "detail": {
+      "title": "In the photo view",
+      "lead": "When you want a good look at the photo first.",
+      "openTitle": "Tap the photo",
+      "openBody": "It opens full screen.",
+      "tapTitle": "Tap the printer",
+      "tapBody": "You'll find it in the toolbar at the bottom: <printer></printer>. That marks the photo for print as one copy.",
+      "nextTitle": "Carry on with the next photo",
+      "nextBody": "Swipe sideways or use the arrows, and keep marking the same way."
+    },
+    "quantity": {
+      "heading": "How many copies?",
+      "lead": "After the first tap, the printer turns into a counter. It works the same in the overview and in the photo view.",
+      "plus": "<plus></plus> adds another copy of the same photo. Three copies, say – one for you, one for your parents and one for grandma.",
+      "minus": "<minus></minus> takes one copy away. When you take away the last one, the mark disappears and the plain printer comes back.",
+      "max": "You can ask for up to 99 copies of one photo.",
+      "others": "When several people choose through the same link, you'll see a grey number next to the counter, such as (+2). Those are copies the others want of that photo. Your own count doesn't change.",
+      "demoLabel": "Example: a photo marked for print as three copies, with others wanting two more."
+    },
+    "summary": {
+      "heading": "The summary at the top",
+      "lead": "While you choose, a bar stays at the top so you can see at a glance how much you have.",
+      "demoLabel": "Example of the print selection summary",
+      "photosTerm": "Photos",
+      "photosBody": "How many different photos you have chosen.",
+      "piecesTerm": "Copies",
+      "piecesBody": "How many prints that adds up to – you may want some photos more than once.",
+      "everyoneTerm": "With everyone",
+      "everyoneBody": "The total for everyone choosing through the same link as you. It only shows when more than one person is choosing.",
+      "savedTerm": "Saved",
+      "savedBody": "Your selection is safely saved. There is no “Send” button, and none is needed."
+    },
+    "tipsHeading": "Good to know",
+    "tips": [
+      {
+        "title": "A heart isn't a print.",
+        "body": "A heart saves a photo to your favourites. Your photographer only adds it to the prints when you tap the printer."
+      },
+      {
+        "title": "When you've finished choosing, let your photographer know.",
+        "body": "They can see your selection as it grows, but can't tell when it's complete. A short message is enough."
+      },
+      {
+        "title": "Add your name.",
+        "body": "The first time you mark a photo, the gallery asks for your name. Your photographer then knows whose selection is whose. You can skip it if you like."
+      },
+      {
+        "title": "No signal? No problem.",
+        "body": "On a train or out in the country you'll see a note that changes are waiting. They save themselves as soon as you're back online."
+      },
+      {
+        "title": "Can't see a printer at all?",
+        "body": "Your photographer hasn't switched print selection on for this link. Send them a message and sort it out together."
+      }
+    ],
+    "visibility": {
+      "heading": "Who sees your selection",
+      "lead": "A print selection isn't a private notebook – it's an order that several people can put together at once. So it's good to know who sees what.",
+      "photographerTerm": "Your photographer",
+      "photographerBody": "Sees everything: which photos, how many copies, and from whom, if you add your name.",
+      "sameLinkTerm": "Anyone with the same link as you",
+      "sameLinkBody": "Your partner or parents, say, if you forward them the link. On each photo they only see the grey number of copies the others want, plus the overall summary. They can't see who chose what.",
+      "guestsTerm": "Guests from the wedding page",
+      "guestsBody": "They have their own link, so they don't see your selection at all – and you don't see theirs.",
+      "hint": "So only send the link to your gallery to people you want to choose with."
+    },
+    "devices": {
+      "heading": "Start on your phone, carry on at home",
+      "lead": "The gallery remembers your selection in the browser you make it in – no account, no password. To carry on on another device, you move it across with a short code.",
+      "step1Title": "On the first device, ask for a code",
+      "step1Body": "Scroll right to the bottom, below the photos, and tap “Continue on another device”. An eight-character code appears, such as K7P2-M9XQ.",
+      "step2Title": "On the second device, open the same gallery",
+      "step2Body": "Use the same link as before – from your photographer's email or message, for example.",
+      "step3Title": "Enter the code",
+      "step3Body": "Right at the bottom, click “I have a code”, type it in and confirm with “Transfer”. The page reloads and your selection is there.",
+      "notes": [
+        "The code is valid for 15 minutes and works only once. If you miss it, just create a new one.",
+        "Capital letters and the dash don't matter.",
+        "Everything comes across: your print selection, hearts, reactions and your name.",
+        "From then on both devices share one selection. What you add on the computer shows up on your phone after a reload.",
+        "Enter the code before you start marking anything on the second device. Anything you mark there before that stays with your photographer as a separate selection, which you can no longer change."
+      ],
+      "togetherHint": "Choosing as a couple? You don't need to move anything – each of you can choose on your own phone and the selections add up. Or use the code to share one selection across both phones."
+    }
+  },
+  "favorites": {
+    "heading": "4. Favourites and reactions",
+    "intro": "Use the heart to mark the photos you like best. Handy for picking photos for an album, or for showing them to family all in one place.",
+    "howHeading": "How to give a photo a heart",
+    "phone": "On a phone, open the photo and tap <heart></heart> in the toolbar at the bottom. Or tap the <marking></marking> button at the top and the hearts appear right on the photos in the overview.",
+    "desktop": "On a computer, move your mouse over a photo – the heart is at the bottom right.",
+    "filterHeading": "Favourites only",
+    "filterBody": "As soon as you have your first favourite, a button with a heart and a number appears at the top. Tap it to see only your favourites; tap again to see all the photos.",
+    "countBody": "The number next to the heart shows how many people have the photo among their favourites. Nobody can see who exactly.",
+    "reactionsHeading": "Reactions",
+    "reactionsBody": "In the photo view, next to the heart, you'll also find five emoji: ❤️ love, 😮 wow, 😂 laughter, 🥲 touched and 👏 applause. You can give each photo one reaction. Tap again to remove it or swap it for another. In the overview you'll then see how others reacted to each photo.",
+    "devicesNote": "The gallery remembers hearts and reactions just like your print selection – in the browser you give them in. To move them to another device, use a code, see <a>Start on your phone, carry on at home</a>.",
+    "missing": "Can't see any hearts? Your photographer hasn't switched them on for this link."
+  },
+  "download": {
+    "heading": "5. Downloading photos",
+    "intro": "You can download photos in full quality – one at a time, just the ones you choose, or the whole gallery at once.",
+    "oneTitle": "One photo",
+    "oneOpenTitle": "Open the photo",
+    "oneOpenBody": "Tap it in the overview.",
+    "oneTapTitle": "Tap the down arrow",
+    "oneTapBody": "You'll find it in the toolbar at the bottom: <download></download>. The original downloads in full quality.",
+    "someTitle": "Just the ones you choose",
+    "someSelectTitle": "Select the photos",
+    "someSelectPhone": "On a phone, hold your finger on a photo until it's selected. Then add more with a normal tap.",
+    "someSelectDesktop": "On a computer, move your mouse over a photo and click the circle <check></check> at the top left. Hold Shift to select every photo between the last one you selected and the one you click.",
+    "someDownloadTitle": "Download them",
+    "someDownloadBody": "Tap the “Download” button at the top, which shows how many photos you've selected. Several photos download as a single ZIP file. Clear the selection with the cross next to it.",
+    "allTitle": "The whole gallery",
+    "allTapTitle": "Tap “Download all”",
+    "allTapBody": "The button is at the top and also shows the size. One ZIP file with all the photos downloads.",
+    "tipsHeading": "Good to know",
+    "tips": [
+      {
+        "title": "What's a ZIP?",
+        "body": "A single file with the photos packed together inside. On a computer you open it with a double-click, on an iPhone in the Files app and on Android in the file manager."
+      },
+      {
+        "title": "Download the whole gallery on a computer and over Wi-Fi if you can.",
+        "body": "It can be several gigabytes. For large galleries, the gallery asks you once more before the download starts."
+      },
+      {
+        "title": "Seeing “Preparing archive”?",
+        "body": "The file with all the photos is still being put together. Meanwhile you can download just the photos you choose, or come back in a little while."
+      },
+      {
+        "title": "“Select all loaded”",
+        "body": "selects only the photos the gallery has already loaded. For the whole gallery, use “Download all”."
+      },
+      {
+        "title": "Can't see any download button?",
+        "body": "Your photographer hasn't switched downloads on for this link. Send them a message."
+      }
+    ]
+  },
+  "corrections": {
+    "heading": "6. Photo edits and requests",
+    "intro": "Would you like something changed on a photo – a stain retouched, the horizon straightened, a lamp taken out of the shot? Write it to your photographer right on the photo; there's no need to describe it in an email. Edit requests are just between the two of you: they open with the six-digit PIN your photographer sent you with the gallery.",
+    "stepsTitle": "How to write a request",
+    "enterTitle": "Turn on edit requests",
+    "enterBody": "At the top of the gallery, tap <pencil></pencil> Edit requests and enter the PIN. You're asked for it every time – anyone who only has the link can neither write nor see requests.",
+    "openTitle": "Open the photo",
+    "openBody": "On a phone the requests show in the lower part of the screen; on a computer, to the right of the photo. Move between photos as usual.",
+    "writeTitle": "Write what to change",
+    "writeBody": "A few words are enough, such as “retouch the stain on the dress”. With Mark the spot and a tap on the photo you can show the exact place – a number appears on the photo, the same as on your request.",
+    "editHeading": "Changing and deleting",
+    "editBody": "Until your photographer has dealt with a request, you can change or delete it at any time. It saves straight away; there's nothing to send at the end.",
+    "doneHeading": "Done ✓",
+    "doneBody": "When your photographer uploads the corrected photo, the request shows Done ✓ and you'll see the new version in the same place in the gallery. Its hearts and print selection stay with it.",
+    "badgeNote": "In the overview, photos with a request carry a number with a pencil. Leave the mode with Done, by closing the page, or it ends by itself after two hours.",
+    "missing": "Can't see the Edit requests button? Your photographer hasn't switched it on for this link – just send them a message."
+  },
+  "guests": {
+    "heading": "7. Photos from guests",
+    "intro": "When your photographer switches it on, guests can add photos to the gallery too – no app and no sign-up. All they need is the link or a QR code.",
+    "addTitle": "Tap “Add photos”",
+    "addBody": "The button is at the bottom of the screen. Pick photos from your phone, or use “Take a photo” to take a new one straight away.",
+    "nameTitle": "Write your name",
+    "nameBody": "The first time, the gallery asks for your name. It appears with your photos so the newlyweds know whom to thank. You can carry on without a name too.",
+    "waitTitle": "Wait for the photos to upload",
+    "waitBody": "The screen stays on while uploading. If it gets interrupted, the rest is sent when you open the gallery again.",
+    "tipsHeading": "Good to know",
+    "tips": [
+      {
+        "title": "A photo added by mistake can be deleted.",
+        "body": "Open it and tap “Delete my photo” at the top left. It works from the device it was added from, or from another one you link to it with a code."
+      },
+      {
+        "title": "Photos from an iPhone work without any trouble.",
+        "body": "The browser sends them in a common format by itself. The gallery doesn't accept videos, and one photo can be at most 25 MB."
+      },
+      {
+        "title": "One person can add up to 150 photos.",
+        "body": "That's plenty for a whole wedding, and it keeps the gallery easy to look through."
+      },
+      {
+        "title": "To change your name,",
+        "body": "use the “Change” link at the bottom, by the “Add photos” button. It changes on all your photos in the gallery."
+      }
+    ],
+    "hubHeading": "A wedding page with several galleries",
+    "hubBody": "Your photographer can bring all the galleries from one wedding together under one link. You'll see them as large tiles, with the guests' gallery below. The link stays the same as more galleries are added. Get back to the overview with the link bearing the wedding's name at the top."
+  },
+  "offline": {
+    "heading": "8. Viewing without internet",
+    "intro": "Off to the countryside or on a plane? You can save the photos to your device beforehand and look at them without internet.",
+    "scrollTitle": "Scroll to the end of the gallery",
+    "scrollBody": "Only the photos the gallery has already loaded are saved. In a large gallery, scroll right to the bottom first.",
+    "tapTitle": "Tap “Offline” at the top",
+    "tapBody": "You'll see how many photos will be saved and how much space they take. If you've marked some, you can save just your favourites and print photos.",
+    "saveTitle": "Choose “Make available offline”",
+    "saveBody": "When you see “Gallery is available offline”, you're done.",
+    "tips": [
+      "Smaller versions of the photos for your screen are saved, not the originals. For printing or keeping, download the photos.",
+      "An iPhone clears saved photos by itself after about a week without opening them. Just save them again.",
+      "Delete the saved photos in the same window with “Remove from device”."
+    ]
+  },
+  "privacy": {
+    "heading": "9. Your name and privacy",
+    "intro": "The gallery needs no account and no email. It only recognises you by the browser you open it in. You don't have to give your name – but if you do, it will be seen by:",
+    "terms": [
+      {
+        "term": "Others in the gallery",
+        "body": "At the top of the gallery are the initials of people who have looked at it recently and given their name. The full name shows when you hover over them."
+      },
+      {
+        "term": "Whoever is looking with you",
+        "body": "When you have the gallery open at the same time, the others see that you're looking right now."
+      },
+      {
+        "term": "Next to your photos",
+        "body": "Photos you add show who they're from."
+      },
+      {
+        "term": "Your photographer",
+        "body": "Sees whose print selection is whose."
+      }
+    ],
+    "countsNote": "For hearts, reactions and print selections, others only see numbers, not names.",
+    "optOutHeading": "Don't count me",
+    "optOutBody": "The gallery counts visits anonymously and without IP addresses. If you'd rather your visits weren't counted at all, tap “Don't count me” right at the bottom. Your name then disappears from all galleries.",
+    "optOutWarning": "Think it over – it can't be undone. Photos you've added stay in the gallery, but you can no longer delete them. And you can no longer give hearts or choose photos for print in this browser."
+  },
+  "trouble": {
+    "heading": "10. When something doesn't work",
+    "items": [
+      {
+        "title": "The gallery asks for a password.",
+        "body": "Your photographer sent it to you with the link. Mind capital and small letters. After five wrong attempts, the gallery locks for 15 minutes. Your browser remembers the right password for 30 days."
+      },
+      {
+        "title": "The edit request PIN doesn't work.",
+        "body": "Check that you're entering all six digits from the delivery message. After ten wrong attempts, entering is locked for 5 minutes. When your photographer creates a new PIN, the old one stops working – ask them for it."
+      },
+      {
+        "title": "“This link no longer works”",
+        "body": "The link has expired. Send your photographer a message and they'll send you a new one."
+      },
+      {
+        "title": "“This link doesn't go anywhere”",
+        "body": "Probably only part of the address was copied. Open the link again straight from the original message, or scan the QR code."
+      },
+      {
+        "title": "“Your last mark didn't save”",
+        "body": "Check your connection and try again."
+      },
+      {
+        "title": "You can't see new photos.",
+        "body": "Reload the page."
+      },
+      {
+        "title": "A button this guide mentions is missing.",
+        "body": "Downloads, hearts, print selection, edit requests and adding photos are switched on by your photographer separately for each link – so guests may have different options from you. If you can't see something, nothing is broken. Send them a message and sort it out together."
+      }
+    ]
+  },
+  "help": "Still stuck? <a>Write to your photographer</a> – happy to help."
+}
