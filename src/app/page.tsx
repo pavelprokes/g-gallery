@@ -4,6 +4,7 @@ import Image from "next/image";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
 import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
+import { guidePath } from "@/lib/guide-path";
 import { type FaqEntry, landingJsonLd } from "@/lib/landing-jsonld";
 import { previewMetadata } from "@/lib/og-image";
 import { Card } from "@/components/ui/card";
@@ -109,6 +110,12 @@ export default async function Home() {
             className="text-brand-primary hover:text-brand-primary-dark mt-6 block w-fit text-sm font-medium underline underline-offset-4"
           >
             {t("forYourWedding")}
+          </a>
+          <a
+            href={guidePath(locale)}
+            className="text-brand-primary hover:text-brand-primary-dark mt-3 block w-fit text-sm font-medium underline underline-offset-4"
+          >
+            {t("guideLink")}
           </a>
           <a
             href={MAIN_SITE_URL}

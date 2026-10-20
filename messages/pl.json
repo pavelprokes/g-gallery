@@ -15,7 +15,8 @@
     "email": "pavel@pavelprokes.cz",
     "website": "svatebni-fotograf-cechy.cz",
     "copyright": "© {year} Pavel Prokeš. Wszelkie prawa zastrzeżone.",
-    "builtBy": "Tę stronę stworzył osobiście Pavel Prokeš."
+    "builtBy": "Tę stronę stworzył osobiście Pavel Prokeš.",
+    "guide": "Jak korzystać z galerii"
   },
   "manifest": {
     "name": "Galeria zdjęć ślubnych",
@@ -28,6 +29,7 @@
     "heroTitle": "Wszystkie zdjęcia ze ślubu pod jednym linkiem — od fotografa i od gości",
     "heroLead": "Tę galerię przysłał Ci fotograf albo przekazali ją Młodzi — link lub kod QR może podawać dalej każda ze stron. Tu znajdziesz, jak do niej wejść, co możesz w niej robić i co zrobić, gdy coś nie działa.",
     "forYourWedding": "Planujesz własny ślub? Zobacz, jak działa galeria dla gości →",
+    "guideLink": "Instrukcja krok po kroku: jak przeglądać, wybierać i pobierać zdjęcia",
     "backToMainSite": "← Wróć do svatebni-fotograf-cechy.cz",
     "heroImageAlt": "Siatka zdjęć ślubnych w galerii, pokazana na iPhonie",
     "twoWaysHeading": "Dwa sposoby, w jakie możesz dostać galerię",

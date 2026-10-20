@@ -16,6 +16,7 @@ import path from "node:path";
 import { prisma } from "../src/lib/db";
 import { generateShareToken, hashPassword, hashShareToken } from "../src/lib/share-token";
 import { gallerySlug } from "../src/lib/gallery-slug";
+import { encryptToken } from "../src/lib/token-cipher";
 import { refreshWovenOrder } from "../src/lib/woven-order-db";
 import { FACES_MODEL, type Face } from "../src/lib/social-video/faces";
 
@@ -69,6 +70,8 @@ async function main() {
     data: {
       galleryId: gallery.id,
       tokenHash: hashShareToken(token),
+      // Readable again in the admin (its "Otevřít galerii"), as in production.
+      tokenCipher: encryptToken(token),
       allowDownload: true,
       allowReactions: true,
       slug,
@@ -449,7 +452,15 @@ async function makeWedding(ownerId: string, title: string, venue: string) {
   const eventDate = new Date("2026-08-12T00:00:00Z");
   const slug = gallerySlug(title, eventDate);
   const event = await prisma.event.create({
-    data: { ownerId, title, venue, eventDate, tokenHash: hashShareToken(token), slug },
+    data: {
+      ownerId,
+      title,
+      venue,
+      eventDate,
+      tokenHash: hashShareToken(token),
+      tokenCipher: encryptToken(token),
+      slug,
+    },
     select: { id: true },
   });
   return { id: event.id, token, slug };

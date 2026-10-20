@@ -16,6 +16,8 @@ import { isCardVisible } from "@/lib/event-cards";
 import { decryptToken } from "@/lib/token-cipher";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { CoverThumb } from "@/components/admin/cover-thumb";
+import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
+import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { NewGalleryInEvent } from "@/components/new-gallery-in-event";
 import { EventSettings } from "@/components/event-settings";
 import { Alert } from "@/components/ui/alert";
@@ -90,6 +92,8 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               slug: true,
               tokenCipher: true,
               createdAt: true,
+              revokedAt: true,
+              expiresAt: true,
             },
           },
         },
@@ -132,6 +136,7 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                 Do koše
               </Button>
             </form>
+            {eventUrl && <OpenGalleryLink href={eventUrl} label="Otevřít svatbu" />}
           </>
         }
       />
@@ -193,6 +198,16 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
               eventToken && gallery.eventKey
                 ? `/s/${eventToken}/${event.slug}/${gallery.eventKey}`
                 : null;
+            // Its own newest live link, else its card on the wedding page.
+            const openUrl =
+              newestLiveShareUrl(
+                gallery.shareLinks.map((link) => {
+                  const token = decryptToken(link.tokenCipher);
+                  return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+                }),
+                gallery.status === "PUBLISHED",
+                now,
+              ) ?? (visible ? cardUrl : null);
 
             return (
               <li key={gallery.id} className="space-y-3 py-4">
@@ -208,9 +223,12 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
                         {GALLERY_STATUS[gallery.status].label}
                       </p>
                     </div>
-                    <Badge tone={visible ? "success" : "muted"}>
-                      {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={visible ? "success" : "muted"}>
+                        {visible ? "Vidí ji hosté" : "Na rozcestníku není"}
+                      </Badge>
+                      {openUrl && <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />}
+                    </div>
                   </div>
                 </div>
 

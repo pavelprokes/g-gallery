@@ -1,12 +1,81 @@
 {
-  "pageTitle": "Jak pracovat s galerií – návod pro klienty",
-  "pageDescription": "Návod krok za krokem: výběr fotek k tisku, oblíbené fotky, stahování, připomínky k úpravám, fotky od hostů, prohlížení bez signálu a co dělat, když něco nejde.",
-  "kicker": "Návod pro klienty",
-  "heroTitle": "Jak pracovat se svou galerií",
-  "heroLead": "Galerii zvládneš v telefonu i na počítači. Nic se neinstaluje a nikam se nepřihlašuješ – stačí odkaz, který ti fotograf poslal. Tady najdeš krok za krokem všechno, co se ti při práci s ní může hodit.",
-  "tocHeading": "Obsah",
+  "pageTitle": "Návod ke galerii – jak prohlížet, vybírat a stahovat svatební fotky",
+  "pageDescription": "Návod krok za krokem i pro úplné začátečníky: jak otevřít galerii z e-mailu, prohlížet fotky, vybrat je k tisku, stáhnout je a poslat fotografovi připomínku k úpravě.",
+  "kicker": "Návod ke galerii",
+  "heroTitle": "Jak na svou galerii",
+  "heroLead": "Dostal(a) jsi od fotografa odkaz e-mailem nebo ve zprávě? Tady najdeš krok za krokem všechno, co s galerií můžeš dělat. Nic se neinstaluje a nikam se nepřihlašuješ – stačí telefon nebo počítač a ten odkaz.",
+  "otherLanguage": "English version",
+  "tocHeading": "Co chceš udělat?",
+  "tocLead": "Vyber, s čím potřebuješ pomoct. Jsi tu poprvé? Začni prvním bodem.",
+  "toc": {
+    "start": "Otevřít galerii poprvé",
+    "browse": "Prohlížet fotky",
+    "print": "Vybrat fotky k tisku",
+    "favorites": "Označit oblíbené fotky",
+    "download": "Stáhnout fotky",
+    "corrections": "Poprosit o úpravu fotky",
+    "guests": "Přidat své fotky ze svatby",
+    "offline": "Prohlížet bez internetu",
+    "privacy": "Jméno a soukromí",
+    "trouble": "Něco nefunguje"
+  },
+  "start": {
+    "heading": "1. Poprvé v galerii",
+    "intro": "Jestli jsi galerii ještě neotevíral(a), začni tady. Zabere to minutu.",
+    "openTitle": "Klepni na odkaz",
+    "openBody": "Najdi e-mail nebo zprávu od fotografa a klepni na odkaz. Galerie se otevře v prohlížeči – v Safari, Chromu nebo v tom, který běžně používáš. Nic nestahuješ, neinstaluješ ani se neregistruješ.",
+    "passwordTitle": "Zadej heslo, pokud se galerie zeptá",
+    "passwordBody": "Některé galerie jsou chráněné heslem. Najdeš ho ve stejné zprávě jako odkaz. Prohlížeč si ho pak 30 dní pamatuje.",
+    "lookTitle": "Rozhlédni se",
+    "lookBody": "Nahoře je název galerie a pár tlačítek, pod tím všechny fotky vedle sebe. Fotky se načítají postupně, jak posouváš dolů. Klepnutím na kteroukoli fotku ji zvětšíš přes celou obrazovku.",
+    "keepTitle": "Ulož si odkaz",
+    "keepBody": "Ke galerii se budeš chtít vrátit. Nech si zprávu s odkazem, nebo si stránku přidej do záložek. Na telefonu ji můžeš přes „Sdílet“ přidat i na plochu jako ikonu.",
+    "termsHeading": "Co je co",
+    "termsLead": "Tyhle tři pojmy v návodu uvidíš často:",
+    "terms": [
+      {
+        "term": "Přehled",
+        "body": "Všechny fotky galerie vedle sebe. To je to, co uvidíš hned po otevření odkazu."
+      },
+      {
+        "term": "Detail fotky",
+        "body": "Jedna fotka přes celou obrazovku. Otevře se klepnutím na fotku v přehledu."
+      },
+      {
+        "term": "Lišta",
+        "body": "Řada tlačítek dole v detailu fotky – srdíčko, tiskárna, stažení a další."
+      }
+    ],
+    "buttonsNote": "Nevidíš některé tlačítko, o kterém je tu řeč? Fotograf zapíná stahování, výběr k tisku, srdíčka i připomínky zvlášť pro každou galerii. Když něco chybí, není to chyba – jen to u tvé galerie není zapnuté."
+  },
+  "browse": {
+    "heading": "2. Prohlížení fotek",
+    "intro": "Galerie se otevře jako přehled všech fotek. Další se načítají samy, jak posouváš dolů.",
+    "detailHeading": "Fotka přes celou obrazovku",
+    "detailLead": "Klepni na kteroukoli fotku a otevře se přes celou obrazovku. Adresa stránky přitom ukazuje právě tuhle fotku, takže ji můžeš zkopírovat a poslat. Kdo odkaz otevře, uvidí rovnou ji.",
+    "phoneTerm": "Na telefonu",
+    "phone": [
+      "Přejetím prstem do strany přejdeš na další fotku.",
+      "Roztažením dvou prstů nebo dvojitým klepnutím si fotku přiblížíš.",
+      "Jedním klepnutím schováš ovládání, ať vidíš jen fotku. Dalším klepnutím ho vrátíš.",
+      "Zavřeš ji přejetím prstem dolů, křížkem vlevo nahoře nebo tlačítkem Zpět."
+    ],
+    "desktopTerm": "Na počítači",
+    "desktop": [
+      "Listuješ šipkami na okrajích obrazovky nebo šipkami na klávesnici.",
+      "Fotku zavřeš křížkem vlevo nahoře nebo klávesou Esc."
+    ],
+    "chaptersHeading": "Kapitoly",
+    "chaptersBody": "Když fotograf galerii rozdělí na části – třeba Přípravy, Obřad a Hostina –, uvidíš nahoře řadu štítků. Klepnutím na štítek skočíš rovnou na danou část. Adresa stránky se přitom mění, takže můžeš poslat odkaz přímo na konkrétní kapitolu.",
+    "highlightsHeading": "To nejlepší z celého dne",
+    "highlightsBody": "Nad přehledem může být výběr nejhezčích fotek, který připravil fotograf. Klepnutím na fotku z výběru se posuneš na její místo v galerii. Fotka se na chvíli orámuje, ať ji snadno najdeš.",
+    "slideshowHeading": "Projekce",
+    "slideshowBody": "Tlačítko <projector></projector> „Projekce“ nahoře spustí fotky přes celou obrazovku, jednu po druhé. Hodí se na televizi nebo plátno, třeba když fotky ukazujete rodině. Ukončíš ji klepnutím kamkoli nebo klávesou Esc.",
+    "slideshowNote": "Projekce ukazuje fotky, které už galerie načetla. U velké galerie proto nejdřív sjeď až na konec.",
+    "newPhotos": "Když fotograf do galerie něco přidá, v přehledu se to samo neobjeví. Stačí stránku načíst znovu."
+  },
   "print": {
-    "heading": "1. Výběr fotek k tisku",
+    "heading": "3. Výběr fotek k tisku",
     "intro": "Fotky, které chceš mít na papíře, si označíš přímo v galerii. Nemusíš nic vypisovat ani posílat e-mailem – fotograf tvůj výběr uvidí u sebe. Označovat můžeš dvěma způsoby a klidně je střídat.",
     "grid": {
       "title": "V přehledu fotek",
@@ -102,34 +171,8 @@
       "togetherHint": "Vybíráte ve dvou? Nemusíte nic přenášet – každý může vybírat ze svého telefonu a výběry se sčítají. Kódem si naopak můžete udělat jeden společný výběr na obou telefonech."
     }
   },
-  "browse": {
-    "heading": "2. Prohlížení fotek",
-    "intro": "Galerie se otevře jako přehled všech fotek. Další se načítají samy, jak posouváš dolů.",
-    "detailHeading": "Fotka přes celou obrazovku",
-    "detailLead": "Klepni na kteroukoli fotku a otevře se přes celou obrazovku. Adresa stránky přitom ukazuje právě tuhle fotku, takže ji můžeš zkopírovat a poslat. Kdo odkaz otevře, uvidí rovnou ji.",
-    "phoneTerm": "Na telefonu",
-    "phone": [
-      "Přejetím prstem do strany přejdeš na další fotku.",
-      "Roztažením dvou prstů nebo dvojitým klepnutím si fotku přiblížíš.",
-      "Jedním klepnutím schováš ovládání, ať vidíš jen fotku. Dalším klepnutím ho vrátíš.",
-      "Zavřeš ji přejetím prstem dolů, křížkem vlevo nahoře nebo tlačítkem Zpět."
-    ],
-    "desktopTerm": "Na počítači",
-    "desktop": [
-      "Listuješ šipkami na okrajích obrazovky nebo šipkami na klávesnici.",
-      "Fotku zavřeš křížkem vlevo nahoře nebo klávesou Esc."
-    ],
-    "chaptersHeading": "Kapitoly",
-    "chaptersBody": "Když fotograf galerii rozdělí na části – třeba Přípravy, Obřad a Hostina –, uvidíš nahoře řadu štítků. Klepnutím na štítek skočíš rovnou na danou část. Adresa stránky se přitom mění, takže můžeš poslat odkaz přímo na konkrétní kapitolu.",
-    "highlightsHeading": "To nejlepší z celého dne",
-    "highlightsBody": "Nad přehledem může být výběr nejhezčích fotek, který připravil fotograf. Klepnutím na fotku z výběru se posuneš na její místo v galerii. Fotka se na chvíli orámuje, ať ji snadno najdeš.",
-    "slideshowHeading": "Projekce",
-    "slideshowBody": "Tlačítko <projector></projector> „Projekce“ nahoře spustí fotky přes celou obrazovku, jednu po druhé. Hodí se na televizi nebo plátno, třeba když fotky ukazujete rodině. Ukončíš ji klepnutím kamkoli nebo klávesou Esc.",
-    "slideshowNote": "Projekce ukazuje fotky, které už galerie načetla. U velké galerie proto nejdřív sjeď až na konec.",
-    "newPhotos": "Když fotograf do galerie něco přidá, v přehledu se to samo neobjeví. Stačí stránku načíst znovu."
-  },
   "favorites": {
-    "heading": "3. Oblíbené fotky a reakce",
+    "heading": "4. Oblíbené fotky a reakce",
     "intro": "Srdíčkem si označíš fotky, které se ti líbí nejvíc. Hodí se třeba na výběr do alba nebo když je chceš rodině ukázat pohromadě.",
     "howHeading": "Jak dát fotce srdíčko",
     "phone": "Na telefonu otevři fotku a klepni na <heart></heart> dole v liště. Nebo nahoře zapni tlačítko <marking></marking> a srdíčka se objeví přímo na fotkách v přehledu.",
@@ -143,7 +186,7 @@
     "missing": "Nevidíš srdíčka vůbec? Fotograf je u tohohle odkazu nezapnul."
   },
   "download": {
-    "heading": "4. Stahování fotek",
+    "heading": "5. Stahování fotek",
     "intro": "Fotky si můžeš stáhnout v plné kvalitě – po jedné, jen vybrané, nebo celou galerii najednou.",
     "oneTitle": "Jednu fotku",
     "oneOpenTitle": "Otevři fotku",
@@ -184,8 +227,8 @@
     ]
   },
   "corrections": {
-    "heading": "5. Připomínky a úpravy fotek",
-    "intro": "Chceš na některé fotce něco upravit – vyretušovat skvrnu, srovnat horizont, ubrat lampu ze záběru? Napiš to fotografovi rovnou k fotce. Režim připomínek je jen pro vás dva: otevírá se šestimístným PINem, který ti fotograf dal při předání galerie.",
+    "heading": "6. Úpravy fotek a připomínky",
+    "intro": "Chceš na některé fotce něco upravit – vyretušovat skvrnu, srovnat horizont, ubrat lampu ze záběru? Napiš to fotografovi rovnou k fotce, nemusíš nic popisovat v e-mailu. Připomínky jsou jen pro vás dva: otevírají se šestimístným PINem, který ti fotograf poslal spolu s galerií.",
     "stepsTitle": "Jak napsat připomínku",
     "enterTitle": "Zapni režim připomínek",
     "enterBody": "Nahoře v galerii klepni na <pencil></pencil> Připomínky a zadej PIN. Ptáme se na něj při každém vstupu – kdo má jen odkaz, připomínky nenapíše ani neuvidí.",
@@ -201,7 +244,7 @@
     "missing": "Tlačítko Připomínky nevidíš? Fotograf je u tohohle odkazu nezapnul – stačí mu napsat."
   },
   "guests": {
-    "heading": "6. Fotky od hostů",
+    "heading": "7. Fotky od hostů",
     "intro": "Když to fotograf zapne, můžou do galerie přidávat fotky i hosté – bez aplikace a bez registrace. Stačí jim odkaz nebo QR kód.",
     "addTitle": "Klepni na „Přidat fotky“",
     "addBody": "Tlačítko je dole na obrazovce. Vybereš fotky z telefonu, nebo přes „Vyfotit“ rovnou vyfotíš novou.",
@@ -232,7 +275,7 @@
     "hubBody": "Fotograf může všechny galerie z jedné svatby spojit pod jeden odkaz. Uvidíš je jako velké dlaždice a pod nimi galerii od hostů. Odkaz zůstává stejný, i když další galerie přibývají. Zpátky na přehled se dostaneš odkazem s názvem svatby nahoře."
   },
   "offline": {
-    "heading": "7. Prohlížení bez signálu",
+    "heading": "8. Prohlížení bez internetu",
     "intro": "Jedeš na chalupu nebo do letadla? Fotky si můžeš předem uložit do zařízení a prohlížet je i bez internetu.",
     "scrollTitle": "Sjeď na konec galerie",
     "scrollBody": "Uloží se jen fotky, které už galerie načetla. U velké galerie proto nejdřív sjeď úplně dolů.",
@@ -247,7 +290,7 @@
     ]
   },
   "privacy": {
-    "heading": "8. Jméno a soukromí",
+    "heading": "9. Jméno a soukromí",
     "intro": "Galerie nepotřebuje účet ani e-mail. Pozná tě jen podle prohlížeče, ve kterém ji otevřeš. Jméno vyplňovat nemusíš – když ho ale vyplníš, uvidí ho:",
     "terms": [
       {
@@ -273,7 +316,7 @@
     "optOutWarning": "Rozmysli si to, vrátit to nejde. Fotky, které máš v galerii od sebe, v ní zůstanou, jen je už nepůjde smazat. A dávat srdíčka ani vybírat fotky k tisku už v tomhle prohlížeči nepůjde."
   },
   "trouble": {
-    "heading": "9. Když něco nejde",
+    "heading": "10. Když něco nejde",
     "items": [
       {
         "title": "Galerie chce heslo.",
@@ -305,5 +348,5 @@
       }
     ]
   },
-  "help": "Něco nejde, nebo si nevíš rady? <a>Napiš fotografovi</a>, rád pomůže."
+  "help": "Pořád si nevíš rady? <a>Napiš fotografovi</a>, rád pomůže."
 }

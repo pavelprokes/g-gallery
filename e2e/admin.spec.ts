@@ -190,3 +190,46 @@ test("on a phone: thumb-sized targets, no drag-and-drop or chart talk", async ({
   await expect(legends).not.toHaveCount(0);
   for (const legend of await legends.all()) await expect(legend).toBeHidden();
 });
+
+test("every gallery and wedding opens as guests see it, in a new tab", async ({ page }) => {
+  await page.goto("/admin");
+  const openGallery = page.getByRole("link", { name: "Otevřít galerii ↗" });
+  await expect(openGallery.first()).toBeVisible();
+  await expect(openGallery.first()).toHaveAttribute("target", "_blank");
+  await expect(openGallery.first()).toHaveAttribute("href", /^\/g\//);
+  await expect(page.getByRole("link", { name: "Otevřít svatbu ↗" }).first()).toHaveAttribute(
+    "href",
+    /^\/s\//,
+  );
+
+  await page.goto(`/admin/g/${seed.galleryId}`);
+  const header = page.getByRole("link", { name: "Otevřít galerii ↗" });
+  await expect(header).toHaveAttribute("target", "_blank");
+  const [guestTab] = await Promise.all([page.context().waitForEvent("page"), header.click()]);
+  await guestTab.waitForLoadState();
+  await expect(guestTab.getByRole("list", { name: "Fotky v galerii" })).toBeVisible();
+  await guestTab.close();
+
+  await page.goto(`/admin/e/${seed.weddingId}`);
+  await expect(page.getByRole("link", { name: "Otevřít svatbu ↗" })).toHaveAttribute(
+    "href",
+    /^\/s\//,
+  );
+});
+
+test("chapters and highlights stay folded until opened", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.galleryId}`);
+  for (const title of ["Kapitoly", "Výběr na začátku galerie"]) {
+    const panel = page
+      .locator("details")
+      .filter({ has: page.getByRole("heading", { name: title }) });
+    await expect(panel).not.toHaveAttribute("open");
+    await panel.locator("summary").click();
+    await expect(panel).toHaveAttribute("open");
+  }
+  // Opened for editing on the timeline, where chapters are made.
+  await page.goto(`/admin/g/${seed.galleryId}?sort=order`);
+  await expect(
+    page.locator("details").filter({ has: page.getByRole("heading", { name: "Kapitoly" }) }),
+  ).toHaveAttribute("open");
+});

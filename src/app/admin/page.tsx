@@ -11,6 +11,8 @@ import { createGallery, restoreGallery, restoreEvent } from "./actions";
 import { AdminCreateBar } from "@/components/admin-create-bar";
 import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { CoverThumb, type AdminCover } from "@/components/admin/cover-thumb";
+import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
+import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { ViewSparkline, ViewSparklineLegend } from "@/components/admin/view-sparkline";
 import { decryptToken } from "@/lib/token-cipher";
 import { Badge } from "@/components/ui/badge";
@@ -117,6 +119,11 @@ export default async function AdminPage() {
         event: { select: { eventDate: true } },
         coverPhoto: chosenCover,
         photos: newestPhoto,
+        shareLinks: {
+          where: { revokedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: { slug: true, tokenCipher: true, revokedAt: true, expiresAt: true },
+        },
         _count: {
           select: { photos: { where: { status: "CONFIRMED" } }, viewers: true },
         },
@@ -233,8 +240,16 @@ export default async function AdminPage() {
                     <ViewStats series={series} max={eventMax} label={event.title} />
                   </div>
                   {token ? (
-                    <div className="relative z-10">
-                      <CopyableLink href={`/s/${token}/${event.slug}`} />
+                    <div className="relative z-10 flex flex-wrap items-center gap-2">
+                      <OpenGalleryLink
+                        href={`/s/${token}/${event.slug}`}
+                        size="sm"
+                        variant="secondary"
+                        label="Otevřít svatbu"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <CopyableLink href={`/s/${token}/${event.slug}`} />
+                      </div>
                     </div>
                   ) : (
                     <UnrecoverableLink reason="Adresu už nelze zobrazit — svatba vznikla dřív, než se odkazy ukládaly čitelně." />
@@ -259,8 +274,19 @@ export default async function AdminPage() {
         {galleries.map((gallery) => {
           const status = GALLERY_STATUS[gallery.status];
           const series = gallerySeries.get(gallery.id) ?? emptySeries(days);
+          const openUrl = newestLiveShareUrl(
+            gallery.shareLinks.map((link) => {
+              const token = decryptToken(link.tokenCipher);
+              return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+            }),
+            gallery.status === "PUBLISHED",
+            now,
+          );
           return (
-            <li key={gallery.id} className="relative flex items-center gap-x-4 gap-y-3 p-4">
+            <li
+              key={gallery.id}
+              className="relative flex flex-wrap items-center gap-x-4 gap-y-3 p-4"
+            >
               <CoverThumb cover={coverOf(gallery.coverPhoto, gallery.photos)} />
               <div className="min-w-0 flex-1 basis-48">
                 <Link href={`/admin/g/${gallery.id}`} className={ROW_LINK}>
@@ -283,6 +309,11 @@ export default async function AdminPage() {
                 <ViewLine series={series} />
               </div>
               <ViewStats series={series} max={galleryMax} label={gallery.title} />
+              {openUrl && (
+                <div className="relative z-10 shrink-0">
+                  <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />
+                </div>
+              )}
             </li>
           );
         })}
