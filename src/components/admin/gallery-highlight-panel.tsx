@@ -4,8 +4,8 @@ import {
   setHighlightsEnabled,
 } from "@/app/admin/highlight-actions";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
+import { CollapsiblePanel } from "@/components/admin/collapsible-panel";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
 import { Hint } from "@/components/ui/input";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { MAX_PINNED, MIN_PHOTOS_FOR_AUTO } from "@/lib/gallery-highlights";
@@ -42,9 +42,13 @@ export function GalleryHighlightPanel({
   ownCount: number;
 }) {
   return (
-    <Card as="section">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <CardTitle className="mb-0">Výběr na začátku galerie</CardTitle>
+    <CollapsiblePanel
+      title="Výběr na začátku galerie"
+      status={
+        enabled ? `Hosté vidí ${pluralize(highlights.length, FORMS.photoAccusative)}` : "Vypnuto"
+      }
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
         <form action={setHighlightsEnabled.bind(null, galleryId, !enabled)}>
           <Button type="submit" variant={enabled ? "ghost" : "secondary"} size="sm">
             {enabled ? "Skrýt hostům" : "Ukázat hostům"}
@@ -121,6 +125,6 @@ export function GalleryHighlightPanel({
         vyplňuješ, ale v originálech zůstanou. Fotky nahrané dřív tyhle značky nemají, u nich
         připínej ručně. Připnutá fotka je ve výběru vždy, vyřazená nikdy.
       </Hint>
-    </Card>
+    </CollapsiblePanel>
   );
 }

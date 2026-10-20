@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { deleteChapter, updateChapter } from "@/app/admin/chapter-actions";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
+import { CollapsiblePanel } from "@/components/admin/collapsible-panel";
 import { TranslationFields } from "@/components/admin/translation-fields";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
-import { Card, CardTitle } from "@/components/ui/card";
 import { Hint, Input, Label } from "@/components/ui/input";
 import { TRANSLATED_LOCALES, type ContentTranslations } from "@/lib/content-translations";
 import { FORMS, pluralize } from "@/lib/czech-plural";
@@ -160,9 +160,11 @@ export function GalleryChapterPanel({
   }
 
   return (
-    <Card as="section">
-      <CardTitle className="mb-3">Kapitoly</CardTitle>
-
+    <CollapsiblePanel
+      title="Kapitoly"
+      status={chapters.length === 0 ? "Žádné" : pluralize(chapters.length, FORMS.chapter)}
+      defaultOpen={timelineActive}
+    >
       {chapters.length === 0 && (
         <p className="text-admin-muted mb-3 text-sm dark:text-neutral-400">
           Galerie zatím nemá kapitoly. Hosté ji procházejí jako jeden dlouhý proud fotek.
@@ -274,6 +276,6 @@ export function GalleryChapterPanel({
         Fotky přidané později se do kapitol zařadí samy podle pořadí galerie (názvu souboru nebo
         času pořízení).
       </Hint>
-    </Card>
+    </CollapsiblePanel>
   );
 }

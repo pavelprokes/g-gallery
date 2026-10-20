@@ -29,6 +29,8 @@ import { publishGallery, restoreGallery, setFeaturedVideo } from "../../actions"
 import { startChapter } from "../../chapter-actions";
 import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-panel";
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
+import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
+import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
 import {
@@ -215,16 +217,10 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       correctionPin: decryptToken(link.correctionPinCipher),
     };
   });
-  // A chapter's link is a share link plus its anchor: the newest one a guest
-  // can actually open — live, copyable, and on a published gallery (a draft
-  // resolves to not-found for everyone).
+  // The gallery as a guest opens it — the header's "Otevřít galerii" and each
+  // chapter's link (that plus its anchor).
   const now = new Date();
-  const chapterShareUrl =
-    gallery.status === "PUBLISHED"
-      ? (shareLinks.find(
-          (link) => link.url && !link.revokedAt && (!link.expiresAt || link.expiresAt > now),
-        )?.url ?? null)
-      : null;
+  const guestUrl = newestLiveShareUrl(shareLinks, gallery.status === "PUBLISHED", now);
 
   // Chapters are placed exactly as a guest's grid places them
   // (src/lib/gallery-grid.ts), over the photos in the gallery's order.
@@ -503,6 +499,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         subtitle={`${GALLERY_STATUS[gallery.status].label} · ${pluralize(gallery.photos.length, FORMS.photo)}`}
         actions={
           <>
+            {guestUrl && <OpenGalleryLink href={guestUrl} />}
             {/* docs/SOCIAL-VIDEO.md — a Reel or a gift from this gallery's photos. */}
             <a href={`/admin/g/${gallery.id}/video`} className={buttonClasses("secondary", "md")}>
               Video pro sítě
@@ -599,7 +596,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
 
       <GalleryChapterPanel
         chapters={adminChapters}
-        shareUrl={chapterShareUrl}
+        shareUrl={guestUrl}
         timelineHref={`/admin/g/${gallery.id}` + adminViewQuery({ ...view, sort: "order" })}
         timelineActive={timelineView}
       />

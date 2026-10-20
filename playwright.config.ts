@@ -20,6 +20,16 @@ const baseURL = `http://127.0.0.1:${PORT}`;
  */
 const localEnv = loadEnv({ path: ".env" }).parsed ?? {};
 
+/**
+ * A fixed, test-only key when `.env` has none, so the seed can store share
+ * tokens readable again (`tokenCipher`) and the admin can show and open them
+ * as it does in production. Set on this process too: the seed runs from
+ * `globalSetup`, which inherits it.
+ */
+const E2E_TOKEN_KEY = Buffer.alloc(32, 7).toString("base64");
+localEnv.TOKEN_ENCRYPTION_KEY ||= process.env.TOKEN_ENCRYPTION_KEY || E2E_TOKEN_KEY;
+process.env.TOKEN_ENCRYPTION_KEY = localEnv.TOKEN_ENCRYPTION_KEY;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
