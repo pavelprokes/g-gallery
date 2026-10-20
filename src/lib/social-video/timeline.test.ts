@@ -30,7 +30,7 @@ describe("buildTimeline", () => {
   });
 
   it("is empty for no photos", () => {
-    expect(buildTimeline(0, 15)).toEqual({ slides: [], duration: 0 });
+    expect(buildTimeline(0, 15)).toEqual({ slides: [], duration: 0, fade: FADE_SECONDS });
   });
 });
 
@@ -53,5 +53,17 @@ describe("slidesAt", () => {
       { index: last, progress: 1, alpha: 1 },
     ]);
     expect(slidesAt(t, t.duration)).toEqual([{ index: last, progress: 1, alpha: 1 }]);
+  });
+});
+
+describe("a pacing of its own", () => {
+  const quick = { first: 1.6, slide: 1.2, minSlide: 0.9, maxSlide: 1.8, fade: 0.2, hold: 0.4 };
+
+  it("lays the slides out and fades by it", () => {
+    const t = buildTimeline(5, 1.6 + 4 * 1.2, quick);
+    expect(t.duration).toBeCloseTo(6.4, 5);
+    expect(t.slides[1]).toMatchObject({ start: 1.6 });
+    expect(t.slides[1]!.end).toBeCloseTo(1.6 + 1.2 + 0.2, 5);
+    expect(slidesAt(t, 1.7).at(-1)!.alpha).toBeCloseTo(0.5, 5);
   });
 });

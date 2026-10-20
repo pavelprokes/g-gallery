@@ -103,6 +103,30 @@ describe("drawFrame", () => {
     expect(h).toBeLessThanOrEqual(1080 * 1.03 + 1e-9);
     expect(x! + w! / 2).toBeCloseTo(960);
   });
+
+  it("stretches the photo's blurred copy over the whole frame behind it, instead of a colour", () => {
+    const { ctx, calls } = recorder();
+    const blurred = {
+      ...plan,
+      slides: [
+        plan.slides[0]!,
+        {
+          ...plan.slides[1]!,
+          blurred: { ...image("blurred"), width: 24, height: 36 } as FrameImage,
+        },
+      ],
+    };
+    drawFrame(ctx, blurred, FIRST_SECONDS + FADE_SECONDS / 2);
+    expect(calls.map((c) => c.image)).toEqual(["first", "blurred", "second"]);
+    const back = calls[1]!;
+    expect(back.alpha).toBeCloseTo(0.5);
+    const [x, y, w, h] = back.args;
+    expect(x).toBeLessThanOrEqual(0);
+    expect(y).toBeLessThanOrEqual(0);
+    expect(x! + w!).toBeGreaterThanOrEqual(1920);
+    expect(y! + h!).toBeGreaterThanOrEqual(1080);
+    expect(ctx.globalAlpha).toBe(1);
+  });
 });
 
 describe("backdropColor", () => {

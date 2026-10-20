@@ -15,25 +15,48 @@ export interface ShotPhoto {
   coupleTags?: readonly Box[];
 }
 
+/** Wider (or taller) than the video by more than this counts as the other way round. */
+const ACROSS_FROM = 1.1;
+
+/** A landscape photo in a vertical video, or a portrait one in a landscape video. */
+export function isAcross(photo: { width: number; height: number }, format: VideoFormat): boolean {
+  const photoAspect = photo.width / photo.height;
+  return format.width < format.height ? photoAspect >= ACROSS_FROM : photoAspect <= 1 / ACROSS_FROM;
+}
+
+export interface ShotsOptions {
+  /** Show a photo turned the other way whole, over a blurred copy of itself,
+   * instead of cutting the video's shape out of it (docs/SLIDESHOW-MAKER.md §2). */
+  fitAcross?: boolean;
+}
+
 export function shotsFor(
   photos: readonly ShotPhoto[],
   faces: Readonly<Record<string, PhotoFaces | null | undefined>>,
   format: VideoFormat,
   timeline: Timeline,
+  { fitAcross = false }: ShotsOptions = {},
 ): Shot[] {
   const seconds = moveSeconds(timeline);
   return directShots(
     photos.map((p, i) =>
-      planShot(
-        {
-          width: p.width,
-          height: p.height,
-          faces: focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
-        },
-        format,
-        seconds[i] ?? seconds.at(-1) ?? 3,
-      ),
+      fitAcross && isAcross(p, format)
+        ? wholePhoto(p)
+        : planShot(
+            {
+              width: p.width,
+              height: p.height,
+              faces: focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
+            },
+            format,
+            seconds[i] ?? seconds.at(-1) ?? 3,
+          ),
     ),
     photos.map((p) => faces[p.id]?.faces.length ?? 0),
   );
+}
+
+function wholePhoto({ width, height }: { width: number; height: number }): Shot {
+  const whole = { x: 0, y: 0, w: width, h: height };
+  return { kind: "fit", from: whole, to: whole };
 }

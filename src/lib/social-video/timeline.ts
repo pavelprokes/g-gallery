@@ -32,7 +32,29 @@ export interface SlideTime {
 export interface Timeline {
   slides: SlideTime[];
   duration: number;
+  /** How long a slide takes to fade in over the one before. */
+  fade: number;
 }
+
+/** The rhythm of a video: how long slides stay and how they cross. */
+export interface Pacing {
+  first: number;
+  slide: number;
+  minSlide: number;
+  maxSlide: number;
+  fade: number;
+  hold: number;
+}
+
+/** The studio's rhythm — and the public maker's "klidné" one (docs/SLIDESHOW-MAKER.md). */
+export const NORMAL_PACING: Pacing = {
+  first: FIRST_SECONDS,
+  slide: SLIDE_SECONDS,
+  minSlide: MIN_SLIDE_SECONDS,
+  maxSlide: MAX_SLIDE_SECONDS,
+  fade: FADE_SECONDS,
+  hold: HOLD_SECONDS,
+};
 
 /** How many photos a video of `seconds` holds at the usual pace. */
 export function photoCountFor(seconds: number): number {
@@ -43,25 +65,26 @@ export function photoCountFor(seconds: number): number {
  * `count` slides fitted to `seconds`: the pace stretches or tightens to fit,
  * within bounds — past them the video is simply longer or shorter.
  */
-export function buildTimeline(count: number, seconds: number): Timeline {
-  if (count <= 0) return { slides: [], duration: 0 };
+export function buildTimeline(
+  count: number,
+  seconds: number,
+  pacing: Pacing = NORMAL_PACING,
+): Timeline {
+  const { first, fade, hold } = pacing;
+  if (count <= 0) return { slides: [], duration: 0, fade };
   const pace =
     count === 1
-      ? SLIDE_SECONDS
-      : Math.min(
-          MAX_SLIDE_SECONDS,
-          Math.max(MIN_SLIDE_SECONDS, (seconds - FIRST_SECONDS) / (count - 1)),
-        );
-  const duration =
-    count === 1 ? Math.max(FIRST_SECONDS, seconds) : FIRST_SECONDS + (count - 1) * pace;
+      ? pacing.slide
+      : Math.min(pacing.maxSlide, Math.max(pacing.minSlide, (seconds - first) / (count - 1)));
+  const duration = count === 1 ? Math.max(first, seconds) : first + (count - 1) * pace;
   const slides = Array.from({ length: count }, (_, i): SlideTime => {
-    const start = i === 0 ? 0 : FIRST_SECONDS + (i - 1) * pace;
+    const start = i === 0 ? 0 : first + (i - 1) * pace;
     const isLast = i === count - 1;
-    const next = i === 0 ? FIRST_SECONDS : start + pace;
-    const end = isLast ? duration : next + FADE_SECONDS;
-    return { start, end, moveEnd: isLast ? duration - HOLD_SECONDS : end };
+    const next = i === 0 ? first : start + pace;
+    const end = isLast ? duration : next + fade;
+    return { start, end, moveEnd: isLast ? duration - hold : end };
   });
-  return { slides, duration };
+  return { slides, duration, fade };
 }
 
 export interface VisibleSlide {
@@ -81,7 +104,7 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
     visible.push({
       index,
       progress: span > 0 ? Math.min(1, (t - slide.start) / span) : 1,
-      alpha: index === 0 ? 1 : Math.min(1, (t - slide.start) / FADE_SECONDS),
+      alpha: index === 0 ? 1 : Math.min(1, (t - slide.start) / timeline.fade),
     });
   });
   // At the very end `t` equals the duration; keep the last frame drawn.
