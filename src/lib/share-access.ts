@@ -198,6 +198,12 @@ export async function resolveShareLink(token: string): Promise<ShareAccess> {
  * for `UNLOCK_LOCKOUT_MS` and further attempts are rejected *before* touching
  * `verifyPassword` — that's what actually kills the scrypt CPU-amplification
  * angle, not just the UX throttle.
+ *
+ * The attempt is reserved under a row lock *before* the scrypt check, so
+ * concurrent guesses each use one up — checking first and counting after would
+ * let a burst of parallel requests through (same pattern as the corrections
+ * PIN, docs/CORRECTIONS.md). The attempt that reaches the limit locks at once;
+ * a right password on it clears the lock again.
  */
 export async function verifySharePassword(
   token: string,
@@ -206,21 +212,29 @@ export async function verifySharePassword(
   const link = await findShareLink(token);
   if (checkValidity(link) || !link?.passwordHash) return { ok: false };
 
-  if (isUnlockLocked(link.unlockLockedUntil)) return { ok: false };
+  const linkId = link.id;
+  const reserved = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "g_gallery"."ShareLink" WHERE id = ${linkId} FOR UPDATE`;
+    const current = await tx.shareLink.findUniqueOrThrow({
+      where: { id: linkId },
+      select: { passwordHash: true, failedUnlockAttempts: true, unlockLockedUntil: true },
+    });
+    if (!current.passwordHash || isUnlockLocked(current.unlockLockedUntil)) return null;
+    await tx.shareLink.update({
+      where: { id: linkId },
+      data: nextFailedUnlockState(current.failedUnlockAttempts, current.unlockLockedUntil),
+    });
+    return current.passwordHash;
+  });
+  if (!reserved) return { ok: false };
 
   const { verifyPassword } = await import("@/lib/share-token");
-  if (!(await verifyPassword(password, link.passwordHash))) {
-    await prisma.shareLink.update({
-      where: { id: link.id },
-      data: nextFailedUnlockState(link.failedUnlockAttempts, link.unlockLockedUntil),
-    });
-    return { ok: false };
-  }
+  if (!(await verifyPassword(password, reserved))) return { ok: false };
 
   await prisma.shareLink.update({
-    where: { id: link.id },
+    where: { id: linkId },
     data: { failedUnlockAttempts: 0, unlockLockedUntil: null },
   });
 
-  return { ok: true, shareLinkId: link.id, passwordHash: link.passwordHash };
+  return { ok: true, shareLinkId: linkId, passwordHash: reserved };
 }
