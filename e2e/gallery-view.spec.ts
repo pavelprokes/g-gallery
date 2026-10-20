@@ -112,6 +112,18 @@ test.describe("share gallery viewer", () => {
     const galleryUrl = new RegExp(`/g/${seed.token}/${seed.slug}$`);
     await page.goto(`/g/${seed.token}/${seed.slug}`);
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
+    await expect(grid.locator('button[aria-label^="Otevřít"]').first()).toBeVisible();
+
+    // Writing the address is History API only (Next documents it as syncing
+    // the router, no navigation): no server round trip, no reload.
+    const serverRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document" || request.headers()["rsc"]) {
+        serverRequests.push(request.url());
+      }
+    });
+    await page.evaluate(() => Object.assign(window, { __samePage: true }));
+
     await grid.locator('button[aria-label^="Otevřít"]').first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page).toHaveURL(/\?foto=[A-Za-z0-9_-]+$/);
@@ -126,6 +138,8 @@ test.describe("share gallery viewer", () => {
     await page.goBack();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await expect(page).toHaveURL(galleryUrl);
+    expect(await page.evaluate(() => "__samePage" in window)).toBe(true);
+    expect(serverRequests).toEqual([]);
 
     // Sent on: the link opens on that photo, and previews with it in a chat.
     await page.goto(photoLink);
