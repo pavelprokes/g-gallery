@@ -55,6 +55,15 @@ as here.
 
 The tab must stay open while it renders. That is the trade for a feature with no server.
 
+**Dárek pro pár** (2026-10-20, Pavel): one click makes both versions every package includes —
+9:16 and 16:9, 15 s — from the suggestion as it stands (§3), with faces found where missing, and
+adds both to the gallery. No editing in between; the editor below it is still there for that.
+"Dárkové video" in the gallery's header opens the page with `?gift=1`, which starts it on arrival
+and is taken off the address so a reload does not make the gift twice
+(`src/components/admin/gift-video.ts`, `gift-video-card.tsx`). It needs H.264 like "Add to gallery";
+a browser without it is told so. Both paths plan the camera through `shotsFor`
+(`src/lib/social-video/shots.ts`), so the gift is drawn exactly as the studio would draw it.
+
 ## 3. The suggestion
 
 A starting point, never a verdict — the same spirit as the highlights (`docs/HIGHLIGHTS.md`).

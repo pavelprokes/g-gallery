@@ -11,6 +11,7 @@ import { photoCounts } from "@/lib/activity";
 import { printTotals } from "@/lib/print-selections";
 import { reactionTotals } from "@/lib/reactions";
 import { galleryVideoCrumbs } from "@/lib/admin-breadcrumbs";
+import { GiftVideoCard } from "@/components/admin/gift-video-card";
 import { SocialVideoStudio, type StudioPhoto } from "@/components/admin/social-video-studio";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -108,13 +109,22 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
       {photos.length < 2 ? (
         <Alert>Na video jsou potřeba aspoň dvě fotky. Nahraj je v detailu galerie.</Alert>
       ) : (
-        <SocialVideoStudio
-          galleryId={gallery.id}
-          galleryTitle={gallery.title}
-          photos={photos}
-          chapterStarts={gallery.chapters.map((chapter) => chapterStartOf(order, chapter))}
-          savedDraft={parseSocialVideoDraft(gallery.socialVideoDraft)}
-        />
+        <>
+          <GiftVideoCard
+            galleryId={gallery.id}
+            galleryTitle={gallery.title}
+            photos={photos}
+            chapterStarts={gallery.chapters.map((chapter) => chapterStartOf(order, chapter))}
+            autoStart={(await props.searchParams).gift === "1"}
+          />
+          <SocialVideoStudio
+            galleryId={gallery.id}
+            galleryTitle={gallery.title}
+            photos={photos}
+            chapterStarts={gallery.chapters.map((chapter) => chapterStartOf(order, chapter))}
+            savedDraft={parseSocialVideoDraft(gallery.socialVideoDraft)}
+          />
+        </>
       )}
     </div>
   );
