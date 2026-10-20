@@ -8,6 +8,7 @@ import {
 } from "@/lib/content-translations";
 import { pickCover } from "@/lib/event-access";
 import { previewMetadata } from "@/lib/og-image";
+import { PHOTO_PARAM } from "@/lib/photo-link";
 import { PHOTO_ORDERS, photoOrderBy, type PhotoOrder } from "@/lib/photo-order";
 
 /**
@@ -49,13 +50,31 @@ async function galleryPreviewKey(galleryId: string): Promise<string | null> {
 
 const noIndex = { index: false, follow: false } as const;
 
+/**
+ * A link to one photo (`?foto=`, docs/PHOTO-LINKS.md) previews with that
+ * photo — when it is a delivered photo of this very gallery. Anything else
+ * falls back to the gallery's own preview, so an id from elsewhere shows
+ * nothing it should not.
+ */
+async function linkedPhotoKey(galleryId: string, photoId: string): Promise<string | null> {
+  const photo = await prisma.photo.findFirst({
+    where: { id: photoId, galleryId, status: "CONFIRMED" },
+    select: { objectKey: true },
+  });
+  return photo?.objectKey ?? null;
+}
+
 export async function galleryShareMetadata(
   galleryId: string,
   t: (key: string) => string,
   locale: Locale,
   url: string,
+  photoId: string | null = null,
 ): Promise<Metadata> {
-  const gallery = await galleryPreview(galleryId);
+  const [gallery, photoKey] = await Promise.all([
+    galleryPreview(galleryId),
+    photoId ? linkedPhotoKey(galleryId, photoId) : null,
+  ]);
 
   // The tab and the link preview carry the title in the reader's language too.
   const title = gallery
@@ -73,7 +92,13 @@ export async function galleryShareMetadata(
     title: { absolute: title },
     description,
     robots: noIndex,
-    ...previewMetadata({ title, description, locale, url, imageKey: cover?.objectKey ?? null }),
+    ...previewMetadata({
+      title,
+      description,
+      locale,
+      url: photoKey && photoId ? `${url}?${PHOTO_PARAM}=${photoId}` : url,
+      imageKey: photoKey ?? cover?.objectKey ?? null,
+    }),
   };
 }
 

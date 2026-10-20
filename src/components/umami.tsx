@@ -20,6 +20,10 @@ export function UmamiScript() {
         data-website-id={UMAMI_WEBSITE_ID}
         data-domains={new URL(SITE_ORIGIN).hostname}
         data-before-send="umamiScrub"
+        // The query never reaches Umami anyway (umamiScrub drops it); without
+        // this, every photo browsed in the lightbox (`?foto=`) counted as a
+        // pageview.
+        data-exclude-search="true"
         strategy="afterInteractive"
       />
     </>
