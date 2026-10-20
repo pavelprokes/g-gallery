@@ -202,7 +202,13 @@ export function planPick(
   existing: readonly ExistingPhoto[],
 ): PickPlan[] {
   const slot = slotter(existing);
-  const slots = files.map((file) => slot(file.name));
+  // Never filed under a name another picked file already carries: two photos
+  // with one name, and resume could not tell them apart.
+  const pickedNames = new Set(files.map((file) => file.name.toLowerCase()));
+  const slots = files.map((file) => {
+    const filed = slot(file.name);
+    return filed && !pickedNames.has(filed.name.toLowerCase()) ? filed : null;
+  });
   const rows = new Map<string, PendingUpload[]>();
   for (const row of pending) {
     if (row.sizeBytes === null) continue;

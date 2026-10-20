@@ -4,6 +4,7 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { compareTimeline } from "@/lib/gallery-chapters";
 import { HIGHLIGHT_CANDIDATE_SELECT, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { CHAPTER_START_SELECT, chapterStartOf, positionOf } from "@/lib/photo-order";
+import { parseSocialVideoDraft } from "@/lib/social-video/draft";
 import { currentFaces } from "@/lib/social-video/faces";
 import { galleryVideoCrumbs } from "@/lib/admin-breadcrumbs";
 import { SocialVideoStudio, type StudioPhoto } from "@/components/admin/social-video-studio";
@@ -29,6 +30,7 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
       id: true,
       title: true,
       photoOrder: true,
+      socialVideoDraft: true,
       event: { select: { id: true, title: true } },
       chapters: { select: CHAPTER_START_SELECT },
       photos: {
@@ -92,6 +94,7 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
           galleryTitle={gallery.title}
           photos={photos}
           chapterStarts={gallery.chapters.map((chapter) => chapterStartOf(order, chapter))}
+          savedDraft={parseSocialVideoDraft(gallery.socialVideoDraft)}
         />
       )}
     </div>

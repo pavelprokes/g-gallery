@@ -28,6 +28,11 @@ the key a download delivers, or the lightbox player. On a video row `objectKey` 
 the admin's `/admin/g/[id]/video`, or the
 self-hosted face detection (YuNet in `public/vendor/yunet/`, MediaPipe's blink model under
 `public/vendor/mediapipe/`).
+**`docs/ADMIN-FILTERS.md`** is the authority for the admin grid's filters and sort (adopted
+2026-10-19) — every choice lives in the URL; read it before touching `/admin/g/[id]`'s photo grid.
+**`docs/REPLACE-PHOTOS.md`** is the authority for replacing delivered photos with a corrected export
+and filing new shots by camera number (adopted 2026-10-19) — read it before touching pairing,
+`planPick` or the replace path in `api/uploads/confirm`.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).

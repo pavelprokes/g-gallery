@@ -226,6 +226,11 @@ model Gallery {
   /// SetNull for the same reason as the cover — deleting the film drops the card.
   featuredVideoId   String?
   featuredVideo     Photo?        @relation("GalleryFeaturedVideo", fields: [featuredVideoId], references: [id], onDelete: SetNull)
+  /// The "Video pro sítě" draft — `{ aspect, length, order }`, photo ids in
+  /// slide order (docs/SOCIAL-VIDEO.md). Kept here rather than only in the
+  /// browser so another device continues it and the admin grid can filter by
+  /// it (docs/ADMIN-FILTERS.md). Null until the studio is first opened.
+  socialVideoDraft  Json?
   /// R2 key prefix: "galleries/<128-bit-random>" — unguessable, rotated on expiry
   storagePrefix     String        @unique
   publishedAt       DateTime?

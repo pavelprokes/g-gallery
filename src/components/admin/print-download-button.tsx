@@ -20,7 +20,16 @@ const FRAME_LIFETIME_MS = 60_000;
  * rest of the queue. A cross-origin frame cannot report what happened, so the
  * button ends by saying how many files should have arrived.
  */
-export function PrintDownloadButton({ galleryId, count }: { galleryId: string; count: number }) {
+export function PrintDownloadButton({
+  galleryId,
+  count,
+  photoIds,
+}: {
+  galleryId: string;
+  count: number;
+  /** Only these, when the admin view is narrowed (docs/ADMIN-FILTERS.md). */
+  photoIds?: string[];
+}) {
   const [progress, setProgress] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
@@ -28,7 +37,7 @@ export function PrintDownloadButton({ galleryId, count }: { galleryId: string; c
     setResult(null);
     setProgress("Připravuji…");
     try {
-      const links = await printDownloadLinks(galleryId);
+      const links = await printDownloadLinks(galleryId, photoIds);
       for (const [index, link] of links.entries()) {
         setProgress(`Stahuji ${index + 1}/${links.length}`);
         const frame = document.createElement("iframe");

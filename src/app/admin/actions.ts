@@ -841,11 +841,13 @@ export async function setFeaturedVideo(galleryId: string, photoId: string | null
  * bytes from R2 itself — nothing passes through Vercel, and no ZIP is built
  * for a few dozen files.
  */
-export async function printDownloadLinks(galleryId: string) {
+export async function printDownloadLinks(galleryId: string, photoIds?: string[]) {
   const session = await requireAdmin();
 
   const parsed = z.string().min(1).safeParse(galleryId);
   if (!parsed.success) throw new Error("INVALID_INPUT");
+  // A narrowed admin view downloads only what it shows (docs/ADMIN-FILTERS.md).
+  const only = z.array(idSchema).max(5000).optional().parse(photoIds);
 
   const gallery = await prisma.gallery.findFirst({
     where: { id: parsed.data, ownerId: session.user.id },
@@ -854,6 +856,10 @@ export async function printDownloadLinks(galleryId: string) {
   if (!gallery) throw new Error("NOT_FOUND");
 
   const quantities = await printTotals(gallery.id);
+  if (only) {
+    const keep = new Set(only);
+    for (const id of [...quantities.keys()]) if (!keep.has(id)) quantities.delete(id);
+  }
   const photos = await prisma.photo.findMany({
     where: { id: { in: [...quantities.keys()] }, galleryId: gallery.id, status: "CONFIRMED" },
     select: { id: true, objectKey: true, fileName: true },
