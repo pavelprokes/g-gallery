@@ -24,7 +24,38 @@ export interface VideoCandidate extends HighlightCandidate {
   /** The boxes the photographer named as the couple on this photo (§4, "Who
    * is who"); none when absent. */
   coupleTags?: readonly Box[];
+  /** How much the guests took to it — favourites, reactions, print copies and
+   * unique viewers, weighted (`likedScore`); 0 or absent when nobody did. */
+  liked?: number;
 }
+
+export interface SuggestOptions {
+  /** Photos a previous suggestion already showed: "Jiný výběr" reaches past
+   * them where the day offers anything else. Pinned photos stay regardless. */
+  avoid?: ReadonlySet<string>;
+}
+
+/** A guest's heart says the most, a reaction or a print copy a little less, a
+ * look the least — but many looks still add up. */
+export function likedScore(signals: {
+  favorites: number;
+  reactions: number;
+  printCopies: number;
+  uniqueViewers: number;
+}): number {
+  return (
+    signals.favorites * 3 + signals.reactions * 2 + signals.printCopies * 2 + signals.uniqueViewers
+  );
+}
+
+/** At most this much from the guests — as much as the right shape, never more
+ * than the couple: a loved photo of the wrong shape can still win, a liked
+ * landscape photo does not push the couple's portrait out of a Reel. */
+const LIKED_MAX_BONUS = 2;
+
+/** Pushes an already-shown photo below the alternatives without ruling it out —
+ * a small day may have nothing else to offer. */
+const AVOID_PENALTY = 4;
 
 /** Shut eyes (src/lib/photo-check.ts, `CLOSED_FROM`) spoil a group photo —
  * someone blinked. In a photo of one or two people they are as often the
@@ -57,6 +88,7 @@ export function suggestPhotos(
   chapterStarts: readonly TimelinePosition[],
   format: VideoFormat,
   count: number,
+  { avoid = new Set() }: SuggestOptions = {},
 ): string[] {
   const byId = new Map(candidates.map((c) => [c.id, c]));
   // Any gallery gets a proposal — a small one simply all of its photos. (The
@@ -70,10 +102,21 @@ export function suggestPhotos(
   // short. Top it up from the rest of the day, evenly, to the same twice the
   // count — so the fit to the format still has a choice to make.
   const inPick = new Set(highlighted.map((p) => p.candidate.id));
-  const others = candidates.filter((c) => c.own && !inPick.has(c.id)).sort(compareTimeline);
+  // What the guests loved joins the pool even when no mark of the
+  // photographer's put it there — up to the count, the most loved first.
+  const loved = candidates
+    .filter((c) => c.own && !inPick.has(c.id) && (c.liked ?? 0) > 0)
+    .sort((p, q) => q.liked! - p.liked! || compareTimeline(p, q))
+    .slice(0, count);
+  const inPool = new Set([...inPick, ...loved.map((c) => c.id)]);
+  const others = candidates.filter((c) => c.own && !inPool.has(c.id)).sort(compareTimeline);
+  // Asked for another selection, the pool reaches as far past the photos
+  // already shown as it takes to replace them.
+  const poolSize = count * 2 + avoid.size;
   const pool = [
     ...highlighted.map((p) => ({ ...p, picked: true })),
-    ...evenly(others, count * 2 - highlighted.length).map((candidate) => ({
+    ...loved.map((candidate) => ({ candidate, pinned: false, picked: false })),
+    ...evenly(others, poolSize - highlighted.length - loved.length).map((candidate) => ({
       candidate,
       pinned: false,
       picked: false,
@@ -81,25 +124,69 @@ export function suggestPhotos(
   ].sort((p, q) => compareTimeline(p.candidate, q.candidate));
 
   const fitness = new Map(pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format)]));
+  const likedBonus = likedBonusFor(candidates);
   const rank = (p: (typeof pool)[number]) =>
-    fitness.get(p.candidate.id)! + (p.picked ? PICK_BONUS : 0);
+    fitness.get(p.candidate.id)! +
+    (p.picked ? PICK_BONUS : 0) +
+    likedBonus(p.candidate) -
+    (avoid.has(p.candidate.id) ? AVOID_PENALTY : 0);
   const pinned = pool.filter((p) => p.pinned);
-  const rest = pool
-    .map((p, order) => ({ ...p, order }))
-    .filter((p) => !p.pinned)
-    .sort((p, q) => rank(q) - rank(p) || p.order - q.order)
-    .slice(0, Math.max(0, count - pinned.length));
+  const rest = acrossChapters(
+    pool
+      .map((p, order) => ({ ...p, order, part: partOf(p.candidate, chapterStarts) }))
+      .filter((p) => !p.pinned)
+      .sort((p, q) => rank(q) - rank(p) || p.order - q.order),
+    Math.max(0, count - pinned.length),
+  );
   const chosen = new Set([...pinned, ...rest].map((p) => p.candidate.id));
   const picked = pool.filter((p) => chosen.has(p.candidate.id)).map((p) => p.candidate);
 
   const strength = (c: VideoCandidate) =>
-    (c.pin === true ? 1000 : 0) + (c.tagged ? 10 : 0) + (c.rating ?? 0) + fitness.get(c.id)!;
+    (c.pin === true ? 1000 : 0) +
+    (c.tagged ? 10 : 0) +
+    (c.rating ?? 0) +
+    fitness.get(c.id)! +
+    likedBonus(c);
   // Ends first: moving them afterwards could line up a new run. The runs are
   // then broken only in the middle, so the ends stay.
   return breakFacelessRuns(
     withStrongEnds(picked, strength),
     pool.map((p) => p.candidate).filter((c) => !chosen.has(c.id)),
   ).map((c) => c.id);
+}
+
+/** 0 to LIKED_MAX_BONUS, against the gallery's most loved photo — so a week
+ * after delivery a single heart does not count for as much as it will never
+ * count for again. */
+function likedBonusFor(candidates: readonly VideoCandidate[]): (c: VideoCandidate) => number {
+  const most = Math.max(0, ...candidates.map((c) => c.liked ?? 0));
+  if (most === 0) return () => 0;
+  return (c) => (LIKED_MAX_BONUS * (c.liked ?? 0)) / most;
+}
+
+/** Which chapter a photo falls in: how many chapters start at or before it. */
+function partOf(c: VideoCandidate, chapterStarts: readonly TimelinePosition[]): number {
+  return chapterStarts.filter((start) => compareTimeline(start, c) <= 0).length;
+}
+
+/**
+ * `n` of the ranked photos, taken round the chapters — the best of each in
+ * turn, the chapter with the stronger best photo first — so a short video
+ * still visits every part of the day it can. Without chapters, plain rank.
+ */
+function acrossChapters<T extends { part: number }>(ranked: readonly T[], n: number): T[] {
+  const parts = new Map<number, T[]>();
+  for (const item of ranked) parts.set(item.part, [...(parts.get(item.part) ?? []), item]);
+  const queues = [...parts.values()];
+  const out: T[] = [];
+  while (out.length < n && queues.some((q) => q.length > 0)) {
+    for (const queue of queues) {
+      if (out.length >= n) break;
+      const next = queue.shift();
+      if (next) out.push(next);
+    }
+  }
+  return out;
 }
 
 /** How well a photo suits the format, from its shape and — when known — its faces. */

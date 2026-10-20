@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { guidePath } from "./guide-path";
+import { LOCALES } from "@/i18n/locales";
+import { GUIDE_PATHS, guidePath } from "./guide-path";
 
 describe("guidePath", () => {
-  it("sends Czech and Slovak readers to the Czech guide", () => {
+  it("keeps the addresses Czech and English were published under", () => {
     expect(guidePath("cs")).toBe("/navod");
-    expect(guidePath("sk")).toBe("/navod");
+    expect(guidePath("en")).toBe("/guide");
   });
 
-  it("sends everyone else to the English guide", () => {
-    for (const locale of ["en", "de", "fr", "es", "pl"] as const) {
-      expect(guidePath(locale)).toBe("/guide");
-    }
+  it("gives every language its own address", () => {
+    expect(new Set(LOCALES.map(guidePath)).size).toBe(LOCALES.length);
+    expect(guidePath("sk")).toBe("/guide/sk");
+    expect(Object.keys(GUIDE_PATHS).sort()).toEqual([...LOCALES].sort());
   });
 });

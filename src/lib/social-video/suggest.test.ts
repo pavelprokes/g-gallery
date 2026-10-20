@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FORMATS } from "@/lib/social-video/camera";
 import { FACES_MODEL, type Face } from "@/lib/social-video/faces";
-import { fitFor, suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
+import { fitFor, likedScore, suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
 
 const DAY = Date.UTC(2026, 8, 12, 10, 0);
 const VERTICAL = FORMATS["9:16"];
@@ -206,5 +206,40 @@ describe("suggestPhotos", () => {
     for (let i = 2; i < ids.length; i++) {
       expect([ids[i - 2], ids[i - 1], ids[i]].some((id) => hasPeople.has(id!))).toBe(true);
     }
+  });
+
+  it("brings in the photos the guests loved, even with no mark of the photographer's", () => {
+    // Every photo the same to the highlights; one the guests loved, mid-burst.
+    const loved = photo(151, {
+      liked: likedScore({ favorites: 9, reactions: 4, printCopies: 3, uniqueViewers: 20 }),
+    });
+    const ids = suggestPhotos([...day, loved], [], VERTICAL, 6);
+    expect(ids).toContain(loved.id);
+  });
+
+  it("offers another selection, keeping what is pinned", () => {
+    const pinned = photo(2, { pin: true });
+    const all = [...day, pinned];
+    const first = suggestPhotos(all, [], VERTICAL, 6);
+    const second = suggestPhotos(all, [], VERTICAL, 6, { avoid: new Set(first) });
+    expect(second).toHaveLength(6);
+    expect(second).toContain(pinned.id);
+    const repeated = second.filter((id) => id !== pinned.id && first.includes(id));
+    expect(repeated).toEqual([]);
+  });
+
+  it("visits every chapter of the day it can", () => {
+    // Four chapters; the morning's photos the best shape by far.
+    const morning = Array.from({ length: 30 }, (_, i) =>
+      photo(i * 5, { width: 2000, height: 3000 }),
+    );
+    const rest = Array.from({ length: 30 }, (_, i) => photo(200 + i * 5));
+    const starts = [rest[0]!, rest[10]!, rest[20]!].map(({ key, id }) => ({ key, id }));
+    const ids = new Set(suggestPhotos([...morning, ...rest], starts, VERTICAL, 6));
+    const chapterOf = (id: string) => {
+      const i = rest.findIndex((p) => p.id === id);
+      return i < 0 ? 0 : 1 + Math.floor(i / 10);
+    };
+    expect(new Set([...ids].map(chapterOf))).toEqual(new Set([0, 1, 2, 3]));
   });
 });

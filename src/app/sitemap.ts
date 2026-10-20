@@ -3,7 +3,7 @@ import { GUIDE_PATHS } from "@/lib/guide-path";
 import { SITE_ORIGIN } from "@/lib/site-url";
 
 /**
- * `/` and the client guide (`/navod`, `/guide`) are the only pages in this app
+ * `/` and the client guide (`/navod`, `/guide`, `/guide/<code>`) are the only pages in this app
  * meant to be found by search — everything else is per-user private content (`/g/*`, `/s/*`), auth-gated (`/admin/*`,
  * `/sign-in`), or an API route, and each of those sets its own `noindex`
  * rather than appearing here.
@@ -19,10 +19,9 @@ const LANDING_LAST_MODIFIED = "2026-10-05";
 /** The same rule for the guide: bump it when its copy really changes. */
 const GUIDE_LAST_MODIFIED = "2026-10-20";
 
-const guideLanguages = {
-  cs: `${SITE_ORIGIN}${GUIDE_PATHS.cs}`,
-  en: `${SITE_ORIGIN}${GUIDE_PATHS.en}`,
-};
+const guideLanguages = Object.fromEntries(
+  Object.entries(GUIDE_PATHS).map(([locale, path]) => [locale, `${SITE_ORIGIN}${path}`]),
+);
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

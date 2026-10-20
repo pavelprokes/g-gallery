@@ -307,10 +307,31 @@ async function main() {
     "mobile-safari": await makeReplaceGallery(user.id, "mobile-safari"),
   };
 
+  // A password-gated link: the gate is the first screen such a guest sees, and
+  // it points to the guide.
+  const gatedGallery = await prisma.gallery.create({
+    data: {
+      ownerId: user.id,
+      title: "E2E Heslo",
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      storagePrefix: `galleries/e2e-gated-${Date.now()}`,
+    },
+  });
+  const gatedToken = generateShareToken();
+  await prisma.shareLink.create({
+    data: {
+      galleryId: gatedGallery.id,
+      tokenHash: hashShareToken(gatedToken),
+      passwordHash: await hashPassword("e2e-heslo"),
+    },
+  });
+
   fs.writeFileSync(
     path.join(__dirname, ".seed.json"),
     JSON.stringify({
       adminCookie,
+      gatedToken,
       videoGalleries,
       socialVideoGalleryId,
       manualOrder,

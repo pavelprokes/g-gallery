@@ -1,13 +1,34 @@
-import { CZECH_READING_LOCALES, type Locale } from "@/i18n/locales";
+import type { Locale } from "@/i18n/locales";
 
-/** The languages the client guide is written in (src/app/navod/guide-page.tsx). */
-export type GuideLocale = "cs" | "en";
+/** The client guide is written in every language the app speaks (src/app/navod/guide-page.tsx). */
+export type GuideLocale = Locale;
 
-export const GUIDE_PATHS: Record<GuideLocale, string> = { cs: "/navod", en: "/guide" };
+/**
+ * Where each language's guide lives. Czech and English keep the addresses they
+ * were published under; the rest sit under `/guide`.
+ */
+export const GUIDE_PATHS: Record<GuideLocale, string> = {
+  cs: "/navod",
+  en: "/guide",
+  fr: "/guide/fr",
+  de: "/guide/de",
+  es: "/guide/es",
+  sk: "/guide/sk",
+  pl: "/guide/pl",
+};
 
-/** The guide a viewer reading `locale` should be sent to: Czech for Czech readers, English for everyone else. */
+/** Each language named in itself, for the list of the guide's other languages. */
+export const GUIDE_LANGUAGE_NAMES: Record<GuideLocale, string> = {
+  cs: "Čeština",
+  en: "English",
+  fr: "Français",
+  de: "Deutsch",
+  es: "Español",
+  sk: "Slovenčina",
+  pl: "Polski",
+};
+
+/** The guide a viewer reading `locale` should be sent to. */
 export function guidePath(locale: Locale): string {
-  return locale === "cs" || CZECH_READING_LOCALES.includes(locale)
-    ? GUIDE_PATHS.cs
-    : GUIDE_PATHS.en;
+  return GUIDE_PATHS[locale];
 }

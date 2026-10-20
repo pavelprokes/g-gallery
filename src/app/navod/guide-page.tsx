@@ -17,12 +17,23 @@ import {
   PrinterIcon,
   ProjectorIcon,
 } from "@/components/ui/icons";
-import { GUIDE_PATHS, type GuideLocale } from "@/lib/guide-path";
 import { previewMetadata } from "@/lib/og-image";
+import { GUIDE_LANGUAGE_NAMES, GUIDE_PATHS, type GuideLocale } from "@/lib/guide-path";
+import { LOCALES } from "@/i18n/locales";
 import cs from "../../../messages/cs.json";
+import de from "../../../messages/de.json";
 import en from "../../../messages/en.json";
+import es from "../../../messages/es.json";
+import fr from "../../../messages/fr.json";
+import pl from "../../../messages/pl.json";
+import sk from "../../../messages/sk.json";
 import guideCs from "./guide.cs.json";
+import guideDe from "./guide.de.json";
 import guideEn from "./guide.en.json";
+import guideEs from "./guide.es.json";
+import guideFr from "./guide.fr.json";
+import guidePl from "./guide.pl.json";
+import guideSk from "./guide.sk.json";
 import {
   CheckList,
   GuideSection,
@@ -35,12 +46,12 @@ import {
 } from "./guide-ui";
 
 /**
- * The client guide, in Czech at /navod and in English at /guide — one page per
+ * The client guide, in every language the app speaks: Czech at /navod,
+ * English at /guide, the rest at /guide/<code> (`GUIDE_PATHS`). One page per
  * language, so each has its own address a search engine can index and link
- * the other by hreflang. The language comes from the address, never from the
+ * the others by hreflang. The language comes from the address, never from the
  * viewer's cookie or browser: a link sent in an email must show the same page
- * to everyone who opens it. Every other locale gets English (the app's
- * fallback, docs/I18N.md) and Slovak gets Czech, via `guidePath`.
+ * to everyone who opens it.
  *
  * Its copy lives next to the page (guide.<code>.json), not in messages/*.json:
  * the root layout hands the whole shared catalog to the client on every page,
@@ -68,34 +79,36 @@ const SECTION_KEYS = [
 ] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
 
-/** Section anchors per language. The Czech ones are older than the English page and are kept. */
-const ANCHORS: Record<GuideLocale, Record<SectionKey | "devices", string>> = {
-  cs: {
-    start: "zaciname",
-    browse: "prohlizeni",
-    print: "tisk",
-    favorites: "oblibene",
-    download: "stahovani",
-    corrections: "pripominky",
-    guests: "hoste",
-    offline: "offline",
-    privacy: "soukromi",
-    trouble: "problemy",
-    devices: "jine-zarizeni",
-  },
-  en: {
-    start: "getting-started",
-    browse: "browsing",
-    print: "print",
-    favorites: "favourites",
-    download: "downloading",
-    corrections: "edits",
-    guests: "guests",
-    offline: "offline",
-    privacy: "privacy",
-    trouble: "troubleshooting",
-    devices: "other-device",
-  },
+type Anchors = Record<SectionKey | "devices", string>;
+
+/** Section anchors. The Czech ones are older than the other languages and are kept. */
+const CZECH_ANCHORS: Anchors = {
+  start: "zaciname",
+  browse: "prohlizeni",
+  print: "tisk",
+  favorites: "oblibene",
+  download: "stahovani",
+  corrections: "pripominky",
+  guests: "hoste",
+  offline: "offline",
+  privacy: "soukromi",
+  trouble: "problemy",
+  devices: "jine-zarizeni",
+};
+
+/** Every other language links by the English anchors — one plain-ASCII set to keep stable. */
+const ENGLISH_ANCHORS: Anchors = {
+  start: "getting-started",
+  browse: "browsing",
+  print: "print",
+  favorites: "favourites",
+  download: "downloading",
+  corrections: "edits",
+  guests: "guests",
+  offline: "offline",
+  privacy: "privacy",
+  trouble: "troubleshooting",
+  devices: "other-device",
 };
 
 const TOC_ICONS: Partial<Record<SectionKey, ComponentType<{ className?: string }>>> = {
@@ -112,9 +125,12 @@ const TOC_ICONS: Partial<Record<SectionKey, ComponentType<{ className?: string }
 const MESSAGES = {
   cs: { ...cs, guide: guideCs },
   en: { ...en, guide: guideEn },
-} as const;
-
-const OTHER: Record<GuideLocale, GuideLocale> = { cs: "en", en: "cs" };
+  fr: { ...fr, guide: guideFr },
+  de: { ...de, guide: guideDe },
+  es: { ...es, guide: guideEs },
+  sk: { ...sk, guide: guideSk },
+  pl: { ...pl, guide: guidePl },
+} satisfies Record<GuideLocale, unknown>;
 
 export function guideMetadata(locale: GuideLocale): Metadata {
   const t = createTranslator({ locale, messages: MESSAGES[locale], namespace: "guide" });
@@ -134,7 +150,7 @@ export function guideMetadata(locale: GuideLocale): Metadata {
     description,
     alternates: {
       canonical: GUIDE_PATHS[locale],
-      languages: { cs: GUIDE_PATHS.cs, en: GUIDE_PATHS.en, "x-default": GUIDE_PATHS.en },
+      languages: { ...GUIDE_PATHS, "x-default": GUIDE_PATHS.en },
     },
     robots: { index: true, follow: true },
     ...preview,
@@ -153,7 +169,7 @@ interface TermEntry {
 
 export function GuidePage({ locale }: { locale: GuideLocale }) {
   const messages = MESSAGES[locale];
-  const anchor = ANCHORS[locale];
+  const anchor = locale === "cs" ? CZECH_ANCHORS : ENGLISH_ANCHORS;
   const t = createTranslator({ locale, messages, namespace: "guide" });
   const tGallery = createTranslator({
     locale,
@@ -242,14 +258,26 @@ export function GuidePage({ locale }: { locale: GuideLocale }) {
             {t("heroTitle")}
           </h1>
           <p className="mt-4 max-w-prose text-neutral-600 dark:text-neutral-400">{t("heroLead")}</p>
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <a href={GUIDE_PATHS[OTHER[locale]]} hrefLang={OTHER[locale]} className={linkClasses}>
-              {t("otherLanguage")}
-            </a>
-            <a href={MAIN_SITE_URL} className={linkClasses}>
-              {tMarketing("backToMainSite")}
-            </a>
-          </div>
+          <a href={MAIN_SITE_URL} className={`${linkClasses} mt-6 inline-block text-sm`}>
+            {tMarketing("backToMainSite")}
+          </a>
+          <nav aria-label={t("otherLanguages")} className="mt-4 text-sm">
+            <p className="text-neutral-600 dark:text-neutral-400">{t("otherLanguages")}</p>
+            <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {LOCALES.filter((other) => other !== locale).map((other) => (
+                <li key={other}>
+                  <a
+                    href={GUIDE_PATHS[other]}
+                    hrefLang={other}
+                    lang={other}
+                    className={`${linkClasses} inline-block py-1`}
+                  >
+                    {GUIDE_LANGUAGE_NAMES[other]}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
         <Image
           src="/iphone-mockup.webp"

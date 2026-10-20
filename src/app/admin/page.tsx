@@ -241,14 +241,17 @@ export default async function AdminPage() {
                   </div>
                   {token ? (
                     <div className="relative z-10 flex flex-wrap items-center gap-2">
-                      <OpenGalleryLink
-                        href={`/s/${token}/${event.slug}`}
-                        size="sm"
-                        variant="secondary"
-                        label="Otevřít svatbu"
-                      />
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-56">
                         <CopyableLink href={`/s/${token}/${event.slug}`} />
+                      </div>
+                      {/* Right-aligned, as on every gallery row below — also when it wraps. */}
+                      <div className="ml-auto shrink-0">
+                        <OpenGalleryLink
+                          href={`/s/${token}/${event.slug}`}
+                          size="sm"
+                          variant="secondary"
+                          label="Otevřít svatbu"
+                        />
                       </div>
                     </div>
                   ) : (
@@ -310,7 +313,7 @@ export default async function AdminPage() {
               </div>
               <ViewStats series={series} max={galleryMax} label={gallery.title} />
               {openUrl && (
-                <div className="relative z-10 shrink-0">
+                <div className="relative z-10 ml-auto shrink-0">
                   <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />
                 </div>
               )}

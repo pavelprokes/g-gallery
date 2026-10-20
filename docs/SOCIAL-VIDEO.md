@@ -70,6 +70,16 @@ A starting point, never a verdict — the same spirit as the highlights (`docs/H
   three or more**. In a couple's photo closed eyes are as often the moment itself (a kiss, a hug).
 - **A short pick is topped up** from the rest of the day to twice the count before the fit chooses:
   photos seconds apart are one burst to the highlights, and the fit must still have a choice.
+- **What the guests loved** (Pavel, 2026-10-20): favourites ×3, reactions and print copies ×2,
+  unique viewers ×1 (`likedScore`). Up to `count` of the most loved own photos join the pool even
+  when no mark put them there, and each scores up to +2 against the gallery's most loved photo —
+  as much as the right shape, never more than the couple.
+- **Every chapter** (Pavel, 2026-10-20): the photos are taken round the chapters — the best of
+  each in turn — so a short video visits every part of the day it can, not only the part with the
+  best-shaped photos. The shape is a preference, not a rule.
+- **"Jiný výběr"** asks for another selection: photos already shown since the last "Navrhnout
+  znovu" drop by 4, so alternatives win where the day has any; pins stay; when nothing new is left
+  it starts over.
 - **Rhythm:** no three face-less slides in a row; alternate people and details.
 - **Ends:** the first and last slides are the strongest (pinned or highest score).
 

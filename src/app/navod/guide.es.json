@@ -1,0 +1,352 @@
+{
+  "pageTitle": "Guía de la galería: ver, elegir y descargar tus fotos de boda",
+  "pageDescription": "Guía paso a paso para principiantes: abre la galería desde el correo, mira las fotos, elige las que quieres imprimir, descárgalas y pide retoques al fotógrafo.",
+  "kicker": "Guía de la galería",
+  "heroTitle": "Cómo usar tu galería",
+  "heroLead": "¿Te ha enviado tu fotógrafo un enlace por correo o por mensaje? Aquí tienes, paso a paso, todo lo que puedes hacer con la galería. No hay que instalar nada ni crear ninguna cuenta: solo necesitas un móvil o un ordenador y ese enlace.",
+  "otherLanguages": "Esta guía en otros idiomas:",
+  "tocHeading": "¿Qué quieres hacer?",
+  "tocLead": "Elige en qué necesitas ayuda. ¿Es tu primera vez? Empieza por el primer punto.",
+  "toc": {
+    "start": "Abrir la galería por primera vez",
+    "browse": "Ver las fotos",
+    "print": "Elegir fotos para imprimir",
+    "favorites": "Marcar tus fotos favoritas",
+    "download": "Descargar fotos",
+    "corrections": "Pedir que retoquen una foto",
+    "guests": "Añadir tus propias fotos de la boda",
+    "offline": "Ver las fotos sin internet",
+    "privacy": "Tu nombre y tu privacidad",
+    "trouble": "Algo no funciona"
+  },
+  "start": {
+    "heading": "1. Tu primera visita",
+    "intro": "Si nunca has abierto la galería, empieza por aquí. Es cosa de un minuto.",
+    "openTitle": "Toca el enlace",
+    "openBody": "Busca el correo o el mensaje de tu fotógrafo y toca el enlace. La galería se abre en el navegador: Safari, Chrome o el que uses normalmente. No tienes que descargar ni instalar nada, ni registrarte.",
+    "passwordTitle": "Escribe la contraseña si la galería te la pide",
+    "passwordBody": "Algunas galerías están protegidas con contraseña. La encontrarás en el mismo mensaje que el enlace. Después, el navegador la recuerda durante 30 días.",
+    "lookTitle": "Echa un vistazo",
+    "lookBody": "Arriba verás el nombre de la galería y algunos botones; debajo, todas las fotos una junto a otra. Se van cargando más a medida que bajas. Toca cualquier foto para verla a pantalla completa.",
+    "keepTitle": "Guarda el enlace",
+    "keepBody": "Seguro que querrás volver a la galería. Guarda el mensaje con el enlace o añade la página a tus marcadores. En el móvil también puedes añadirla como icono a la pantalla de inicio desde «Compartir».",
+    "termsHeading": "Qué es cada cosa",
+    "termsLead": "Estas tres palabras aparecen a menudo en la guía:",
+    "terms": [
+      {
+        "term": "Vista general",
+        "body": "Todas las fotos de la galería, una junto a otra. Es lo primero que ves al abrir el enlace."
+      },
+      {
+        "term": "Vista de foto",
+        "body": "Una sola foto a pantalla completa. Se abre al tocar una foto en la vista general."
+      },
+      {
+        "term": "Barra de herramientas",
+        "body": "La fila de botones en la parte inferior de la vista de foto: el corazón, la impresora, la descarga y más."
+      }
+    ],
+    "buttonsNote": "¿No ves algún botón del que habla esta guía? Tu fotógrafo activa por separado en cada galería las descargas, la selección para imprimir, los corazones y las peticiones de retoque. Si falta algo, no es un error: simplemente no está activado en tu galería."
+  },
+  "browse": {
+    "heading": "2. Ver las fotos",
+    "intro": "La galería se abre con la vista general de todas las fotos. A medida que bajas, se van cargando más solas.",
+    "detailHeading": "Una foto a pantalla completa",
+    "detailLead": "Toca cualquier foto y se abrirá a pantalla completa. La dirección de la página muestra entonces justo esa foto, así que puedes copiarla y enviársela a alguien. Quien abra el enlace irá directamente a ella.",
+    "phoneTerm": "En el móvil",
+    "phone": [
+      "Desliza el dedo hacia un lado para pasar a la siguiente foto.",
+      "Separa dos dedos o toca dos veces para ampliarla.",
+      "Toca una vez para ocultar los botones y ver solo la foto. Vuelve a tocar para que aparezcan.",
+      "Ciérrala deslizando hacia abajo, con la cruz de arriba a la izquierda o con el botón Atrás."
+    ],
+    "desktopTerm": "En el ordenador",
+    "desktop": [
+      "Pasa de una foto a otra con las flechas de los bordes de la pantalla o con las flechas del teclado.",
+      "Cierra la foto con la cruz de arriba a la izquierda o con la tecla Esc."
+    ],
+    "chaptersHeading": "Capítulos",
+    "chaptersBody": "Si tu fotógrafo ha dividido la galería en partes —por ejemplo, Preparativos, Ceremonia y Banquete—, verás arriba una fila de etiquetas. Toca una para ir directamente a esa parte. La dirección de la página cambia al mismo tiempo, así que puedes enviar un enlace a un capítulo concreto.",
+    "highlightsHeading": "Lo mejor del día",
+    "highlightsBody": "Encima de la vista general puede haber una selección de las fotos más bonitas, elegidas por tu fotógrafo. Toca una para ir a su sitio en la galería. La foto se enmarca un momento para que la encuentres fácilmente.",
+    "slideshowHeading": "Pase de fotos",
+    "slideshowBody": "El botón <projector></projector> «Pase de fotos» de arriba muestra las fotos a pantalla completa, una tras otra. Es ideal para la tele o un proyector, por ejemplo, cuando se las enseñas a la familia. Para pararlo, toca en cualquier sitio o pulsa Esc.",
+    "slideshowNote": "El pase muestra las fotos que la galería ya ha cargado. Si la galería es grande, baja primero hasta el final.",
+    "newPhotos": "Cuando tu fotógrafo añade algo a la galería, no aparece automáticamente en la vista general. Basta con volver a cargar la página."
+  },
+  "print": {
+    "heading": "3. Elegir fotos para imprimir",
+    "intro": "Marca directamente en la galería las fotos que quieras tener en papel. No hace falta hacer listas ni mandar correos: tu fotógrafo verá tu selección en su galería. Hay dos formas de marcar fotos y puedes alternarlas como quieras.",
+    "grid": {
+      "title": "En la vista general",
+      "lead": "Rápido cuando estás repasando toda la galería.",
+      "showTitle": "Muestra las impresoras",
+      "showPhone": "En el móvil, toca el botón <marking></marking> de arriba, junto al nombre de la galería. Aparecerá una pequeña impresora arriba a la derecha de cada foto.",
+      "showDesktop": "En el ordenador, basta con pasar el ratón por encima de una foto y la impresora aparece sola.",
+      "tapTitle": "Toca la impresora",
+      "tapBody": "Toca <printer></printer> en la foto que quieres imprimir. Así la marcas para imprimir una copia."
+    },
+    "detail": {
+      "title": "En la vista de foto",
+      "lead": "Cuando prefieres ver bien la foto primero.",
+      "openTitle": "Toca la foto",
+      "openBody": "Se abre a pantalla completa.",
+      "tapTitle": "Toca la impresora",
+      "tapBody": "La encontrarás en la barra de herramientas de abajo: <printer></printer>. Así marcas la foto para imprimir una copia.",
+      "nextTitle": "Sigue con la siguiente foto",
+      "nextBody": "Desliza el dedo hacia un lado o usa las flechas, y sigue marcando igual."
+    },
+    "quantity": {
+      "heading": "¿Cuántas copias?",
+      "lead": "Después del primer toque, la impresora se convierte en un contador. Funciona igual en la vista general y en la vista de foto.",
+      "plus": "<plus></plus> añade otra copia de la misma foto. Por ejemplo, tres: una para vosotros, otra para los padres y otra para la abuela.",
+      "minus": "<minus></minus> quita una copia. Si quitas la última, la marca desaparece y vuelve la impresora de siempre.",
+      "max": "Puedes pedir hasta 99 copias de una misma foto.",
+      "others": "Si varias personas eligen con el mismo enlace, verás un número gris junto al contador, por ejemplo (+2). Son las copias de esa foto que quieren los demás. Tu número no cambia.",
+      "demoLabel": "Ejemplo: una foto marcada para imprimir tres copias; otras personas quieren dos más."
+    },
+    "summary": {
+      "heading": "El resumen de arriba",
+      "lead": "Mientras eliges, arriba verás siempre una barra que te muestra de un vistazo cuántas llevas.",
+      "demoLabel": "Ejemplo del resumen de la selección para imprimir",
+      "photosTerm": "Fotos",
+      "photosBody": "Cuántas fotos distintas has elegido.",
+      "piecesTerm": "Copias",
+      "piecesBody": "Cuántas copias impresas suman en total: puede que quieras algunas fotos más de una vez.",
+      "everyoneTerm": "Entre todos",
+      "everyoneBody": "El total de todas las personas que eligen con el mismo enlace que tú. Solo aparece cuando elige más de una persona.",
+      "savedTerm": "Guardado",
+      "savedBody": "Tu selección está guardada y a salvo. No hay ningún botón «Enviar» y tampoco hace falta."
+    },
+    "tipsHeading": "Conviene saber",
+    "tips": [
+      {
+        "title": "Un corazón no es una copia impresa.",
+        "body": "Con el corazón guardas la foto entre tus favoritas. Tu fotógrafo solo la añade a las copias impresas cuando tocas la impresora."
+      },
+      {
+        "title": "Cuando termines de elegir, avisa a tu fotógrafo.",
+        "body": "Tu fotógrafo ve cómo crece tu selección, pero no sabe cuándo la has terminado. Basta con un mensaje corto."
+      },
+      {
+        "title": "Pon tu nombre.",
+        "body": "La primera vez que marcas una foto, la galería te pregunta cómo te llamas. Así tu fotógrafo sabe de quién es cada selección. Si quieres, puedes saltarte este paso."
+      },
+      {
+        "title": "¿Sin cobertura? No pasa nada.",
+        "body": "En el tren o en el pueblo verás un aviso de que hay cambios pendientes. Se guardarán solos en cuanto vuelvas a tener conexión."
+      },
+      {
+        "title": "¿No ves ninguna impresora?",
+        "body": "Tu fotógrafo no ha activado la selección para imprimir en este enlace. Escríbele y lo arregláis juntos."
+      }
+    ],
+    "visibility": {
+      "heading": "Quién ve tu selección",
+      "lead": "La selección para imprimir no es un cuaderno privado: es un pedido que pueden preparar varias personas a la vez. Por eso conviene saber quién ve qué.",
+      "photographerTerm": "Tu fotógrafo",
+      "photographerBody": "Lo ve todo: qué fotos, cuántas copias y de quién son, si pones tu nombre.",
+      "sameLinkTerm": "Quien tenga el mismo enlace que tú",
+      "sameLinkBody": "Por ejemplo, tu pareja o tus padres, si les reenvías el enlace. En cada foto solo ven el número gris de copias que quieren los demás y el resumen total. No ven quién ha elegido qué.",
+      "guestsTerm": "Los invitados de la página de la boda",
+      "guestsBody": "Tienen su propio enlace, así que no ven tu selección en absoluto, y tú tampoco ves la suya.",
+      "hint": "Por eso, envía el enlace de tu galería solo a quienes quieras que elijan contigo."
+    },
+    "devices": {
+      "heading": "Empieza en el móvil, sigue en casa",
+      "lead": "La galería recuerda tu selección en el navegador en el que la haces, sin cuenta ni contraseña. Para seguir en otro dispositivo, puedes trasladarla con un código corto.",
+      "step1Title": "En el primer dispositivo, pide un código",
+      "step1Body": "Baja hasta el final, debajo de las fotos, y toca «Continuar en otro dispositivo». Aparecerá un código de ocho caracteres, por ejemplo K7P2-M9XQ.",
+      "step2Title": "En el segundo dispositivo, abre la misma galería",
+      "step2Body": "Usa el mismo enlace que antes, por ejemplo, el del correo o el mensaje de tu fotógrafo.",
+      "step3Title": "Escribe el código",
+      "step3Body": "Abajo del todo, haz clic en «Tengo un código», escríbelo y confirma con «Trasladar». La página se vuelve a cargar y ahí está tu selección.",
+      "notes": [
+        "El código vale durante 15 minutos y solo se puede usar una vez. Si se te pasa el tiempo, crea otro.",
+        "Da igual si usas mayúsculas o minúsculas, y el guion es opcional.",
+        "Se traslada todo: tu selección para imprimir, los corazones, las reacciones y tu nombre.",
+        "A partir de entonces, los dos dispositivos comparten una misma selección. Lo que añadas en el ordenador aparecerá en el móvil al volver a cargar la página.",
+        "Escribe el código antes de empezar a marcar nada en el segundo dispositivo. Lo que marques allí antes se queda para tu fotógrafo como una selección aparte que ya no podrás cambiar."
+      ],
+      "togetherHint": "¿Elegís en pareja? No hace falta trasladar nada: cada uno puede elegir desde su móvil y las selecciones se suman. O usad el código para compartir una sola selección en los dos móviles."
+    }
+  },
+  "favorites": {
+    "heading": "4. Favoritas y reacciones",
+    "intro": "Con el corazón marcas las fotos que más te gustan. Viene muy bien para elegir las fotos del álbum o para enseñárselas a la familia todas juntas.",
+    "howHeading": "Cómo dar un corazón a una foto",
+    "phone": "En el móvil, abre la foto y toca <heart></heart> en la barra de herramientas de abajo. O toca el botón <marking></marking> de arriba y los corazones aparecerán directamente sobre las fotos en la vista general.",
+    "desktop": "En el ordenador, pasa el ratón por encima de una foto: el corazón está abajo a la derecha.",
+    "filterHeading": "Solo favoritas",
+    "filterBody": "En cuanto tengas tu primera favorita, aparecerá arriba un botón con un corazón y un número. Tócalo para ver solo tus favoritas; vuelve a tocarlo para ver todas las fotos.",
+    "countBody": "El número junto al corazón indica cuántas personas tienen esa foto entre sus favoritas. Nadie puede ver quiénes son.",
+    "reactionsHeading": "Reacciones",
+    "reactionsBody": "En la vista de foto, junto al corazón, también encontrarás cinco emojis: ❤️ corazón, 😮 guau, 😂 risa, 🥲 emoción y 👏 aplauso. Puedes dejar una reacción en cada foto. Vuelve a tocar para quitarla o cambiarla por otra. En la vista general verás cómo han reaccionado los demás a cada foto.",
+    "devicesNote": "La galería recuerda los corazones y las reacciones igual que tu selección para imprimir: en el navegador en el que los das. Para trasladarlos a otro dispositivo, usa un código (consulta <a>Empieza en el móvil, sigue en casa</a>).",
+    "missing": "¿No ves ningún corazón? Tu fotógrafo no los ha activado en este enlace."
+  },
+  "download": {
+    "heading": "5. Descargar fotos",
+    "intro": "Puedes descargar las fotos en calidad original: de una en una, solo las que elijas o toda la galería de una vez.",
+    "oneTitle": "Una foto",
+    "oneOpenTitle": "Abre la foto",
+    "oneOpenBody": "Tócala en la vista general.",
+    "oneTapTitle": "Toca la flecha hacia abajo",
+    "oneTapBody": "La encontrarás en la barra de herramientas de abajo: <download></download>. Se descarga el original con toda su calidad.",
+    "someTitle": "Solo las que elijas",
+    "someSelectTitle": "Selecciona las fotos",
+    "someSelectPhone": "En el móvil, mantén el dedo sobre una foto hasta que quede seleccionada. Después, añade más con un toque normal.",
+    "someSelectDesktop": "En el ordenador, pasa el ratón por encima de una foto y haz clic en el círculo <check></check> de arriba a la izquierda. Si mantienes pulsada la tecla Mayús, se seleccionan todas las fotos entre la última que seleccionaste y aquella en la que haces clic.",
+    "someDownloadTitle": "Descárgalas",
+    "someDownloadBody": "Toca el botón «Descargar» de arriba, que muestra cuántas fotos has seleccionado. Si son varias, se descargan en un único archivo ZIP. Para borrar la selección, toca la cruz de al lado.",
+    "allTitle": "Toda la galería",
+    "allTapTitle": "Toca «Descargar todo»",
+    "allTapBody": "El botón está arriba y también indica el tamaño. Se descarga un archivo ZIP con todas las fotos.",
+    "tipsHeading": "Conviene saber",
+    "tips": [
+      {
+        "title": "¿Qué es un ZIP?",
+        "body": "Un único archivo con todas las fotos empaquetadas dentro. En el ordenador se abre con doble clic; en el iPhone, en la app Archivos, y en Android, en el gestor de archivos."
+      },
+      {
+        "title": "Si puedes, descarga la galería entera desde un ordenador y con wifi.",
+        "body": "Puede ocupar varios gigabytes. Si la galería es grande, te pedirá confirmación antes de empezar la descarga."
+      },
+      {
+        "title": "¿Ves «Preparando archivo»?",
+        "body": "El archivo con todas las fotos aún se está preparando. Mientras tanto, puedes descargar solo las fotos que elijas o volver en un rato."
+      },
+      {
+        "title": "«Seleccionar las cargadas»",
+        "body": "selecciona solo las fotos que la galería ya ha cargado. Para la galería entera, usa «Descargar todo»."
+      },
+      {
+        "title": "¿No ves ningún botón de descarga?",
+        "body": "Tu fotógrafo no ha activado las descargas en este enlace. Escríbele."
+      }
+    ]
+  },
+  "corrections": {
+    "heading": "6. Retoques y peticiones",
+    "intro": "¿Quieres cambiar algo en una foto: retocar una mancha, enderezar el horizonte, quitar una lámpara del encuadre? Escríbeselo a tu fotógrafo directamente en la foto; no hace falta describirlo en un correo. Las peticiones de retoque quedan solo entre tu fotógrafo y tú: se abren con el PIN de seis dígitos que tu fotógrafo te envió junto con la galería.",
+    "stepsTitle": "Cómo escribir una petición",
+    "enterTitle": "Activa las peticiones de retoque",
+    "enterBody": "Arriba en la galería, toca <pencil></pencil> «Retoques» y escribe el PIN. Te lo pedirá cada vez que entres: quien solo tiene el enlace no puede escribir ni ver las peticiones.",
+    "openTitle": "Abre la foto",
+    "openBody": "En el móvil, las peticiones aparecen en la parte inferior de la pantalla; en el ordenador, a la derecha de la foto. Pasa de una foto a otra como siempre.",
+    "writeTitle": "Escribe qué hay que cambiar",
+    "writeBody": "Bastan unas palabras, por ejemplo, «retocar la mancha del vestido». Con el botón «Marcar el lugar» y un toque en la foto señalas el sitio exacto: en la foto aparecerá un número, el mismo que el de tu petición.",
+    "editHeading": "Cambiar y borrar",
+    "editBody": "Mientras tu fotógrafo no haya resuelto una petición, puedes cambiarla o borrarla cuando quieras. Se guarda al momento; no hay que enviar nada al final.",
+    "doneHeading": "Retocada ✓",
+    "doneBody": "Cuando tu fotógrafo sube la foto corregida, la petición muestra «Retocada ✓» y verás la nueva versión en el mismo lugar de la galería. La foto conserva sus corazones y su selección para imprimir.",
+    "badgeNote": "En la vista general, las fotos con petición llevan un número con un lápiz. Para salir del modo de retoques, toca «Terminar» o cierra la página; si no, se cerrará solo a las dos horas.",
+    "missing": "¿No ves el botón «Retoques»? Tu fotógrafo no lo ha activado en este enlace; escríbele y listo."
+  },
+  "guests": {
+    "heading": "7. Fotos de los invitados",
+    "intro": "Si tu fotógrafo lo activa, los invitados también pueden añadir fotos a la galería, sin app ni registro. Solo necesitan el enlace o un código QR.",
+    "addTitle": "Toca «Añadir fotos»",
+    "addBody": "El botón está en la parte inferior de la pantalla. Elige fotos del móvil o usa «Hacer una foto» para sacar una nueva en ese momento.",
+    "nameTitle": "Escribe tu nombre",
+    "nameBody": "La primera vez, la galería te pregunta cómo te llamas. Tu nombre aparece junto a tus fotos para que los novios sepan a quién dar las gracias. También puedes seguir sin nombre.",
+    "waitTitle": "Espera a que se suban las fotos",
+    "waitBody": "La pantalla se mantiene encendida mientras se suben. Si la subida se interrumpe, el resto se enviará cuando vuelvas a abrir la galería.",
+    "tipsHeading": "Conviene saber",
+    "tips": [
+      {
+        "title": "Si añades una foto por error, puedes borrarla.",
+        "body": "Ábrela y toca «Borrar mi foto» arriba a la izquierda. Funciona desde el dispositivo con el que la añadiste o desde otro que vincules con un código."
+      },
+      {
+        "title": "Las fotos del iPhone funcionan sin problema.",
+        "body": "El navegador se encarga de enviarlas en un formato compatible. La galería no admite vídeos, y cada foto puede ocupar como máximo 25 MB."
+      },
+      {
+        "title": "Cada persona puede añadir hasta 150 fotos.",
+        "body": "Es más que suficiente para toda una boda, y así la galería sigue siendo fácil de ver."
+      },
+      {
+        "title": "Para cambiar tu nombre,",
+        "body": "usa el enlace «Cambiar» de abajo, junto al botón «Añadir fotos». El cambio se aplica a todas tus fotos de la galería."
+      }
+    ],
+    "hubHeading": "Una página de boda con varias galerías",
+    "hubBody": "Tu fotógrafo puede reunir todas las galerías de una boda en un solo enlace. Las verás como mosaicos grandes y, debajo, la galería de los invitados. El enlace sigue siendo el mismo aunque se añadan más galerías. Para volver a la página de la boda, toca arriba el enlace con su nombre."
+  },
+  "offline": {
+    "heading": "8. Ver las fotos sin internet",
+    "intro": "¿Te vas al pueblo o vas a coger un avión? Puedes guardar las fotos en tu dispositivo antes de salir y verlas sin internet.",
+    "scrollTitle": "Baja hasta el final de la galería",
+    "scrollBody": "Solo se guardan las fotos que la galería ya ha cargado. Si la galería es grande, baja primero del todo.",
+    "tapTitle": "Toca «Sin conexión» arriba",
+    "tapBody": "Verás cuántas fotos se guardarán y cuánto espacio ocupan. Si has marcado alguna, puedes guardar solo tus favoritas y las fotos para imprimir.",
+    "saveTitle": "Elige «Disponible sin conexión»",
+    "saveBody": "Cuando veas «La galería está disponible sin conexión», ya está.",
+    "tips": [
+      "Se guardan versiones más pequeñas de las fotos, adaptadas a tu pantalla, no los originales. Para imprimirlas o conservarlas, descárgalas.",
+      "El iPhone borra por su cuenta las fotos guardadas si pasas más o menos una semana sin abrirlas. Basta con volver a guardarlas.",
+      "Para borrar las fotos guardadas, usa «Quitar del dispositivo» en esa misma ventana."
+    ]
+  },
+  "privacy": {
+    "heading": "9. Tu nombre y tu privacidad",
+    "intro": "La galería no necesita cuenta ni correo. Solo te reconoce por el navegador en el que la abres. No tienes por qué dar tu nombre, pero si lo das, lo verán:",
+    "terms": [
+      {
+        "term": "Los demás en la galería",
+        "body": "Arriba en la galería aparecen las iniciales de las personas que la han visto hace poco y han dado su nombre. Al pasar el ratón por encima se ve el nombre completo."
+      },
+      {
+        "term": "Quien esté mirando contigo",
+        "body": "Si tenéis la galería abierta al mismo tiempo, los demás ven que la estás mirando en ese momento."
+      },
+      {
+        "term": "Junto a tus fotos",
+        "body": "Las fotos que añadas muestran de quién son."
+      },
+      {
+        "term": "Tu fotógrafo",
+        "body": "Ve de quién es cada selección para imprimir."
+      }
+    ],
+    "countsNote": "En los corazones, las reacciones y la selección para imprimir, los demás solo ven números, no nombres.",
+    "optOutHeading": "No contarme",
+    "optOutBody": "La galería cuenta las visitas de forma anónima y sin direcciones IP. Si prefieres que tus visitas no se cuenten en absoluto, toca «No contarme» abajo del todo. Tu nombre desaparecerá entonces de todas las galerías.",
+    "optOutWarning": "Piénsalo bien: no se puede deshacer. Las fotos que hayas añadido se quedan en la galería, pero ya no podrás borrarlas. Y en este navegador ya no podrás dar corazones ni elegir fotos para imprimir."
+  },
+  "trouble": {
+    "heading": "10. Cuando algo no funciona",
+    "items": [
+      {
+        "title": "La galería pide una contraseña.",
+        "body": "Tu fotógrafo te la envió junto con el enlace. Fíjate en las mayúsculas y minúsculas. Tras cinco intentos fallidos, la galería se bloquea durante 15 minutos. El navegador recuerda la contraseña correcta durante 30 días."
+      },
+      {
+        "title": "El PIN de las peticiones de retoque no funciona.",
+        "body": "Comprueba que escribes los seis dígitos del mensaje con el que recibiste la galería. Tras diez intentos fallidos, tendrás que esperar 5 minutos para volver a intentarlo. Si tu fotógrafo crea un PIN nuevo, el anterior deja de funcionar: pídeselo."
+      },
+      {
+        "title": "«Este enlace ya no funciona»",
+        "body": "El enlace ha caducado. Escribe a tu fotógrafo y te enviará uno nuevo."
+      },
+      {
+        "title": "«Este enlace no lleva a ninguna parte»",
+        "body": "Seguramente solo se copió una parte de la dirección. Vuelve a abrir el enlace directamente desde el mensaje original o escanea el código QR."
+      },
+      {
+        "title": "«Tu última marca no se ha guardado»",
+        "body": "Comprueba la conexión e inténtalo de nuevo."
+      },
+      {
+        "title": "No ves las fotos nuevas.",
+        "body": "Vuelve a cargar la página."
+      },
+      {
+        "title": "Falta un botón del que habla esta guía.",
+        "body": "Tu fotógrafo activa por separado en cada enlace las descargas, los corazones, la selección para imprimir, las peticiones de retoque y la opción de añadir fotos, así que los invitados pueden tener opciones distintas de las tuyas. Si no ves algo, no es un error. Escríbele y lo arregláis juntos."
+      }
+    ]
+  },
+  "help": "¿Sigues con dudas? <a>Escribe a tu fotógrafo</a>; estará encantado de ayudarte."
+}
