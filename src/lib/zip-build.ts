@@ -299,12 +299,14 @@ export async function kickoffPendingZipBuild(): Promise<KickoffResult> {
     };
   }
 
+  // `zipObjectKey` stays on the archive the gallery is serving: this build's
+  // key names an object that does not exist until the Worker completes it, and
+  // only the callback may point the row there (and retire the old one).
   const body = (await response.json()) as { uploadId: string; expectedParts: number };
   await prisma.gallery.update({
     where: { id: gallery.id },
     data: {
       zipUploadId: body.uploadId,
-      zipObjectKey: objectKey,
       zipPartsExpected: body.expectedParts,
     },
   });
