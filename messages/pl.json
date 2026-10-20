@@ -91,7 +91,7 @@
       },
       {
         "q": "Czy ze zdjęć da się zrobić film na Instagram albo TikToka?",
-        "a": "Tak. Do każdego ślubu fotograf układa z galerii krótki film (15 lub 30 sekund) w dwóch wersjach: pionowej 9:16 do Stories, Reels i TikToka oraz poziomej 16:9 na YouTube i strony. Kamera powoli zbliża się do twarzy. Obie wersje znajdziesz w galerii do pobrania. Są bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
+        "a": "Tak. Do każdego ślubu fotograf układa z galerii krótki film (15 lub 30 sekund) w dwóch wersjach: pionowej 9:16 do Stories, Reels i TikToka oraz poziomej 16:9 na YouTube i strony. Obie wersje znajdziesz w galerii do pobrania. Są bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
       }
     ],
     "guestTipsHeading": "Wskazówki dla gości, którzy robią zdjęcia",
@@ -109,6 +109,7 @@
     "features": [
       "Jeden link, nic do instalowania — otwiera się w każdej zwykłej przeglądarce, na telefonie i na komputerze.",
       "Szybka siatka zdjęć i widok na pełnym ekranie, płynny nawet na starszym telefonie.",
+      "Udostępnianie jednego zdjęcia – jednym przyciskiem wyślesz link prosto do zdjęcia, które właśnie oglądasz, a podgląd wiadomości pokaże właśnie je.",
       "Siedem języków — czeski, angielski, francuski, niemiecki, hiszpański, słowacki i polski. Galeria dopasowuje się do języka telefonu, a zmienisz go w stopce.",
       "Pobieranie całej galerii jednym kliknięciem (ZIP).",
       "Filmy prosto w galerii — film od fotografa odtworzysz na telefonie i komputerze i pobierzesz razem ze zdjęciami.",
@@ -121,7 +122,7 @@
       "Kontynuuj na innym urządzeniu — przenieś ulubione, reakcje i wybór do druku z telefonu na komputer jednorazowym kodem.",
       "Powiadomienia, gdy fotograf doda nowe zdjęcia.",
       "Zdjęcia od gości — goście dodają własne ujęcia ze ślubu prosto do galerii, bez aplikacji i bez konta.",
-      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty, a zdjęcia od fotografa powoli przybliżają się do twarzy.",
+      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty.",
       "Kilka galerii pod jednym rosnącym linkiem — wybór najlepszych ujęć, pełny zestaw i galeria gości, bez wysyłania nowego linku."
     ],
     "footerText": "Tę galerię prowadzi Twój fotograf.",
@@ -202,6 +203,8 @@
     "select": "Zaznacz",
     "preparingDownload": "Przygotowuję pobieranie",
     "downloadOriginal": "Pobierz oryginał",
+    "sharePhoto": "Udostępnij zdjęcie",
+    "photoLinkCopied": "Link do zdjęcia skopiowany",
     "privacyNotice": "Wizyty liczymy anonimowo, tylko w tej przeglądarce — bez adresu IP.",
     "optOut": "Nie licz mnie",
     "optedOutNotice": "Twoje wizyty nie są liczone.",

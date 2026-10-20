@@ -52,7 +52,7 @@
     "heading": "2. Looking through the photos",
     "intro": "The gallery opens as an overview of all the photos. More load by themselves as you scroll down.",
     "detailHeading": "A photo full screen",
-    "detailLead": "Tap any photo and it opens full screen. The page's address then shows that very photo, so you can copy it and send it to someone. Whoever opens the link goes straight to it.",
+    "detailLead": "Tap any photo and it opens full screen. Want to send it to someone? Tap <share></share> “Share photo” in the toolbar at the bottom: on a phone your share menu opens (WhatsApp, say), on a computer the link is copied. Whoever opens it goes straight to that photo.",
     "phoneTerm": "On a phone",
     "phone": [
       "Swipe sideways to go to the next photo.",

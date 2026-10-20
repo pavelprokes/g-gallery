@@ -233,3 +233,12 @@ test("chapters and highlights stay folded until opened", async ({ page }) => {
     page.locator("details").filter({ has: page.getByRole("heading", { name: "Kapitoly" }) }),
   ).toHaveAttribute("open");
 });
+
+test("a gallery's faces are searched without a click", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.galleryId}`);
+  // Seeded photos have no bytes, so the search runs and reports them unloaded —
+  // what matters is that it started on its own.
+  await expect(
+    page.getByRole("status").filter({ hasText: /Hledám tváře|Tváře jsou hledané/ }),
+  ).toBeVisible({ timeout: 30_000 });
+});

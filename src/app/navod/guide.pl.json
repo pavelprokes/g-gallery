@@ -52,7 +52,7 @@
     "heading": "2. Przeglądanie zdjęć",
     "intro": "Galeria otwiera się jako siatka wszystkich zdjęć. Kolejne wczytują się same, gdy przewijasz w dół.",
     "detailHeading": "Zdjęcie na cały ekran",
-    "detailLead": "Dotknij dowolnego zdjęcia, a otworzy się na cały ekran. Adres strony pokazuje wtedy właśnie to zdjęcie, więc możesz go skopiować i komuś wysłać. Każdy, kto otworzy link, od razu je zobaczy.",
+    "detailLead": "Dotknij dowolnego zdjęcia, a otworzy się na cały ekran. Chcesz je komuś wysłać? Dotknij <share></share> „Udostępnij zdjęcie” na pasku na dole: w telefonie otworzy się menu udostępniania (np. do WhatsAppa), a na komputerze link zostanie skopiowany. Każdy, kto go otworzy, od razu zobaczy to zdjęcie.",
     "phoneTerm": "Na telefonie",
     "phone": [
       "Przesuń palcem w bok, aby przejść do następnego zdjęcia.",
