@@ -1125,6 +1125,8 @@ function GalleryViewInner({
   const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
   const [projecting, setProjecting] = useState(false);
   const [confirmingDownload, setConfirmingDownload] = useState(false);
+  /** Counts the download, then redirects to the CDN (api/g/[token]/archive). */
+  const archiveHref = `/api/g/${encodeURIComponent(token)}/archive`;
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
   // server-rendered.
@@ -1357,7 +1359,7 @@ function GalleryViewInner({
   );
 
   const report = useCallback(
-    (type: "GALLERY_VIEW" | "PHOTO_VIEW" | "DOWNLOAD", photoId?: string) => {
+    (type: "GALLERY_VIEW" | "PHOTO_VIEW", photoId?: string) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
 
@@ -1388,13 +1390,6 @@ function GalleryViewInner({
     }, HEARTBEAT_MS);
 
     return () => clearInterval(interval);
-  }, [optedOut, report]);
-
-  /** The pre-built archive is a plain CDN link, so the server only hears of a
-   * download if the click says so. Picked photos go through the zip route,
-   * which counts them itself. */
-  const reportArchiveDownload = useCallback(() => {
-    if (!optedOut) report("DOWNLOAD");
   }, [optedOut, report]);
 
   // Hearts are per-viewer, and the viewer is only identified client-side, so
@@ -2842,28 +2837,28 @@ function GalleryViewInner({
               >
                 <DownloadIcon />
               </IconButton>
-            ) : archive.url ? (
-              // A pre-built archive is a plain CDN link — no signed manifest,
-              // no Worker request, just a download. Above LARGE_ARCHIVE_BYTES it
+            ) : archive.available ? (
+              // A pre-built archive is a plain link (a redirect to the CDN) —
+              // no signed manifest, no Worker request, just a download. Above LARGE_ARCHIVE_BYTES it
               // asks first: a delivered wedding is 6-8 GB, and starting that on
               // a phone's data plan is a mistake nobody can take back once the
               // bytes are moving.
               <IconButtonLink
-                href={archive.url}
+                href={archiveHref}
                 label={
                   archive.sizeBytes
                     ? t("downloadAllLabelSized", { size: formatBytes(archive.sizeBytes) })
                     : t("downloadAllLabel")
                 }
                 title={archive.stale ? t("downloadAllStaleTitle") : t("downloadAllTitle")}
-                onClick={(event) => {
-                  if (archive.sizeBytes && archive.sizeBytes >= LARGE_ARCHIVE_BYTES) {
-                    event.preventDefault();
-                    setConfirmingDownload(true);
-                    return;
-                  }
-                  reportArchiveDownload();
-                }}
+                onClick={
+                  archive.sizeBytes && archive.sizeBytes >= LARGE_ARCHIVE_BYTES
+                    ? (event) => {
+                        event.preventDefault();
+                        setConfirmingDownload(true);
+                      }
+                    : undefined
+                }
               >
                 <DownloadIcon />
               </IconButtonLink>
@@ -3441,13 +3436,12 @@ function GalleryViewInner({
         </FilmDialog>
       )}
 
-      {confirmingDownload && archive.url && (
+      {confirmingDownload && archive.available && (
         <DownloadAllPrompt
-          href={archive.url}
+          href={archiveHref}
           sizeBytes={archive.sizeBytes}
           items={mediaCounts(t, liveCount, videoCount).join(", ")}
           galleryTitle={title}
-          onDownload={reportArchiveDownload}
           onClose={() => setConfirmingDownload(false)}
         />
       )}
@@ -4213,7 +4207,6 @@ function DownloadAllPrompt({
   sizeBytes,
   items,
   galleryTitle,
-  onDownload,
   onClose,
 }: {
   href: string;
@@ -4223,7 +4216,6 @@ function DownloadAllPrompt({
   /** Goes into the mailto subject, so the photographer knows which wedding is
    * asking without having to work it out from the sender. */
   galleryTitle: string;
-  onDownload: () => void;
   onClose: () => void;
 }) {
   const t = useTranslations("gallery");
@@ -4287,14 +4279,7 @@ function DownloadAllPrompt({
           {/* A plain link, so the browser's own download manager takes over —
               which is also what makes resuming possible, and what keeps a
               middle click or "open in new tab" working. */}
-          <a
-            href={href}
-            className={buttonClasses("primary")}
-            onClick={() => {
-              onDownload();
-              onClose();
-            }}
-          >
+          <a href={href} className={buttonClasses("primary")} onClick={onClose}>
             {t("downloadPromptConfirm")}
           </a>
         </div>

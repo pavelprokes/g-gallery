@@ -17,16 +17,14 @@ export const maxDuration = 10;
 const bodySchema = z
   .object({
     anonKey: z.uuid(),
-    // DOWNLOAD here is only the pre-built archive: a plain CDN link the server
-    // never sees otherwise. Picked photos are counted by the zip route.
-    type: z.enum(["GALLERY_VIEW", "PHOTO_VIEW", "PROMO_CLICK", "DOWNLOAD"]),
+    type: z.enum(["GALLERY_VIEW", "PHOTO_VIEW", "PROMO_CLICK"]),
     photoId: z.string().min(1).optional(),
   })
-  // A promo tile is never a photo (docs/PROMO-CARDS.md), and the archive is the
-  // whole gallery, so either arriving with a photo id is a caller bug; storing
-  // it would put the event into the per-photo counts.
-  .refine((body) => (body.type !== "PROMO_CLICK" && body.type !== "DOWNLOAD") || !body.photoId, {
-    error: "photo_id_not_allowed",
+  // A promo tile is never a photo (docs/PROMO-CARDS.md), so a promo click that
+  // arrives carrying a photo id is a caller bug; storing it would put a
+  // PROMO_CLICK into the per-photo counts.
+  .refine((body) => body.type !== "PROMO_CLICK" || body.photoId === undefined, {
+    error: "photo_id_on_promo_click",
     path: ["photoId"],
   });
 
@@ -38,9 +36,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/a
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  if (parsed.data.type === "DOWNLOAD" && !access.shareLink.allowDownload) {
-    return NextResponse.json({ error: "DOWNLOAD_DISABLED" }, { status: 403 });
-  }
 
   const result = await recordActivity({
     galleryId: access.shareLink.galleryId,
@@ -53,14 +48,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/a
   // The photographer's credit tile: the one click that is a lead, not a view.
   if (parsed.data.type === "PROMO_CLICK" && result.recorded) {
     trackServerEvent({ name: "promo-click", request });
-  }
-  // Same event as the zip route, so Umami counts every download in one place.
-  if (parsed.data.type === "DOWNLOAD" && result.recorded) {
-    trackServerEvent({
-      name: "gallery-download",
-      data: { partial: false, prebuilt: true },
-      request,
-    });
   }
 
   // Only a genuinely new session is news; the 5-minute heartbeat is not.
