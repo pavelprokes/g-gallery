@@ -28,7 +28,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resolveShareLink.mockResolvedValue({
     ok: true,
-    shareLink: { id: "share_1", galleryId: "gal_1" },
+    shareLink: { id: "share_1", galleryId: "gal_1", allowDownload: true },
   });
   recordActivity.mockResolvedValue({ newSession: false, viewerName: null, recorded: true });
 });
@@ -78,6 +78,45 @@ describe("POST /api/g/[token]/activity", () => {
 
     expect([view.status, photo.status]).toEqual([204, 204]);
     expect(recordActivity).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts a pre-built archive download in the feed and in Umami", async () => {
+    const response = await POST(post({ anonKey: ANON_KEY, type: "DOWNLOAD" }), ctx);
+
+    expect(response.status).toBe(204);
+    expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({ type: "DOWNLOAD" }));
+    expect(trackServerEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "gallery-download",
+        data: { partial: false, prebuilt: true },
+      }),
+    );
+
+    trackServerEvent.mockClear();
+    recordActivity.mockResolvedValue({ newSession: false, viewerName: null, recorded: false });
+    await POST(post({ anonKey: ANON_KEY, type: "DOWNLOAD" }), ctx);
+    expect(trackServerEvent).not.toHaveBeenCalled();
+  });
+
+  it("refuses a download beacon on a link with downloads off", async () => {
+    resolveShareLink.mockResolvedValue({
+      ok: true,
+      shareLink: { id: "share_1", galleryId: "gal_1", allowDownload: false },
+    });
+
+    const response = await POST(post({ anonKey: ANON_KEY, type: "DOWNLOAD" }), ctx);
+
+    expect(response.status).toBe(403);
+    expect(recordActivity).not.toHaveBeenCalled();
+  });
+
+  it("rejects a download carrying a photo id", async () => {
+    const response = await POST(
+      post({ anonKey: ANON_KEY, type: "DOWNLOAD", photoId: "photo_1" }),
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it("rejects an unknown activity type", async () => {

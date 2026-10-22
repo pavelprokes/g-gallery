@@ -189,8 +189,9 @@ function describe(group: FeedGroup): string {
     case "FAVORITE":
       return many ? `${who} přidal ${photos} do oblíbených` : `${who} přidal fotku do oblíbených`;
     case "DOWNLOAD":
-      // The archive route records neither who nor how many photos (one photo
-      // or the whole gallery), so the row claims only that it happened.
+      // The zip route records neither who nor how many photos, and the
+      // pre-built archive's beacon not how many, so the row claims only that
+      // it happened.
       return group.events > 1 ? `Stažení z galerie · ${group.events}×` : "Stažení z galerie";
     case "VISITOR_IDENTIFIED":
       return `${who} se představil`;

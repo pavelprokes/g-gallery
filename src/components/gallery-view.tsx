@@ -1357,7 +1357,7 @@ function GalleryViewInner({
   );
 
   const report = useCallback(
-    (type: "GALLERY_VIEW" | "PHOTO_VIEW", photoId?: string) => {
+    (type: "GALLERY_VIEW" | "PHOTO_VIEW" | "DOWNLOAD", photoId?: string) => {
       const anonKey = getViewerId();
       if (!anonKey) return;
 
@@ -1388,6 +1388,13 @@ function GalleryViewInner({
     }, HEARTBEAT_MS);
 
     return () => clearInterval(interval);
+  }, [optedOut, report]);
+
+  /** The pre-built archive is a plain CDN link, so the server only hears of a
+   * download if the click says so. Picked photos go through the zip route,
+   * which counts them itself. */
+  const reportArchiveDownload = useCallback(() => {
+    if (!optedOut) report("DOWNLOAD");
   }, [optedOut, report]);
 
   // Hearts are per-viewer, and the viewer is only identified client-side, so
@@ -2849,14 +2856,14 @@ function GalleryViewInner({
                     : t("downloadAllLabel")
                 }
                 title={archive.stale ? t("downloadAllStaleTitle") : t("downloadAllTitle")}
-                onClick={
-                  archive.sizeBytes && archive.sizeBytes >= LARGE_ARCHIVE_BYTES
-                    ? (event) => {
-                        event.preventDefault();
-                        setConfirmingDownload(true);
-                      }
-                    : undefined
-                }
+                onClick={(event) => {
+                  if (archive.sizeBytes && archive.sizeBytes >= LARGE_ARCHIVE_BYTES) {
+                    event.preventDefault();
+                    setConfirmingDownload(true);
+                    return;
+                  }
+                  reportArchiveDownload();
+                }}
               >
                 <DownloadIcon />
               </IconButtonLink>
@@ -3440,6 +3447,7 @@ function GalleryViewInner({
           sizeBytes={archive.sizeBytes}
           items={mediaCounts(t, liveCount, videoCount).join(", ")}
           galleryTitle={title}
+          onDownload={reportArchiveDownload}
           onClose={() => setConfirmingDownload(false)}
         />
       )}
@@ -4205,6 +4213,7 @@ function DownloadAllPrompt({
   sizeBytes,
   items,
   galleryTitle,
+  onDownload,
   onClose,
 }: {
   href: string;
@@ -4214,6 +4223,7 @@ function DownloadAllPrompt({
   /** Goes into the mailto subject, so the photographer knows which wedding is
    * asking without having to work it out from the sender. */
   galleryTitle: string;
+  onDownload: () => void;
   onClose: () => void;
 }) {
   const t = useTranslations("gallery");
@@ -4277,7 +4287,14 @@ function DownloadAllPrompt({
           {/* A plain link, so the browser's own download manager takes over —
               which is also what makes resuming possible, and what keeps a
               middle click or "open in new tab" working. */}
-          <a href={href} className={buttonClasses("primary")} onClick={onClose}>
+          <a
+            href={href}
+            className={buttonClasses("primary")}
+            onClick={() => {
+              onDownload();
+              onClose();
+            }}
+          >
             {t("downloadPromptConfirm")}
           </a>
         </div>
