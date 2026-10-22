@@ -40,7 +40,7 @@ test.describe("pre-built archive: the download control", () => {
     // decision on a phone than 12 MB is.
     const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
     await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", /_archive\.zip$/);
+    await expect(link).toHaveAttribute("href", /\/archive$/);
     await expect(link).toHaveAttribute("title", "Stáhnout vše (ZIP)");
 
     await expect(page.getByRole("button", { name: PREPARING })).toHaveCount(0);
@@ -51,7 +51,7 @@ test.describe("pre-built archive: the download control", () => {
 
     const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
     await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", /_archive\.zip$/);
+    await expect(link).toHaveAttribute("href", /\/archive$/);
     // Flagged as one photo short rather than presented as complete.
     await expect(link).toHaveAttribute("title", /obnovuje/);
 
@@ -64,7 +64,7 @@ test.describe("pre-built archive: the download control", () => {
 
     const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
     await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", /_archive\.zip$/);
+    await expect(link).toHaveAttribute("href", /\/archive$/);
     await expect(page.getByRole("button", { name: PREPARING })).toHaveCount(0);
   });
 
@@ -86,7 +86,7 @@ test.describe("pre-built archive: the download control", () => {
     // 12.3 MB is under the threshold: asking would be friction, not care.
     await page.goto(`/g/${seed.archives.ready.token}/${seed.archives.ready.slug}`);
     const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
-    await expect(link).toHaveAttribute("href", /\.zip$/);
+    await expect(link).toHaveAttribute("href", /\/archive$/);
     await expect(page.getByRole("dialog", { name: /Stahujete celou galerii/ })).toHaveCount(0);
   });
 
@@ -119,8 +119,31 @@ test.describe("pre-built archive: the download control", () => {
     // over — which is what makes an interrupted download resumable.
     await expect(dialog.getByRole("link", { name: "Stáhnout" })).toHaveAttribute(
       "href",
-      /_archive-[0-9a-f]{32}\.zip$/,
+      /\/archive$/,
     );
+  });
+
+  test("the archive link counts the download and redirects to the built archive", async ({
+    page,
+  }) => {
+    // The CDN link used to sit in the page, so the server never heard of the
+    // most common download. Now the route records it, then hands over the
+    // exact key the last completed build wrote.
+    const response = await page.request.get(`/api/g/${seed.archives.large.token}/archive`, {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(302);
+    expect(response.headers()["location"]).toMatch(/_archive-[0-9a-f]{32}\.zip$/);
+  });
+
+  test("the archive link sends the guest back while no archive has been built", async ({
+    page,
+  }) => {
+    // Opened by navigation, so no JSON error page: a redirect back instead.
+    const response = await page.request.get(`/api/g/${seed.archives.none.token}/archive`, {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(303);
   });
 
   test("the download prompt can be dismissed without starting anything", async ({ page }) => {

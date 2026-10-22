@@ -1125,6 +1125,8 @@ function GalleryViewInner({
   const lightboxCloseRef = useRef<HTMLButtonElement | null>(null);
   const [projecting, setProjecting] = useState(false);
   const [confirmingDownload, setConfirmingDownload] = useState(false);
+  /** Counts the download, then redirects to the CDN (api/g/[token]/archive). */
+  const archiveHref = `/api/g/${encodeURIComponent(token)}/archive`;
   // Photos this viewer uploaded — the only ones they may take back
   // (docs/GUEST-GALLERIES.md §7). Per-viewer, so like favourites it cannot be
   // server-rendered.
@@ -2835,14 +2837,14 @@ function GalleryViewInner({
               >
                 <DownloadIcon />
               </IconButton>
-            ) : archive.url ? (
-              // A pre-built archive is a plain CDN link — no signed manifest,
-              // no Worker request, just a download. Above LARGE_ARCHIVE_BYTES it
+            ) : archive.available ? (
+              // A pre-built archive is a plain link (a redirect to the CDN) —
+              // no signed manifest, no Worker request, just a download. Above LARGE_ARCHIVE_BYTES it
               // asks first: a delivered wedding is 6-8 GB, and starting that on
               // a phone's data plan is a mistake nobody can take back once the
               // bytes are moving.
               <IconButtonLink
-                href={archive.url}
+                href={archiveHref}
                 label={
                   archive.sizeBytes
                     ? t("downloadAllLabelSized", { size: formatBytes(archive.sizeBytes) })
@@ -3434,9 +3436,9 @@ function GalleryViewInner({
         </FilmDialog>
       )}
 
-      {confirmingDownload && archive.url && (
+      {confirmingDownload && archive.available && (
         <DownloadAllPrompt
-          href={archive.url}
+          href={archiveHref}
           sizeBytes={archive.sizeBytes}
           items={mediaCounts(t, liveCount, videoCount).join(", ")}
           galleryTitle={title}

@@ -123,11 +123,13 @@ export interface GalleryViewData {
  * absent again, for everyone, every time a guest added a photo.
  */
 export interface GalleryArchive {
-  /** Direct CDN link to a complete archive, or null while none exists. */
-  url: string | null;
+  /** A complete archive exists. The viewer downloads it through
+   * `/api/g/{token}/archive`, which counts the download and redirects to the
+   * CDN — the CDN URL itself never reaches the page. */
+  available: boolean;
   /** The archive on offer predates the newest photos; a rebuild is queued. */
   stale: boolean;
-  /** Size of the archive at `url`, for a label the viewer can act on — a
+  /** Size of the archive on offer, for a label the viewer can act on — a
    * 8 GB download is a different decision on a phone than a 300 MB one. */
   sizeBytes: number | null;
 }
@@ -333,12 +335,7 @@ export async function loadGalleryViewData(
     chapters,
     highlights,
     featuredFilm: featuredFilmOf(gallery.featuredVideo),
-    archive: archiveFor(
-      gallery.zipStatus,
-      gallery.zipObjectKey,
-      gallery.zipSizeBytes,
-      gallery.zipBuiltAt,
-    ),
+    archive: archiveOf(gallery),
   };
 }
 
@@ -414,9 +411,12 @@ async function loadHighlights(
 }
 
 /**
- * The finished archive is a plain CDN link — no Worker involved at download
+ * The finished archive is a plain CDN object — no Worker involved at download
  * time (docs/TODO.md §7). Built server-side since NEXT_PUBLIC_PHOTOS_BASE_URL
  * is the same public, build-time value the custom image loader already uses.
+ * Only `/api/g/[token]/archive` hands it out, as a redirect: a link straight to
+ * the CDN was invisible to the server, so the most common download was never
+ * counted (2026-10-22).
  *
  * ## Once an archive exists, the download button never disappears again
  *
@@ -437,26 +437,33 @@ async function loadHighlights(
  * A gallery that has never completed a build has nothing to serve, and the UI
  * says so ("Připravujeme archiv") rather than linking at a key that 404s.
  */
-function archiveFor(
-  zipStatus: string,
-  zipObjectKey: string | null,
-  zipSizeBytes: bigint | null,
-  zipBuiltAt: Date | null,
-): GalleryArchive {
-  const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
-  if (!zipBuiltAt || !zipObjectKey || !base) return { url: null, stale: false, sizeBytes: null };
-
-  const path = zipObjectKey.split("/").map(encodeURIComponent).join("/");
+function archiveOf(gallery: {
+  zipStatus: string;
+  zipObjectKey: string | null;
+  zipSizeBytes: bigint | null;
+  zipBuiltAt: Date | null;
+}): GalleryArchive {
+  if (!archiveUrlOf(gallery.zipObjectKey, gallery.zipBuiltAt)) {
+    return { available: false, stale: false, sizeBytes: null };
+  }
   return {
-    url: `${base.replace(/\/$/, "")}/${path}`,
-    stale: zipStatus !== "READY",
-    // Describes the object at `url` — while a rebuild is queued or running,
+    available: true,
+    stale: gallery.zipStatus !== "READY",
+    // Describes the archive on offer — while a rebuild is queued or running,
     // that is still the previous archive, and so is this number. Both are
     // written by the same callback, so they never disagree.
     // Narrowed to a number on the way out: a bigint cannot cross into a client
     // component, and an 8 GB archive is nowhere near Number.MAX_SAFE_INTEGER.
-    sizeBytes: zipSizeBytes === null ? null : Number(zipSizeBytes),
+    sizeBytes: gallery.zipSizeBytes === null ? null : Number(gallery.zipSizeBytes),
   };
+}
+
+export function archiveUrlOf(zipObjectKey: string | null, zipBuiltAt: Date | null): string | null {
+  const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
+  if (!zipBuiltAt || !zipObjectKey || !base) return null;
+
+  const path = zipObjectKey.split("/").map(encodeURIComponent).join("/");
+  return `${base.replace(/\/$/, "")}/${path}`;
 }
 
 /**
