@@ -7,6 +7,11 @@ const prisma = vi.hoisted(() => ({
   activityEvent: { create: vi.fn() },
 }));
 
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  // Outside a request there is no `after()` scope; run the work inline.
+  after: (work: () => unknown) => void work(),
+}));
 vi.mock("@/lib/share-access", () => ({ resolveShareLink }));
 vi.mock("@/lib/umami", () => ({ trackServerEvent }));
 vi.mock("@/lib/db", () => ({ prisma }));
@@ -34,7 +39,10 @@ beforeEach(() => {
     zipObjectKey: "galleries/g/_archive-1.zip",
     zipBuiltAt: new Date(),
   });
+  prisma.activityEvent.create.mockResolvedValue({});
 });
+
+const GALLERY_PAGE = "https://example.test/g/tok/svatba";
 
 describe("GET /api/g/[token]/archive", () => {
   it("counts the download, then redirects to the built archive", async () => {
@@ -53,6 +61,21 @@ describe("GET /api/g/[token]/archive", () => {
     );
   });
 
+  it("still redirects when the download cannot be recorded", async () => {
+    prisma.activityEvent.create.mockRejectedValue(new Error("pooler down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await GET(get(), ctx);
+
+    expect(response.status).toBe(302);
+  });
+
+  it("counts a first request that asks for the range from byte 0", async () => {
+    await GET(get({ headers: { range: "bytes=0-" } }), ctx);
+
+    expect(prisma.activityEvent.create).toHaveBeenCalledTimes(1);
+  });
+
   it("does not count a resumed download or a HEAD probe again", async () => {
     const resumed = await GET(get({ headers: { range: "bytes=1000-" } }), ctx);
     const probe = await GET(get({ method: "HEAD" }), ctx);
@@ -62,26 +85,39 @@ describe("GET /api/g/[token]/archive", () => {
     expect(trackServerEvent).not.toHaveBeenCalled();
   });
 
-  it("refuses a dead link and a link with downloads off", async () => {
+  it("sends a dead link or one with downloads off back to the gallery page", async () => {
+    // Opened by navigation: the gallery page explains an expired link or asks
+    // for the password, where a JSON error would strand the guest.
     resolveShareLink.mockResolvedValueOnce({ ok: false, reason: "EXPIRED" });
-    const expired = await GET(get(), ctx);
+    const expired = await GET(get({ headers: { referer: GALLERY_PAGE } }), ctx);
 
     resolveShareLink.mockResolvedValueOnce({
       ok: true,
       shareLink: { id: "share_1", galleryId: "gal_1", allowDownload: false },
     });
-    const disabled = await GET(get(), ctx);
+    const disabled = await GET(get({ headers: { referer: GALLERY_PAGE } }), ctx);
 
-    expect([expired.status, disabled.status]).toEqual([403, 403]);
+    for (const response of [expired, disabled]) {
+      expect(response.status).toBe(303);
+      expect(response.headers.get("location")).toBe(GALLERY_PAGE);
+    }
     expect(prisma.activityEvent.create).not.toHaveBeenCalled();
   });
 
-  it("answers 404, uncounted, while no archive has been built", async () => {
+  it("never sends the guest back to another site", async () => {
+    resolveShareLink.mockResolvedValueOnce({ ok: false, reason: "EXPIRED" });
+
+    const response = await GET(get({ headers: { referer: "https://evil.test/x" } }), ctx);
+
+    expect(response.headers.get("location")).toBe("https://example.test/");
+  });
+
+  it("goes back, uncounted, while no archive has been built", async () => {
     prisma.gallery.findUnique.mockResolvedValue({ zipObjectKey: null, zipBuiltAt: null });
 
-    const response = await GET(get(), ctx);
+    const response = await GET(get({ headers: { referer: GALLERY_PAGE } }), ctx);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(303);
     expect(prisma.activityEvent.create).not.toHaveBeenCalled();
   });
 });

@@ -136,11 +136,14 @@ test.describe("pre-built archive: the download control", () => {
     expect(response.headers()["location"]).toMatch(/_archive-[0-9a-f]{32}\.zip$/);
   });
 
-  test("the archive link answers 404 while no archive has been built", async ({ page }) => {
+  test("the archive link sends the guest back while no archive has been built", async ({
+    page,
+  }) => {
+    // Opened by navigation, so no JSON error page: a redirect back instead.
     const response = await page.request.get(`/api/g/${seed.archives.none.token}/archive`, {
       maxRedirects: 0,
     });
-    expect(response.status()).toBe(404);
+    expect(response.status()).toBe(303);
   });
 
   test("the download prompt can be dismissed without starting anything", async ({ page }) => {

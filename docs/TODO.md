@@ -214,6 +214,11 @@ dead "Připravujeme archiv" button over a complete, downloadable archive. The ru
 `zipBuiltAt`: once an archive has been built, the link never disappears again. Covered by
 `e2e/gallery-archive.spec.ts`.
 
+Since 2026-10-22 the page no longer carries the CDN URL: "Stáhnout vše" opens
+`/api/g/[token]/archive`, which checks the share link, counts the download (feed, digest, Umami
+`gallery-download` with `prebuilt: true`) and redirects to the CDN. A plain CDN link was invisible
+to the server, so the most common download was never counted.
+
 ### 7b. The build's tracking manifest was public — **fixed 2026-09-02**
 
 Found while fixing §7a. The builder Worker parks a tracking manifest in the photos bucket for the

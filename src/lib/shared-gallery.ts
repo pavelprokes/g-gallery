@@ -335,16 +335,7 @@ export async function loadGalleryViewData(
     chapters,
     highlights,
     featuredFilm: featuredFilmOf(gallery.featuredVideo),
-    archive: {
-      available: archiveUrlOf(gallery.zipObjectKey, gallery.zipBuiltAt) !== null,
-      stale: gallery.zipStatus !== "READY",
-      // Describes the archive on offer — while a rebuild is queued or running,
-      // that is still the previous archive, and so is this number. Both are
-      // written by the same callback, so they never disagree.
-      // Narrowed to a number on the way out: a bigint cannot cross into a client
-      // component, and an 8 GB archive is nowhere near Number.MAX_SAFE_INTEGER.
-      sizeBytes: gallery.zipSizeBytes === null ? null : Number(gallery.zipSizeBytes),
-    },
+    archive: archiveOf(gallery),
   };
 }
 
@@ -446,6 +437,27 @@ async function loadHighlights(
  * A gallery that has never completed a build has nothing to serve, and the UI
  * says so ("Připravujeme archiv") rather than linking at a key that 404s.
  */
+function archiveOf(gallery: {
+  zipStatus: string;
+  zipObjectKey: string | null;
+  zipSizeBytes: bigint | null;
+  zipBuiltAt: Date | null;
+}): GalleryArchive {
+  if (!archiveUrlOf(gallery.zipObjectKey, gallery.zipBuiltAt)) {
+    return { available: false, stale: false, sizeBytes: null };
+  }
+  return {
+    available: true,
+    stale: gallery.zipStatus !== "READY",
+    // Describes the archive on offer — while a rebuild is queued or running,
+    // that is still the previous archive, and so is this number. Both are
+    // written by the same callback, so they never disagree.
+    // Narrowed to a number on the way out: a bigint cannot cross into a client
+    // component, and an 8 GB archive is nowhere near Number.MAX_SAFE_INTEGER.
+    sizeBytes: gallery.zipSizeBytes === null ? null : Number(gallery.zipSizeBytes),
+  };
+}
+
 export function archiveUrlOf(zipObjectKey: string | null, zipBuiltAt: Date | null): string | null {
   const base = process.env.NEXT_PUBLIC_PHOTOS_BASE_URL;
   if (!zipBuiltAt || !zipObjectKey || !base) return null;
