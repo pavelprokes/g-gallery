@@ -30,6 +30,16 @@ const E2E_TOKEN_KEY = Buffer.alloc(32, 7).toString("base64");
 localEnv.TOKEN_ENCRYPTION_KEY ||= process.env.TOKEN_ENCRYPTION_KEY || E2E_TOKEN_KEY;
 process.env.TOKEN_ENCRYPTION_KEY = localEnv.TOKEN_ENCRYPTION_KEY;
 
+/**
+ * The MCP endpoint's development token (docs/MCP.md §Development token),
+ * acting as the seeded E2E admin, so e2e/mcp.spec.ts can call tools without
+ * running OAuth. Also on this process, where the spec reads it.
+ */
+localEnv.MCP_DEV_TOKEN ||= process.env.MCP_DEV_TOKEN || "e2e-mcp-dev-token-".padEnd(48, "x");
+// Always the seeded admin, whatever a local .env says: the spec reads its rows.
+localEnv.MCP_DEV_EMAIL = "e2e@example.com";
+process.env.MCP_DEV_TOKEN = localEnv.MCP_DEV_TOKEN;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,

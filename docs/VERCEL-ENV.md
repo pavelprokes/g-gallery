@@ -179,6 +179,10 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 | **`NEXT_PUBLIC_UMAMI_WEBSITE_ID`**  | **build** | Same                                                                                                   |
 | **`NEXT_PUBLIC_UMAMI_SCRIPT`**      | **build** | Defaults to `stats.js` (Umami's own default is `script.js`)                                            |
 | `UMAMI_COLLECT_ENDPOINT`            | runtime   | Server events post to `/api/e` (Umami's own default is `/api/send`)                                    |
+| `MCP_DEV_TOKEN`                     | runtime   | MCP needs OAuth (docs/MCP.md). ≥ 32 chars; **never set on Production** — it is ignored there anyway    |
+| `MCP_DEV_EMAIL`                     | runtime   | Same — the admin account the dev token acts as                                                         |
+| `MCP_SERVICE_TOKEN_SHA256`          | runtime   | No service token (docs/MCP.md §Service token). SHA-256 hex of the token, never the token itself        |
+| `MCP_SERVICE_EMAIL`                 | runtime   | Same — the admin account the service token acts as                                                     |
 
 Shared Supabase project (`docs/SETUP.md` §6) — the service role only has access to the `g_gallery`
 schema, granted explicitly; it cannot read the marketing site's own data in `public`.
