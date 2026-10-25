@@ -137,7 +137,7 @@ test.describe("reading", () => {
       "galleries_list",
       {
         query: "E2E Test Gallery",
-        limit: 100,
+        limit: 50,
       },
     );
     const listed = list.galleries.find((gallery) => gallery.id === seed.galleryId);
@@ -178,7 +178,7 @@ test.describe("reading", () => {
       gallery_id: seed.galleryId,
       compact: true,
       offset: 5,
-      limit: 100,
+      limit: 60,
     });
     expect(compact.photos).toHaveLength(seed.photoCount - 5);
     expect(Object.keys(compact.photos[0]!).sort()).toEqual([
@@ -203,7 +203,7 @@ test.describe("reading", () => {
 
   test("reads weddings, activity, corrections and the print order", async ({ request }) => {
     const weddings = await tool<{ weddings: { id: string }[] }>(request, "weddings_list", {
-      limit: 100,
+      limit: 50,
     });
     expect(weddings.weddings.map((wedding) => wedding.id)).toContain(seed.weddingId);
     const wedding = await tool<{ title: string; galleries: { visibleToGuests: boolean }[] }>(

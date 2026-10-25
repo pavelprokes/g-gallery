@@ -44,17 +44,18 @@ function filterWhere(filter: (typeof FILTERS)[number]): Prisma.PhotoWhereInput {
 
 /**
  * What fits one answer to the model: a full row is ~790 characters of JSON and
- * a compact one ~560, mostly the CDN addresses. 200 full rows (~157 k) were
- * cut off by the client; these keep a page under ~60 k.
+ * a compact one ~560, mostly the CDN addresses. Measured against Claude in
+ * production: ~36 k characters came through, ~56 k were cut off into a file.
+ * These keep a page at ~33 k.
  */
-const FULL_PAGE_MAX = 50;
-const COMPACT_PAGE_MAX = 100;
+const FULL_PAGE_MAX = 40;
+const COMPACT_PAGE_MAX = 60;
 
 export const photosList = defineTool({
   name: "photos_list",
   title: "Fotky galerie",
   description:
-    "Fotky a videa jedné galerie v pořadí, v jakém je vidí hosté, s adresami na veřejném CDN: thumbUrl (náhled do mřížky), previewUrl (velký náhled, 1920 px) a originalUrl (plná kvalita). compact=true vrátí jen id, název souboru a adresy (až 100 na stránku) — na procházení náhledů velkých galerií.",
+    "Fotky a videa jedné galerie v pořadí, v jakém je vidí hosté, s adresami na veřejném CDN: thumbUrl (náhled do mřížky), previewUrl (velký náhled, 1920 px) a originalUrl (plná kvalita). compact=true vrátí jen id, název souboru a adresy (až 60 na stránku) — na procházení náhledů velkých galerií.",
   input: z.strictObject({
     gallery_id: idInput("galerie"),
     filter: z

@@ -7,7 +7,7 @@ import { printList } from "@/lib/print-export";
 import { printTotalsByViewer } from "@/lib/print-selections";
 import { mediaUrls, thumbUrl } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
-import { idInput, iso, limitInput, owned } from "./common";
+import { idInput, iso, limitInput, offsetInput, owned } from "./common";
 
 /**
  * What the Updates feed shows (src/lib/feed.ts) plus the rest of what guests
@@ -39,7 +39,7 @@ export const activityRecent = defineTool({
       .optional()
       .describe("Jen tyto druhy."),
     days: z.number().int().min(1).max(395).default(7).describe("Jak daleko do minulosti (dny)."),
-    limit: limitInput(200, 50),
+    limit: limitInput(100, 50),
   }),
   access: "read",
   handler: async (args, caller) => {
@@ -89,7 +89,8 @@ export const correctionsList = defineTool({
   input: z.strictObject({
     gallery_id: z.string().min(1).max(64).optional().describe("Jen připomínky této galerie."),
     status: z.enum(["open", "resolved", "all"]).default("open"),
-    limit: limitInput(200, 100),
+    limit: limitInput(40, 40),
+    offset: offsetInput,
   }),
   access: "read",
   handler: async (args, caller) => {
@@ -103,6 +104,7 @@ export const correctionsList = defineTool({
         ...(args.status === "resolved" ? { resolvedAt: { not: null } } : {}),
       },
       orderBy: { createdAt: "asc" },
+      skip: args.offset,
       take: args.limit,
       select: {
         id: true,
@@ -144,12 +146,19 @@ export const correctionsList = defineTool({
   },
 });
 
+const PRINT_PAGE_MAX = 40;
+
 export const printOrderGet = defineTool({
   name: "print_order_get",
   title: "Objednávka do tisku",
   description:
-    "Co hosté v galerii označili do tisku: každá fotka s počtem kusů a názvem souboru pro tiskárnu („5x_…“), odkaz ke stažení originálu pod tím názvem (platí 15 minut) a kdo kolik vybral.",
-  input: z.strictObject({ gallery_id: idInput("galerie") }),
+    "Co hosté v galerii označili do tisku: celý seznam pro tiskárnu („5x_…“), kdo kolik vybral, a po stránkách položky s odkazem ke stažení originálu pod tiskovým názvem (platí 15 minut).",
+  input: z.strictObject({
+    gallery_id: idInput("galerie"),
+    // A signed download link is ~700 characters; the plain list stays whole.
+    limit: limitInput(PRINT_PAGE_MAX, PRINT_PAGE_MAX),
+    offset: offsetInput,
+  }),
   access: "read",
   handler: async (args, caller) => {
     const items = await owned(
@@ -160,7 +169,8 @@ export const printOrderGet = defineTool({
     return jsonResult({
       photos: items.length,
       pieces: items.reduce((sum, item) => sum + item.quantity, 0),
-      items: items.map((item) => ({
+      offset: args.offset,
+      items: items.slice(args.offset, args.offset + args.limit).map((item) => ({
         photoId: item.id,
         printName: item.name,
         quantity: item.quantity,

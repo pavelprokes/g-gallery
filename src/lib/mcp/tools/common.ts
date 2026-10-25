@@ -20,6 +20,10 @@ export const parseDay = (value: string): Date => new Date(value);
 
 export const titleInput = z.string().trim().min(1).max(200);
 
+/**
+ * Page sizes are kept so one answer stays under ~35 k characters — measured
+ * against Claude in production, ~56 k was cut off into a file (docs/MCP.md).
+ */
 export const limitInput = (max: number, fallback: number) =>
   z.number().int().min(1).max(max).default(fallback).describe(`Kolik položek vrátit (1–${max}).`);
 
