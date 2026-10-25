@@ -41,6 +41,8 @@ official SDK clients (v1 legacy, v2 modern) and Claude:
   `isError` result with a Czech message; a crash is logged, never shown.
 - **Origin check** against DNS rebinding: no `Origin`, `https://claude.ai`/`claude.com`, localhost,
   or this site.
+- Results are JSON text without indentation (a model reads it) plus the same value as
+  `structuredContent`.
 - Every `tools/call` logs one line `{"event":"mcp.tool_call","email",…,"tool","ok","durationMs"}`.
 
 ## Sign-in (OAuth 2.1)
@@ -121,7 +123,7 @@ Read (`readOnlyHint`):
 | `gallery_stats`    | Visits and viewers (all time + per day), downloads, favourites, reactions, prints by viewer, guest uploads, corrections, promo clicks, top photos |
 | `weddings_list`    | Weddings with cover, guest URL                                                                                                                    |
 | `wedding_get`      | Cards in page order, and whether a guest actually sees each (`isCardVisible`)                                                                     |
-| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters, `compact` for browsing thumbnails                                                          |
+| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters; ≤ 50 full rows or ≤ 100 `compact` ones a page                                              |
 | `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, engagement, corrections, full-quality URLs                                   |
 | `activity_recent`  | What guests did lately (no view heartbeats)                                                                                                       |
 | `corrections_list` | The couple's corrections                                                                                                                          |

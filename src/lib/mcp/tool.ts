@@ -62,10 +62,14 @@ export function defineTool<S extends z.ZodObject>(definition: ToolDefinition<S>)
   };
 }
 
-/** A result both as JSON text (what every client shows the model) and structured. */
+/**
+ * A result both as JSON text (what every client shows the model) and structured.
+ * The text is unindented: it is read by a model, not a person, and indentation
+ * alone made a page of 200 photos about a third larger.
+ */
 export function jsonResult(value: Record<string, unknown>): McpToolResult {
   return {
-    content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(value) }],
     structuredContent: value,
   };
 }

@@ -178,7 +178,7 @@ test.describe("reading", () => {
       gallery_id: seed.galleryId,
       compact: true,
       offset: 5,
-      limit: 500,
+      limit: 100,
     });
     expect(compact.photos).toHaveLength(seed.photoCount - 5);
     expect(Object.keys(compact.photos[0]!).sort()).toEqual([
