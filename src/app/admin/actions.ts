@@ -5,20 +5,26 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { idSchema } from "@/lib/id-schema";
-import {
-  generateShareToken,
-  generateStoragePrefix,
-  hashPassword,
-  hashShareToken,
-} from "@/lib/share-token";
 import type { Prisma } from "@/generated/prisma/client";
 import { readTranslationsFromForm } from "@/lib/content-translations";
-import { gallerySlug, slugify } from "@/lib/gallery-slug";
-import { deleteObject, presignDownload } from "@/lib/r2";
-import { printTotals } from "@/lib/print-selections";
-import { printEntries } from "@/lib/print-export";
-import { encryptToken } from "@/lib/token-cipher";
-import { generateCorrectionPin } from "@/lib/correction-session";
+import { deleteObject } from "@/lib/r2";
+import {
+  attachGalleryToEventFor,
+  createEventFor,
+  createGalleryFor,
+  createGalleryInEventFor,
+  createShareLinkFor,
+  newCorrectionPin,
+  printDownloadsFor,
+  publishGalleryFor,
+  setGalleryCoverFor,
+  setGalleryEventLinkFor,
+  setGalleryListedFor,
+  setShareLinkPermissionsFor,
+  unpublishGalleryFor,
+  updateEventFor,
+  updateGalleryFor,
+} from "@/lib/gallery-admin";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
@@ -38,30 +44,15 @@ export async function createGallery(formData: FormData) {
   });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const gallery = await prisma.gallery.create({
-    data: {
-      ownerId: session.user.id,
-      title: parsed.data.title,
-      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
-      storagePrefix: generateStoragePrefix(),
-    },
-    select: { id: true },
+  return createGalleryFor(session.user.id, {
+    title: parsed.data.title,
+    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
   });
-
-  revalidatePath("/admin");
-  return gallery.id;
 }
 
 export async function publishGallery(galleryId: string) {
   const session = await requireAdmin();
-
-  await prisma.gallery.updateMany({
-    where: { id: galleryId, ownerId: session.user.id },
-    data: { status: "PUBLISHED", publishedAt: new Date() },
-  });
-
-  revalidatePath("/admin");
-  revalidatePath(`/admin/g/${galleryId}`);
+  await publishGalleryFor(session.user.id, galleryId);
 }
 
 /**
@@ -102,12 +93,6 @@ function readPermissions(formData: FormData) {
   };
 }
 
-/** A new PIN for the corrections mode, as stored: hash to verify, cipher to show. */
-async function newCorrectionPin() {
-  const pin = generateCorrectionPin();
-  return { correctionPinHash: await hashPassword(pin), correctionPinCipher: encryptToken(pin) };
-}
-
 /**
  * Returns the raw token, and also stores it encrypted so the admin can show it
  * again later (`src/lib/token-cipher.ts`). Access still resolves only by the
@@ -129,36 +114,7 @@ export async function createShareLink(
   });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: parsed.data.galleryId, ownerId: session.user.id },
-    select: { id: true, title: true, eventDate: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  const token = generateShareToken();
-  const slug = gallerySlug(gallery.title, gallery.eventDate);
-
-  await prisma.shareLink.create({
-    data: {
-      galleryId: gallery.id,
-      tokenHash: hashShareToken(token),
-      tokenCipher: encryptToken(token),
-      label: parsed.data.label,
-      passwordHash: parsed.data.password ? await hashPassword(parsed.data.password) : null,
-      expiresAt: parsed.data.expiresInDays
-        ? new Date(Date.now() + parsed.data.expiresInDays * 86_400_000)
-        : null,
-      allowDownload: parsed.data.allowDownload ?? false,
-      allowReactions: parsed.data.allowReactions ?? false,
-      allowPrintSelection: parsed.data.allowPrintSelection ?? false,
-      allowUpload: parsed.data.allowUpload ?? false,
-      allowCorrections: parsed.data.allowCorrections ?? false,
-      ...(parsed.data.allowCorrections ? await newCorrectionPin() : {}),
-      slug,
-    },
-  });
-
-  revalidatePath(`/admin/g/${gallery.id}`);
+  const { token, slug } = await createShareLinkFor(session.user.id, parsed.data);
   return { token, slug };
 }
 
@@ -177,27 +133,7 @@ export async function updateShareLinkPermissions(shareLinkId: string, formData: 
   const parsed = shareLinkPermissionsSchema.safeParse(readPermissions(formData));
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const link = await prisma.shareLink.findFirst({
-    where: { id: shareLinkId, gallery: { ownerId: session.user.id } },
-    select: { id: true, galleryId: true, correctionPinHash: true },
-  });
-  if (!link) throw new Error("NOT_FOUND");
-
-  await prisma.shareLink.update({
-    where: { id: link.id },
-    data: {
-      allowDownload: parsed.data.allowDownload ?? false,
-      allowReactions: parsed.data.allowReactions ?? false,
-      allowPrintSelection: parsed.data.allowPrintSelection ?? false,
-      allowUpload: parsed.data.allowUpload ?? false,
-      allowCorrections: parsed.data.allowCorrections ?? false,
-      // The first time the mode is switched on, the link gets its PIN; later
-      // switches keep it, so a PIN already handed over stays valid.
-      ...(parsed.data.allowCorrections && !link.correctionPinHash ? await newCorrectionPin() : {}),
-    },
-  });
-
-  revalidatePath(`/admin/g/${link.galleryId}`);
+  await setShareLinkPermissionsFor(session.user.id, shareLinkId, parsed.data);
 }
 
 /**
@@ -394,25 +330,11 @@ export async function createEvent(
   });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const eventDate = parsed.data.eventDate ? new Date(parsed.data.eventDate) : null;
-  const token = generateShareToken();
-  const slug = gallerySlug(parsed.data.title, eventDate);
-
-  const event = await prisma.event.create({
-    data: {
-      ownerId: session.user.id,
-      title: parsed.data.title,
-      eventDate,
-      venue: parsed.data.venue,
-      tokenHash: hashShareToken(token),
-      tokenCipher: encryptToken(token),
-      slug,
-    },
-    select: { id: true },
+  return createEventFor(session.user.id, {
+    title: parsed.data.title,
+    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+    venue: parsed.data.venue,
   });
-
-  revalidatePath("/admin");
-  return { id: event.id, token, slug };
 }
 
 /**
@@ -423,46 +345,7 @@ export async function createEvent(
  */
 export async function attachGalleryToEvent(eventId: string, galleryId: string) {
   const session = await requireAdmin();
-
-  const [event, gallery] = await Promise.all([
-    prisma.event.findFirst({
-      where: { id: eventId, ownerId: session.user.id },
-      select: { id: true, galleries: { select: { eventKey: true, position: true } } },
-    }),
-    prisma.gallery.findFirst({
-      where: { id: galleryId, ownerId: session.user.id },
-      select: { id: true, title: true },
-    }),
-  ]);
-  if (!event || !gallery) throw new Error("NOT_FOUND");
-
-  const taken = new Set(
-    event.galleries.map((g) => g.eventKey).filter((key): key is string => Boolean(key)),
-  );
-  const nextPosition = Math.max(0, ...event.galleries.map((g) => g.position + 1), 0);
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: {
-      eventId: event.id,
-      eventKey: uniqueEventKey(gallery.title, taken),
-      position: nextPosition,
-    },
-  });
-
-  revalidatePath(`/admin/e/${event.id}`);
-  revalidatePath(`/admin/g/${gallery.id}`);
-}
-
-/** Suffixes until free. Keys only need to be unique within one wedding. */
-function uniqueEventKey(title: string, taken: Set<string>): string {
-  const base = slugify(title) || "galerie";
-  if (!taken.has(base)) return base;
-  for (let n = 2; n < 100; n += 1) {
-    const candidate = `${base}-${n}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-  throw new Error("NO_FREE_EVENT_KEY");
+  await attachGalleryToEventFor(session.user.id, eventId, galleryId);
 }
 
 /**
@@ -491,19 +374,7 @@ export async function detachGalleryFromEvent(galleryId: string) {
 /** The listing switch on its own — the gallery's own link is untouched. */
 export async function setGalleryListed(galleryId: string, listed: boolean) {
   const session = await requireAdmin();
-
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: galleryId, ownerId: session.user.id },
-    select: { id: true, eventId: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: { listedOnEvent: listed },
-  });
-
-  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+  await setGalleryListedFor(session.user.id, galleryId, listed);
 }
 
 /**
@@ -514,27 +385,7 @@ export async function setGalleryListed(galleryId: string, listed: boolean) {
  */
 export async function setGalleryEventLink(galleryId: string, shareLinkId: string | null) {
   const session = await requireAdmin();
-
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: galleryId, ownerId: session.user.id },
-    select: { id: true, eventId: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  if (shareLinkId) {
-    const link = await prisma.shareLink.findFirst({
-      where: { id: shareLinkId, galleryId: gallery.id },
-      select: { id: true },
-    });
-    if (!link) throw new Error("NOT_FOUND");
-  }
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: { eventLinkId: shareLinkId },
-  });
-
-  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+  await setGalleryEventLinkFor(session.user.id, galleryId, shareLinkId);
 }
 
 /**
@@ -583,47 +434,17 @@ export async function restoreEvent(eventId: string) {
 export async function createGalleryForEvent(eventId: string, formData: FormData) {
   const session = await requireAdmin();
 
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, ownerId: session.user.id },
-    select: { id: true },
+  const parsed = createGallerySchema.safeParse({
+    title: formData.get("title"),
+    eventDate: formData.get("eventDate") || undefined,
   });
-  if (!event) throw new Error("NOT_FOUND");
+  if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const galleryId = await createGallery(formData);
-  await attachGalleryToEvent(event.id, galleryId);
-  await publishGallery(galleryId);
-
-  const gallery = await prisma.gallery.findFirstOrThrow({
-    where: { id: galleryId },
-    select: { title: true, eventDate: true },
+  await createGalleryInEventFor(session.user.id, eventId, {
+    title: parsed.data.title,
+    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+    allowUpload: Boolean(formData.get("allowUpload")),
   });
-
-  const token = generateShareToken();
-  const link = await prisma.shareLink.create({
-    data: {
-      galleryId,
-      tokenHash: hashShareToken(token),
-      tokenCipher: encryptToken(token),
-      slug: gallerySlug(gallery.title, gallery.eventDate),
-      allowUpload: formData.get("allowUpload") ? true : false,
-      label: formData.get("allowUpload") ? "Pro hosty" : "Pro pár",
-    },
-    select: { id: true },
-  });
-
-  await prisma.gallery.update({
-    where: { id: galleryId },
-    data: {
-      eventLinkId: link.id,
-      listedOnEvent: false,
-      // A guests' gallery is ordered by when its photos were taken: phones
-      // name files by their own counters, which say nothing about the day
-      // (docs/PHOTO-ORDER.md). Everything else defaults to file-name order.
-      ...(formData.get("allowUpload") ? { photoOrder: "TAKEN_AT" as const } : {}),
-    },
-  });
-
-  revalidatePath(`/admin/e/${event.id}`);
 }
 
 const updateEventSchema = z.object({
@@ -656,18 +477,12 @@ export async function updateEvent(eventId: string, formData: FormData) {
   const translations = readTranslationsFromForm(formData, { title: 200, venue: 200 });
   if (!parsed.success || !translations.success) throw new Error("INVALID_INPUT");
 
-  await prisma.event.updateMany({
-    where: { id: eventId, ownerId: session.user.id },
-    data: {
-      title: parsed.data.title,
-      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
-      venue: parsed.data.venue ?? null,
-      translations: translations.data as Prisma.InputJsonObject,
-    },
+  await updateEventFor(session.user.id, eventId, {
+    title: parsed.data.title,
+    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+    venue: parsed.data.venue ?? null,
+    translations: translations.data as Prisma.InputJsonObject,
   });
-
-  revalidatePath(`/admin/e/${eventId}`);
-  revalidatePath("/admin");
 }
 
 /**
@@ -723,20 +538,7 @@ export async function moveGalleryInEvent(galleryId: string, direction: "up" | "d
  */
 export async function unpublishGallery(galleryId: string) {
   const session = await requireAdmin();
-
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: galleryId, ownerId: session.user.id },
-    select: { id: true, eventId: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: { status: "DRAFT", publishedAt: null },
-  });
-
-  revalidatePath(`/admin/g/${gallery.id}`);
-  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+  await unpublishGalleryFor(session.user.id, galleryId);
 }
 
 const updateGallerySchema = z.object({
@@ -767,25 +569,12 @@ export async function updateGallery(galleryId: string, formData: FormData) {
   const translations = readTranslationsFromForm(formData, { title: 200 });
   if (!parsed.success || !translations.success) throw new Error("INVALID_INPUT");
 
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: galleryId, ownerId: session.user.id },
-    select: { id: true, eventId: true },
+  await updateGalleryFor(session.user.id, galleryId, {
+    title: parsed.data.title,
+    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+    description: parsed.data.description ?? null,
+    translations: translations.data as Prisma.InputJsonObject,
   });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: {
-      title: parsed.data.title,
-      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
-      description: parsed.data.description ?? null,
-      translations: translations.data as Prisma.InputJsonObject,
-    },
-  });
-
-  revalidatePath(`/admin/g/${gallery.id}`);
-  revalidatePath("/admin");
-  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
 }
 
 const setGalleryCoverSchema = z.object({
@@ -810,28 +599,7 @@ export async function setGalleryCover(galleryId: string, photoId: string | null)
   const parsed = setGalleryCoverSchema.safeParse({ galleryId, photoId });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: parsed.data.galleryId, ownerId: session.user.id },
-    select: { id: true, eventId: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  if (parsed.data.photoId) {
-    const photo = await prisma.photo.findFirst({
-      where: { id: parsed.data.photoId, galleryId: gallery.id, status: "CONFIRMED" },
-      select: { id: true },
-    });
-    if (!photo) throw new Error("NOT_FOUND");
-  }
-
-  await prisma.gallery.update({
-    where: { id: gallery.id },
-    data: { coverPhotoId: parsed.data.photoId },
-  });
-
-  revalidatePath(`/admin/g/${gallery.id}`);
-  revalidatePath("/admin");
-  if (gallery.eventId) revalidatePath(`/admin/e/${gallery.eventId}`);
+  await setGalleryCoverFor(session.user.id, parsed.data.galleryId, parsed.data.photoId);
 }
 
 /**
@@ -887,35 +655,6 @@ export async function printDownloadLinks(galleryId: string, photoIds?: string[])
   // A narrowed admin view downloads only what it shows (docs/ADMIN-FILTERS.md).
   const only = z.array(idSchema).max(5000).optional().parse(photoIds);
 
-  const gallery = await prisma.gallery.findFirst({
-    where: { id: parsed.data, ownerId: session.user.id },
-    select: { id: true },
-  });
-  if (!gallery) throw new Error("NOT_FOUND");
-
-  const quantities = await printTotals(gallery.id);
-  if (only) {
-    const keep = new Set(only);
-    for (const id of [...quantities.keys()]) if (!keep.has(id)) quantities.delete(id);
-  }
-  const photos = await prisma.photo.findMany({
-    where: { id: { in: [...quantities.keys()] }, galleryId: gallery.id, status: "CONFIRMED" },
-    select: { id: true, objectKey: true, fileName: true },
-  });
-  const objectKeys = new Map(photos.map((photo) => [photo.id, photo.objectKey]));
-
-  // Same names, same order as the list the admin copies (printList).
-  const entries = printEntries(
-    photos.map((photo) => ({
-      id: photo.id,
-      fileName: photo.fileName,
-      quantity: quantities.get(photo.id) ?? 0,
-    })),
-  );
-  return Promise.all(
-    entries.map(async (entry) => ({
-      name: entry.name,
-      url: await presignDownload(objectKeys.get(entry.id)!, entry.name),
-    })),
-  );
+  const links = await printDownloadsFor(session.user.id, parsed.data, only);
+  return links.map(({ name, url }) => ({ name, url }));
 }

@@ -40,6 +40,7 @@ model User {
   events            Event[]
   pushSubscriptions PushSubscription[]
   promoCards        PromoCard[]
+  mcpGrants         McpGrant[]
 
   @@map("user")
   @@schema("g_gallery")
@@ -891,5 +892,41 @@ model PhotoComment {
 
   @@index([photoId])
   @@index([shareLinkId])
+  @@schema("g_gallery")
+}
+
+/// One "Connect Claude" consent (docs/MCP.md): the OAuth 2.1 authorization code
+/// it started as, then the access/refresh token pair it became. Only SHA-256
+/// hashes of the tokens are stored, the same rule share tokens follow
+/// (CLAUDE.md invariant #5). Every MCP request re-checks that the user is still
+/// an admin, so a role change cuts a grant off without touching this row.
+model McpGrant {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The client's metadata-document URL — one of `TRUSTED_CLIENTS` only.
+  clientId            String
+  clientName          String
+  redirectUri         String
+  scope               String
+  /// The MCP endpoint the tokens are bound to (RFC 8707 audience).
+  resource            String
+  codeHash            String    @unique
+  codeChallenge       String
+  codeExpiresAt       DateTime
+  codeUsedAt          DateTime?
+  accessHash          String?   @unique
+  accessExpiresAt     DateTime?
+  refreshHash         String?   @unique
+  /// The refresh token just rotated away. Presenting it again is a replay,
+  /// and revokes the whole grant.
+  previousRefreshHash String?   @unique
+  refreshExpiresAt    DateTime?
+  refreshedAt         DateTime?
+  lastUsedAt          DateTime?
+  revokedAt           DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
   @@schema("g_gallery")
 }

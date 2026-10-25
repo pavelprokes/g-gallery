@@ -1,0 +1,80 @@
+import { DEVICE_SIZES, IMAGE_SIZES, QUALITY } from "@/lib/image-sizes";
+import { isThumbKey } from "@/lib/thumbnail";
+import { videoSrc } from "@/lib/video";
+
+// Photo addresses on the public CDN, built exactly as the custom image loader
+// builds them (src/lib/image-loader.ts) — same host, same parameter set — so
+// a link handed to Claude is a variant the gallery already paid for, never a
+// new billable transformation, and no byte passes through Vercel (CLAUDE.md
+// invariant #1). The loader itself is a client module, hence the twin.
+
+const THUMB_WIDTH = IMAGE_SIZES[0];
+const PREVIEW_WIDTH = DEVICE_SIZES[2];
+
+function base(): string | null {
+  return process.env.NEXT_PUBLIC_PHOTOS_BASE_URL?.replace(/\/$/, "") || null;
+}
+
+function transformMode() {
+  const mode = process.env.NEXT_PUBLIC_IMAGE_TRANSFORM;
+  return mode === "imgproxy" || mode === "none" ? mode : "cloudflare";
+}
+
+function encodeKey(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+function transformed(key: string, width: number): string | null {
+  const host = base();
+  if (!host) return null;
+  switch (transformMode()) {
+    case "imgproxy":
+      return `${host}/insecure/rs:fit:${width}:0/q:${QUALITY}/plain/${key}`;
+    case "none":
+      return `${host}/${encodeKey(key)}`;
+    default:
+      return `${host}/cdn-cgi/image/width=${width},quality=${QUALITY},format=auto,fit=scale-down/${key}`;
+  }
+}
+
+/**
+ * The object exactly as stored — the photographer's full-quality export. On
+ * Cloudflare the delivery host is the bucket's public custom domain; locally
+ * (imgproxy) the original sits behind imgproxy's untouched `plain` path.
+ */
+export function originalUrl(key: string): string | null {
+  const host = base();
+  if (!host) return null;
+  return transformMode() === "imgproxy"
+    ? `${host}/insecure/plain/${key}`
+    : `${host}/${encodeKey(key)}`;
+}
+
+/** The grid tile: the browser-made thumbnail when there is one, served untransformed. */
+export function thumbUrl(objectKey: string, thumbObjectKey: string | null): string | null {
+  if (thumbObjectKey && isThumbKey(thumbObjectKey) && transformMode() === "cloudflare") {
+    return originalUrl(thumbObjectKey);
+  }
+  return transformed(objectKey, THUMB_WIDTH);
+}
+
+/** The lightbox's own full-screen variant — big enough to judge a photo by. */
+export function previewUrl(objectKey: string): string | null {
+  return transformed(objectKey, PREVIEW_WIDTH);
+}
+
+export interface MediaRow {
+  objectKey: string;
+  thumbObjectKey: string | null;
+  videoObjectKey: string | null;
+}
+
+/** Every address of one photo or video, as the tools return them. */
+export function mediaUrls(row: MediaRow) {
+  return {
+    thumbUrl: thumbUrl(row.objectKey, row.thumbObjectKey),
+    previewUrl: previewUrl(row.objectKey),
+    originalUrl: originalUrl(row.objectKey),
+    ...(row.videoObjectKey ? { videoUrl: videoSrc(row.videoObjectKey) } : {}),
+  };
+}

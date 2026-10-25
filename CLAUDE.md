@@ -44,6 +44,10 @@ touching `src/lib/slideshow/*`, `src/components/slideshow/*` or adding any serve
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
+**`docs/MCP.md`** is the authority for the MCP server for Claude (`/api/mcp`, adopted 2026-10-25) and
+its OAuth sign-in (`/oauth/authorize`, `/api/oauth/*`, `/.well-known/oauth-*`, `McpGrant`) — read it
+before touching `src/lib/mcp/*` or `src/lib/gallery-admin.ts`, which the admin's Server Actions and
+the MCP tools share: change an admin operation there, not in a copy.
 
 ## Commands
 
