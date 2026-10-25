@@ -35,7 +35,7 @@ export const weddingsList = defineTool({
       .optional()
       .describe("Část názvu, bez ohledu na velikost písmen."),
     in_trash: z.boolean().default(false).describe("Místo živých svateb vrátí ty v koši."),
-    limit: limitInput(100, 50),
+    limit: limitInput(50, 50),
     offset: offsetInput,
   }),
   access: "read",

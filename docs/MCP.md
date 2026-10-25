@@ -42,7 +42,9 @@ official SDK clients (v1 legacy, v2 modern) and Claude:
 - **Origin check** against DNS rebinding: no `Origin`, `https://claude.ai`/`claude.com`, localhost,
   or this site.
 - Results are JSON text without indentation (a model reads it) plus the same value as
-  `structuredContent`.
+  `structuredContent`. Every list pages so one answer stays under ~35 k characters: measured in
+  production, ~36 k reached the model and ~56 k was cut off into a file. Most of a row is CDN
+  addresses, so the page size follows how many each row carries.
 - Every `tools/call` logs one line `{"event":"mcp.tool_call","email",…,"tool","ok","durationMs"}`.
 
 ## Sign-in (OAuth 2.1)
@@ -123,11 +125,11 @@ Read (`readOnlyHint`):
 | `gallery_stats`    | Visits and viewers (all time + per day), downloads, favourites, reactions, prints by viewer, guest uploads, corrections, promo clicks, top photos |
 | `weddings_list`    | Weddings with cover, guest URL                                                                                                                    |
 | `wedding_get`      | Cards in page order, and whether a guest actually sees each (`isCardVisible`)                                                                     |
-| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters; ≤ 50 full rows or ≤ 100 `compact` ones a page                                              |
+| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters; ≤ 40 full rows or ≤ 60 `compact` ones a page                                               |
 | `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, engagement, corrections, full-quality URLs                                   |
 | `activity_recent`  | What guests did lately (no view heartbeats)                                                                                                       |
 | `corrections_list` | The couple's corrections                                                                                                                          |
-| `print_order_get`  | Print list with print names and 15-minute download links                                                                                          |
+| `print_order_get`  | Whole print list, and the 15-minute download links 40 a page                                                                                      |
 
 Write — create or set, all through `src/lib/gallery-admin.ts`, the same code the admin's Server
 Actions call: `gallery_create` (draft, or published inside a wedding with its card link),
