@@ -211,30 +211,55 @@ describe("token endpoint", () => {
     });
   });
 
-  it("rotates the refresh token and treats a replay of the old one as theft", async () => {
+  it("rotates the refresh token and treats a later replay of the old one as theft", async () => {
     const { code } = await authorize();
     const issued = await exchange(code);
     if (issued.status !== 200) throw new Error("exchange failed");
-    const refresh = (token: string) =>
+    const start = Date.now();
+    const at = (ms: number) => new Date(start + ms);
+    const refresh = (token: string, now: Date) =>
       grantTokens(
         { grant_type: "refresh_token", refresh_token: token, client_id: CLAUDE_AI },
         ISSUER,
+        now,
       );
 
-    const rotated = await refresh(issued.body.refresh_token);
+    const rotated = await refresh(issued.body.refresh_token, at(0));
     expect(rotated.status).toBe(200);
     if (rotated.status !== 200) return;
     expect(rotated.body.refresh_token).not.toBe(issued.body.refresh_token);
-    expect(await findGrantForAccessToken(issued.body.access_token, ISSUER)).toBeNull();
+    expect(await findGrantForAccessToken(issued.body.access_token, ISSUER, at(0))).toBeNull();
 
-    expect(await refresh(issued.body.refresh_token)).toMatchObject({
+    expect(await refresh(issued.body.refresh_token, at(2 * 60_000))).toMatchObject({
       body: { error: "invalid_grant" },
     });
     // The replay ended the grant: the legitimate holder's new token is dead too.
-    expect(await refresh(rotated.body.refresh_token)).toMatchObject({
+    expect(await refresh(rotated.body.refresh_token, at(2 * 60_000))).toMatchObject({
       body: { error: "invalid_grant" },
     });
-    expect(await findGrantForAccessToken(rotated.body.access_token, ISSUER)).toBeNull();
+    expect(
+      await findGrantForAccessToken(rotated.body.access_token, ISSUER, at(2 * 60_000)),
+    ).toBeNull();
+  });
+
+  it("refuses, without revoking, the same client refreshing twice at once", async () => {
+    const { code } = await authorize();
+    const issued = await exchange(code);
+    if (issued.status !== 200) throw new Error("exchange failed");
+    const refresh = () =>
+      grantTokens(
+        {
+          grant_type: "refresh_token",
+          refresh_token: issued.body.refresh_token,
+          client_id: CLAUDE_AI,
+        },
+        ISSUER,
+      );
+
+    const winner = await refresh();
+    expect(await refresh()).toMatchObject({ body: { error: "invalid_grant" } });
+    if (winner.status !== 200) throw new Error("rotation failed");
+    expect(await findGrantForAccessToken(winner.body.access_token, ISSUER)).not.toBeNull();
   });
 
   it("revokes the grant once the account is no longer an admin", async () => {

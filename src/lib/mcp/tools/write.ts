@@ -17,6 +17,7 @@ import {
   updateEventFor,
   updateGalleryFor,
 } from "@/lib/gallery-admin";
+import { isCardVisible } from "@/lib/event-cards";
 import { decryptToken } from "@/lib/token-cipher";
 import { defineTool, jsonResult } from "../tool";
 import { McpToolError } from "../types";
@@ -26,6 +27,7 @@ import {
   day,
   dayInput,
   idInput,
+  isLive,
   notFound,
   owned,
   parseDay,
@@ -205,7 +207,9 @@ export const galleryPublish = defineTool({
   handler: async (args, caller) => {
     const gallery = await ownedGallery(caller.userId, args.gallery_id);
     if (gallery.trashedAt) throw new McpToolError("Galerie je v koši. Obnov ji v administraci.");
-    await publishGalleryFor(caller.userId, gallery.id);
+    // Already live: publishing again would move `publishedAt`, the lifecycle
+    // cron's clock for moving originals to cheaper storage (src/lib/lifecycle.ts).
+    if (gallery.status !== "PUBLISHED") await publishGalleryFor(caller.userId, gallery.id);
     const links = await prisma.shareLink.findMany({
       where: { galleryId: gallery.id, revokedAt: null },
       orderBy: { createdAt: "desc" },
@@ -288,6 +292,8 @@ export const shareLinkCreate = defineTool({
   access: "write",
   handler: async (args, caller) => {
     const gallery = await ownedGallery(caller.userId, args.gallery_id);
+    // Trash cuts access by revoking every link; a new one would reopen it.
+    if (gallery.trashedAt) throw new McpToolError("Galerie je v koši. Obnov ji v administraci.");
     const link = await owned(
       createShareLinkFor(caller.userId, {
         galleryId: gallery.id,
@@ -462,6 +468,9 @@ export const weddingAddGallery = defineTool({
         attachGalleryToEventFor(caller.userId, args.wedding_id, gallery.id),
         WEDDING_NOT_FOUND,
       );
+      // The column defaults to listed; a card must not reach every guest of the
+      // wedding as a side effect of being attached (as in createGalleryInEventFor).
+      await setGalleryListedFor(caller.userId, gallery.id, false);
     }
     if (args.card_share_link_id) {
       await owned(
@@ -493,16 +502,39 @@ export const weddingSetGalleryListed = defineTool({
     if (!gallery.eventId)
       throw new McpToolError("Galerie nepatří k žádné svatbě (wedding_add_gallery).");
     await owned(setGalleryListedFor(caller.userId, gallery.id, args.listed), GALLERY_NOT_FOUND);
+    const card = await prisma.gallery.findUniqueOrThrow({
+      where: { id: gallery.id },
+      select: {
+        id: true,
+        title: true,
+        eventKey: true,
+        position: true,
+        listedOnEvent: true,
+        status: true,
+        trashedAt: true,
+        eventLink: { select: { revokedAt: true, expiresAt: true } },
+        event: { select: { trashedAt: true } },
+      },
+    });
+    const now = new Date();
+    const link = card.eventLink;
     const blockers = [
-      ...(gallery.status !== "PUBLISHED" ? ["galerie není zveřejněná (gallery_publish)"] : []),
-      ...(!gallery.eventLinkId
+      ...(card.status !== "PUBLISHED" ? ["galerie není zveřejněná (gallery_publish)"] : []),
+      ...(card.trashedAt ? ["galerie je v koši"] : []),
+      ...(card.event?.trashedAt ? ["svatba je v koši"] : []),
+      ...(!link
         ? ["karta nemá odkaz (wedding_add_gallery s card_share_link_id)"]
-        : []),
+        : !isLive(link, now)
+          ? ["odkaz karty je zrušený nebo prošlý (vyber jiný přes wedding_add_gallery)"]
+          : []),
     ];
+    // The wedding page's own rule decides; the reasons above only explain it.
+    const visible = !card.event?.trashedAt && isCardVisible(card, now);
     return jsonResult({
       galleryId: gallery.id,
       listed: args.listed,
-      ...(args.listed && blockers.length ? { hiddenBecause: blockers } : {}),
+      visibleToGuests: visible,
+      ...(args.listed && !visible ? { hiddenBecause: blockers } : {}),
     });
   },
 });

@@ -317,6 +317,51 @@ test.describe("creating", () => {
     });
     expect(renamed).toMatchObject({ title: "MCP Svatba 2", venue: "Zámek Loučeň" });
   });
+
+  test("an existing gallery joins a wedding hidden, and says why it is not shown yet", async ({
+    request,
+  }) => {
+    const wedding = await tool<{ id: string }>(request, "wedding_create", { title: "MCP Druhá" });
+    const gallery = await tool<{ id: string }>(request, "gallery_create", { title: "MCP Hostina" });
+    const link = await tool<{ id: string }>(request, "share_link_create", {
+      gallery_id: gallery.id,
+    });
+
+    await tool(request, "wedding_add_gallery", {
+      wedding_id: wedding.id,
+      gallery_id: gallery.id,
+      card_share_link_id: link.id,
+    });
+    const attached = await tool<{ galleries: { listedOnWeddingPage: boolean }[] }>(
+      request,
+      "wedding_get",
+      { wedding_id: wedding.id },
+    );
+    expect(attached.galleries).toEqual([expect.objectContaining({ listedOnWeddingPage: false })]);
+
+    const draft = await tool<{ visibleToGuests: boolean; hiddenBecause: string[] }>(
+      request,
+      "wedding_set_gallery_listed",
+      { gallery_id: gallery.id, listed: true },
+    );
+    expect(draft.visibleToGuests).toBe(false);
+    expect(draft.hiddenBecause).toEqual([expect.stringContaining("není zveřejněná")]);
+
+    await tool(request, "gallery_publish", { gallery_id: gallery.id });
+    const shown = await tool<{ visibleToGuests: boolean }>(request, "wedding_set_gallery_listed", {
+      gallery_id: gallery.id,
+      listed: true,
+    });
+    expect(shown.visibleToGuests).toBe(true);
+  });
+
+  test("refuses an impossible date instead of shifting it", async ({ request }) => {
+    const { result } = await rpc(request, "tools/call", {
+      name: "wedding_create",
+      arguments: { title: "MCP Únor", event_date: "2026-02-30" },
+    });
+    expect(result).toMatchObject({ isError: true });
+  });
 });
 
 test.describe("consent page", () => {
@@ -337,5 +382,11 @@ test.describe("consent page", () => {
     await expect(page.getByRole("heading", { name: "Připojení se nepovedlo" })).toBeVisible();
     await expect(page.getByText(/Neznámý klient/)).toBeVisible();
     expect(new URL(page.url()).host).toBe(new URL(baseURL!).host);
+  });
+
+  test("cannot be framed by another site", async ({ request }) => {
+    const response = await request.get("/oauth/authorize", { maxRedirects: 0 });
+    expect(response.headers()["x-frame-options"]).toBe("DENY");
+    expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   });
 });

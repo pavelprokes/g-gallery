@@ -6,6 +6,7 @@ const findGrantForAccessToken = vi.hoisted(() => vi.fn());
 vi.mock("./caller", () => ({ loadAdminCaller }));
 vi.mock("./oauth/token-grant", () => ({ findGrantForAccessToken }));
 
+import { createHash } from "node:crypto";
 import { resolveMcpCaller } from "./auth";
 
 const ISSUER = "http://localhost:3000";
@@ -51,6 +52,22 @@ describe("resolveMcpCaller", () => {
     vi.stubEnv("VERCEL_ENV", "");
     vi.stubEnv("MCP_DEV_TOKEN", "short");
     expect(await resolveMcpCaller(bearer("short"), ISSUER)).toMatchObject({ status: 401 });
+  });
+
+  it("accepts the service token by its SHA-256, in production too", async () => {
+    const serviceToken = `ggs_${"s".repeat(40)}`;
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("MCP_SERVICE_TOKEN_SHA256", createHash("sha256").update(serviceToken).digest("hex"));
+    vi.stubEnv("MCP_SERVICE_EMAIL", "pavel@example.test");
+
+    expect((await resolveMcpCaller(bearer(serviceToken), ISSUER)).ok).toBe(true);
+    expect(loadAdminCaller).toHaveBeenCalledWith({ email: "pavel@example.test" });
+    expect(await resolveMcpCaller(bearer(`${serviceToken}x`), ISSUER)).toMatchObject({
+      status: 401,
+    });
+
+    vi.stubEnv("MCP_SERVICE_TOKEN_SHA256", "not-a-hash");
+    expect(await resolveMcpCaller(bearer(serviceToken), ISSUER)).toMatchObject({ status: 401 });
   });
 
   it("resolves an OAuth access token through its grant", async () => {

@@ -9,7 +9,12 @@ export const idInput = (what: string) => z.string().min(1).max(64).describe(`Id 
 export const dayInput = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Datum musí mít tvar RRRR-MM-DD.")
-  .refine((value) => !Number.isNaN(new Date(value).getTime()), "Neplatné datum.");
+  // `new Date("2026-02-30")` rolls over to 2 March instead of failing, and the
+  // date ends up frozen in a slug — so it must read back as the same day.
+  .refine((value) => {
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, "Takový den v kalendáři není.");
 
 export const parseDay = (value: string): Date => new Date(value);
 

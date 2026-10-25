@@ -38,24 +38,34 @@ function transformed(key: string, width: number): string | null {
 }
 
 /**
- * The object exactly as stored — the photographer's full-quality export. On
- * Cloudflare the delivery host is the bucket's public custom domain; locally
- * (imgproxy) the original sits behind imgproxy's untouched `plain` path.
+ * A file straight from the bucket's public host, as `archiveFor`
+ * (src/lib/shared-gallery.ts) serves the ZIP and the loader a thumbnail.
+ */
+export function bucketUrl(key: string): string | null {
+  const host = base();
+  return host ? `${host}/${encodeKey(key)}` : null;
+}
+
+/**
+ * The photographer's full-quality export, exactly as stored. On Cloudflare the
+ * delivery host is the bucket's public custom domain; locally (imgproxy) the
+ * original sits behind imgproxy's untouched `plain` path.
  */
 export function originalUrl(key: string): string | null {
   const host = base();
   if (!host) return null;
-  return transformMode() === "imgproxy"
-    ? `${host}/insecure/plain/${key}`
-    : `${host}/${encodeKey(key)}`;
+  return transformMode() === "imgproxy" ? `${host}/insecure/plain/${key}` : bucketUrl(key);
 }
 
-/** The grid tile: the browser-made thumbnail when there is one, served untransformed. */
+/**
+ * The grid tile, as the grid asks the loader for it: the browser-made
+ * thumbnail when there is one — served untransformed on Cloudflare, through
+ * imgproxy locally — and the original's 384 px variant otherwise.
+ */
 export function thumbUrl(objectKey: string, thumbObjectKey: string | null): string | null {
-  if (thumbObjectKey && isThumbKey(thumbObjectKey) && transformMode() === "cloudflare") {
-    return originalUrl(thumbObjectKey);
-  }
-  return transformed(objectKey, THUMB_WIDTH);
+  const key = thumbObjectKey ?? objectKey;
+  if (transformMode() === "cloudflare" && isThumbKey(key)) return bucketUrl(key);
+  return transformed(key, THUMB_WIDTH);
 }
 
 /** The lightbox's own full-screen variant — big enough to judge a photo by. */

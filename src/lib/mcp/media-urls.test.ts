@@ -40,8 +40,18 @@ describe("mediaUrls", () => {
     vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "http://localhost:8080");
     vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "imgproxy");
     expect(mediaUrls(PHOTO)).toMatchObject({
-      thumbUrl: "http://localhost:8080/insecure/rs:fit:384:0/q:82/plain/galleries/abc/1f2e.jpg",
+      thumbUrl:
+        "http://localhost:8080/insecure/rs:fit:384:0/q:82/plain/galleries/abc/1f2e.thumb.webp",
       originalUrl: "http://localhost:8080/insecure/plain/galleries/abc/1f2e.jpg",
+    });
+  });
+
+  it("serves the thumbnail object itself when nothing transforms", () => {
+    vi.stubEnv("NEXT_PUBLIC_PHOTOS_BASE_URL", "https://bucket.example.test");
+    vi.stubEnv("NEXT_PUBLIC_IMAGE_TRANSFORM", "none");
+    expect(mediaUrls(PHOTO)).toMatchObject({
+      thumbUrl: "https://bucket.example.test/galleries/abc/1f2e.thumb.webp",
+      originalUrl: "https://bucket.example.test/galleries/abc/1f2e.jpg",
     });
   });
 

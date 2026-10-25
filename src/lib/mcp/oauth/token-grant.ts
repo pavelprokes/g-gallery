@@ -34,6 +34,13 @@ export type TokenResult = { status: 200; body: TokenSuccess } | { status: 400; b
 
 export type TokenParams = Record<string, string | undefined>;
 
+/**
+ * A rotated-away refresh token presented this soon after its rotation is the
+ * same client racing itself (two conversations refreshing at once), not a
+ * thief: it is refused, but the grant survives. Later than this, it is a replay.
+ */
+const ROTATION_GRACE_MS = 60 * 1000;
+
 /** How often `lastUsedAt` is written — a busy session would otherwise update per call. */
 const LAST_USED_RESOLUTION_MS = 5 * 60 * 1000;
 
@@ -138,7 +145,9 @@ async function refresh(params: TokenParams, issuer: string, now: Date): Promise<
     // A rotated-away refresh token coming back means two parties hold it
     // (OAuth 2.1 §4.3.1): end the grant for both.
     const replayed = await findGrant("previousRefreshHash", refreshHash);
-    if (replayed && !replayed.revokedAt) await revoke(replayed, now);
+    const racing =
+      replayed?.refreshedAt && now.getTime() - replayed.refreshedAt.getTime() < ROTATION_GRACE_MS;
+    if (replayed && !replayed.revokedAt && !racing) await revoke(replayed, now);
     return invalidGrant("Unknown or already used refresh token");
   }
   if (grant.revokedAt || isPast(grant.refreshExpiresAt, now)) {

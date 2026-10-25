@@ -24,6 +24,16 @@ const nextConfig: NextConfig = {
         source: "/vendor/mediapipe/:version/wasm/:file*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      {
+        // The "Connect Claude" consent (docs/MCP.md): never inside another
+        // site's frame, where "Povolit přístup" could be clicked blind
+        // (RFC 6749 §10.13, clickjacking).
+        source: "/oauth/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
     ];
   },
 };

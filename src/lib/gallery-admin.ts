@@ -491,7 +491,7 @@ export async function printDownloadsFor(
   ownerId: string,
   galleryId: string,
   only?: readonly string[],
-): Promise<{ id: string; name: string; quantity: number; url: string }[]> {
+): Promise<{ id: string; fileName: string; name: string; quantity: number; url: string }[]> {
   const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, ownerId },
     select: { id: true },
@@ -507,7 +507,7 @@ export async function printDownloadsFor(
     where: { id: { in: [...quantities.keys()] }, galleryId: gallery.id, status: "CONFIRMED" },
     select: { id: true, objectKey: true, fileName: true },
   });
-  const objectKeys = new Map(photos.map((photo) => [photo.id, photo.objectKey]));
+  const byId = new Map(photos.map((photo) => [photo.id, photo]));
 
   // Same names, same order as the list the admin copies (printList).
   const entries = printEntries(
@@ -520,9 +520,10 @@ export async function printDownloadsFor(
   return Promise.all(
     entries.map(async (entry) => ({
       id: entry.id,
+      fileName: byId.get(entry.id)!.fileName,
       name: entry.name,
       quantity: entry.quantity,
-      url: await presignDownload(objectKeys.get(entry.id)!, entry.name),
+      url: await presignDownload(byId.get(entry.id)!.objectKey, entry.name),
     })),
   );
 }

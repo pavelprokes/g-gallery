@@ -32,6 +32,24 @@ function devTokenEmail(token: string): string | null {
   return timingSafeEqual(digest(token), digest(devToken)) ? devEmail : null;
 }
 
+const SERVICE_TOKEN_MIN_LENGTH = 40;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * The service token (docs/MCP.md §Service token): one long-lived secret for a
+ * client that cannot do the browser sign-in — an agent on the photographer's
+ * own server. Unlike the development token it works in production, so only
+ * its SHA-256 lives in the environment (`MCP_SERVICE_TOKEN_SHA256`): a leaked
+ * Vercel environment does not hand out the token itself.
+ */
+function serviceTokenEmail(token: string): string | null {
+  const expected = process.env.MCP_SERVICE_TOKEN_SHA256?.trim().toLowerCase();
+  const email = process.env.MCP_SERVICE_EMAIL;
+  if (!expected || !SHA256_HEX.test(expected) || !email) return null;
+  if (token.length < SERVICE_TOKEN_MIN_LENGTH) return null;
+  return timingSafeEqual(digest(token), Buffer.from(expected, "hex")) ? email : null;
+}
+
 export async function resolveMcpCaller(headers: Headers, issuer: string): Promise<McpAuthResult> {
   const token = bearerToken(headers);
   if (!token) {
@@ -42,9 +60,9 @@ export async function resolveMcpCaller(headers: Headers, issuer: string): Promis
       invalidToken: false,
     };
   }
-  const devEmail = devTokenEmail(token);
-  const lookup = devEmail
-    ? { email: devEmail }
+  const staticEmail = devTokenEmail(token) ?? serviceTokenEmail(token);
+  const lookup = staticEmail
+    ? { email: staticEmail }
     : await findGrantForAccessToken(token, issuer).then((grant) =>
         grant ? { id: grant.userId } : null,
       );

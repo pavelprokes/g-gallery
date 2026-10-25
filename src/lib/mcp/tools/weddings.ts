@@ -11,6 +11,7 @@ import {
   adminWeddingUrl,
   day,
   idInput,
+  isLive,
   iso,
   limitInput,
   notFound,
@@ -157,9 +158,7 @@ export const weddingGet = defineTool({
       guestUrl: base,
       galleries: event.galleries.map((gallery) => {
         const link = gallery.eventLink;
-        const linkLive = Boolean(
-          link && !link.revokedAt && (!link.expiresAt || link.expiresAt > now),
-        );
+        const linkLive = link ? isLive(link, now) : false;
         return {
           id: gallery.id,
           title: gallery.title,
@@ -167,7 +166,7 @@ export const weddingGet = defineTool({
           photos: gallery._count.photos,
           listedOnWeddingPage: gallery.listedOnEvent,
           // The wedding page's own rule, so "visible" means what a guest sees.
-          visibleToGuests: isCardVisible(gallery, now),
+          visibleToGuests: !event.trashedAt && isCardVisible(gallery, now),
           cardShareLink: link ? { id: link.id, label: link.label, live: linkLive } : null,
           cardUrl:
             token && gallery.eventKey

@@ -90,6 +90,25 @@ claude mcp add --transport http g-gallery-local http://localhost:3000/api/mcp \
   --header "Authorization: Bearer $MCP_DEV_TOKEN"
 ```
 
+### Service token
+
+For a client that cannot do the browser sign-in — an agent on the photographer's own server
+(Paperclip on the NAS, a cron job). One long-lived bearer token acting as `MCP_SERVICE_EMAIL`
+(still re-checked for the admin role on every request), **valid in production**. Only its SHA-256
+is stored, in `MCP_SERVICE_TOKEN_SHA256`; the token itself (≥ 40 characters) lives only on that
+server. Compared in constant time.
+
+```bash
+TOKEN="ggs_$(openssl rand -base64 36 | tr '+/' '-_' | tr -d '=')"   # keep it on the server only
+printf %s "$TOKEN" | shasum -a 256 | cut -d' ' -f1                  # → MCP_SERVICE_TOKEN_SHA256 on Vercel
+```
+
+Then any MCP client that can send a header:
+`Authorization: Bearer $TOKEN` against `https://photos.svatebni-fotograf-cechy.cz/api/mcp`, e.g.
+`claude mcp add --transport http g-gallery https://photos.svatebni-fotograf-cechy.cz/api/mcp --header "Authorization: Bearer $TOKEN"`.
+Revoking: remove or change the variable and redeploy. It does not expire on its own — treat it
+like a password.
+
 ## Tools
 
 Read (`readOnlyHint`):

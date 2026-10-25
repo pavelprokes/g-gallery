@@ -5,9 +5,10 @@ import { galleryCounts, photoCounts, promoClickCounts } from "@/lib/activity";
 import { pickCover } from "@/lib/event-access";
 import { printTotals, printTotalsByViewer } from "@/lib/print-selections";
 import { buildViewSeries, emptySeries, lastDays, windowStart } from "@/lib/view-series";
+import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { decryptToken } from "@/lib/token-cipher";
 import { CHAPTER_START_SELECT, compareChapterStarts } from "@/lib/photo-order";
-import { mediaUrls, originalUrl, thumbUrl } from "../media-urls";
+import { bucketUrl, mediaUrls, thumbUrl } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
 import {
   adminGalleryUrl,
@@ -42,7 +43,7 @@ const linkFields = {
   createdAt: true,
 } as const;
 
-/** The newest link a guest can open right now — what "Otevřít galerii" opens. */
+/** What "Otevřít galerii" opens in the admin, by the admin's own rule. */
 function liveUrl(
   origin: string,
   published: boolean,
@@ -54,13 +55,8 @@ function liveUrl(
   }[],
   now: Date,
 ): string | null {
-  if (!published) return null;
-  for (const link of links) {
-    if (!isLive(link, now)) continue;
-    const url = shareLinkUrl(origin, link);
-    if (url) return url;
-  }
-  return null;
+  const withUrls = links.map((link) => ({ ...link, url: shareLinkUrl(origin, link) }));
+  return newestLiveShareUrl(withUrls, published, now);
 }
 
 export const overview = defineTool({
@@ -357,7 +353,7 @@ export const galleryGet = defineTool({
         })),
       archive: {
         status: gallery.zipStatus,
-        url: gallery.zipBuiltAt && gallery.zipObjectKey ? originalUrl(gallery.zipObjectKey) : null,
+        url: gallery.zipBuiltAt && gallery.zipObjectKey ? bucketUrl(gallery.zipObjectKey) : null,
         sizeBytes: gallery.zipSizeBytes === null ? null : Number(gallery.zipSizeBytes),
         builtAt: iso(gallery.zipBuiltAt),
       },

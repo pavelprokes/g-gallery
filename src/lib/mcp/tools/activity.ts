@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import type { ActivityType } from "@/generated/prisma/enums";
 import { printDownloadsFor } from "@/lib/gallery-admin";
+import { printList } from "@/lib/print-export";
 import { printTotalsByViewer } from "@/lib/print-selections";
 import { mediaUrls, thumbUrl } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
@@ -170,7 +171,7 @@ export const printOrderGet = defineTool({
         photos: row.photos,
         pieces: row.pieces,
       })),
-      list: items.map((item) => `${item.name} — ${item.quantity} ks`).join("\n"),
+      list: printList(items),
     });
   },
 });

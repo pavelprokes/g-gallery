@@ -36,7 +36,8 @@ process.env.TOKEN_ENCRYPTION_KEY = localEnv.TOKEN_ENCRYPTION_KEY;
  * running OAuth. Also on this process, where the spec reads it.
  */
 localEnv.MCP_DEV_TOKEN ||= process.env.MCP_DEV_TOKEN || "e2e-mcp-dev-token-".padEnd(48, "x");
-localEnv.MCP_DEV_EMAIL ||= "e2e@example.com";
+// Always the seeded admin, whatever a local .env says: the spec reads its rows.
+localEnv.MCP_DEV_EMAIL = "e2e@example.com";
 process.env.MCP_DEV_TOKEN = localEnv.MCP_DEV_TOKEN;
 
 export default defineConfig({
