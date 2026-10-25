@@ -42,11 +42,19 @@ function filterWhere(filter: (typeof FILTERS)[number]): Prisma.PhotoWhereInput {
   }
 }
 
+/**
+ * What fits one answer to the model: a full row is ~790 characters of JSON and
+ * a compact one ~560, mostly the CDN addresses. 200 full rows (~157 k) were
+ * cut off by the client; these keep a page under ~60 k.
+ */
+const FULL_PAGE_MAX = 50;
+const COMPACT_PAGE_MAX = 100;
+
 export const photosList = defineTool({
   name: "photos_list",
   title: "Fotky galerie",
   description:
-    "Fotky a videa jedné galerie v pořadí, v jakém je vidí hosté, s adresami na veřejném CDN: thumbUrl (náhled do mřížky), previewUrl (velký náhled, 1920 px) a originalUrl (plná kvalita). compact=true vrátí jen id, název souboru a adresy — na procházení náhledů velkých galerií.",
+    "Fotky a videa jedné galerie v pořadí, v jakém je vidí hosté, s adresami na veřejném CDN: thumbUrl (náhled do mřížky), previewUrl (velký náhled, 1920 px) a originalUrl (plná kvalita). compact=true vrátí jen id, název souboru a adresy (až 100 na stránku) — na procházení náhledů velkých galerií.",
   input: z.strictObject({
     gallery_id: idInput("galerie"),
     filter: z
@@ -60,9 +68,11 @@ export const photosList = defineTool({
       .number()
       .int()
       .min(1)
-      .max(500)
-      .default(50)
-      .describe("Kolik položek vrátit (1–500; bez compact nejvýš 200)."),
+      .max(COMPACT_PAGE_MAX)
+      .default(FULL_PAGE_MAX)
+      .describe(
+        `Kolik položek vrátit (1–${COMPACT_PAGE_MAX}; bez compact nejvýš ${FULL_PAGE_MAX}). Další stránku dá offset.`,
+      ),
     offset: offsetInput,
   }),
   access: "read",
@@ -73,7 +83,7 @@ export const photosList = defineTool({
     });
     if (!gallery) throw notFound("Galerie nenalezena");
 
-    const limit = args.compact ? args.limit : Math.min(args.limit, 200);
+    const limit = args.compact ? args.limit : Math.min(args.limit, FULL_PAGE_MAX);
     const where: Prisma.PhotoWhereInput = {
       galleryId: gallery.id,
       status: "CONFIRMED",
