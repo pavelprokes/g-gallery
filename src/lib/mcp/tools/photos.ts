@@ -6,8 +6,9 @@ import { photoOrderBy } from "@/lib/photo-order";
 import { presignDownload } from "@/lib/r2";
 import { downloadKeyOf } from "@/lib/video";
 import { isDetailShot } from "@/lib/social-video/aim";
-import { currentFaces } from "@/lib/social-video/faces";
-import { mediaUrls } from "../media-urls";
+import { currentFaces, storedFaces } from "@/lib/social-video/faces";
+import { parseAspect, planCrop } from "@/lib/photo-crop";
+import { croppedUrl, mediaUrls } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
 import { adminGalleryUrl, idInput, iso, notFound, offsetInput } from "./common";
 
@@ -343,4 +344,136 @@ export const photoGet = defineTool({
   },
 });
 
-export const PHOTO_READ_TOOLS = [photosList, photoGet];
+const CROP_BATCH_MAX = 20;
+const SIZE_LIMIT = z.number().int().min(16).max(8192);
+
+export const photoCrop = defineTool({
+  name: "photo_crop",
+  title: "Ořez a zmenšení fotek",
+  description:
+    "Adresy na veřejném CDN s fotkou ořezanou na zadaný poměr stran a zmenšenou do zadané největší velikosti — např. pro Instagram (4:5, 1080 px, JPEG) nebo Facebook (1:1). Ořez míří chytře: na pojmenovaný pár, jinak na obličeje (nikdy neusekne hlavu kvůli linii očí), u detailů na ostré místo, jinak do horní třetiny. Vrátí výřez, výslednou velikost a varování (koho by ořez usekl, že je výřez menší než požadovaná velikost, fotka od hosta). Bajty nestahuje; každý nový ořez je na Cloudflare zpoplatněná transformace, tak žádej jen ty, které použiješ.",
+  input: z.strictObject({
+    photo_ids: z
+      .array(idInput("fotky"))
+      .min(1)
+      .max(CROP_BATCH_MAX)
+      .describe(`Fotky, které ořezat stejně (1–${CROP_BATCH_MAX}, např. celý carousel).`),
+    aspect: z
+      .string()
+      .trim()
+      .default("4:5")
+      .refine((value) => {
+        try {
+          parseAspect(value);
+          return true;
+        } catch {
+          return false;
+        }
+      }, "Poměr stran zadej jako „4:5“, „1:1“, „1.91:1“, „9:16“, jiný „Š:V“ (0,25–4), nebo „original“.")
+      .describe(
+        "Poměr šířky k výšce: 4:5 (Instagram feed), 1:1, 1.91:1, 9:16 (Reel, Story), 16:9, 3:2, 2:3, 4:3, 3:4, jakýkoli „Š:V“, nebo „original“ (bez ořezu, jen zmenšení).",
+      ),
+    framing: z
+      .enum(["photo", "subject"])
+      .default("photo")
+      .describe(
+        "photo = co největší kus fotky v tom poměru; subject = těsně kolem páru, obličejů nebo ostrého detailu (ne menší než výstup, pokud nepovolíš zvětšení).",
+      ),
+    max_width: SIZE_LIMIT.optional().describe(
+      "Největší šířka výsledku v px. Bez max_width i max_height je to 1080.",
+    ),
+    max_height: SIZE_LIMIT.optional().describe("Největší výška výsledku v px."),
+    allow_upscale: z
+      .boolean()
+      .default(false)
+      .describe("Zvětšit výřez, když je menší než požadovaná velikost (jinak zůstane, jak je)."),
+    format: z.enum(["jpeg", "webp"]).default("jpeg").describe("jpeg pro Instagram a Facebook."),
+    quality: z.number().int().min(30).max(100).default(85),
+  }),
+  access: "read",
+  handler: async (args, caller) => {
+    const aspect = parseAspect(args.aspect);
+    const rows = await prisma.photo.findMany({
+      where: { id: { in: args.photo_ids }, gallery: { ownerId: caller.userId } },
+      select: {
+        id: true,
+        fileName: true,
+        galleryId: true,
+        objectKey: true,
+        videoObjectKey: true,
+        width: true,
+        height: true,
+        status: true,
+        source: true,
+        faces: true,
+        faceTags: {
+          where: { person: { couple: true } },
+          select: { x: true, y: true, w: true, h: true },
+        },
+      },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    const crops = args.photo_ids.map((id) => {
+      const photo = byId.get(id);
+      if (!photo || photo.status !== "CONFIRMED")
+        return { photoId: id, error: "Fotka nenalezena." };
+      if (!photo.width || !photo.height) {
+        return {
+          photoId: id,
+          fileName: photo.fileName,
+          error: "Rozměry fotky nejsou známé — ořez nejde spočítat.",
+        };
+      }
+      const stored = storedFaces(photo.faces);
+      const plan = planCrop(
+        {
+          width: photo.width,
+          height: photo.height,
+          faces: stored?.faces ?? [],
+          focus: stored?.focus ?? null,
+          coupleTags: photo.faceTags,
+        },
+        {
+          aspect,
+          framing: args.framing,
+          maxWidth: args.max_width ?? null,
+          maxHeight: args.max_height ?? null,
+          allowUpscale: args.allow_upscale,
+        },
+      );
+      const url = croppedUrl(photo.objectKey, {
+        width: photo.width,
+        height: photo.height,
+        rect: plan.rect,
+        output: plan.output,
+        format: args.format,
+        quality: args.quality,
+      });
+      const warnings = [
+        ...(photo.source === "GUEST" ? ["Fotka od hosta, ne fotografova práce."] : []),
+        ...(photo.videoObjectKey ? ["Video: ořez je z jeho plakátu."] : []),
+        ...(!stored ? ["Obličeje ještě nejsou rozpoznané — ořez míří jen podle kompozice."] : []),
+        ...(url ? [] : ["Ořez tu nejde: CDN nemá zapnuté transformace obrázků."]),
+        ...plan.warnings,
+      ];
+      return {
+        photoId: photo.id,
+        fileName: photo.fileName,
+        galleryId: photo.galleryId,
+        url,
+        width: plan.output.width,
+        height: plan.output.height,
+        format: args.format,
+        crop: { ...plan.rect, of: { width: photo.width, height: photo.height } },
+        aim: plan.aim,
+        faces: plan.faces,
+        upscaled: plan.upscaled,
+        warnings,
+      };
+    });
+    return jsonResult({ aspect: args.aspect, framing: args.framing, crops });
+  },
+});
+
+export const PHOTO_READ_TOOLS = [photosList, photoGet, photoCrop];

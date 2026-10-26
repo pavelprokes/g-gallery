@@ -148,6 +148,7 @@ Read (`readOnlyHint`):
 | `wedding_get`      | Cards in page order, and whether a guest actually sees each (`isCardVisible`)                                                                     |
 | `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters (incl. `details`, as the admin's "Detaily"); ≤ 40 full rows or ≤ 60 `compact` ones a page   |
 | `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, sharp part (`focus`, `detail`), engagement, corrections, full-quality URLs   |
+| `photo_crop`       | 1–20 photos cut to an aspect (4:5, 1:1, 1.91:1, 9:16, any W:H, or original) and resized to a max size, aimed at the couple/faces/focus (§Crops)   |
 | `activity_recent`  | What guests did lately (no view heartbeats)                                                                                                       |
 | `corrections_list` | The couple's corrections                                                                                                                          |
 | `print_order_get`  | Whole print list, and the 15-minute download links 40 a page                                                                                      |
@@ -170,6 +171,29 @@ new billable transformation:
   quality; on a video row that is the poster, and `videoUrl` is the MP4;
 - `downloadUrl` (`photo_get`, `print_order_get`) — a presigned R2 GET that saves under the original
   file name, valid 15 minutes.
+
+### Crops
+
+`photo_crop` (adopted 2026-10-26, for the social-media agent: Instagram wants JPEG ≤ 8 MB at
+4:5 – 1.91:1, the originals are 15–20 MB) returns a CDN address per photo, still no bytes:
+
+- **Where it aims** (`src/lib/photo-crop.ts`, built on the social video's camera): the faces
+  named as the couple (`FaceTag` → `person.couple`), else every face the camera frames by
+  (`framedFaces`), unless the sharp part wins as in `aimFaces`; then the sharp part (`focus`); then
+  the upper third. Eyes go on a third of the height (0.4 in a wide frame), but the top of a head is
+  never cut to get them there. `framing: "photo"` keeps the largest crop of the aspect;
+  `"subject"` crops tight around the subject with air, never below the output size unless
+  `allow_upscale`.
+- **Warnings** instead of refusals: faces the crop cuts (the couple first), a cut-out smaller than
+  the asked size (not enlarged by default), a guest's photo, a video (its poster), faces not
+  detected yet.
+- **Size:** fitted into `max_width` × `max_height` (1080 wide when neither is given), exact aspect,
+  `jpeg` (default) or `webp`, quality 85.
+- **Address:** Cloudflare `trim=top;right;bottom;left` (pixels of the EXIF-oriented photo —
+  verified against a phone original with orientation 6) then `width,height,fit=cover`; imgproxy
+  `crop:w:h:nowe:x:y` + `rs:fit`; nothing when transformations are off. Unlike the other
+  addresses this is a **new billable transformation** per distinct crop — the tool says so, and
+  the agent asks only for crops it will publish.
 
 Showing a photo _inside_ the conversation (MCP `image` content) would mean fetching its bytes in a
 Vercel function — that is the invariant, so it is deliberately not done.

@@ -73,6 +73,46 @@ export function previewUrl(objectKey: string): string | null {
   return transformed(objectKey, PREVIEW_WIDTH);
 }
 
+export type CropFormat = "jpeg" | "webp";
+
+export interface CropSpec {
+  /** The photo's own size, which `rect` is measured in. */
+  width: number;
+  height: number;
+  rect: { x: number; y: number; w: number; h: number };
+  output: { width: number; height: number };
+  format: CropFormat;
+  quality: number;
+}
+
+/**
+ * A cut-out of the photo at an exact size and format (photo_crop,
+ * docs/MCP.md §Crops): Cloudflare trims the rectangle off the original and
+ * resizes it; imgproxy crops at an offset. Each distinct one is a new billable
+ * transformation, made only when asked for. Null without a transform backend.
+ */
+export function croppedUrl(key: string, spec: CropSpec): string | null {
+  const host = base();
+  if (!host) return null;
+  const { rect, output } = spec;
+  switch (transformMode()) {
+    case "none":
+      return null;
+    case "imgproxy": {
+      const enlarge = output.width > rect.w ? 1 : 0;
+      const ext = spec.format === "jpeg" ? "jpg" : spec.format;
+      return `${host}/insecure/crop:${rect.w}:${rect.h}:nowe:${rect.x}:${rect.y}/rs:fit:${output.width}:${output.height}:${enlarge}/q:${spec.quality}/f:${ext}/plain/${key}`;
+    }
+    default: {
+      const right = spec.width - rect.x - rect.w;
+      const bottom = spec.height - rect.y - rect.h;
+      const trim =
+        rect.x || rect.y || right || bottom ? `trim=${rect.y};${right};${bottom};${rect.x},` : "";
+      return `${host}/cdn-cgi/image/${trim}width=${output.width},height=${output.height},fit=cover,quality=${spec.quality},format=${spec.format}/${key}`;
+    }
+  }
+}
+
 export interface MediaRow {
   objectKey: string;
   thumbObjectKey: string | null;
