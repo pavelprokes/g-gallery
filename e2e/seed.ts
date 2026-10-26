@@ -19,6 +19,7 @@ import { gallerySlug } from "../src/lib/gallery-slug";
 import { encryptToken } from "../src/lib/token-cipher";
 import { refreshWovenOrder } from "../src/lib/woven-order-db";
 import { FACES_MODEL, type Face } from "../src/lib/social-video/faces";
+import { FOCUS_VERSION } from "../src/lib/social-video/focus";
 
 async function main() {
   let user = await prisma.user.findFirst({ where: { email: "e2e@example.com" } });
@@ -1223,6 +1224,7 @@ async function makeFilterGallery(ownerId: string) {
           model: FACES_MODEL,
           faces: [],
           focus: i === 3 ? { x: 0.3, y: 0.5, w: 0.3, h: 0.3, strength: 40 } : null,
+          focusVersion: FOCUS_VERSION,
         },
       },
     });
