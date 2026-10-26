@@ -183,6 +183,7 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 | `MCP_DEV_EMAIL`                     | runtime   | Same — the admin account the dev token acts as                                                         |
 | `MCP_SERVICE_TOKEN_SHA256`          | runtime   | No service token (docs/MCP.md §Service token). SHA-256 hex of the token, never the token itself        |
 | `MCP_SERVICE_EMAIL`                 | runtime   | Same — the admin account the service token acts as                                                     |
+| `MCP_OAUTH_REDIRECT_ORIGINS`        | runtime   | No client registration (docs/MCP.md §Other clients). Comma-separated origins, e.g. the NAS's Paperclip |
 
 Shared Supabase project (`docs/SETUP.md` §6) — the service role only has access to the `g_gallery`
 schema, granted explicitly; it cannot read the marketing site's own data in `public`.

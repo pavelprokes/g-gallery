@@ -10,6 +10,7 @@ import {
   REFRESH_TOKEN_TTL_S,
 } from "./config";
 import { findGrant, updateGrant, type McpGrant } from "./grant-store";
+import { clientStillTrusted } from "./registration";
 import { hashToken, newToken, verifyPkce } from "./tokens";
 
 export interface TokenSuccess {
@@ -89,9 +90,13 @@ const revoke = (grant: McpGrant, now: Date) => updateGrant(grant.id, null, { rev
 
 const isPast = (at: Date | null, now: Date): boolean => !at || at.getTime() <= now.getTime();
 
-/** No longer an admin: the grant is revoked for good, not just refused once. */
-async function stillAdmin(grant: McpGrant, now: Date): Promise<boolean> {
-  if (await loadAdminCaller({ id: grant.userId }, now)) return true;
+/**
+ * No longer an admin, or a registered client whose origin is no longer
+ * allowed: the grant is revoked for good, not just refused once.
+ */
+async function stillAllowed(grant: McpGrant, now: Date): Promise<boolean> {
+  if (clientStillTrusted(grant.clientId) && (await loadAdminCaller({ id: grant.userId }, now)))
+    return true;
   await revoke(grant, now);
   return false;
 }
@@ -122,7 +127,7 @@ async function exchangeCode(params: TokenParams, issuer: string, now: Date): Pro
     return invalidGrant("Authorization code was issued for another resource");
   }
   if (!verifyPkce(verifier, grant.codeChallenge)) return invalidGrant("PKCE verification failed");
-  if (!(await stillAdmin(grant, now))) return invalidGrant("The account no longer has access");
+  if (!(await stillAllowed(grant, now))) return invalidGrant("The access is no longer allowed");
 
   const tokens = issueTokens(grant, now);
   const redeemed = await updateGrant(
@@ -169,7 +174,7 @@ async function refresh(params: TokenParams, issuer: string, now: Date): Promise<
   if (grant.resource !== mcpResourceUrl(issuer)) {
     return invalidGrant("Refresh token was issued for another resource");
   }
-  if (!(await stillAdmin(grant, now))) return invalidGrant("The account no longer has access");
+  if (!(await stillAllowed(grant, now))) return invalidGrant("The access is no longer allowed");
 
   const tokens = issueTokens(grant, now);
   const rotated = await updateGrant(
@@ -202,7 +207,8 @@ export async function findGrantForAccessToken(
     !grant ||
     grant.revokedAt ||
     isPast(grant.accessExpiresAt, now) ||
-    grant.resource !== mcpResourceUrl(issuer)
+    grant.resource !== mcpResourceUrl(issuer) ||
+    !clientStillTrusted(grant.clientId)
   ) {
     return null;
   }

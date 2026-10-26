@@ -62,7 +62,7 @@ better-auth + Google.
   and Claude Code (`…/claude-code-client-metadata` → only loopback, any port). Nothing else is ever
   fetched, so there is no SSRF surface; a document listing another return address does not make it
   allowed. If Anthropic moves a document, connecting fails with "Neznámý klient" and the list gets
-  the new URL. No dynamic client registration.
+  the new URL. Other apps register themselves (§Other clients).
 - **`/oauth/authorize`** — the consent page. Signed out → `/sign-in?next=…` and back; signed in
   without the admin role → refused. It shows the app, its host, the account, what it may do and
   where it returns (with a warning for localhost). PKCE S256 is required, `resource` must be this
@@ -82,6 +82,27 @@ better-auth + Google.
   `UPDATE g_gallery."McpGrant" SET "revokedAt" = now() WHERE id = '…';`. A page listing connections
   in the admin is the obvious next step.
 
+### Other clients (dynamic registration)
+
+Added 2026-10-26 for Paperclip on the photographer's NAS, so it signs in like Claude does (Google
+account → consent page → **Povolit přístup**) instead of holding a long-lived token.
+
+- `POST /api/oauth/register` (RFC 7591), advertised as `registration_endpoint` — only while
+  `MCP_OAUTH_REDIRECT_ORIGINS` lists at least one origin (comma-separated; HTTPS, or HTTP on
+  loopback). Otherwise 404 and not advertised.
+- Every `redirect_uris` entry must be on one of those origins, with no fragment or userinfo; the
+  client returns only to an exact registered URI. `token_endpoint_auth_method` is always `none`
+  (public client, PKCE), whatever was asked.
+- **Stateless.** The `client_id` is the registration: `ggd_<base64url {name, uris, issued}>.<HMAC-SHA256>`
+  keyed by `BETTER_AUTH_SECRET` (`src/lib/mcp/oauth/registration.ts`). Nothing is stored, so
+  registering costs nothing and fills nothing; a forged or altered id fails the signature.
+- The origin list is checked again on every use — consent, code exchange, refresh and every MCP
+  request. Removing an origin cuts its clients off, live tokens included (the grant is revoked at
+  its next refresh). Rotating `BETTER_AUTH_SECRET` does the same for all registered clients (and
+  signs everyone out of the admin).
+- Anyone can register a client, but only to return to the photographer's own servers, and only
+  the admin can consent — the consent page names the app and the return host.
+
 ### Development token
 
 `Authorization: Bearer $MCP_DEV_TOKEN` acts as `MCP_DEV_EMAIL` (still re-checked for the admin
@@ -96,7 +117,7 @@ claude mcp add --transport http g-gallery-local http://localhost:3000/api/mcp \
 
 ### Service token
 
-For a client that cannot do the browser sign-in — an agent on the photographer's own server
+For a client that cannot do the browser sign-in at all (prefer §Other clients when it can) — an agent on the photographer's own server
 (Paperclip on the NAS, a cron job). One long-lived bearer token acting as `MCP_SERVICE_EMAIL`
 (still re-checked for the admin role on every request), **valid in production**. Only its SHA-256
 is stored, in `MCP_SERVICE_TOKEN_SHA256`; the token itself (≥ 40 characters) lives only on that

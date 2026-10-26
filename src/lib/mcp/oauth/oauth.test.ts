@@ -43,13 +43,20 @@ vi.mock("../caller", () => ({
     store.admin ? { userId: "user_1", email: "pavel@example.test" } : null,
 }));
 
-import { clearClientCache } from "./clients";
+import { clearClientCache, resolveClient } from "./clients";
 import {
   issueAuthorizationCode,
   parseAuthorizeRequest,
   type AuthorizeParams,
 } from "./authorization";
-import { authorizationServerMetadata, protectedResourceMetadata, publicOrigin } from "./config";
+import {
+  allowedRedirectOrigins,
+  authorizationServerMetadata,
+  protectedResourceMetadata,
+  publicOrigin,
+  registrationEnabled,
+} from "./config";
+import { registerClient } from "./registration";
 import { findGrantForAccessToken, grantTokens } from "./token-grant";
 
 const ISSUER = "https://photos.example.test";
@@ -307,5 +314,117 @@ describe("discovery", () => {
       "https://photos.svatebni-fotograf-cechy.cz",
     );
     vi.unstubAllEnvs();
+  });
+});
+
+describe("dynamic client registration", () => {
+  const NAS = "https://nas.example.test:10443";
+  const NAS_CALLBACK = `${NAS}/oauth/callback`;
+
+  function register(body: unknown = { client_name: "Paperclip", redirect_uris: [NAS_CALLBACK] }) {
+    const result = registerClient(body);
+    if (!result.ok) throw new Error(result.body.error);
+    return result.body.client_id;
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("MCP_OAUTH_REDIRECT_ORIGINS", `${NAS}, not a url, http://evil.test`);
+    vi.stubEnv("BETTER_AUTH_SECRET", "s".repeat(32));
+    return () => vi.unstubAllEnvs();
+  });
+
+  it("registers only return addresses on an allowed origin", () => {
+    expect(allowedRedirectOrigins()).toEqual([NAS]);
+    const result = registerClient({ client_name: "Paperclip", redirect_uris: [NAS_CALLBACK] });
+    expect(result).toMatchObject({
+      ok: true,
+      body: {
+        client_name: "Paperclip",
+        redirect_uris: [NAS_CALLBACK],
+        token_endpoint_auth_method: "none",
+      },
+    });
+    for (const redirect of [
+      "https://evil.test/cb",
+      "http://evil.test/cb",
+      `${NAS}/cb#x`,
+      "https://user@nas.example.test:10443/cb",
+    ]) {
+      expect(registerClient({ redirect_uris: [NAS_CALLBACK, redirect] })).toMatchObject({
+        ok: false,
+        body: { error: "invalid_redirect_uri" },
+      });
+    }
+    expect(
+      registerClient({ redirect_uris: Array(5).fill(`${NAS_CALLBACK}?${"x".repeat(400)}`) }),
+    ).toMatchObject({ ok: false, body: { error: "invalid_client_metadata" } });
+    expect(registerClient({ client_name: "x" })).toMatchObject({
+      ok: false,
+      body: { error: "invalid_client_metadata" },
+    });
+  });
+
+  it("signs in a registered client and returns exactly where it registered", async () => {
+    const clientId = register();
+    const resolution = await resolveClient(clientId);
+    expect(resolution).toMatchObject({
+      ok: true,
+      client: { clientName: "Paperclip", host: "nas.example.test:10443" },
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    const { url, code } = await authorize({ client_id: clientId, redirect_uri: NAS_CALLBACK });
+    expect(`${url.origin}${url.pathname}`).toBe(NAS_CALLBACK);
+    const tokens = await exchange(code, { client_id: clientId, redirect_uri: NAS_CALLBACK });
+    if (tokens.status !== 200) throw new Error("exchange failed");
+    expect(await findGrantForAccessToken(tokens.body.access_token, ISSUER)).not.toBeNull();
+
+    const elsewhere = await parseAuthorizeRequest(
+      params({ client_id: clientId, redirect_uri: `${NAS}/other` }),
+      ISSUER,
+    );
+    expect(elsewhere).toMatchObject({ ok: false, redirectTo: null });
+  });
+
+  it("refuses a forged or tampered client id", async () => {
+    const clientId = register();
+    const [payload, signature] = clientId.slice("ggd_".length).split(".");
+    const forged = Buffer.from(
+      JSON.stringify({ n: "Paperclip", r: ["https://evil.test/cb"], t: 0 }),
+    ).toString("base64url");
+    for (const id of [`ggd_${forged}.${signature}`, `ggd_${payload}.AAAA`, `ggd_${payload}`]) {
+      expect(await resolveClient(id)).toMatchObject({ ok: false });
+    }
+    vi.stubEnv("BETTER_AUTH_SECRET", "t".repeat(32));
+    expect(await resolveClient(clientId)).toMatchObject({ ok: false });
+  });
+
+  it("cuts a client off, tokens included, once its origin is no longer allowed", async () => {
+    const clientId = register();
+    const { code } = await authorize({ client_id: clientId, redirect_uri: NAS_CALLBACK });
+    const tokens = await exchange(code, { client_id: clientId, redirect_uri: NAS_CALLBACK });
+    if (tokens.status !== 200) throw new Error("exchange failed");
+
+    vi.stubEnv("MCP_OAUTH_REDIRECT_ORIGINS", "https://other.example.test");
+    expect(await findGrantForAccessToken(tokens.body.access_token, ISSUER)).toBeNull();
+    expect(
+      await grantTokens(
+        {
+          grant_type: "refresh_token",
+          refresh_token: tokens.body.refresh_token,
+          client_id: clientId,
+        },
+        ISSUER,
+      ),
+    ).toMatchObject({ body: { error: "invalid_grant" } });
+    expect([...store.grants.values()][0]?.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("is advertised only while enabled", () => {
+    expect(authorizationServerMetadata(ISSUER)).toMatchObject({
+      registration_endpoint: `${ISSUER}/api/oauth/register`,
+    });
+    vi.stubEnv("MCP_OAUTH_REDIRECT_ORIGINS", "");
+    expect(registrationEnabled()).toBe(false);
+    expect(authorizationServerMetadata(ISSUER)).not.toHaveProperty("registration_endpoint");
   });
 });
