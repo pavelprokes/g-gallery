@@ -18,6 +18,11 @@ export function updatesCrumbs(): Crumb[] {
   return [OVERVIEW, { label: "Aktivita" }];
 }
 
+/** Přehled / Přepočet fotek */
+export function rescanCrumbs(): Crumb[] {
+  return [OVERVIEW, { label: "Přepočet fotek" }];
+}
+
 /** Přehled / {wedding} */
 export function eventCrumbs(event: EventRef): Crumb[] {
   return [OVERVIEW, { label: event.title }];

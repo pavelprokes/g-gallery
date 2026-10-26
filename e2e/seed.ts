@@ -268,6 +268,7 @@ async function main() {
   const fileOrder = await makeFileOrderGallery(user.id);
   const wovenOrder = await makeWovenOrderGallery(user.id);
   const highlights = await makeHighlightsGallery(user.id);
+  await makeRescanGallery(user.id);
 
   const adminCookie = await makeAdminSession(user.id);
   await makeActivity(user.id);
@@ -1153,6 +1154,32 @@ async function makeCorrectionGallery(ownerId: string, project: string) {
     slug,
     pin: E2E_CORRECTION_PIN,
   };
+}
+
+/** One photo never searched for faces, in a gallery no spec opens in the admin,
+ * so the bulk rescan always has something to list (e2e/admin-rescan.spec.ts). */
+async function makeRescanGallery(ownerId: string) {
+  const gallery = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Přepočet",
+      status: "DRAFT",
+      storagePrefix: `galleries/e2e-rescan-${Date.now()}`,
+    },
+  });
+  await prisma.photo.create({
+    data: {
+      galleryId: gallery.id,
+      objectKey: `${gallery.storagePrefix}/neprohledana.jpg`,
+      fileName: "neprohledana.jpg",
+      width: 1200,
+      height: 800,
+      placeholder: "#9a7b62",
+      status: "CONFIRMED",
+      sizeBytes: 900_000,
+      crc32: "00000000",
+    },
+  });
 }
 
 /** Four photos, each with one thing to filter by (docs/ADMIN-FILTERS.md). */
