@@ -17,7 +17,7 @@ import { ViewSparkline, ViewSparklineLegend } from "@/components/admin/view-spar
 import { decryptToken } from "@/lib/token-cipher";
 import { Badge } from "@/components/ui/badge";
 import { GALLERY_STATUS } from "@/lib/gallery-status";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -200,7 +200,14 @@ export default async function AdminPage() {
 
   return (
     <>
-      <PageHeader title="Přehled" />
+      <PageHeader
+        title="Přehled"
+        actions={
+          <Link href="/admin/prepocet" className={buttonClasses("secondary", "md")}>
+            Přepočet fotek
+          </Link>
+        }
+      />
 
       <AdminCreateBar createGalleryAction={create} />
 

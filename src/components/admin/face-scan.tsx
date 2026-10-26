@@ -49,7 +49,7 @@ export function sourceUrl(
 
 /** A photo's bytes at the size a 9:16 video fetches it — the default format,
  * so its render finds the transform already cached. */
-function fetchForFaces(photo: ScanPhoto): Promise<Blob> {
+export function fetchForFaces(photo: ScanPhoto): Promise<Blob> {
   return fetchPhotoBytes(sourceUrl(photo.objectKey, photo, FORMATS["9:16"]));
 }
 

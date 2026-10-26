@@ -5,6 +5,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { photoOrderBy } from "@/lib/photo-order";
 import { presignDownload } from "@/lib/r2";
 import { downloadKeyOf } from "@/lib/video";
+import { isDetailShot } from "@/lib/social-video/aim";
 import { currentFaces } from "@/lib/social-video/faces";
 import { mediaUrls } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
@@ -19,6 +20,7 @@ const FILTERS = [
   "print",
   "corrections",
   "highlights",
+  "details",
 ] as const;
 
 function filterWhere(filter: (typeof FILTERS)[number]): Prisma.PhotoWhereInput {
@@ -37,6 +39,9 @@ function filterWhere(filter: (typeof FILTERS)[number]): Prisma.PhotoWhereInput {
       return { comments: { some: {} } };
     case "highlights":
       return { highlightPin: true };
+    // Narrowed further in the handler: "details" is read off the stored faces.
+    case "details":
+      return { videoObjectKey: null };
     default:
       return {};
   }
@@ -62,7 +67,7 @@ export const photosList = defineTool({
       .enum(FILTERS)
       .default("all")
       .describe(
-        "photos/videos = jen fotky/videa, guests = od hostů, favorites = má srdíčko, print = vybráno do tisku, corrections = má připomínku, highlights = připnuto do výběru dne.",
+        "photos/videos = jen fotky/videa, guests = od hostů, favorites = má srdíčko, print = vybráno do tisku, corrections = má připomínku, highlights = připnuto do výběru dne, details = detaily (boty, prstýnky, dort…): fotky bez ostrého obličeje s jedním ostrým místem, jak je vybírá filtr Detaily v administraci.",
       ),
     compact: z.boolean().default(false),
     limit: z
@@ -90,12 +95,39 @@ export const photosList = defineTool({
       status: "CONFIRMED",
       ...filterWhere(args.filter),
     };
+    // "details" is decided per photo from its stored faces (src/lib/social-video/aim.ts),
+    // so the page is cut from the matching ids in the guests' order.
+    const detailIds =
+      args.filter === "details"
+        ? (
+            await prisma.photo.findMany({
+              where,
+              orderBy: photoOrderBy(gallery.photoOrder),
+              select: {
+                id: true,
+                faces: true,
+                faceTags: {
+                  where: { person: { couple: true } },
+                  select: { x: true, y: true, w: true, h: true },
+                },
+              },
+            })
+          )
+            .filter((photo) => {
+              const faces = currentFaces(photo.faces);
+              return faces !== null && isDetailShot(faces, photo.faceTags);
+            })
+            .map((photo) => photo.id)
+        : null;
+    const pageWhere: Prisma.PhotoWhereInput = detailIds
+      ? { ...where, id: { in: detailIds.slice(args.offset, args.offset + limit) } }
+      : where;
     const [total, photos] = await Promise.all([
-      prisma.photo.count({ where }),
+      detailIds ? Promise.resolve(detailIds.length) : prisma.photo.count({ where }),
       prisma.photo.findMany({
-        where,
+        where: pageWhere,
         orderBy: photoOrderBy(gallery.photoOrder),
-        skip: args.offset,
+        skip: detailIds ? 0 : args.offset,
         take: limit,
         select: {
           id: true,
@@ -186,7 +218,15 @@ export const photoGet = defineTool({
         checkKeptAt: true,
         gallery: { select: { id: true, title: true, coverPhotoId: true, featuredVideoId: true } },
         uploadedBy: { select: { displayName: true } },
-        faceTags: { select: { person: { select: { name: true, couple: true } } } },
+        faceTags: {
+          select: {
+            x: true,
+            y: true,
+            w: true,
+            h: true,
+            person: { select: { name: true, couple: true } },
+          },
+        },
         reactions: { select: { kind: true } },
         printSelections: { select: { quantity: true } },
         comments: {
@@ -256,6 +296,23 @@ export const photoGet = defineTool({
       },
       highlightPin: photo.highlightPin,
       faces: faces ? faces.faces.length : null,
+      // The sharp part the video camera aims at without a sharp face (docs/SOCIAL-VIDEO.md §5),
+      // 0–1 of the photo; null when nothing stands out or it was not looked for yet.
+      focus: faces?.focus
+        ? {
+            x: faces.focus.x,
+            y: faces.focus.y,
+            w: faces.focus.w,
+            h: faces.focus.h,
+            strength: faces.focus.strength,
+          }
+        : null,
+      detail: faces
+        ? isDetailShot(
+            faces,
+            photo.faceTags.filter((tag) => tag.person.couple),
+          )
+        : null,
       people: photo.faceTags.map((tag) => ({ name: tag.person.name, couple: tag.person.couple })),
       checkKeptAt: iso(photo.checkKeptAt),
       favorites: photo._count.favorites,

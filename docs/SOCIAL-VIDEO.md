@@ -170,6 +170,13 @@ only when both are shut — a laugh squints one eye past 0.5 as often as not. It
 the pinned package on install (`scripts/copy-mediapipe.mjs`, served immutable under its version),
 its model committed in `public/vendor/mediapipe/models/`.
 
+**Every gallery at once** (`/admin/prepocet`, "Přepočet fotek" on the overview, 2026-10-26): the
+photos each gallery page would scan on its own when opened — faces never searched, from an older
+build, or the sharp part not yet looked for (`needsFocus`) — listed for all of the owner's galleries
+and scanned one gallery after another in that tab (`BulkFaceScan`), with the same worker, fetch and
+`saveFaces`. Pausing stops at the next photo; what is saved stays saved, and the page lists only the
+rest next time.
+
 ### The photo check
 
 **Kontrola fotek** (`/admin/g/[id]/check`, Pavel, 2026-10-18) lists the photos where someone has

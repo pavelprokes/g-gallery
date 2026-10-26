@@ -125,8 +125,8 @@ Read (`readOnlyHint`):
 | `gallery_stats`    | Visits and viewers (all time + per day), downloads, favourites, reactions, prints by viewer, guest uploads, corrections, promo clicks, top photos |
 | `weddings_list`    | Weddings with cover, guest URL                                                                                                                    |
 | `wedding_get`      | Cards in page order, and whether a guest actually sees each (`isCardVisible`)                                                                     |
-| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters; ≤ 40 full rows or ≤ 60 `compact` ones a page                                               |
-| `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, engagement, corrections, full-quality URLs                                   |
+| `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters (incl. `details`, as the admin's "Detaily"); ≤ 40 full rows or ≤ 60 `compact` ones a page   |
+| `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, sharp part (`focus`, `detail`), engagement, corrections, full-quality URLs   |
 | `activity_recent`  | What guests did lately (no view heartbeats)                                                                                                       |
 | `corrections_list` | The couple's corrections                                                                                                                          |
 | `print_order_get`  | Whole print list, and the 15-minute download links 40 a page                                                                                      |
