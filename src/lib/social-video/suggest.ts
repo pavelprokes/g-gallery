@@ -12,6 +12,7 @@ import {
   planShot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
+import { aimFaces } from "@/lib/social-video/aim";
 import { coupleFaces, focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import { FADE_SECONDS, SLIDE_SECONDS } from "@/lib/social-video/timeline";
@@ -66,7 +67,9 @@ const BLINK_MIN_FACES = 3;
  * shot (camera.ts), so here it does not count as someone either. Null when
  * faces are not known. */
 function peopleIn(c: VideoCandidate): Face[] | null {
-  return c.faces?.faces.filter((f) => f.score >= FRAMING_MIN_SCORE) ?? null;
+  // As the camera aims: soft faces behind a sharp detail are not the slide's people.
+  if (!c.faces) return null;
+  return aimFaces(c.faces.faces, c.faces.focus).filter((f) => f.score >= FRAMING_MIN_SCORE);
 }
 
 /** The couple named on a photo: it is their video. As much as the right
@@ -201,7 +204,7 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   if (!faces || !people || c.width === null || c.height === null) return score;
   if (people.length > 0) score += 1;
   const coupleTags = c.coupleTags ?? [];
-  if (coupleFaces(faces, coupleTags).length > 0) score += COUPLE_BONUS;
+  if (people.length > 0 && coupleFaces(faces, coupleTags).length > 0) score += COUPLE_BONUS;
   // Known to show no face: for 9:16 a landscape photo is then cut blind — a
   // wide church or a beach with the couple somewhere off the crop.
   else if (wantsPortrait && !portrait) score -= 2;
@@ -215,7 +218,7 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   const framing = {
     width: c.width,
     height: c.height,
-    faces: focusFaces(faces, coupleTags),
+    faces: aimFaces(focusFaces(faces, coupleTags), c.faces?.focus),
     focus: c.faces?.focus,
   };
   const shot = planShot(framing, format, SLIDE_SECONDS + FADE_SECONDS);

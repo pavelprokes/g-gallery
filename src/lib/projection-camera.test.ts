@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FACES_MODEL, type Face } from "@/lib/social-video/faces";
 import {
   projectionFaces,
+  projectionFocus,
   projectionShot,
   shotKeyframes,
   transformFor,
@@ -63,6 +64,34 @@ describe("projectionShot", () => {
   it("pulls out of a group every time", () => {
     const group = { ...landscape, faces: [0.3, 0.4, 0.5].map((x) => face({ x })) };
     expect(projectionShot(group, SCREEN, 7, 0)!.kind).toBe("pull");
+  });
+});
+
+describe("focus in the projection", () => {
+  const rings = { x: 0.4, y: 0.55, w: 0.2, h: 0.25, strength: 40 };
+
+  it("hands over the sharp part, rounded, and drops soft faces in front of it", () => {
+    const stored = {
+      v: 1,
+      model: FACES_MODEL,
+      faces: [{ ...face({ x: 0.2 }), sharp: 0.02 }],
+      focus: { ...rings, x: 0.400049 },
+    };
+    expect(projectionFocus(stored)).toEqual(rings);
+    expect(projectionFaces(stored)).toEqual([]);
+    expect(projectionFocus({ v: 1, model: FACES_MODEL, faces: [] })).toBeNull();
+  });
+
+  it("moves a faceless detail towards its sharp part", () => {
+    const shot = projectionShot(
+      { width: 3000, height: 2000, faces: [], focus: rings },
+      SCREEN,
+      7,
+      0,
+    )!;
+    expect(shot).not.toBeNull();
+    const tight = shot.kind === "push" ? shot.to : shot.from;
+    expect(tight.y + tight.h / 2).toBeGreaterThan(1000);
   });
 });
 

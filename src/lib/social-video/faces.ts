@@ -58,7 +58,7 @@ export const photoFacesSchema = z.object({
   model: z.string().min(1).max(80),
   faces: z.array(faceSchema).max(MAX_FACES),
   /** Null: looked, nothing stands out. Absent: written before focus existed
-   * (2026-10-26) — `needsFocus` (camera.ts) sends such a faceless photo back to the worker
+   * (2026-10-26) — `needsFocus` (aim.ts) sends such a photo — faceless, or with no face measured sharp — back to the worker
    * without a `FACES_MODEL` bump re-searching every photo of every gallery. */
   focus: focusSchema.nullable().optional(),
 });

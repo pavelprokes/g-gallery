@@ -1,6 +1,7 @@
 "use client";
 
 import type { Face } from "@/lib/social-video/faces";
+import type { Focus } from "@/lib/social-video/focus";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -188,6 +189,8 @@ export interface GalleryPhoto {
   /** The face boxes the projection's camera frames by
    * (src/lib/projection-camera.ts); null when they were never searched. */
   faces: Face[] | null;
+  /** The sharp part it aims at without a face to frame (docs/SOCIAL-VIDEO.md §5). */
+  focus: Focus | null;
 }
 
 export interface GalleryViewer {

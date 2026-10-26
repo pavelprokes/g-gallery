@@ -31,7 +31,7 @@ import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-p
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { GalleryFaceScan } from "@/components/admin/gallery-face-scan";
-import { isDetailShot, needsFocus } from "@/lib/social-video/camera";
+import { isDetailShot, needsFocus } from "@/lib/social-video/aim";
 import { currentFaces } from "@/lib/social-video/faces";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
@@ -231,7 +231,18 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       width: { not: null },
       height: { not: null },
     },
-    select: { id: true, objectKey: true, width: true, height: true, faces: true },
+    select: {
+      id: true,
+      objectKey: true,
+      width: true,
+      height: true,
+      faces: true,
+      // The couple's named boxes, so "Detaily" narrows the faces as the camera does.
+      faceTags: {
+        where: { person: { couple: true } },
+        select: { x: true, y: true, w: true, h: true },
+      },
+    },
   });
   const scanned = stills.map((photo) => ({ photo, faces: currentFaces(photo.faces) }));
   // Searched for faces never, by an older build, or (with no face to frame)
@@ -246,7 +257,9 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     }));
   // "Detaily" (docs/ADMIN-FILTERS.md): what the camera frames by its sharp part.
   const details = new Set(
-    scanned.filter(({ faces }) => faces && isDetailShot(faces)).map(({ photo }) => photo.id),
+    scanned
+      .filter(({ photo, faces }) => faces && isDetailShot(faces, photo.faceTags))
+      .map(({ photo }) => photo.id),
   );
 
   // The gallery as a guest opens it — the header's "Otevřít galerii" and each

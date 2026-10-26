@@ -3,6 +3,7 @@
 // and the one-click gift, so both draw the same video from the same photos.
 
 import { directShots, planShot, type Shot, type VideoFormat } from "@/lib/social-video/camera";
+import { aimFaces } from "@/lib/social-video/aim";
 import { focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { moveSeconds, type Timeline } from "@/lib/social-video/timeline";
@@ -38,22 +39,21 @@ export function shotsFor(
   { fitAcross = false }: ShotsOptions = {},
 ): Shot[] {
   const seconds = moveSeconds(timeline);
+  const aimed = photos.map((p) =>
+    aimFaces(focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []), faces[p.id]?.focus),
+  );
   return directShots(
     photos.map((p, i) =>
       fitAcross && isAcross(p, format)
         ? wholePhoto(p)
         : planShot(
-            {
-              width: p.width,
-              height: p.height,
-              faces: focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
-              focus: faces[p.id]?.focus,
-            },
+            { width: p.width, height: p.height, faces: aimed[i]!, focus: faces[p.id]?.focus },
             format,
             seconds[i] ?? seconds.at(-1) ?? 3,
           ),
     ),
-    photos.map((p) => faces[p.id]?.faces.length ?? 0),
+    // A detail in front of soft faces is not a group: counted as the camera aims.
+    aimed.map((list) => list.length),
   );
 }
 
