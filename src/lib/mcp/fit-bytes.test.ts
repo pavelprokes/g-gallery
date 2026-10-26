@@ -19,12 +19,21 @@ describe("fitBytes", () => {
     expect(sizeOf).toHaveBeenCalledTimes(1);
   });
 
-  it("starts below the pixel bound for a huge original", async () => {
-    const sizeOf = jpeg(0.2);
-    const fitted = await fitBytes(build, { width: 4692, height: 7035 }, 85, 8_000_000, sizeOf);
-    expect(fitted.output.width * fitted.output.height).toBeLessThanOrEqual(16_000_000);
-    expect(fitted.output.width / fitted.output.height).toBeCloseTo(4692 / 7035, 2);
-    expect(fitted.fits).toBe(true);
+  it("keeps a huge original whole when it fits, without guessing smaller first", async () => {
+    const sizeOf = jpeg(0.1);
+    const fitted = await fitBytes(build, { width: 5464, height: 8192 }, 85, 8_000_000, sizeOf);
+    expect(fitted).toMatchObject({
+      fits: true,
+      quality: 85,
+      output: { width: 5464, height: 8192 },
+    });
+    expect(sizeOf).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays at the asked size when it fits a small limit", async () => {
+    const sizeOf = jpeg(0.12);
+    const fitted = await fitBytes(build, { width: 1080, height: 1080 }, 85, 300_000, sizeOf);
+    expect(fitted).toMatchObject({ fits: true, output: { width: 1080 } });
   });
 
   it("lowers the quality first when the file is a little too big", async () => {
