@@ -204,6 +204,46 @@ test.describe("reading", () => {
     expect(photo.downloadUrl).toContain("X-Amz-Signature=");
   });
 
+  test("crops photos to an aspect and a size, and says what it could not", async ({ request }) => {
+    const page = await tool<{ photos: { id: string }[] }>(request, "photos_list", {
+      gallery_id: seed.galleryId,
+      limit: 2,
+    });
+    const ids = page.photos.map((photo) => photo.id);
+    const result = await tool<{
+      crops: {
+        photoId: string;
+        url?: string | null;
+        width?: number;
+        height?: number;
+        crop?: { w: number; h: number; of: { width: number; height: number } };
+        error?: string;
+      }[];
+    }>(request, "photo_crop", {
+      photo_ids: [...ids, "missing-photo"],
+      aspect: "1:1",
+      max_width: 400,
+    });
+    const exact = await tool<{
+      crops: { crop: { x: number; w: number; of: { width: number } } }[];
+    }>(request, "photo_crop", { photo_ids: [ids[0]!], rect: { x: 0.5, y: 0, w: 0.5, h: 1 } });
+    expect(exact.crops[0]!.crop.x).toBe(Math.round(exact.crops[0]!.crop.of.width / 2));
+    expect(result.crops.map((crop) => crop.photoId)).toEqual([...ids, "missing-photo"]);
+    for (const crop of result.crops.slice(0, 2)) {
+      expect(crop).toMatchObject({ width: 400, height: 400 });
+      expect(crop.crop!.w).toBe(crop.crop!.h);
+      expect(crop.crop!.h).toBe(Math.min(crop.crop!.of.width, crop.crop!.of.height));
+      expect(crop.url).toMatch(/(cdn-cgi\/image\/.*width=400,height=400|crop:\d+:\d+:nowe)/);
+    }
+    expect(result.crops[2]).toMatchObject({ error: expect.stringContaining("nenalezena") });
+
+    const { result: bad } = await rpc(request, "tools/call", {
+      name: "photo_crop",
+      arguments: { photo_ids: ids, aspect: "10:1" },
+    });
+    expect(bad).toMatchObject({ isError: true });
+  });
+
   test("reads weddings, activity, corrections and the print order", async ({ request }) => {
     const weddings = await tool<{ weddings: { id: string }[] }>(request, "weddings_list", {
       limit: 50,

@@ -148,6 +148,7 @@ Read (`readOnlyHint`):
 | `wedding_get`      | Cards in page order, and whether a guest actually sees each (`isCardVisible`)                                                                     |
 | `photos_list`      | Photos in the guests' order (`photoOrderBy`), filters (incl. `details`, as the admin's "Detaily"); ≤ 40 full rows or ≤ 60 `compact` ones a page   |
 | `photo_get`        | One photo or video in full: metadata, Lightroom marks, faces/people, sharp part (`focus`, `detail`), engagement, corrections, full-quality URLs   |
+| `photo_crop`       | 1–20 photos cut as asked (aspect + gravity/point, or an exact rect) and resized by Cloudflare, always under `max_bytes` (default 8 MB) (§Crops)   |
 | `activity_recent`  | What guests did lately (no view heartbeats)                                                                                                       |
 | `corrections_list` | The couple's corrections                                                                                                                          |
 | `print_order_get`  | Whole print list, and the 15-minute download links 40 a page                                                                                      |
@@ -170,6 +171,29 @@ new billable transformation:
   quality; on a video row that is the poster, and `videoUrl` is the MP4;
 - `downloadUrl` (`photo_get`, `print_order_get`) — a presigned R2 GET that saves under the original
   file name, valid 15 minutes.
+
+### Crops
+
+`photo_crop` (adopted 2026-10-26, for the social-media agent in Paperclip: Instagram and Facebook
+take images up to 8 MB, the originals are 15–20 MB) hands back a CDN address per photo — Cloudflare
+crops and resizes, the server only writes the address and never sees a byte.
+
+- **The client decides where to cut** (`src/lib/photo-crop.ts`, geometry only — nothing looks at
+  the picture): `aspect` (`4:5`, `1:1`, `1.91:1`, `9:16`, any `W:H`, or `original` = no crop) placed
+  by `gravity` (centre or an edge) or centred on a `point`; or an exact `rect` (shares 0–1 of the
+  photo), trimmed to the aspect around its centre when both are given. Then fitted into
+  `max_width` × `max_height`, never enlarged unless `allow_upscale`.
+- **Always under `max_bytes`** (default 8 000 000; `src/lib/mcp/fit-bytes.ts`): a JPEG's size
+  can't be known before it is made, so the server asks the CDN with `HEAD` — size, no body, so
+  invariant #1 holds — and steps quality down (to 70) and then the dimensions until it fits, at
+  most five tries; it starts below ~0.5 byte a pixel, which a wedding export rarely needs a second
+  try for. The answer carries the measured `bytes`; when the CDN can't be asked it says so instead
+  of guessing.
+- **Address:** Cloudflare `trim=top;right;bottom;left` (pixels of the EXIF-oriented photo —
+  verified against a phone original with orientation 6) then `width,height,fit=cover,quality,format`;
+  imgproxy `crop:w:h:nowe:x:y` + `rs:fit`; nothing when transformations are off. Unlike the other
+  addresses this is a **new billable transformation** per distinct crop (the `HEAD` makes it, the
+  platform then fetches it from the cache) — the agent asks only for crops it will publish.
 
 Showing a photo _inside_ the conversation (MCP `image` content) would mean fetching its bytes in a
 Vercel function — that is the invariant, so it is deliberately not done.
