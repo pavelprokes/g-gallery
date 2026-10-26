@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { rescanCrumbs } from "@/lib/admin-breadcrumbs";
 import { needsFocus } from "@/lib/social-video/aim";
 import { currentFaces, FACES_MODEL } from "@/lib/social-video/faces";
+import { FOCUS_VERSION } from "@/lib/social-video/focus";
 import { BulkFaceScan, type RescanGallery } from "@/components/admin/bulk-face-scan";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -20,9 +21,10 @@ export default async function RescanPage() {
   const session = await getAdminSession();
   if (!session) redirect("/sign-in?next=/admin/prepocet");
 
-  // The database narrows to the candidates — no faces, another build, or no
-  // focus key yet — so a library that is up to date reads almost nothing; the
-  // exact rule (`needsFocus`) runs on those few below.
+  // The database narrows to the candidates — no faces, another build, no
+  // focus key yet, or a focus aimed by an older version — so a library that is
+  // up to date reads almost nothing; the exact rule (`needsFocus`) runs on
+  // those few below.
   const candidates = await prisma.$queryRaw<{ id: string }[]>`
     SELECT p.id FROM "g_gallery"."Photo" p
     JOIN "g_gallery"."Gallery" g ON g.id = p."galleryId"
@@ -34,7 +36,9 @@ export default async function RescanPage() {
       AND p.height IS NOT NULL
       AND (p.faces IS NULL
         OR p.faces->>'model' IS DISTINCT FROM ${FACES_MODEL}
-        OR p.faces->'focus' IS NULL)`;
+        OR p.faces->'focus' IS NULL
+        OR (jsonb_typeof(p.faces->'focus') = 'object'
+          AND p.faces->>'focusVersion' IS DISTINCT FROM ${String(FOCUS_VERSION)}))`;
 
   const photos = await prisma.photo.findMany({
     where: { id: { in: candidates.map((row) => row.id) } },

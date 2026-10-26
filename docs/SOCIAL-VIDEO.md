@@ -301,9 +301,24 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
    union. **No face, one sharp part** (2026-10-26): the detail shots of a wedding — shoes, rings,
    a cake, a buttonhole — are shot wide open, so the subject is what is sharp. The face worker
    also measures the Laplacian's energy over a 12-tile grid of a 256 px copy
-   (`src/lib/social-video/focus.ts`); when the sharpest tile is ≥ 8× the median one (floored at 50, the sharpest at least 500), the tiles at
-   ≥ 45 % of it, connected to it, form the **focus box**, stored as `Photo.faces.focus` and framed like S (centred
-   on it, 8 % air, the same zoom caps). Measured on a real wedding (2026-10-26, in the worker): shoes 61×, a ring bearer's name card and buttonhole 29×, a bride from behind against a sharp window 5.6× — below the threshold on purpose, the upper third frames her better. **No face, nothing stands out** (`focus: null`, a
+   (`src/lib/social-video/focus.ts`); when the sharpest tile is ≥ 8× the median one (floored at 50, the sharpest at least 500), the photo
+   has a **focus box** (where it goes: below), stored as `Photo.faces.focus` and framed like S (centred
+   on it, 8 % air, the same zoom caps). Measured on a real wedding (2026-10-26, in the worker): shoes 61×, a ring bearer's name card and buttonhole 29×, a bride from behind against a sharp window 5.6× — below the threshold on purpose, the upper third frames her better.
+   **Where the box goes** (`FOCUS_VERSION` 2, same day): the 256 px copy only decides _whether_
+   something stands out. _Where_ is measured on a **512 px** copy with Crété-Roffet's
+   no-reference blur metric (the one scikit-image ships as `measure.blur_effect`, written out in
+   `focus.ts`, no dependency): per tile, the share of its Sobel edges a 9 px box blur takes away
+   — contrast-independent, so baby's breath across the bottom no longer outscores the rings in
+   the middle — damped below 30 % of the busiest tile's gradient (a smooth cake or a bare wall
+   with one fine edge does not win either), weighted ×(1 − 0.8 · 2d²) by the distance d from the
+   middle, the box being the tiles ≥ 90 % of the aimed one within 2 tiles of it. Chosen on 270
+   faceless photos from 7 real galleries, 214 of them hand-labelled where the methods disagreed
+   (copies made by Chromium's canvas, as in the worker): the 256 px Laplacian aimed right on 74 %,
+   the same at 512 px with the centre weight 84 %, OpenCV's Tenengrad × spectral-residual
+   saliency 75 %, scikit-image's `blur_effect` alone 89 % with boxes three times too wide to
+   push into, this one **91 %**; without the centre weight 70 %. What it still misses is mostly
+   a couple too small to find in a landscape. A focus aimed by version 1 is sent back by
+   `needsFocus` and listed by "Přepočet fotek". **No face, nothing stands out** (`focus: null`, a
    landscape, a crowd from behind): a gentle zoom (≤ 1.12) centred across and aimed at the
    **upper third** — at a wedding the heads are up there, and the middle of a full-length
    portrait cut to 16:9 is a waist. A value written before focus existed has no `focus` key;

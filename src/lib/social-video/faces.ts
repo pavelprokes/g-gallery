@@ -61,6 +61,8 @@ export const photoFacesSchema = z.object({
    * (2026-10-26) — `needsFocus` (aim.ts) sends such a photo — faceless, or with no face measured sharp — back to the worker
    * without a `FACES_MODEL` bump re-searching every photo of every gallery. */
   focus: focusSchema.nullable().optional(),
+  /** The `FOCUS_VERSION` (focus.ts) that aimed `focus`; absent: 1. */
+  focusVersion: z.number().int().min(1).max(1000).optional(),
 });
 
 /** Coordinates are 0–1 of the oriented photo, origin top left. */

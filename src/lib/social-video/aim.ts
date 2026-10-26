@@ -7,7 +7,7 @@
 import { framedFaces } from "@/lib/social-video/camera";
 import { focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
-import type { Focus } from "@/lib/social-video/focus";
+import { FOCUS_VERSION, type Focus } from "@/lib/social-video/focus";
 import { SOFT_BELOW } from "@/lib/photo-check";
 
 /** A face in the plane of focus: its eyes were measured, and came out sharp. */
@@ -55,10 +55,13 @@ export function isDetailShot(stored: PhotoFaces, coupleTags: readonly Box[] = []
   return !!stored.focus && framedFaces(aimed).length === 0;
 }
 
-/** Searched before focus existed (2026-10-26) where focus could decide the
- * aim — no face to frame, or none measured sharp: the face scan looks again. */
+/** Searched before focus existed (2026-10-26), or aimed by an older
+ * `FOCUS_VERSION`, where focus could decide the aim — no face to frame, or
+ * none measured sharp: the face scan looks again. A photo where nothing stood
+ * out (`focus: null`) still has nothing: the test of that did not change. */
 export function needsFocus(stored: PhotoFaces): boolean {
-  if (stored.focus !== undefined) return false;
+  if (stored.focus === null) return false;
+  if (stored.focus !== undefined && stored.focusVersion === FOCUS_VERSION) return false;
   const framed = framedFaces(stored.faces);
   return framed.length === 0 || noneSharp(framed);
 }

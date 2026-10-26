@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aimFaces, isDetailShot, needsFocus } from "@/lib/social-video/aim";
 import { FACES_MODEL, type Face } from "@/lib/social-video/faces";
-import type { Focus } from "@/lib/social-video/focus";
+import { FOCUS_VERSION, type Focus } from "@/lib/social-video/focus";
 
 /** A framed face at (x, y), its eyes measured `sharp` (null: not measured). */
 const face = (x: number, y: number, sharp: number | null): Face => ({
@@ -64,6 +64,15 @@ describe("isDetailShot and needsFocus", () => {
     expect(needsFocus(stored([face(0.25, 0.15, 0.4)]))).toBe(false);
     expect(needsFocus(stored([face(0.25, 0.15, null)]))).toBe(true);
     expect(needsFocus(stored([], null))).toBe(false);
+  });
+
+  it("sends back a focus aimed by an older version, not one aimed by this one", () => {
+    expect(needsFocus(stored([], rings))).toBe(true);
+    expect(needsFocus({ ...stored([], rings), focusVersion: FOCUS_VERSION - 1 })).toBe(true);
+    expect(needsFocus({ ...stored([], rings), focusVersion: FOCUS_VERSION })).toBe(false);
+    expect(needsFocus({ ...stored([face(0.25, 0.15, 0.4)], rings), focusVersion: 1 })).toBe(false);
+    // Nothing stood out: the test of that is the same in every version.
+    expect(needsFocus({ ...stored([], null), focusVersion: 1 })).toBe(false);
   });
 });
 
