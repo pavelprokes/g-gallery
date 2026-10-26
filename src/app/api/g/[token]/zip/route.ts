@@ -99,7 +99,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/g/[token]/z
 
   trackServerEvent({
     name: "gallery-download",
-    data: { photos: photos.length, partial: photoIds.length > 0 },
+    data: { photos: photos.length, partial: photoIds.length > 0, prebuilt: false },
     request,
   });
 
