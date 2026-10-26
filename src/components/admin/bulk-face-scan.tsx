@@ -20,25 +20,31 @@ export interface RescanGallery {
   photos: ScanPhoto[];
 }
 
+/** Photos in a row that fail to load or search: past it, something is wrong
+ * with the connection or the worker, not with the photos, and going on would
+ * only fetch the rest of the library for nothing. */
+const FAILURE_STREAK = 10;
+
 type State =
   | { kind: "idle" }
   | { kind: "running"; gallery: number; done: number }
   | { kind: "paused"; gallery: number; done: number }
+  | { kind: "stopped"; reason: "streak" | "save" }
   | { kind: "finished"; failed: number };
 
 /**
  * Every gallery's photos that the face scan still owes something — faces never
  * searched, or the sharp part not yet looked for (docs/SOCIAL-VIDEO.md §4–§5) —
- * searched one gallery after another in this tab, with the same worker and the
- * same saving the gallery page does on its own. Paused or closed halfway, the
- * saved part stays saved and the page lists only the rest next time.
+ * searched one gallery after another in this tab, with the same worker, fetch
+ * and saving as the gallery page's own scan (`scanFaces`). Paused or closed
+ * halfway, the saved part stays saved and the page lists only the rest next
+ * time. Its own driver rather than `useFaceScan`, which holds one gallery.
  */
 export function BulkFaceScan({ galleries }: { galleries: RescanGallery[] }) {
   const router = useRouter();
   const finder = useFaceFinder();
   const [state, setState] = useState<State>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
-  const failedRef = useRef(0);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const total = galleries.reduce((sum, g) => sum + g.photos.length, 0);
@@ -48,38 +54,55 @@ export function BulkFaceScan({ galleries }: { galleries: RescanGallery[] }) {
   const run = async (fromGallery: number, skip: number) => {
     const controller = new AbortController();
     abortRef.current = controller;
+    let failed = 0;
+    let streak = 0;
+    const counted = async <T,>(work: Promise<T>): Promise<T> => {
+      try {
+        const result = await work;
+        streak = 0;
+        return result;
+      } catch (cause) {
+        streak += 1;
+        if (streak >= FAILURE_STREAK) controller.abort();
+        throw cause;
+      }
+    };
     for (let index = fromGallery; index < galleries.length; index++) {
       const gallery = galleries[index]!;
       const offset = index === fromGallery ? skip : 0;
-      const photos = gallery.photos.slice(offset);
       setState({ kind: "running", gallery: index, done: before(index) + offset });
       try {
-        const { done, failed } = await scanFaces({
-          photos,
-          fetchPhoto: fetchForFaces,
-          find: (blob) => finder().find(blob),
+        const progress = await scanFaces({
+          photos: gallery.photos.slice(offset),
+          fetchPhoto: (photo) => counted(fetchForFaces(photo)),
+          find: (blob) => counted(finder().find(blob)),
           save: (entries) => saveFaces(gallery.id, entries),
-          onProgress: (progress) =>
-            setState({
-              kind: "running",
-              gallery: index,
-              done: before(index) + offset + progress.done,
-            }),
+          onProgress: ({ done }) =>
+            setState({ kind: "running", gallery: index, done: before(index) + offset + done }),
           signal: controller.signal,
         });
-        failedRef.current += failed;
+        failed += progress.failed;
         if (controller.signal.aborted) {
-          setState({ kind: "paused", gallery: index, done: before(index) + offset + done });
+          setState(
+            streak >= FAILURE_STREAK
+              ? { kind: "stopped", reason: "streak" }
+              : { kind: "paused", gallery: index, done: before(index) + offset + progress.done },
+          );
+          abortRef.current = null;
           return;
         }
       } catch (cause) {
-        // A save that failed leaves this gallery for the next run; the others go on.
-        console.warn("[g-gallery/faces] bulk scan: gallery failed", gallery.id, cause);
-        failedRef.current += photos.length;
+        // Saving failed — the session, the database: not something the next
+        // gallery would get past. What was saved before stays saved.
+        console.warn("[g-gallery/faces] bulk scan: save failed", gallery.id, cause);
+        setState({ kind: "stopped", reason: "save" });
+        abortRef.current = null;
+        router.refresh();
+        return;
       }
     }
     abortRef.current = null;
-    setState({ kind: "finished", failed: failedRef.current });
+    setState({ kind: "finished", failed });
     router.refresh();
   };
 
@@ -92,6 +115,7 @@ export function BulkFaceScan({ galleries }: { galleries: RescanGallery[] }) {
   }
 
   const current = state.kind === "running" || state.kind === "paused" ? state : null;
+  const canStart = state.kind === "idle" || state.kind === "finished" || state.kind === "stopped";
   return (
     <Card className="space-y-4">
       <p className="text-sm">
@@ -114,8 +138,19 @@ export function BulkFaceScan({ galleries }: { galleries: RescanGallery[] }) {
           {state.failed > 0 && ` ${pluralize(state.failed, NOT_LOADED)}, zkusí se příště.`}
         </p>
       )}
+      {state.kind === "stopped" && (
+        <p className="text-admin-danger text-sm" role="status">
+          {state.reason === "streak"
+            ? `Zastaveno: ${FAILURE_STREAK} fotek po sobě se nepodařilo načíst nebo projít. Zkontroluj připojení a zkus to znovu.`
+            : "Zastaveno: výsledky se nepodařilo uložit. Co se uložilo předtím, zůstává; zkus to znovu."}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
-        {state.kind === "idle" && <Button onClick={() => void run(0, 0)}>Přepočítat vše</Button>}
+        {canStart && (
+          <Button onClick={() => void run(0, 0)}>
+            {state.kind === "idle" ? "Přepočítat vše" : "Přepočítat zbytek"}
+          </Button>
+        )}
         {state.kind === "running" && (
           <Button variant="secondary" onClick={() => abortRef.current?.abort()}>
             Pozastavit

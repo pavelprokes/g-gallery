@@ -40,8 +40,15 @@ function filterWhere(filter: (typeof FILTERS)[number]): Prisma.PhotoWhereInput {
     case "highlights":
       return { highlightPin: true };
     // Narrowed further in the handler: "details" is read off the stored faces.
+    // Only stills with a sharp part can be one — the same stills the admin page
+    // reads (width and height known) — so the faces JSON loaded is the few.
     case "details":
-      return { videoObjectKey: null };
+      return {
+        videoObjectKey: null,
+        width: { not: null },
+        height: { not: null },
+        faces: { path: ["focus", "strength"], gte: 0 },
+      };
     default:
       return {};
   }
@@ -307,12 +314,13 @@ export const photoGet = defineTool({
             strength: faces.focus.strength,
           }
         : null,
-      detail: faces
-        ? isDetailShot(
-            faces,
-            photo.faceTags.filter((tag) => tag.person.couple),
-          )
-        : null,
+      detail:
+        faces && !photo.videoObjectKey
+          ? isDetailShot(
+              faces,
+              photo.faceTags.filter((tag) => tag.person.couple),
+            )
+          : null,
       people: photo.faceTags.map((tag) => ({ name: tag.person.name, couple: tag.person.couple })),
       checkKeptAt: iso(photo.checkKeptAt),
       favorites: photo._count.favorites,
