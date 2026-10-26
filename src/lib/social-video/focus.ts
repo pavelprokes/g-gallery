@@ -7,11 +7,20 @@
 export const FOCUS_EDGE = 256;
 /** Tiles along the longer side. */
 const GRID = 12;
-/** The sharpest tile against the median one: below it the photo is sharp all
- * over (a landscape, a group) and nothing in it stands out. */
-export const FOCUS_FROM = 3;
-/** Tiles at least this share of the sharpest one belong to the subject. */
+/** The sharpest tile against the median one: below it nothing stands out
+ * enough to aim at. On a real wedding the detail shots scored 29–61, while a
+ * bride from behind against a sharp window scored 5.6 — and aiming her by the
+ * sharpest tile landed between her and the dress beside her; the upper third
+ * frames her better. */
+export const FOCUS_FROM = 8;
+/** Tiles at least this share of the sharpest one, touching it, are the subject. */
 const SUBJECT_SHARE = 0.45;
+/** The sharpest tile's energy must reach this: below, nothing in the photo is
+ * crisp (on real detail shots at 256 px the sharp tiles score 3 600–7 100). */
+const MIN_TOP_ENERGY = 500;
+/** The median is read as at least this, so a photo that is mostly black or
+ * blown-out sky does not score an endless strength from a single textured tile. */
+const MEDIAN_FLOOR = 50;
 
 /** The sharp part of a photo, 0–1 of it, origin top left. */
 export interface Focus {
@@ -48,23 +57,39 @@ export function focusOf(rgba: ArrayLike<number>, width: number, height: number):
   }
   const scores = Array.from(energy, (e, t) => (count[t] ? e / count[t]! : 0));
   const top = Math.max(...scores);
+  if (top < MIN_TOP_ENERGY) return null;
   const median = [...scores].sort((a, b) => a - b)[Math.floor(scores.length / 2)]!;
-  const strength = median > 0 ? top / median : top > 0 ? Infinity : 0;
-  if (!(strength >= FOCUS_FROM)) return null;
+  const strength = top / Math.max(median, MEDIAN_FLOOR);
+  if (strength < FOCUS_FROM) return null;
 
+  // The sharp tiles connected to the sharpest one: two sharp spots apart are
+  // not one subject spanning the blur between them.
+  const start = scores.indexOf(top);
+  const seen = new Set([start]);
+  const queue = [start];
   let x0 = cols;
   let y0 = rows;
   let x1 = 0;
   let y1 = 0;
-  scores.forEach((score, t) => {
-    if (score < SUBJECT_SHARE * top) return;
+  for (let t = queue.pop(); t !== undefined; t = queue.pop()) {
     const cx = t % cols;
     const cy = Math.floor(t / cols);
     x0 = Math.min(x0, cx);
     y0 = Math.min(y0, cy);
     x1 = Math.max(x1, cx + 1);
     y1 = Math.max(y1, cy + 1);
-  });
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+        const n = ny * cols + nx;
+        if (seen.has(n) || scores[n]! < SUBJECT_SHARE * top) continue;
+        seen.add(n);
+        queue.push(n);
+      }
+    }
+  }
   const r = (n: number) => Math.round(n * 1000) / 1000;
   return {
     x: r((x0 * tile) / width),

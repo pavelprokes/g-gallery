@@ -2,7 +2,7 @@
 // ends in the photo, and where it is at any moment between. Pure and
 // client-safe; every rectangle is in the photo's own pixels.
 
-import type { Face } from "@/lib/social-video/faces";
+import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import type { Focus } from "@/lib/social-video/focus";
 
 export type Aspect = "9:16" | "16:9";
@@ -115,6 +115,18 @@ export function framedFaces(faces: readonly Face[]): Face[] {
   if (strong.length === 0) return [];
   const largest = Math.max(...strong.map((f) => f.w * f.h));
   return strong.filter((f) => f.w * f.h >= largest * FRAMING_MIN_AREA);
+}
+
+/** A detail shot: no face the camera frames by, one sharp part it aims at
+ * instead (`planShot`) — what the admin's "Detaily" filter lists. */
+export function isDetailShot(faces: PhotoFaces): boolean {
+  return !!faces.focus && framedFaces(faces.faces).length === 0;
+}
+
+/** Searched before focus existed (2026-10-26) and with no face to frame by:
+ * the camera has nothing to aim at, so the face scan looks at it again. */
+export function needsFocus(faces: PhotoFaces): boolean {
+  return faces.focus === undefined && framedFaces(faces.faces).length === 0;
 }
 
 /** The faces that frame the photo, widened to head and shoulders, as one box. */

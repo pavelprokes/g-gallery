@@ -294,9 +294,9 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
    union. **No face, one sharp part** (2026-10-26): the detail shots of a wedding — shoes, rings,
    a cake, a buttonhole — are shot wide open, so the subject is what is sharp. The face worker
    also measures the Laplacian's energy over a 12-tile grid of a 256 px copy
-   (`src/lib/social-video/focus.ts`); when the sharpest tile is ≥ 3× the median one, the tiles at
-   ≥ 45 % of it form the **focus box**, stored as `Photo.faces.focus` and framed like S (centred
-   on it, 8 % air, the same zoom caps). Measured on a real wedding (2026-10-26, in the worker): shoes 61×, a ring bearer's name card and buttonhole 29×, a bride from behind 5.6×. **No face, nothing stands out** (`focus: null`, a
+   (`src/lib/social-video/focus.ts`); when the sharpest tile is ≥ 8× the median one (floored at 50, the sharpest at least 500), the tiles at
+   ≥ 45 % of it, connected to it, form the **focus box**, stored as `Photo.faces.focus` and framed like S (centred
+   on it, 8 % air, the same zoom caps). Measured on a real wedding (2026-10-26, in the worker): shoes 61×, a ring bearer's name card and buttonhole 29×, a bride from behind against a sharp window 5.6× — below the threshold on purpose, the upper third frames her better. **No face, nothing stands out** (`focus: null`, a
    landscape, a crowd from behind): a gentle zoom (≤ 1.12) centred across and aimed at the
    **upper third** — at a wedding the heads are up there, and the middle of a full-length
    portrait cut to 16:9 is a waist. A value written before focus existed has no `focus` key;

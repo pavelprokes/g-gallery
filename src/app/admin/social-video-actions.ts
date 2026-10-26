@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
 import { idSchema } from "@/lib/id-schema";
 import { socialVideoDraftSchema } from "@/lib/social-video/draft";
-import { photoFacesSchema } from "@/lib/social-video/faces";
+import { photoFacesSchema, storedFaces } from "@/lib/social-video/faces";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
 // re-verifies the session internally (CLAUDE.md invariant #3), and every write
@@ -56,17 +56,23 @@ export async function saveFaces(
       galleryId: input.data.galleryId,
       gallery: { ownerId: session.user.id },
     },
-    select: { id: true },
+    select: { id: true, faces: true },
   });
-  const ownedIds = new Set(owned.map((p) => p.id));
-  const writes = input.data.entries.filter((e) => ownedIds.has(e.photoId));
+  const before = new Map(owned.map((p) => [p.id, storedFaces(p.faces)?.faces ?? null]));
+  const writes = input.data.entries.filter((e) => before.has(e.photoId));
   await prisma.$transaction(
     writes.map((e) =>
       prisma.photo.update({
         where: { id: e.photoId },
         // New faces can raise new flags: a photo kept in the photo check is
-        // put back on its list (docs/SOCIAL-VIDEO.md §4).
-        data: { faces: e.faces, checkKeptAt: null },
+        // put back on its list (docs/SOCIAL-VIDEO.md §4) — unless only the
+        // sharp part was added and the faces are the same.
+        data: {
+          faces: e.faces,
+          ...(JSON.stringify(before.get(e.photoId)) === JSON.stringify(e.faces.faces)
+            ? {}
+            : { checkKeptAt: null }),
+        },
       }),
     ),
   );

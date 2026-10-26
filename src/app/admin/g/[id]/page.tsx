@@ -31,8 +31,8 @@ import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-p
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { GalleryFaceScan } from "@/components/admin/gallery-face-scan";
-import { framedFaces } from "@/lib/social-video/camera";
-import { currentFaces, needsFocus } from "@/lib/social-video/faces";
+import { isDetailShot, needsFocus } from "@/lib/social-video/camera";
+import { currentFaces } from "@/lib/social-video/faces";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
@@ -233,24 +233,20 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
     },
     select: { id: true, objectKey: true, width: true, height: true, faces: true },
   });
-  const stillFaces = new Map(stills.map((photo) => [photo.id, currentFaces(photo.faces)]));
-  // Searched for faces never, by an older build, or (faceless) before the
-  // sharp part was looked for — the face scan below covers all three.
-  const facelessStills = stills
-    .filter((photo) => {
-      const faces = stillFaces.get(photo.id);
-      return faces === null || faces === undefined || needsFocus(faces);
-    })
-    .map(({ id, objectKey, width, height }) => ({ id, objectKey, width: width!, height: height! }));
-  // "Detaily": no face to frame, one sharp part — the shoes, the rings
-  // (docs/ADMIN-FILTERS.md, docs/SOCIAL-VIDEO.md §5).
+  const scanned = stills.map((photo) => ({ photo, faces: currentFaces(photo.faces) }));
+  // Searched for faces never, by an older build, or (with no face to frame)
+  // before the sharp part was looked for — the face scan below covers all three.
+  const facelessStills = scanned
+    .filter(({ faces }) => faces === null || needsFocus(faces))
+    .map(({ photo: { id, objectKey, width, height } }) => ({
+      id,
+      objectKey,
+      width: width!,
+      height: height!,
+    }));
+  // "Detaily" (docs/ADMIN-FILTERS.md): what the camera frames by its sharp part.
   const details = new Set(
-    stills
-      .filter((photo) => {
-        const faces = stillFaces.get(photo.id);
-        return !!faces?.focus && framedFaces(faces.faces).length === 0;
-      })
-      .map((photo) => photo.id),
+    scanned.filter(({ faces }) => faces && isDetailShot(faces)).map(({ photo }) => photo.id),
   );
 
   // The gallery as a guest opens it — the header's "Otevřít galerii" and each
