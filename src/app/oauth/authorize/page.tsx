@@ -8,13 +8,13 @@ import { Card } from "@/components/ui/card";
 import { parseAuthorizeRequest, pickAuthorizeParams } from "@/lib/mcp/oauth/authorization";
 import { isLoopbackHost, publicOrigin } from "@/lib/mcp/oauth/config";
 
-// "Connect Claude" consent (docs/MCP.md §Sign-in): the authorization endpoint
+// "Connect an app" consent (docs/MCP.md §Sign-in): the authorization endpoint
 // of the MCP connection. Outside /admin, so proxy.ts does not gate it — the
 // page checks the session itself and sends a stranger to the sign-in.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Připojit Claude",
+  title: "Připojit aplikaci",
   robots: { index: false, follow: false },
 };
 
@@ -39,7 +39,7 @@ function Failure({ message }: { message: string }) {
       </h1>
       <Alert tone="danger">{message}</Alert>
       <p className="text-admin-muted text-sm">
-        Zavřete toto okno a spusťte připojení v Claude znovu.
+        Zavřete toto okno a spusťte připojení v aplikaci znovu.
       </p>
     </Shell>
   );
@@ -100,12 +100,12 @@ export default async function AuthorizePage(props: PageProps<"/oauth/authorize">
       </dl>
       <Alert tone="warning">
         {toThisComputer
-          ? "Povolte jen tehdy, když jste připojení právě spustili v Claude Code na tomto počítači. Adresu localhost může použít kterýkoli program v počítači."
-          : "Povolte jen tehdy, když jste připojení právě sami spustili v Claude. Odkaz na tuto stránku od někoho jiného zamítněte — získal by přístup ke galeriím za vás."}
+          ? `Povolte jen tehdy, když jste připojení právě spustili v aplikaci ${client.clientName} na tomto počítači. Adresu localhost může použít kterýkoli program v počítači.`
+          : `Povolte jen tehdy, když jste připojení právě sami spustili v aplikaci ${client.clientName}. Odkaz na tuto stránku od někoho jiného zamítněte — získal by přístup ke galeriím za vás.`}
       </Alert>
       <McpConsentForm params={params} />
       <p className="text-admin-muted text-xs">
-        Přístup se sám prodlužuje, dokud ho Claude aspoň jednou za 30 dní použije, nejdéle 90 dní.
+        Přístup se sám prodlužuje, dokud ho aplikace aspoň jednou za 30 dní použije, nejdéle 90 dní.
         Odebrání role správce ho zruší hned.
       </p>
     </Shell>

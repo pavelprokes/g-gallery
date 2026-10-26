@@ -9,6 +9,7 @@ export const OFFLINE_ACCESS_SCOPE = "offline_access";
 export const MCP_ENDPOINT_PATH = "/api/mcp";
 export const AUTHORIZE_PAGE_PATH = "/oauth/authorize";
 export const TOKEN_ENDPOINT_PATH = "/api/oauth/token";
+export const REGISTRATION_ENDPOINT_PATH = "/api/oauth/register";
 export const PROTECTED_RESOURCE_METADATA_PATH = `/.well-known/oauth-protected-resource${MCP_ENDPOINT_PATH}`;
 
 export const CODE_TTL_S = 2 * 60;
@@ -16,7 +17,7 @@ export const ACCESS_TOKEN_TTL_S = 60 * 60;
 export const REFRESH_TOKEN_TTL_S = 30 * 24 * 60 * 60;
 export const GRANT_MAX_AGE_S = 90 * 24 * 60 * 60;
 
-export type RedirectPolicy = "hosted" | "loopback";
+export type RedirectPolicy = "hosted" | "loopback" | "registered";
 
 /**
  * Client ID Metadata Documents (MCP 2025-11-25) — and only these two. Whatever
@@ -38,6 +39,30 @@ const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 
 export function isLoopbackHost(hostname: string): boolean {
   return LOOPBACK_HOSTS.includes(hostname);
+}
+
+/**
+ * Origins a dynamically registered client may return to — the photographer's
+ * own servers (Paperclip on the NAS), from `MCP_OAUTH_REDIRECT_ORIGINS`.
+ * HTTPS, or plain HTTP on loopback; anything else in the list is ignored.
+ */
+export function allowedRedirectOrigins(): string[] {
+  const origins: string[] = [];
+  for (const entry of (process.env.MCP_OAUTH_REDIRECT_ORIGINS ?? "").split(",")) {
+    try {
+      const url = new URL(entry.trim());
+      if (url.protocol === "https:" || (url.protocol === "http:" && isLoopbackHost(url.hostname)))
+        origins.push(url.origin);
+    } catch {
+      continue;
+    }
+  }
+  return origins;
+}
+
+/** Off unless an origin is allowed and there is a secret to sign client ids with. */
+export function registrationEnabled(): boolean {
+  return allowedRedirectOrigins().length > 0 && Boolean(process.env.BETTER_AUTH_SECRET);
 }
 
 /**
@@ -68,6 +93,9 @@ export function authorizationServerMetadata(origin: string) {
     issuer: origin,
     authorization_endpoint: `${origin}${AUTHORIZE_PAGE_PATH}`,
     token_endpoint: `${origin}${TOKEN_ENDPOINT_PATH}`,
+    ...(registrationEnabled()
+      ? { registration_endpoint: `${origin}${REGISTRATION_ENDPOINT_PATH}` }
+      : {}),
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
     grant_types_supported: ["authorization_code", "refresh_token"],

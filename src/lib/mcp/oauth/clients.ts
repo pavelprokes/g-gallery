@@ -5,6 +5,7 @@ import {
   TRUSTED_CLIENTS,
   type RedirectPolicy,
 } from "./config";
+import { isRegisteredClientId, resolveRegisteredClient } from "./registration";
 
 export interface OAuthClient {
   clientId: string;
@@ -98,16 +99,28 @@ function parseDocument(
   return { ok: true, client: { clientId, clientName: name, host, redirectUris, redirectPolicy } };
 }
 
-/** Looks the client up — only ever one of `TRUSTED_CLIENTS`, so no SSRF surface. */
+/**
+ * Looks the client up — one of `TRUSTED_CLIENTS` or a registration this server
+ * signed itself; nothing else is ever fetched, so no SSRF surface.
+ */
 export async function resolveClient(
   clientId: string,
   fetcher: Fetcher = fetch,
 ): Promise<ClientResolution> {
+  if (isRegisteredClientId(clientId)) {
+    const client = resolveRegisteredClient(clientId);
+    return client
+      ? { ok: true, client }
+      : {
+          ok: false,
+          message: "Registrace aplikace už neplatí. Spusťte připojení v aplikaci znovu.",
+        };
+  }
   const redirectPolicy = trustedRedirectPolicy(clientId);
   if (!redirectPolicy) {
     return {
       ok: false,
-      message: "Neznámý klient. Připojit se dá jen Claude (claude.ai, Claude Code).",
+      message: "Neznámý klient. Připojit se dá jen Claude a aplikace na povolených adresách.",
     };
   }
 
@@ -159,11 +172,13 @@ function loopbackUrl(value: string): URL | null {
 }
 
 /**
+ * A registered client returns exactly where it registered to.
  * claude.ai may return only to its fixed callback. Claude Code listens on a
  * random port each time, so a loopback URI matches a registered one on
  * everything but the port (RFC 8252 §7.3).
  */
 export function isRegisteredRedirectUri(client: OAuthClient, requested: string): boolean {
+  if (client.redirectPolicy === "registered") return client.redirectUris.includes(requested);
   if (client.redirectPolicy === "hosted") {
     return HOSTED_CLAUDE_CALLBACKS.includes(requested) && client.redirectUris.includes(requested);
   }

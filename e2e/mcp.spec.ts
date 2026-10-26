@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { APIRequestContext } from "@playwright/test";
@@ -7,8 +8,9 @@ import { test, expect } from "./fixtures";
  * The MCP endpoint for Claude (docs/MCP.md), against the production build and
  * the seeded database. Tools are called with the development token the
  * Playwright config sets (`MCP_DEV_TOKEN`, acting as the E2E admin); the OAuth
- * exchange itself is covered by src/lib/mcp/oauth/oauth.test.ts, since it
- * would need claude.ai's client documents from the network.
+ * exchange with Claude's clients is covered by src/lib/mcp/oauth/oauth.test.ts,
+ * since it would need claude.ai's client documents from the network; a
+ * registered client (Paperclip) goes through the whole flow here.
  */
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   adminCookie: { name: string; value: string };
@@ -69,6 +71,7 @@ test.describe("transport and discovery", () => {
     expect(await server.json()).toMatchObject({
       authorization_endpoint: "http://127.0.0.1:3000/oauth/authorize",
       client_id_metadata_document_supported: true,
+      registration_endpoint: "http://127.0.0.1:3000/api/oauth/register",
     });
     expect((await request.get("/.well-known/oauth-protected-resource/elsewhere")).status()).toBe(
       404,
@@ -388,5 +391,79 @@ test.describe("consent page", () => {
     const response = await request.get("/oauth/authorize", { maxRedirects: 0 });
     expect(response.headers()["x-frame-options"]).toBe("DENY");
     expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  });
+});
+
+test.describe("registered client", () => {
+  const CALLBACK = "https://paperclip.example.test/oauth/callback";
+  const VERIFIER = "e2e-verifier-".padEnd(64, "v");
+
+  test("registers only on an allowed origin", async ({ request }) => {
+    const refused = await request.post("/api/oauth/register", {
+      data: { client_name: "Evil", redirect_uris: ["https://evil.example/cb"] },
+    });
+    expect(refused.status()).toBe(400);
+    expect(await refused.json()).toMatchObject({ error: "invalid_redirect_uri" });
+  });
+
+  test("signs in with the photographer's account and calls a tool", async ({
+    page,
+    context,
+    request,
+    baseURL,
+  }) => {
+    const registered = await request.post("/api/oauth/register", {
+      data: { client_name: "Paperclip", redirect_uris: [CALLBACK] },
+    });
+    expect(registered.status()).toBe(201);
+    const { client_id: clientId } = (await registered.json()) as { client_id: string };
+
+    const challenge = crypto.createHash("sha256").update(VERIFIER).digest("base64url");
+    const authorize = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: CALLBACK,
+      response_type: "code",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      state: "e2e-state",
+      resource: `${baseURL}/api/mcp`,
+    });
+    let returned: URL | null = null;
+    await page.route("https://paperclip.example.test/**", async (route) => {
+      returned = new URL(route.request().url());
+      await route.fulfill({ status: 200, contentType: "text/plain", body: "ok" });
+    });
+    await context.addCookies([{ ...seed.adminCookie, url: baseURL! }]);
+    await page.goto(`/oauth/authorize?${authorize.toString()}`);
+    await expect(page.getByRole("heading", { name: "Připojit Paperclip" })).toBeVisible();
+    await expect(
+      page.getByRole("definition").filter({ hasText: "paperclip.example.test" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Povolit přístup" }).click();
+    await expect.poll(() => returned?.searchParams.get("state")).toBe("e2e-state");
+    const code = returned!.searchParams.get("code")!;
+
+    const tokens = await request.post("/api/oauth/token", {
+      form: {
+        grant_type: "authorization_code",
+        code,
+        code_verifier: VERIFIER,
+        client_id: clientId,
+        redirect_uri: CALLBACK,
+      },
+    });
+    expect(tokens.status()).toBe(200);
+    const { access_token: accessToken } = (await tokens.json()) as { access_token: string };
+    const call = await request.post("/api/mcp", {
+      headers: { Authorization: `Bearer ${accessToken}`, "MCP-Protocol-Version": "2025-11-25" },
+      data: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "overview", arguments: {} },
+      },
+    });
+    expect(call.status()).toBe(200);
+    expect(((await call.json()) as { result: { isError?: boolean } }).result.isError).toBeFalsy();
   });
 });

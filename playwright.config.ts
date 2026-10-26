@@ -39,6 +39,9 @@ localEnv.MCP_DEV_TOKEN ||= process.env.MCP_DEV_TOKEN || "e2e-mcp-dev-token-".pad
 // Always the seeded admin, whatever a local .env says: the spec reads its rows.
 localEnv.MCP_DEV_EMAIL = "e2e@example.com";
 process.env.MCP_DEV_TOKEN = localEnv.MCP_DEV_TOKEN;
+// A registered client's return origin (docs/MCP.md §Other clients); the spec
+// intercepts it in the browser, nothing listens there.
+localEnv.MCP_OAUTH_REDIRECT_ORIGINS = "https://paperclip.example.test";
 
 export default defineConfig({
   testDir: "./e2e",
