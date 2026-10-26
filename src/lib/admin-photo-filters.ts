@@ -18,6 +18,7 @@ export const ADMIN_FILTERS = [
   "untagged",
   "guests",
   "videos",
+  "details",
 ] as const;
 export type AdminFilter = (typeof ADMIN_FILTERS)[number];
 
@@ -126,6 +127,8 @@ export interface PhotoFacts {
   people: readonly string[];
   guest: boolean;
   video: boolean;
+  /** No face to frame, one sharp part — a detail shot (docs/SOCIAL-VIDEO.md §5). */
+  detail: boolean;
   chapter: string | null;
 }
 
@@ -141,6 +144,7 @@ const HOLDS: Record<AdminFilter, (photo: PhotoFacts) => boolean> = {
   untagged: (photo) => photo.people.length === 0,
   guests: (photo) => photo.guest,
   videos: (photo) => photo.video,
+  details: (photo) => photo.detail,
 };
 
 /** Whether a photo shows under the view. */

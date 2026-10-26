@@ -3,6 +3,7 @@
 // client-safe; every rectangle is in the photo's own pixels.
 
 import type { Face } from "@/lib/social-video/faces";
+import type { Focus } from "@/lib/social-video/focus";
 
 export type Aspect = "9:16" | "16:9";
 
@@ -98,6 +99,8 @@ export interface PhotoForShot {
   width: number;
   height: number;
   faces: readonly Face[];
+  /** The sharp part of the photo (focus.ts): the aim when no face frames it. */
+  focus?: Focus | null;
 }
 
 interface Subject {
@@ -158,6 +161,21 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   // sizes the source so the cover frame is at least the output (sourceWidth).
   const minW = Math.max(coverW / maxZoom, Math.min(coverW, format.width / MAX_UPSCALE));
   const subject = subjectOf(photo);
+
+  if (!subject && photo.focus) {
+    // A detail shot wide open: frame the sharp part as a face would be framed,
+    // with air around it, the push no stronger than for a face.
+    const f = photo.focus;
+    const cx = (f.x + f.w / 2) * W;
+    const cy = (f.y + f.h / 2) * H;
+    const needW = Math.max(f.w * W, f.h * H * a) * TIGHT_MARGIN;
+    const tightW = Math.max(minW, Math.min(needW, coverW / MIN_ZOOM));
+    return {
+      kind: "push",
+      from: frame(photo, a, coverW, cx, cy),
+      to: frame(photo, a, tightW, cx, cy),
+    };
+  }
 
   if (!subject) {
     const cy = H * FACELESS_AIM;

@@ -1188,6 +1188,17 @@ async function makeFilterGallery(ownerId: string) {
         crc32: "00000000",
         takenAt: new Date(Date.UTC(2026, 8, 5, 10, i)),
         source: i === 3 ? "GUEST" : "OWNER",
+        // The fourth is a detail shot: no face, one sharp part ("Detaily").
+        ...(i === 3
+          ? {
+              faces: {
+                v: 1,
+                model: FACES_MODEL,
+                faces: [],
+                focus: { x: 0.3, y: 0.5, w: 0.3, h: 0.3, strength: 40 },
+              },
+            }
+          : {}),
       },
     });
     ids.push(photo.id);

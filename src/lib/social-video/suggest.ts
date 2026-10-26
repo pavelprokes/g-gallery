@@ -212,7 +212,12 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
     score -= 5;
   }
   // Framed as the video will frame it: on the couple, where they are named.
-  const framing = { width: c.width, height: c.height, faces: focusFaces(faces, coupleTags) };
+  const framing = {
+    width: c.width,
+    height: c.height,
+    faces: focusFaces(faces, coupleTags),
+    focus: c.faces?.focus,
+  };
   const shot = planShot(framing, format, SLIDE_SECONDS + FADE_SECONDS);
   // A wide group cut to 9:16 can only be shown whole, over its own blur — the
   // suggestion steers away from it; the photographer can still add it.

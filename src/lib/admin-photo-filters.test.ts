@@ -25,6 +25,7 @@ const photo = (over: Partial<PhotoFacts>): PhotoFacts => ({
   people: [],
   guest: false,
   video: false,
+  detail: false,
   chapter: null,
   ...over,
 });
@@ -112,5 +113,14 @@ describe("sortAdminPhotos", () => {
         photo({ id: "y", fileOrderKey: "s0019jpg" }),
       ]).map((p) => p.id),
     ).toEqual(["y", "x"]);
+  });
+});
+
+describe("details", () => {
+  it("keeps the detail shots and reads from the URL", () => {
+    const view = parseAdminView({ f: "details" });
+    expect(view.filters).toEqual(["details"]);
+    expect(matchesAdminView(view, photo({ detail: true }))).toBe(true);
+    expect(matchesAdminView(view, photo({ detail: false }))).toBe(false);
   });
 });

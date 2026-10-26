@@ -31,7 +31,8 @@ import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-p
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { GalleryFaceScan } from "@/components/admin/gallery-face-scan";
-import { currentFaces } from "@/lib/social-video/faces";
+import { framedFaces } from "@/lib/social-video/camera";
+import { currentFaces, needsFocus } from "@/lib/social-video/faces";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { chapterAnchor, compareTimeline } from "@/lib/gallery-chapters";
@@ -222,20 +223,35 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // Stills the face worker has not searched yet (docs/SOCIAL-VIDEO.md §4) —
   // searched on their own by GalleryFaceScan. Their stored faces are read only
   // here, to judge whether they are current.
-  const facelessStills = (
-    await prisma.photo.findMany({
-      where: {
-        galleryId: gallery.id,
-        status: "CONFIRMED",
-        videoObjectKey: null,
-        width: { not: null },
-        height: { not: null },
-      },
-      select: { id: true, objectKey: true, width: true, height: true, faces: true },
+  const stills = await prisma.photo.findMany({
+    where: {
+      galleryId: gallery.id,
+      status: "CONFIRMED",
+      videoObjectKey: null,
+      width: { not: null },
+      height: { not: null },
+    },
+    select: { id: true, objectKey: true, width: true, height: true, faces: true },
+  });
+  const stillFaces = new Map(stills.map((photo) => [photo.id, currentFaces(photo.faces)]));
+  // Searched for faces never, by an older build, or (faceless) before the
+  // sharp part was looked for — the face scan below covers all three.
+  const facelessStills = stills
+    .filter((photo) => {
+      const faces = stillFaces.get(photo.id);
+      return faces === null || faces === undefined || needsFocus(faces);
     })
-  )
-    .filter((photo) => currentFaces(photo.faces) === null)
     .map(({ id, objectKey, width, height }) => ({ id, objectKey, width: width!, height: height! }));
+  // "Detaily": no face to frame, one sharp part — the shoes, the rings
+  // (docs/ADMIN-FILTERS.md, docs/SOCIAL-VIDEO.md §5).
+  const details = new Set(
+    stills
+      .filter((photo) => {
+        const faces = stillFaces.get(photo.id);
+        return !!faces?.focus && framedFaces(faces.faces).length === 0;
+      })
+      .map((photo) => photo.id),
+  );
 
   // The gallery as a guest opens it — the header's "Otevřít galerii" and each
   // chapter's link (that plus its anchor).
@@ -338,6 +354,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       people: photo.faceTags.map((tag) => tag.personId),
       guest: photo.source === "GUEST",
       video: photo.videoObjectKey !== null,
+      detail: details.has(photo.id),
       chapter: chapterOf.get(photo.id) ?? null,
     };
   };

@@ -43,10 +43,24 @@ const faceSchema = z.object({
   smile: unit.nullable().optional(),
 });
 
+/** The sharp part of the photo (src/lib/social-video/focus.ts) — where the
+ * camera aims when there is no face. */
+const focusSchema = z.object({
+  x: unit,
+  y: unit,
+  w: unit,
+  h: unit,
+  strength: z.number().min(0).max(10_000),
+});
+
 export const photoFacesSchema = z.object({
   v: z.literal(1),
   model: z.string().min(1).max(80),
   faces: z.array(faceSchema).max(MAX_FACES),
+  /** Null: looked, nothing stands out. Absent: written before focus existed
+   * (2026-10-26) — `needsFocus` sends such a faceless photo back to the worker
+   * without a `FACES_MODEL` bump re-searching every photo of every gallery. */
+  focus: focusSchema.nullable().optional(),
 });
 
 /** Coordinates are 0–1 of the oriented photo, origin top left. */
@@ -58,6 +72,12 @@ export type PhotoFaces = z.infer<typeof photoFacesSchema>;
 export function currentFaces(stored: unknown): PhotoFaces | null {
   const parsed = photoFacesSchema.safeParse(stored);
   return parsed.success && parsed.data.model === FACES_MODEL ? parsed.data : null;
+}
+
+/** A faceless photo searched before focus existed: the camera has nothing to
+ * aim by, so the face scan looks at it again. */
+export function needsFocus(faces: PhotoFaces): boolean {
+  return faces.faces.length === 0 && faces.focus === undefined;
 }
 
 /** The stored value from any detection build; null for none or anything that
