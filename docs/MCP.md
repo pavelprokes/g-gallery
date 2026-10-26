@@ -186,9 +186,10 @@ crops and resizes, the server only writes the address and never sees a byte.
 - **Always under `max_bytes`** (default 8 000 000; `src/lib/mcp/fit-bytes.ts`): a JPEG's size
   can't be known before it is made, so the server asks the CDN with `HEAD` — size, no body, so
   invariant #1 holds — and steps quality down (to 70) and then the dimensions until it fits, at
-  most five tries; it starts below ~0.5 byte a pixel, which a wedding export rarely needs a second
-  try for. The answer carries the measured `bytes`; when the CDN can't be asked it says so instead
-  of guessing.
+  most five tries. It starts at the size asked for, so nothing comes out smaller than it must
+  (measured in production: a whole 5464 × 8192 export at quality 85 is 4.8 MB — it fits as it is).
+  The answer carries the measured `bytes`; when the CDN can't be asked it says so instead of
+  guessing.
 - **Address:** Cloudflare `trim=top;right;bottom;left` (pixels of the EXIF-oriented photo —
   verified against a phone original with orientation 6) then `width,height,fit=cover,quality,format`;
   imgproxy `crop:w:h:nowe:x:y` + `rs:fit`; nothing when transformations are off. Unlike the other
