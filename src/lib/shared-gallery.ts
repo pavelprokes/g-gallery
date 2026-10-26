@@ -30,7 +30,7 @@ import {
   type PhotoOrder,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
-import { PROJECTION_FACES_SELECT, projectionFaces, projectionFocus } from "@/lib/projection-camera";
+import { PROJECTION_FACES_SELECT, projectionAim } from "@/lib/projection-camera";
 import type { Focus } from "@/lib/social-video/focus";
 import type { Face } from "@/lib/social-video/faces";
 import {
@@ -306,8 +306,7 @@ export async function loadGalleryViewData(
       favoriteCount: photo._count.favorites,
       uploaderName: uploaderNameOf(photo),
       orderKey: orderKeyOf(order, photo),
-      faces: projectionFaces(photo.faces, photo.faceTags),
-      focus: projectionFocus(photo.faces),
+      ...projectionAim(photo.faces, photo.faceTags),
     })),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,

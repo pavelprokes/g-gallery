@@ -300,18 +300,19 @@ For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9)
    landscape, a crowd from behind): a gentle zoom (≤ 1.12) centred across and aimed at the
    **upper third** — at a wedding the heads are up there, and the middle of a full-length
    portrait cut to 16:9 is a waist. A value written before focus existed has no `focus` key;
-   `needsFocus` sends those faceless photos back to the admin's face scan once, without a
-   `FACES_MODEL` bump re-searching every photo. **Soft faces in front of a sharp detail**
-   (phase 2, 2026-10-26) — the rings held up to the lens, the couple blurred behind:
-   `aimFaces` (`src/lib/social-video/aim.ts`) drops the faces the camera would frame by when
-   every one of them had its eyes measured soft (`sharp` < `SOFT_BELOW`, the photo check's
-   threshold), the photo has a focus, and the focus does not cover half of any of those faces.
-   Eyes too small or dark to measure (`sharp` null) keep the faces. Checked on a real photo of
-   two sharp faces (kept) and the same photo blurred with a sharp detail pasted in front (eyes
-   0.005 — aimed at the detail). The studio, the gift, the suggestion, the public maker, the
-   admin's "Detaily" filter and the guests' projection all go through it; the projection gets
-   the decision from the server (`projectionFaces`, `projectionFocus`), where the eyes'
-   sharpness still is. `needsFocus` also sends photos with only soft faces back to the scan.
+   `needsFocus` sends those photos (faceless, and since phase 2 those with no face measured sharp) back to the admin's face scan once, without a
+   `FACES_MODEL` bump re-searching every photo. **Sharpness before faces** (phase 2, Pavel 2026-10-26: "a sharp detail in
+   the foreground with a face detected behind it — I aim at the detail"): `aimFaces`
+   (`src/lib/social-video/aim.ts`) drops the faces the camera would frame by when the photo has
+   a focus, the focus does not cover half of any of those faces, and none of them had its eyes
+   measured sharp (`sharp` ≥ `SOFT_BELOW`, the photo check's threshold). A face measured sharp
+   is in the plane of focus and keeps the camera; a soft one, or one too small or dark to
+   measure, does not. Checked on a real photo of two sharp faces (kept) and the same photo
+   blurred with a sharp detail pasted in front (eyes 0.005 — aimed at the detail). The studio,
+   the gift, the suggestion, the public maker, the admin's "Detaily" filter and the guests'
+   projection all go through it; the projection gets the decision from the server
+   (`projectionAim`), where the eyes' sharpness still is. `needsFocus` also sends photos whose
+   faces are none of them measured sharp back to the scan.
 2. **Cover frame C:** the largest A-aspect rectangle in the photo, centred on S horizontally and
    placed by the same eye line as T vertically, so the move does not drift up or down; clamped
    inside.

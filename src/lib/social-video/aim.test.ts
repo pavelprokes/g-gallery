@@ -34,9 +34,8 @@ describe("aimFaces", () => {
     expect(aimFaces(faces, rings)).toBe(faces);
   });
 
-  it("keeps the faces when their eyes were not measured — dark or tiny", () => {
-    const faces = [face(0.25, 0.15, null)];
-    expect(aimFaces(faces, rings)).toBe(faces);
+  it("aims at the sharp detail over a face whose eyes could not be measured — dark or tiny", () => {
+    expect(aimFaces([face(0.25, 0.15, null)], rings)).toEqual([]);
   });
 
   it("keeps the faces when the sharp part is a face itself", () => {
@@ -59,11 +58,31 @@ describe("isDetailShot and needsFocus", () => {
     expect(isDetailShot(stored([], null))).toBe(false);
   });
 
-  it("sends back only what focus could change: no face, or only soft ones", () => {
+  it("sends back only what focus could change: no face, or none measured sharp", () => {
     expect(needsFocus(stored([]))).toBe(true);
     expect(needsFocus(stored([face(0.25, 0.15, 0.02)]))).toBe(true);
     expect(needsFocus(stored([face(0.25, 0.15, 0.4)]))).toBe(false);
-    expect(needsFocus(stored([face(0.25, 0.15, null)]))).toBe(false);
+    expect(needsFocus(stored([face(0.25, 0.15, null)]))).toBe(true);
     expect(needsFocus(stored([], null))).toBe(false);
+  });
+});
+
+describe("unmeasured faces", () => {
+  it("lets a small framed face the worker never looked at count neither way", () => {
+    const guest = { ...face(0.75, 0.2, null), sharp: undefined, w: 0.08, h: 0.11 };
+    expect(aimFaces([face(0.25, 0.15, 0.02), guest], rings)).toEqual([]);
+  });
+
+  it("aims at the detail over a face stored before sharpness existed", () => {
+    const old = { ...face(0.25, 0.15, null), sharp: undefined };
+    expect(aimFaces([old], rings)).toEqual([]);
+  });
+
+  it("narrows to the named couple first, as the camera does", () => {
+    const couple = face(0.25, 0.15, 0.02);
+    const sharpGuest = face(0.7, 0.1, 0.5);
+    const tags = [{ x: couple.x, y: couple.y, w: couple.w, h: couple.h }];
+    expect(isDetailShot(stored([couple, sharpGuest], rings), tags)).toBe(true);
+    expect(isDetailShot(stored([couple, sharpGuest], rings))).toBe(false);
   });
 });

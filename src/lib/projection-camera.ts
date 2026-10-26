@@ -41,12 +41,26 @@ export const PROJECTION_FACES_SELECT = {
  * whichever build found it. Null when the photo's faces were never searched.
  */
 export function projectionFaces(stored: unknown, coupleTags: readonly Box[] = []): Face[] | null {
+  return projectionAim(stored, coupleTags).faces;
+}
+
+/** The sharp part the projection's camera aims at without a face to frame
+ * (docs/SOCIAL-VIDEO.md §5): a box, rounded; null when there is none. */
+export function projectionFocus(stored: unknown): Focus | null {
+  return projectionAim(stored).focus;
+}
+
+/** Both, from one parse of the stored value — what a guest's page gets per photo. */
+export function projectionAim(
+  stored: unknown,
+  coupleTags: readonly Box[] = [],
+): { faces: Face[] | null; focus: Focus | null } {
   const parsed = storedFaces(stored);
-  if (!parsed) return null;
+  if (!parsed) return { faces: null, focus: null };
   const r = (n: number) => Math.round(n * 1000) / 1000;
   // Soft faces in front of a sharp detail are not what the camera frames by —
   // decided here, where the eyes' sharpness still is (docs/SOCIAL-VIDEO.md §5).
-  return aimFaces(focusFaces(parsed.faces, coupleTags), parsed.focus)
+  const faces = aimFaces(focusFaces(parsed.faces, coupleTags), parsed.focus)
     .filter((f) => f.score >= FRAMING_MIN_SCORE)
     .sort((a, b) => b.w * b.h - a.w * a.h)
     .slice(0, MAX_PROJECTED_FACES)
@@ -56,19 +70,15 @@ export function projectionFaces(stored: unknown, coupleTags: readonly Box[] = []
       w: r(f.w),
       h: r(f.h),
       score: r(f.score),
-      le: [r(f.le[0]), r(f.le[1])],
-      re: [r(f.re[0]), r(f.re[1])],
+      le: [r(f.le[0]), r(f.le[1])] as [number, number],
+      re: [r(f.re[0]), r(f.re[1])] as [number, number],
       blink: null,
     }));
-}
-
-/** The sharp part the projection's camera aims at without a face to frame
- * (docs/SOCIAL-VIDEO.md §5): a box, rounded; null when there is none. */
-export function projectionFocus(stored: unknown): Focus | null {
-  const focus = storedFaces(stored)?.focus;
-  if (!focus) return null;
-  const r = (n: number) => Math.round(n * 1000) / 1000;
-  return { x: r(focus.x), y: r(focus.y), w: r(focus.w), h: r(focus.h), strength: focus.strength };
+  const f = parsed.focus;
+  return {
+    faces,
+    focus: f ? { x: r(f.x), y: r(f.y), w: r(f.w), h: r(f.h), strength: f.strength } : null,
+  };
 }
 
 /** The screen as a camera format: a gentle zoom, the eyes a little above the

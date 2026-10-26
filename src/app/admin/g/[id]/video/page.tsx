@@ -5,7 +5,7 @@ import { compareTimeline } from "@/lib/gallery-chapters";
 import { HIGHLIGHT_CANDIDATE_SELECT, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { CHAPTER_START_SELECT, chapterStartOf, positionOf } from "@/lib/photo-order";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
-import { needsFocus } from "@/lib/social-video/aim";
+import { faceless, needsFocus } from "@/lib/social-video/aim";
 import { currentFaces } from "@/lib/social-video/faces";
 import { likedScore } from "@/lib/social-video/suggest";
 import { photoCounts } from "@/lib/activity";
@@ -89,9 +89,11 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
         ...toHighlightCandidate(order, photo),
         width: photo.width,
         height: photo.height,
-        // Unknown to the studio until the sharp part is looked for too, so its
-        // own scan fills it in (docs/SOCIAL-VIDEO.md §5).
-        faces: ((f) => (f && needsFocus(f) ? null : f))(currentFaces(photo.faces)),
+        // A faceless photo is unknown to the studio until its sharp part is
+        // looked for, so its own scan fills it in (docs/SOCIAL-VIDEO.md §5).
+        // Soft-faced ones keep their faces here; the gallery page's scan
+        // adds their focus without the suggestion losing them meanwhile.
+        faces: ((f) => (f && faceless(f) && needsFocus(f) ? null : f))(currentFaces(photo.faces)),
         coupleTags: photo.faceTags,
         liked: likedScore({
           favorites: photo._count.favorites,

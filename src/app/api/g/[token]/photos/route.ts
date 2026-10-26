@@ -12,7 +12,7 @@ import {
   photoOrderBy,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
-import { PROJECTION_FACES_SELECT, projectionFaces, projectionFocus } from "@/lib/projection-camera";
+import { PROJECTION_FACES_SELECT, projectionAim } from "@/lib/projection-camera";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -108,8 +108,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       uploaderName: uploaderNameOf(photo),
       orderKey: orderKeyOf(order, photo),
       // For the projection's camera (src/lib/projection-camera.ts).
-      faces: projectionFaces(photo.faces, photo.faceTags),
-      focus: projectionFocus(photo.faces),
+      ...projectionAim(photo.faces, photo.faceTags),
     })),
     ...(total !== undefined ? { total } : {}),
     nextCursor:
