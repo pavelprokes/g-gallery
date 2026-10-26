@@ -32,7 +32,7 @@ const INSTRUCTIONS = [
   "Klientské galerie svatebního fotografa Pavla Prokeše (photos.svatebni-fotograf-cechy.cz).",
   "Svatba (wedding) je rozcestník pro hosty a sdružuje několik galerií; galerie má fotky, videa a sdílené odkazy.",
   "Začni přehledem (overview) nebo seznamem (galleries_list, weddings_list) a id ber z jejich výsledků.",
-  "Fotky jsou na veřejném CDN: thumbUrl na mřížku, previewUrl na prohlížení, originalUrl je plná kvalita; ořez a zmenšení na zadaný poměr a velikost (např. pro Instagram) dá photo_crop.",
+  "Fotky jsou na veřejném CDN: thumbUrl na mřížku, previewUrl na prohlížení, originalUrl je plná kvalita; ořez a zmenšení na zadaný poměr, rozměry a největší velikost souboru (výchozí 8 MB pro Instagram a Facebook) dá photo_crop.",
   "Nová galerie vzniká jako koncept a hosté ji uvidí až po zveřejnění (gallery_publish) a se sdíleným odkazem.",
   "Mazat, rušit odkazy a nahrávat fotky jde jen v administraci.",
 ].join(" ");

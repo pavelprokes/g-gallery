@@ -1,48 +1,33 @@
-// A crop of one photo at a given aspect and size, aimed the way the social
-// video's camera aims (docs/MCP.md §Crops): the couple's faces when they are
-// named, else every face it would frame by, else the sharp part, else the upper
-// third. Pure; every rectangle is in the photo's own pixels.
+// The geometry of a photo_crop request (docs/MCP.md §Crops): which rectangle of
+// the photo to keep and how large to deliver it. The client decides where to
+// cut — an aspect with a gravity, or an exact rectangle; nothing here looks at
+// the picture. Pure; rectangles are in the photo's own (EXIF-oriented) pixels.
 
-import { framedFaces, subjectOf, type Rect } from "@/lib/social-video/camera";
-import { aimFaces } from "@/lib/social-video/aim";
-import { coupleFaces, focusFaces, type Box } from "@/lib/social-video/face-tags";
-import type { Face } from "@/lib/social-video/faces";
-import type { Focus } from "@/lib/social-video/focus";
-
-export interface CropPhoto {
-  width: number;
-  height: number;
-  faces: readonly Face[];
-  focus?: Focus | null;
-  /** Face boxes named as the couple (FaceTag with `person.couple`). */
-  coupleTags: readonly Box[];
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
-/**
- * - `photo`: the largest crop of the aspect — as much of the photo as fits;
- * - `subject`: tight around who or what the photo is of, with air, never
- *   smaller than the output unless upscaling is allowed.
- */
-export type Framing = "photo" | "subject";
+/** Which part of the photo an aspect crop keeps: an edge, the centre, or a
+ * point (0–1 of the photo) the crop is centred on as far as it can be. */
+export type Gravity = "center" | "top" | "bottom" | "left" | "right" | { x: number; y: number };
 
 export interface CropRequest {
-  /** Width over height; null keeps the photo's own. */
+  /** Width over height; null keeps the photo's own (or the rectangle's). */
   aspect: number | null;
-  framing: Framing;
+  gravity: Gravity;
+  /** An exact cut-out, as shares 0–1 of the photo; wins over the gravity. */
+  rect: Rect | null;
   maxWidth: number | null;
   maxHeight: number | null;
   allowUpscale: boolean;
 }
 
-export type Aim = "couple" | "faces" | "focus" | "default";
-
 export interface CropPlan {
   rect: Rect;
   output: { width: number; height: number };
-  aim: Aim;
-  upscaled: boolean;
-  /** Framed faces in the photo, and how many of them the crop cuts. */
-  faces: { framed: number; cut: number; coupleCut: number };
   warnings: string[];
 }
 
@@ -62,21 +47,6 @@ export const NAMED_ASPECTS: Record<string, number> = {
 export const MIN_ASPECT = 0.25;
 export const MAX_ASPECT = 4;
 
-/** Where the eyes sit in a still, from the top: a third in an upright frame,
- * a little lower in a wide one. */
-const EYE_LINE_UPRIGHT = 1 / 3;
-const EYE_LINE_WIDE = 0.4;
-
-/** Without a subject the crop keeps the upper third — at a wedding the heads
- * are there far more often than in the middle (camera.ts, FACELESS_AIM). */
-const DEFAULT_AIM_Y = 1 / 3;
-
-/** Air around the subject in a `subject` crop. */
-const SUBJECT_MARGIN = 1.3;
-
-/** A face counts as cut when less than this share of its box is inside. */
-const KEPT_SHARE = 0.9;
-
 /** "4:5", "1.91:1", "original" → width over height (null = the photo's own). */
 export function parseAspect(value: string): number | null {
   if (value === "original") return null;
@@ -94,104 +64,82 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), Math.max(min, max));
 }
 
-function share(face: Face, rect: Rect, W: number, H: number): number {
-  const x0 = Math.max(face.x * W, rect.x);
-  const y0 = Math.max(face.y * H, rect.y);
-  const x1 = Math.min((face.x + face.w) * W, rect.x + rect.w);
-  const y1 = Math.min((face.y + face.h) * H, rect.y + rect.h);
-  const area = face.w * W * face.h * H;
-  return x1 > x0 && y1 > y0 && area > 0 ? ((x1 - x0) * (y1 - y0)) / area : 0;
+/** Where along a free span of `room` pixels the crop starts, for a gravity. */
+function offset(gravity: Gravity, axis: "x" | "y", room: number, size: number, full: number) {
+  if (typeof gravity === "object") return clamp(gravity[axis] * full - size / 2, 0, room);
+  const start = axis === "x" ? "left" : "top";
+  const end = axis === "x" ? "right" : "bottom";
+  if (gravity === start) return 0;
+  if (gravity === end) return room;
+  return room / 2;
 }
 
-/** Whole pixels, inside the photo, at the aspect (to the pixel). */
-function snap(rect: Rect, W: number, H: number, aspect: number): Rect {
-  let w = Math.max(1, Math.min(W, Math.round(rect.w)));
-  let h = Math.max(1, Math.round(w / aspect));
+/** The largest rectangle of `aspect` inside W × H, placed by `gravity`. */
+function aspectRect(W: number, H: number, aspect: number, gravity: Gravity): Rect {
+  let w = Math.min(W, Math.round(H * aspect));
+  let h = Math.round(w / aspect);
   if (h > H) {
     h = H;
-    w = Math.max(1, Math.min(W, Math.round(H * aspect)));
+    w = Math.min(W, Math.round(H * aspect));
   }
   return {
-    x: clamp(Math.round(rect.x), 0, W - w),
-    y: clamp(Math.round(rect.y), 0, H - h),
+    x: Math.round(offset(gravity, "x", W - w, w, W)),
+    y: Math.round(offset(gravity, "y", H - h, h, H)),
     w,
     h,
   };
 }
 
-export function planCrop(photo: CropPhoto, request: CropRequest): CropPlan {
-  const { width: W, height: H } = photo;
-  const a = request.aspect ?? W / H;
+/** Whole pixels of a 0–1 rectangle, at least one pixel, inside the photo. */
+function exactRect(W: number, H: number, share: Rect): Rect {
+  const x = clamp(Math.round(share.x * W), 0, W - 1);
+  const y = clamp(Math.round(share.y * H), 0, H - 1);
+  return {
+    x,
+    y,
+    w: clamp(Math.round(share.w * W), 1, W - x),
+    h: clamp(Math.round(share.h * H), 1, H - y),
+  };
+}
+
+export function planCrop(size: { width: number; height: number }, request: CropRequest): CropPlan {
+  const { width: W, height: H } = size;
   const warnings: string[] = [];
+  let rect = request.rect
+    ? exactRect(W, H, request.rect)
+    : request.aspect === null
+      ? { x: 0, y: 0, w: W, h: H }
+      : aspectRect(W, H, request.aspect, request.gravity);
+  // A rectangle of another shape is cut to the asked aspect around its centre.
+  if (request.rect && request.aspect !== null) {
+    const inner = aspectRect(rect.w, rect.h, request.aspect, "center");
+    if (inner.w !== rect.w || inner.h !== rect.h) {
+      rect = { ...inner, x: rect.x + inner.x, y: rect.y + inner.y };
+      warnings.push("Obdélník neměl zadaný poměr stran — je oříznutý kolem svého středu.");
+    }
+  }
 
-  const couple = coupleFaces(photo.faces, photo.coupleTags);
-  const aimed = aimFaces(focusFaces(photo.faces, photo.coupleTags), photo.focus);
-  const subject = subjectOf({ width: W, height: H, faces: aimed });
-  const focus = !subject && photo.focus ? photo.focus : null;
-  const aim: Aim = subject ? (couple.length > 0 ? "couple" : "faces") : focus ? "focus" : "default";
-
-  // The output box the crop is shrunk into; without a limit, 1080 wide.
-  const limitW = request.maxWidth ?? (request.maxHeight ? Infinity : 1080);
+  const a = request.aspect ?? rect.w / rect.h;
+  const limitW = request.maxWidth ?? Infinity;
   const limitH = request.maxHeight ?? Infinity;
-  const coverW = Math.min(W, H * a);
-
-  let w = coverW;
-  if (request.framing === "subject" && (subject || focus)) {
-    const need = subject
-      ? Math.max(subject.box.w, subject.box.h * a)
-      : Math.max(focus!.w * W, focus!.h * H * a);
-    // Not below the output's own width: a tight crop must not be enlarged.
-    const outputW = Math.min(limitW, limitH * a);
-    const floor = request.allowUpscale ? 1 : Math.min(coverW, outputW);
-    w = clamp(need * SUBJECT_MARGIN, floor, coverW);
-  }
-  const h = w / a;
-
-  let x: number;
-  let y: number;
-  if (subject) {
-    const { box, eyeY } = subject;
-    x = box.x + box.w / 2 - w / 2;
-    if (box.w <= w) x = clamp(x, box.x + box.w - w, box.x);
-    y = eyeY - (a <= 1 ? EYE_LINE_UPRIGHT : EYE_LINE_WIDE) * h;
-    // The heads come first: never cut the top of one to place the eyes.
-    if (box.y < y) y = box.y;
-    if (box.h <= h) y = clamp(y, box.y + box.h - h, box.y);
-  } else if (focus) {
-    x = (focus.x + focus.w / 2) * W - w / 2;
-    y = (focus.y + focus.h / 2) * H - h / 2;
-  } else {
-    x = W / 2 - w / 2;
-    y = H * DEFAULT_AIM_Y - h / 2;
-  }
-  const rect = snap({ x, y, w, h }, W, H, a);
-
-  const framed = framedFaces(photo.faces);
-  const cut = framed.filter((face) => share(face, rect, W, H) < KEPT_SHARE);
-  const coupleCut = couple.filter((face) => share(face, rect, W, H) < KEPT_SHARE);
-  if (coupleCut.length > 0) {
-    warnings.push("Ořez usekne někoho z páru — zkus širší poměr nebo framing photo.");
-  } else if (cut.length > 0) {
-    warnings.push(
-      `Ořez usekne ${cut.length} z ${framed.length} obličejů — zkus širší poměr, pokud mají být všichni vidět.`,
-    );
-  }
-
   const fit = Math.min(limitW / rect.w, limitH / rect.h);
-  const scale = request.allowUpscale ? fit : Math.min(1, fit);
-  const outW = Math.max(1, Math.round(rect.w * scale));
-  const outH = Math.max(1, Math.round(outW / a));
-  if (!request.allowUpscale && fit > 1) {
+  const scale = request.allowUpscale && Number.isFinite(fit) ? fit : Math.min(1, fit);
+  let width = Math.max(1, Math.round(rect.w * scale));
+  let height = Math.max(1, Math.round(width / a));
+  if (height > limitH) {
+    height = Math.floor(limitH);
+    width = Math.max(1, Math.round(height * a));
+  }
+  if (!request.allowUpscale && Number.isFinite(fit) && fit > 1) {
     warnings.push(
       `Výřez má jen ${rect.w} × ${rect.h} px, menší než požadovaná velikost — nezvětšuji ho (allow_upscale).`,
     );
   }
-  return {
-    rect,
-    output: { width: outW, height: outH },
-    aim,
-    upscaled: scale > 1,
-    faces: { framed: framed.length, cut: cut.length, coupleCut: coupleCut.length },
-    warnings,
-  };
+  return { rect, output: { width, height }, warnings };
+}
+
+/** The output scaled by `factor`, keeping its aspect, never below 1 px. */
+export function shrink(output: { width: number; height: number }, factor: number) {
+  const width = Math.max(1, Math.floor(output.width * factor));
+  return { width, height: Math.max(1, Math.round((width * output.height) / output.width)) };
 }

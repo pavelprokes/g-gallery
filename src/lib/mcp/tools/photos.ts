@@ -6,8 +6,9 @@ import { photoOrderBy } from "@/lib/photo-order";
 import { presignDownload } from "@/lib/r2";
 import { downloadKeyOf } from "@/lib/video";
 import { isDetailShot } from "@/lib/social-video/aim";
-import { currentFaces, storedFaces } from "@/lib/social-video/faces";
+import { currentFaces } from "@/lib/social-video/faces";
 import { parseAspect, planCrop } from "@/lib/photo-crop";
+import { fitBytes } from "../fit-bytes";
 import { croppedUrl, mediaUrls } from "../media-urls";
 import { defineTool, jsonResult } from "../tool";
 import { adminGalleryUrl, idInput, iso, notFound, offsetInput } from "./common";
@@ -345,23 +346,26 @@ export const photoGet = defineTool({
 });
 
 const CROP_BATCH_MAX = 20;
-const SIZE_LIMIT = z.number().int().min(16).max(8192);
+const SIZE_LIMIT = z.number().int().min(16).max(12_000);
+const share = z.number().min(0).max(1);
+/** Instagram's and Facebook's ceiling for an image. */
+const META_MAX_BYTES = 8_000_000;
 
 export const photoCrop = defineTool({
   name: "photo_crop",
   title: "Ořez a zmenšení fotek",
   description:
-    "Adresy na veřejném CDN s fotkou ořezanou na zadaný poměr stran a zmenšenou do zadané největší velikosti — např. pro Instagram (4:5, 1080 px, JPEG) nebo Facebook (1:1). Ořez míří chytře: na pojmenovaný pár, jinak na obličeje (nikdy neusekne hlavu kvůli linii očí), u detailů na ostré místo, jinak do horní třetiny. Vrátí výřez, výslednou velikost a varování (koho by ořez usekl, že je výřez menší než požadovaná velikost, fotka od hosta). Bajty nestahuje; každý nový ořez je na Cloudflare zpoplatněná transformace, tak žádej jen ty, které použiješ.",
+    "Adresy na veřejném CDN s fotkou oříznutou a zmenšenou podle zadání — ořez i zmenšení udělá Cloudflare, nic se nestahuje. Kde řezat určuješ ty: poměr stran (aspect) s ukotvením (gravity nebo point), nebo přesný obdélník (rect, podíly 0–1 fotky). Výsledek se vždy vejde do max_bytes (výchozí 8 MB — limit Instagramu a Facebooku): velikost se ověří na CDN a když je soubor větší, sníží se kvalita a pak rozměry. Vrátí adresu, rozměry, kvalitu a ověřenou velikost v bajtech. Každý nový ořez je na Cloudflare zpoplatněná transformace — žádej jen ty, které použiješ.",
   input: z.strictObject({
     photo_ids: z
       .array(idInput("fotky"))
       .min(1)
       .max(CROP_BATCH_MAX)
-      .describe(`Fotky, které ořezat stejně (1–${CROP_BATCH_MAX}, např. celý carousel).`),
+      .describe(`Fotky, které zpracovat stejně (1–${CROP_BATCH_MAX}, např. celý carousel).`),
     aspect: z
       .string()
       .trim()
-      .default("4:5")
+      .default("original")
       .refine((value) => {
         try {
           parseAspect(value);
@@ -373,20 +377,35 @@ export const photoCrop = defineTool({
       .describe(
         "Poměr šířky k výšce: 4:5 (Instagram feed), 1:1, 1.91:1, 9:16 (Reel, Story), 16:9, 3:2, 2:3, 4:3, 3:4, jakýkoli „Š:V“, nebo „original“ (bez ořezu, jen zmenšení).",
       ),
-    framing: z
-      .enum(["photo", "subject"])
-      .default("photo")
+    gravity: z
+      .enum(["center", "top", "bottom", "left", "right"])
+      .default("center")
+      .describe("Kterou část fotky ořez s poměrem stran ponechá."),
+    point: z
+      .strictObject({ x: share, y: share })
+      .optional()
+      .describe("Bod (podíly 0–1 fotky), na který ořez vycentrovat, jak to jde; přebije gravity."),
+    rect: z
+      .strictObject({ x: share, y: share, w: share.positive(), h: share.positive() })
+      .optional()
       .describe(
-        "photo = co největší kus fotky v tom poměru; subject = těsně kolem páru, obličejů nebo ostrého detailu (ne menší než výstup, pokud nepovolíš zvětšení).",
+        "Přesný výřez jako podíly 0–1 fotky (x, y levý horní roh); přebije gravity i point. S aspect se dořízne kolem svého středu.",
       ),
     max_width: SIZE_LIMIT.optional().describe(
-      "Největší šířka výsledku v px. Bez max_width i max_height je to 1080.",
+      "Největší šířka výsledku v px (Instagram: 1080–1440).",
     ),
     max_height: SIZE_LIMIT.optional().describe("Největší výška výsledku v px."),
+    max_bytes: z
+      .number()
+      .int()
+      .min(50_000)
+      .max(50_000_000)
+      .default(META_MAX_BYTES)
+      .describe("Největší velikost souboru v bajtech; výchozí 8 000 000 (Instagram, Facebook)."),
     allow_upscale: z
       .boolean()
       .default(false)
-      .describe("Zvětšit výřez, když je menší než požadovaná velikost (jinak zůstane, jak je)."),
+      .describe("Zvětšit výřez, když je menší než max_width / max_height (jinak zůstane, jak je)."),
     format: z.enum(["jpeg", "webp"]).default("jpeg").describe("jpeg pro Instagram a Facebook."),
     quality: z.number().int().min(30).max(100).default(85),
   }),
@@ -405,74 +424,88 @@ export const photoCrop = defineTool({
         height: true,
         status: true,
         source: true,
-        faces: true,
-        faceTags: {
-          where: { person: { couple: true } },
-          select: { x: true, y: true, w: true, h: true },
-        },
       },
     });
     const byId = new Map(rows.map((row) => [row.id, row]));
+    const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1).replace(".", ",")} MB`;
 
-    const crops = args.photo_ids.map((id) => {
-      const photo = byId.get(id);
-      if (!photo || photo.status !== "CONFIRMED")
-        return { photoId: id, error: "Fotka nenalezena." };
-      if (!photo.width || !photo.height) {
-        return {
-          photoId: id,
-          fileName: photo.fileName,
-          error: "Rozměry fotky nejsou známé — ořez nejde spočítat.",
-        };
-      }
-      const stored = storedFaces(photo.faces);
-      const plan = planCrop(
-        {
-          width: photo.width,
-          height: photo.height,
-          faces: stored?.faces ?? [],
-          focus: stored?.focus ?? null,
-          coupleTags: photo.faceTags,
-        },
-        {
+    const crops = await Promise.all(
+      args.photo_ids.map(async (id) => {
+        const photo = byId.get(id);
+        if (!photo || photo.status !== "CONFIRMED")
+          return { photoId: id, error: "Fotka nenalezena." };
+        if (!photo.width || !photo.height) {
+          return {
+            photoId: id,
+            fileName: photo.fileName,
+            error: "Rozměry fotky nejsou známé — ořez nejde spočítat.",
+          };
+        }
+        const size = { width: photo.width, height: photo.height };
+        const plan = planCrop(size, {
           aspect,
-          framing: args.framing,
+          gravity: args.point ?? args.gravity,
+          rect: args.rect ?? null,
           maxWidth: args.max_width ?? null,
           maxHeight: args.max_height ?? null,
           allowUpscale: args.allow_upscale,
-        },
-      );
-      const url = croppedUrl(photo.objectKey, {
-        width: photo.width,
-        height: photo.height,
-        rect: plan.rect,
-        output: plan.output,
-        format: args.format,
-        quality: args.quality,
-      });
-      const warnings = [
-        ...(photo.source === "GUEST" ? ["Fotka od hosta, ne fotografova práce."] : []),
-        ...(photo.videoObjectKey ? ["Video: ořez je z jeho plakátu."] : []),
-        ...(!stored ? ["Obličeje ještě nejsou rozpoznané — ořez míří jen podle kompozice."] : []),
-        ...(url ? [] : ["Ořez tu nejde: CDN nemá zapnuté transformace obrázků."]),
-        ...plan.warnings,
-      ];
-      return {
-        photoId: photo.id,
-        fileName: photo.fileName,
-        galleryId: photo.galleryId,
-        url,
-        width: plan.output.width,
-        height: plan.output.height,
-        format: args.format,
-        crop: { ...plan.rect, of: { width: photo.width, height: photo.height } },
-        aim: plan.aim,
-        faces: plan.faces,
-        upscaled: plan.upscaled,
-        warnings,
-      };
-    });
-    return jsonResult({ aspect: args.aspect, framing: args.framing, crops });
+        });
+        const build = (output: { width: number; height: number }, quality: number) =>
+          croppedUrl(photo.objectKey, {
+            ...size,
+            rect: plan.rect,
+            output,
+            format: args.format,
+            quality,
+          });
+        const warnings = [
+          ...(photo.source === "GUEST" ? ["Fotka od hosta, ne fotografova práce."] : []),
+          ...(photo.videoObjectKey ? ["Video: ořez je z jeho plakátu."] : []),
+          ...plan.warnings,
+        ];
+        if (!build(plan.output, args.quality)) {
+          return {
+            photoId: photo.id,
+            fileName: photo.fileName,
+            error: "Ořez tu nejde: CDN nemá zapnuté transformace obrázků.",
+          };
+        }
+        const fitted = await fitBytes(
+          (output, quality) => build(output, quality)!,
+          plan.output,
+          args.quality,
+          args.max_bytes,
+        );
+        if (fitted.bytes === null) {
+          warnings.push(
+            "Velikost souboru se nepodařilo ověřit na CDN — zkontroluj ji před použitím.",
+          );
+        } else if (!fitted.fits) {
+          warnings.push(
+            `Ani po zmenšení se nevejde do ${megabytes(args.max_bytes)} (${megabytes(fitted.bytes)}) — zadej menší max_width.`,
+          );
+        } else if (fitted.quality !== args.quality || fitted.output.width !== plan.output.width) {
+          warnings.push(
+            `Kvůli limitu ${megabytes(args.max_bytes)} zmenšeno na ${fitted.output.width} × ${fitted.output.height} px, kvalita ${fitted.quality}.`,
+          );
+        }
+        return {
+          photoId: photo.id,
+          fileName: photo.fileName,
+          galleryId: photo.galleryId,
+          url: fitted.url,
+          width: fitted.output.width,
+          height: fitted.output.height,
+          format: args.format,
+          quality: fitted.quality,
+          bytes: fitted.bytes,
+          crop: { ...plan.rect, of: size },
+          upscaled: fitted.output.width > plan.rect.w,
+          warnings,
+        };
+      }),
+    );
+    return jsonResult({ aspect: args.aspect, maxBytes: args.max_bytes, crops });
   },
 });
 

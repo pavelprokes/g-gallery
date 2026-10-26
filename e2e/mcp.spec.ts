@@ -224,6 +224,10 @@ test.describe("reading", () => {
       aspect: "1:1",
       max_width: 400,
     });
+    const exact = await tool<{
+      crops: { crop: { x: number; w: number; of: { width: number } } }[];
+    }>(request, "photo_crop", { photo_ids: [ids[0]!], rect: { x: 0.5, y: 0, w: 0.5, h: 1 } });
+    expect(exact.crops[0]!.crop.x).toBe(Math.round(exact.crops[0]!.crop.of.width / 2));
     expect(result.crops.map((crop) => crop.photoId)).toEqual([...ids, "missing-photo"]);
     for (const crop of result.crops.slice(0, 2)) {
       expect(crop).toMatchObject({ width: 400, height: 400 });
