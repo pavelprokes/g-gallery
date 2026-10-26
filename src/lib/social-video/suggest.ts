@@ -12,6 +12,7 @@ import {
   planShot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
+import { aimFaces } from "@/lib/social-video/aim";
 import { coupleFaces, focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
 import { FADE_SECONDS, SLIDE_SECONDS } from "@/lib/social-video/timeline";
@@ -215,7 +216,7 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   const framing = {
     width: c.width,
     height: c.height,
-    faces: focusFaces(faces, coupleTags),
+    faces: aimFaces(focusFaces(faces, coupleTags), c.faces?.focus),
     focus: c.faces?.focus,
   };
   const shot = planShot(framing, format, SLIDE_SECONDS + FADE_SECONDS);

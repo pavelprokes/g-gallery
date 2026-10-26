@@ -31,7 +31,7 @@ import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-p
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { GalleryFaceScan } from "@/components/admin/gallery-face-scan";
-import { isDetailShot, needsFocus } from "@/lib/social-video/camera";
+import { isDetailShot, needsFocus } from "@/lib/social-video/aim";
 import { currentFaces } from "@/lib/social-video/faces";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";

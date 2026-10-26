@@ -3,6 +3,7 @@
 // and the one-click gift, so both draw the same video from the same photos.
 
 import { directShots, planShot, type Shot, type VideoFormat } from "@/lib/social-video/camera";
+import { aimFaces } from "@/lib/social-video/aim";
 import { focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { moveSeconds, type Timeline } from "@/lib/social-video/timeline";
@@ -46,7 +47,10 @@ export function shotsFor(
             {
               width: p.width,
               height: p.height,
-              faces: focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
+              faces: aimFaces(
+                focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
+                faces[p.id]?.focus,
+              ),
               focus: faces[p.id]?.focus,
             },
             format,

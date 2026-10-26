@@ -30,7 +30,8 @@ import {
   type PhotoOrder,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
-import { PROJECTION_FACES_SELECT, projectionFaces } from "@/lib/projection-camera";
+import { PROJECTION_FACES_SELECT, projectionFaces, projectionFocus } from "@/lib/projection-camera";
+import type { Focus } from "@/lib/social-video/focus";
 import type { Face } from "@/lib/social-video/faces";
 import {
   IMAGE_GRANT_TTL_SECONDS,
@@ -90,6 +91,7 @@ export interface GalleryViewData {
     orderKey: string;
     /** For the projection's camera (src/lib/projection-camera.ts). */
     faces: Face[] | null;
+    focus: Focus | null;
   }[];
   initialCursor: string | null;
   /** The order `initialPhotos` and every `orderKey` are in (src/lib/photo-order.ts). */
@@ -305,6 +307,7 @@ export async function loadGalleryViewData(
       uploaderName: uploaderNameOf(photo),
       orderKey: orderKeyOf(order, photo),
       faces: projectionFaces(photo.faces, photo.faceTags),
+      focus: projectionFocus(photo.faces),
     })),
     initialCursor:
       hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,

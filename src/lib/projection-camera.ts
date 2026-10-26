@@ -12,8 +12,10 @@ import {
   type Shot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
+import { aimFaces } from "@/lib/social-video/aim";
 import { focusFaces, type Box } from "@/lib/social-video/face-tags";
 import { storedFaces, type Face } from "@/lib/social-video/faces";
+import type { Focus } from "@/lib/social-video/focus";
 
 /** The most faces a photo hands the guests' page — enough to frame any
  * group; the camera only needs the ones it frames by. */
@@ -42,7 +44,9 @@ export function projectionFaces(stored: unknown, coupleTags: readonly Box[] = []
   const parsed = storedFaces(stored);
   if (!parsed) return null;
   const r = (n: number) => Math.round(n * 1000) / 1000;
-  return focusFaces(parsed.faces, coupleTags)
+  // Soft faces in front of a sharp detail are not what the camera frames by —
+  // decided here, where the eyes' sharpness still is (docs/SOCIAL-VIDEO.md §5).
+  return aimFaces(focusFaces(parsed.faces, coupleTags), parsed.focus)
     .filter((f) => f.score >= FRAMING_MIN_SCORE)
     .sort((a, b) => b.w * b.h - a.w * a.h)
     .slice(0, MAX_PROJECTED_FACES)
@@ -56,6 +60,15 @@ export function projectionFaces(stored: unknown, coupleTags: readonly Box[] = []
       re: [r(f.re[0]), r(f.re[1])],
       blink: null,
     }));
+}
+
+/** The sharp part the projection's camera aims at without a face to frame
+ * (docs/SOCIAL-VIDEO.md §5): a box, rounded; null when there is none. */
+export function projectionFocus(stored: unknown): Focus | null {
+  const focus = storedFaces(stored)?.focus;
+  if (!focus) return null;
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  return { x: r(focus.x), y: r(focus.y), w: r(focus.w), h: r(focus.h), strength: focus.strength };
 }
 
 /** The screen as a camera format: a gentle zoom, the eyes a little above the
@@ -79,7 +92,12 @@ export function screenFormat(width: number, height: number): VideoFormat {
  * pushing in and pulling out, as the video does; groups always pull out.
  */
 export function projectionShot(
-  photo: { width: number | null; height: number | null; faces: readonly Face[] | null },
+  photo: {
+    width: number | null;
+    height: number | null;
+    faces: readonly Face[] | null;
+    focus?: Focus | null;
+  },
   screen: { width: number; height: number },
   seconds: number,
   turn: number,
@@ -88,7 +106,7 @@ export function projectionShot(
   if (!width || !height || !faces || screen.width <= 0 || screen.height <= 0) return null;
   if (width >= height !== screen.width >= screen.height) return null;
   const shot = planShot(
-    { width, height, faces },
+    { width, height, faces, focus: photo.focus },
     screenFormat(screen.width, screen.height),
     seconds,
   );

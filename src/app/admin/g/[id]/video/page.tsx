@@ -5,7 +5,7 @@ import { compareTimeline } from "@/lib/gallery-chapters";
 import { HIGHLIGHT_CANDIDATE_SELECT, toHighlightCandidate } from "@/lib/gallery-highlights";
 import { CHAPTER_START_SELECT, chapterStartOf, positionOf } from "@/lib/photo-order";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
-import { needsFocus } from "@/lib/social-video/camera";
+import { needsFocus } from "@/lib/social-video/aim";
 import { currentFaces } from "@/lib/social-video/faces";
 import { likedScore } from "@/lib/social-video/suggest";
 import { photoCounts } from "@/lib/activity";
