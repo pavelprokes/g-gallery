@@ -2,7 +2,8 @@
 // ends in the photo, and where it is at any moment between. Pure and
 // client-safe; every rectangle is in the photo's own pixels.
 
-import type { Face } from "@/lib/social-video/faces";
+import type { Face, PhotoFaces } from "@/lib/social-video/faces";
+import type { Focus } from "@/lib/social-video/focus";
 
 export type Aspect = "9:16" | "16:9";
 
@@ -98,6 +99,8 @@ export interface PhotoForShot {
   width: number;
   height: number;
   faces: readonly Face[];
+  /** The sharp part of the photo (focus.ts): the aim when no face frames it. */
+  focus?: Focus | null;
 }
 
 interface Subject {
@@ -112,6 +115,18 @@ export function framedFaces(faces: readonly Face[]): Face[] {
   if (strong.length === 0) return [];
   const largest = Math.max(...strong.map((f) => f.w * f.h));
   return strong.filter((f) => f.w * f.h >= largest * FRAMING_MIN_AREA);
+}
+
+/** A detail shot: no face the camera frames by, one sharp part it aims at
+ * instead (`planShot`) — what the admin's "Detaily" filter lists. */
+export function isDetailShot(faces: PhotoFaces): boolean {
+  return !!faces.focus && framedFaces(faces.faces).length === 0;
+}
+
+/** Searched before focus existed (2026-10-26) and with no face to frame by:
+ * the camera has nothing to aim at, so the face scan looks at it again. */
+export function needsFocus(faces: PhotoFaces): boolean {
+  return faces.focus === undefined && framedFaces(faces.faces).length === 0;
 }
 
 /** The faces that frame the photo, widened to head and shoulders, as one box. */
@@ -158,6 +173,21 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   // sizes the source so the cover frame is at least the output (sourceWidth).
   const minW = Math.max(coverW / maxZoom, Math.min(coverW, format.width / MAX_UPSCALE));
   const subject = subjectOf(photo);
+
+  if (!subject && photo.focus) {
+    // A detail shot wide open: frame the sharp part as a face would be framed,
+    // with air around it, the push no stronger than for a face.
+    const f = photo.focus;
+    const cx = (f.x + f.w / 2) * W;
+    const cy = (f.y + f.h / 2) * H;
+    const needW = Math.max(f.w * W, f.h * H * a) * TIGHT_MARGIN;
+    const tightW = Math.max(minW, Math.min(needW, coverW / MIN_ZOOM));
+    return {
+      kind: "push",
+      from: frame(photo, a, coverW, cx, cy),
+      to: frame(photo, a, tightW, cx, cy),
+    };
+  }
 
   if (!subject) {
     const cy = H * FACELESS_AIM;

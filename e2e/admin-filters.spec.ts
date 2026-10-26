@@ -57,6 +57,15 @@ test("filters narrow the grid, live in the URL, and Back undoes them", async ({ 
   await expect(tiles(page)).toHaveCount(4);
 });
 
+test("Detaily keeps the photos with no face and one sharp part", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.filterGalleryId}`);
+  const filters = page.getByRole("group", { name: "Filtry fotek" });
+  await filters.getByRole("link", { name: /Detaily/ }).click();
+  await expect(page).toHaveURL(/[?&]f=details/);
+  await expect(tiles(page)).toHaveCount(1);
+  await expect(page.getByRole("img", { name: "svatba_0004_PPR1004.jpg" })).toHaveCount(1);
+});
+
 test("most viewed puts the most viewed photo first", async ({ page }) => {
   await page.goto(`/admin/g/${seed.filterGalleryId}?sort=views`);
   await expect(tiles(page).first()).toHaveAccessibleName("svatba_0003_PPR1003.jpg");

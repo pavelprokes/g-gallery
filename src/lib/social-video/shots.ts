@@ -47,6 +47,7 @@ export function shotsFor(
               width: p.width,
               height: p.height,
               faces: focusFaces(faces[p.id]?.faces ?? [], p.coupleTags ?? []),
+              focus: faces[p.id]?.focus,
             },
             format,
             seconds[i] ?? seconds.at(-1) ?? 3,

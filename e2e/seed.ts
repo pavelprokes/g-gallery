@@ -1188,6 +1188,15 @@ async function makeFilterGallery(ownerId: string) {
         crc32: "00000000",
         takenAt: new Date(Date.UTC(2026, 8, 5, 10, i)),
         source: i === 3 ? "GUEST" : "OWNER",
+        // The fourth is a detail shot: no face, one sharp part ("Detaily"); the
+        // rest are already searched and show nothing, so the page's face scan
+        // has nothing to fill in under the test.
+        faces: {
+          v: 1,
+          model: FACES_MODEL,
+          faces: [],
+          focus: i === 3 ? { x: 0.3, y: 0.5, w: 0.3, h: 0.3, strength: 40 } : null,
+        },
       },
     });
     ids.push(photo.id);

@@ -121,6 +121,32 @@ describe("planShot", () => {
     inside(shot.from, photo);
   });
 
+  it("aims at the sharp part of a faceless detail shot — shoes low in a portrait photo", () => {
+    const shoes = { ...portrait(), focus: { x: 0.12, y: 0.5, w: 0.62, h: 0.33, strength: 87 } };
+    for (const format of [VERTICAL, WIDE]) {
+      const shot = planShot(shoes, format, SECONDS);
+      expect(shot.kind).toBe("push");
+      inside(shot.from, shoes);
+      inside(shot.to, shoes);
+      // The tight frame holds the shoes, not the blurred dress above them.
+      const shoesCy = (0.5 + 0.33 / 2) * 3000;
+      expect(shot.to.y).toBeLessThanOrEqual(shoesCy);
+      expect(shot.to.y + shot.to.h).toBeGreaterThanOrEqual(shoesCy);
+      expect(shot.to.y + shot.to.h / 2).toBeGreaterThan(3000 / 2);
+    }
+  });
+
+  it("keeps a face before the sharp part, and the upper third without either", () => {
+    const withFace = {
+      ...landscape(face(0.3, 0.2, 0.08, 1.5)),
+      focus: { x: 0.7, y: 0.7, w: 0.1, h: 0.1, strength: 20 },
+    };
+    const shot = planShot(withFace, VERTICAL, SECONDS);
+    expect(shot.to.x + shot.to.w / 2).toBeLessThan(1500);
+    const plain = planShot({ ...portrait(), focus: null }, WIDE, SECONDS);
+    expect(plain).toEqual(planShot(portrait(), WIDE, SECONDS));
+  });
+
   it("does not frame by a weak whole-frame hit — a doorway, a box of rings", () => {
     const doorway = { ...face(0.8, 0.3, 0.1, 1.5), score: 0.65 };
     const shot = planShot(landscape(doorway), VERTICAL, SECONDS);

@@ -31,6 +31,7 @@ import { GalleryPhotoOrderPanel } from "@/components/admin/gallery-photo-order-p
 import { GalleryHighlightPanel } from "@/components/admin/gallery-highlight-panel";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { GalleryFaceScan } from "@/components/admin/gallery-face-scan";
+import { isDetailShot, needsFocus } from "@/lib/social-video/camera";
 import { currentFaces } from "@/lib/social-video/faces";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
 import { MAX_PINNED, pickHighlights, toHighlightCandidate } from "@/lib/gallery-highlights";
@@ -222,20 +223,31 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // Stills the face worker has not searched yet (docs/SOCIAL-VIDEO.md §4) —
   // searched on their own by GalleryFaceScan. Their stored faces are read only
   // here, to judge whether they are current.
-  const facelessStills = (
-    await prisma.photo.findMany({
-      where: {
-        galleryId: gallery.id,
-        status: "CONFIRMED",
-        videoObjectKey: null,
-        width: { not: null },
-        height: { not: null },
-      },
-      select: { id: true, objectKey: true, width: true, height: true, faces: true },
-    })
-  )
-    .filter((photo) => currentFaces(photo.faces) === null)
-    .map(({ id, objectKey, width, height }) => ({ id, objectKey, width: width!, height: height! }));
+  const stills = await prisma.photo.findMany({
+    where: {
+      galleryId: gallery.id,
+      status: "CONFIRMED",
+      videoObjectKey: null,
+      width: { not: null },
+      height: { not: null },
+    },
+    select: { id: true, objectKey: true, width: true, height: true, faces: true },
+  });
+  const scanned = stills.map((photo) => ({ photo, faces: currentFaces(photo.faces) }));
+  // Searched for faces never, by an older build, or (with no face to frame)
+  // before the sharp part was looked for — the face scan below covers all three.
+  const facelessStills = scanned
+    .filter(({ faces }) => faces === null || needsFocus(faces))
+    .map(({ photo: { id, objectKey, width, height } }) => ({
+      id,
+      objectKey,
+      width: width!,
+      height: height!,
+    }));
+  // "Detaily" (docs/ADMIN-FILTERS.md): what the camera frames by its sharp part.
+  const details = new Set(
+    scanned.filter(({ faces }) => faces && isDetailShot(faces)).map(({ photo }) => photo.id),
+  );
 
   // The gallery as a guest opens it — the header's "Otevřít galerii" and each
   // chapter's link (that plus its anchor).
@@ -338,6 +350,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       people: photo.faceTags.map((tag) => tag.personId),
       guest: photo.source === "GUEST",
       video: photo.videoObjectKey !== null,
+      detail: details.has(photo.id),
       chapter: chapterOf.get(photo.id) ?? null,
     };
   };

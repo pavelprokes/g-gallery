@@ -10,13 +10,13 @@ browser's Back. Chips are plain links; the person and chapter selects and the se
 `src/lib/admin-photo-filters.ts` parses and writes it — unknown values are dropped, never refused,
 and the links from before (`?print=1`, `?timeline=1`) still work.
 
-| Parameter | Values                                                                                                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `f`       | comma list, all must hold: `comments` (open corrections, docs/CORRECTIONS.md), `print`, `favorites`, `reactions`, `viewed`, `highlights`, `video-draft`, `tagged`, `untagged`, `guests`, `videos` |
-| `person`  | a `GalleryPerson` id — photos with them named (docs/SOCIAL-VIDEO.md §4)                                                                                                                           |
-| `chapter` | a chapter id — its photos as the guests' grid places them (docs/CHAPTERS.md)                                                                                                                      |
-| `q`       | part of the file name — a camera number (`PPR55013`) is enough                                                                                                                                    |
-| `sort`    | `loved` (default), `views`, `viewers`, `order` (the guests' order with chapter headings), `name`                                                                                                  |
+| Parameter | Values                                                                                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `f`       | comma list, all must hold: `comments` (open corrections, docs/CORRECTIONS.md), `print`, `favorites`, `reactions`, `viewed`, `highlights`, `video-draft`, `tagged`, `untagged`, `guests`, `videos`, `details` |
+| `person`  | a `GalleryPerson` id — photos with them named (docs/SOCIAL-VIDEO.md §4)                                                                                                                                      |
+| `chapter` | a chapter id — its photos as the guests' grid places them (docs/CHAPTERS.md)                                                                                                                                 |
+| `q`       | part of the file name — a camera number (`PPR55013`) is enough                                                                                                                                               |
+| `sort`    | `loved` (default), `views`, `viewers`, `order` (the guests' order with chapter headings), `name`                                                                                                             |
 
 Each chip shows how many photos it would leave on top of the rest of the view; a chip that would
 leave none is hidden unless it is on. `tagged` and `untagged` exclude each other.
@@ -31,6 +31,10 @@ from the same grouping the timeline uses.
 **"Ve videu pro sítě"** reads `Gallery.socialVideoDraft` — the studio's draft now also lives on the
 gallery (saved a second after the last change, `saveSocialVideoDraft`), not only in the browser's
 localStorage, so the filter can see it and another device continues the draft.
+
+**"Detaily"** (`details`, 2026-10-26) — photos with no face the camera frames by and one sharp
+part (`Photo.faces.focus`, docs/SOCIAL-VIDEO.md §5): shoes, rings, the cake, decorations. Known
+only once the face scan has looked at the photo.
 
 ## Later
 

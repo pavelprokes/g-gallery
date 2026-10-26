@@ -21,6 +21,7 @@ import {
   type Rect,
 } from "@/lib/photo-check";
 import { FACES_MODEL, MAX_FACES, type Face, type PhotoFaces } from "@/lib/social-video/faces";
+import { FOCUS_EDGE, focusOf } from "@/lib/social-video/focus";
 import {
   CHECK_MIN_SCORE,
   CHECK_SIZE,
@@ -193,9 +194,14 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       const faces = kept.slice(0, MAX_FACES).map((c) => toFace(c, width, height));
 
       const looked = new Set(facesToAnalyse(faces));
+      const k = Math.min(1, FOCUS_EDGE / Math.max(width, height));
+      const focusW = Math.max(1, Math.round(width * k));
+      const focusH = Math.max(1, Math.round(height * k));
+      const small = sample(image, { x: 0, y: 0, w: width, h: height }, focusW, focusH, false);
       return {
         v: 1,
         model: FACES_MODEL,
+        focus: focusOf(small.data, focusW, focusH),
         faces: faces.map((face) =>
           looked.has(face)
             ? { ...face, ...expressionOf(image, face), sharp: sharpnessOf(image, face) }

@@ -32,6 +32,7 @@ const FILTER_LABEL: Record<AdminFilter, string> = {
   untagged: "Bez označení",
   guests: "Od hostů",
   videos: "▶ Videa",
+  details: "Detaily",
 };
 
 const SORT_LABEL: Record<AdminSort, string> = {
