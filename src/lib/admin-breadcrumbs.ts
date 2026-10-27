@@ -57,6 +57,16 @@ export function eventSignCrumbs(event: EventRef): Crumb[] {
   return withLeaf(eventCrumbs(event), `/admin/e/${event.id}`, "Cedulka k tisku");
 }
 
+/** Přehled / {wedding} / Gravírování */
+export function eventEngravingCrumbs(event: EventRef): Crumb[] {
+  return withLeaf(eventCrumbs(event), `/admin/e/${event.id}`, "Gravírování");
+}
+
+/** Přehled / [{wedding}] / {gallery} / Gravírování */
+export function galleryEngravingCrumbs(gallery: GalleryRef): Crumb[] {
+  return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Gravírování");
+}
+
 /** Přehled / [{wedding}] / {gallery} / Cedulka k tisku */
 export function gallerySignCrumbs(gallery: GalleryRef): Crumb[] {
   return withLeaf(galleryCrumbs(gallery), `/admin/g/${gallery.id}`, "Cedulka k tisku");

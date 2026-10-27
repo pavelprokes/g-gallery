@@ -564,6 +564,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             <a href={`/admin/g/${gallery.id}/people`} className={buttonClasses("secondary", "md")}>
               Kdo je kdo
             </a>
+            {/* docs/ENGRAVING.md — the couple's names and date in the leaf frame, for the laser. */}
+            <a
+              href={`/admin/g/${gallery.id}/engraving`}
+              className={buttonClasses("secondary", "md")}
+            >
+              Gravírování
+            </a>
             {/* docs/CORRECTIONS.md — only while the couple has asked for something. */}
             {openCorrections > 0 && (
               <a
