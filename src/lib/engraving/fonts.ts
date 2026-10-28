@@ -27,6 +27,11 @@ export type EngravingFont = {
   namesScale: number;
   /** The date is set in another face where this one's figures do not engrave well. */
   dateFont?: EngravingFontId;
+  /**
+   * A connected script: the monogram's letters touch rather than stand apart
+   * (`MONOGRAM_LETTER_SPACING` would break the joins).
+   */
+  script?: true;
 };
 
 export const ENGRAVING_FONTS: readonly EngravingFont[] = [
@@ -78,6 +83,7 @@ export const ENGRAVING_FONTS: readonly EngravingFont[] = [
     file: "/vendor/engraving/fonts/great-vibes-400.ttf",
     namesScale: 1.45,
     dateFont: "playfair-display",
+    script: true,
   },
 ];
 

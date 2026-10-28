@@ -47,6 +47,22 @@ Everything is measured from Pavel's Affinity file, not eyeballed:
   checks the generator against Pavel's own export of "Alice a Martin, 22. 8. 2026" to within
   4 px.
 
+## Monogram
+
+Asked for 2026-10-28: the couple's initials alone, "A&P", **25 mm wide**. A second section on the
+same page (`src/lib/engraving/monogram.ts`):
+
+- **Initials** follow the names above (first letter, Czech capitalisation, NFC so a decomposed
+  háček stays on its letter) until typed over — "Ch" is a letter a first character cannot guess.
+  One initial missing leaves the other alone, never a bare ampersand.
+- **Width** is the width of the ink itself, 25 mm by default, 5–300 mm. Height follows the face.
+- **Spacing**: 0.06 em between the letters and the ampersand; set solid, a serif "A&P" reads as one
+  blot at 25 mm. Great Vibes (`script: true`) stays solid so its joins survive.
+- **SVG** carries its size in millimetres (`width="25mm"`, viewBox in pixels at 600 dpi), so a
+  laser program imports it at the right size unasked. Outlines only, no background, cropped to the
+  ink.
+- **JPG** at 600 dpi (25 mm = 591 px) — a plate's 144 dpi would leave a 25 mm mark 142 px wide.
+
 ## Fonts
 
 Static instances from Google Fonts with their OFL licences, in `public/vendor/engraving/fonts/`
