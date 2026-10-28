@@ -30,7 +30,7 @@ import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
-import { slidesToDecode } from "@/lib/social-video/timeline";
+import { slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
 import {
   reelFramePlan,
   reelSlides,
@@ -72,6 +72,7 @@ const PREVIEW_FORMAT: VideoFormat = {
 const MAX_TRACK_BYTES = 60 * 1024 * 1024;
 
 const PACE_LABEL: Record<Pace, string> = {
+  song: "Podle písničky",
   fast: "Rychle · cca ½ s",
   beat: "Co vteřina, to fotka",
   calm: "Klidněji · cca 2 s",
@@ -82,6 +83,15 @@ const LAST_TRACK_KEY = "g-gallery:reels:track";
 const SECTION_KEY = "section";
 
 const clock = (seconds: number) => formatDuration(seconds * 1000);
+
+/** "0,6–1,7 s": the shortest and longest photo, the held last one aside. */
+function lengthRange(timeline: Timeline): string {
+  const lengths = timeline.slides.slice(0, -1).map((s) => s.end - s.start);
+  if (lengths.length === 0) return `${timeline.duration.toFixed(1)} s`;
+  const f = (v: number) => v.toLocaleString("cs", { maximumFractionDigits: 1 });
+  const [lo, hi] = [Math.min(...lengths), Math.max(...lengths)];
+  return lo.toFixed(1) === hi.toFixed(1) ? `${f(lo)} s` : `${f(lo)}–${f(hi)} s`;
+}
 
 function trackNote(track: MusicTrack): string {
   switch (kindOf(track)) {
@@ -333,7 +343,7 @@ export function ReelStudio({
 
   // ---- Settings and variants ----
   const [seconds, setSeconds] = useState<ReelLength>(15);
-  const [pace, setPace] = useState<Pace>("beat");
+  const [pace, setPace] = useState<Pace>("song");
   const [exclude, setExclude] = useState<Set<string>>(() => new Set());
   const [round, setRound] = useState(0);
   const [shown, setShown] = useState<Set<string>>(() => new Set());
@@ -626,9 +636,11 @@ export function ReelStudio({
             ))}
           </div>
           <p className="text-admin-muted text-caption mt-3 dark:text-neutral-400">
-            Střih vždy padne na dobu: u rychlé písničky po dvou dobách, u pomalé po jedné. Video
-            začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající hudbou.
-            Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
+            {pace === "song"
+              ? "Střihy jdou s písničkou: v klidné části fotka chvíli vydrží, v refrénu se mění na každou dobu, nová část i výrazný úder dostanou vlastní střih."
+              : "Střih vždy padne na dobu, v pravidelném rytmu."}{" "}
+            Video začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající
+            hudbou. Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
           </p>
           <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
             <input
@@ -948,9 +960,12 @@ function VariantCard({
         </button>
       </div>
       <p className="text-caption mt-3 tabular-nums">
-        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s · střih{" "}
-        {perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`} ({Math.round(bpm)} BPM)
-        {variant.accents && " · zrychlení na konci frází"}
+        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s ·{" "}
+        {plan.adaptive
+          ? `střihy podle hudby, ${lengthRange(timeline)}`
+          : `střih ${perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`}`}{" "}
+        ({Math.round(bpm)} BPM)
+        {variant.accents && (plan.adaptive ? " · rychlejší" : " · zrychlení na konci frází")}
       </p>
       <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
         <span>

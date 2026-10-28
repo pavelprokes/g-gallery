@@ -61,12 +61,27 @@ microphone fed a 126 BPM track: found 126 BPM from the recording.
    mono, averaged down to ~22 kHz.
 2. **Onset envelope**: log-magnitude spectral flux (1024-sample Hann frames, 256 hop, bins up to
    8 kHz), half-wave rectified, minus its ±0.5 s mean, normalised.
-3. **Tempo**: the envelope's autocorrelation between 60 and 200 BPM under a log-Gaussian prior
-   centred on 120 BPM, one octave wide (librosa's defaults), refined between lags by a parabola.
+3. **Tempo** (since 2026-10-28): comb-filter resonance (Davies & Plumbley 2007, eq. 5) — each
+   tempo 60–200 BPM scores the envelope's autocorrelation at its period and three multiples, each
+   widened by its tolerance, under a Rayleigh weighting peaking at 120 BPM; then to 0.1 BPM. After
+   `@audio/beat`'s `combTempo` (MIT, github.com/audiojs/beat — found by Pavel), ported rather than
+   installed: the rest of that package is the same spectral flux and Ellis DP as here. On our own
+   synthetic set (`beats.styles.test.ts`, 9 styles × 70–180 BPM) it lifted exact tempo from 64 % to
+   70 % and tempo-or-octave from 88 % to 96 %; the plain autocorrelation (librosa's prior) remains
+   for a clip too short for the comb.
 4. **Beats**: Ellis' dynamic programme (2007, librosa's `beat_track`) — tightness 100, onsets
    smeared by a Gaussian of period/32; beats before the first real onset (a silent intro) dropped.
-5. **Bars**: 4/4 assumed; the downbeat is the phase of every fourth beat with the strongest onsets.
+5. **Bars**: 4/4 assumed; the downbeat is the phase of every fourth beat that is hit hardest and,
+   weighted four times more, where the song gets louder — a chorus starts on a bar's first beat.
+   Loudness, not onsets, because it reads the same at 44.1 and 48 kHz: on Pavel's test song
+   (d.higgs, "Shut It Down") the onset-only phase moved by two beats between the two rates.
 6. **Energy**: RMS from each beat to the next, against the loudest.
+7. **Strength, off-beat, density** (`BEATS_VERSION` 2): the onset at each beat and halfway to the
+   next (±35 ms), and the mean onset from beat to beat — what the cuts follow (§3).
+
+The Web Audio `AnalyserNode` (suggested 2026-10-28) is not used: it gives FFT snapshots of sound
+playing in real time, so a 3-minute song would take 3 minutes to read and its frames would land
+on animation ticks, not on samples. The decoded file is read whole instead, ~1.5 s for 3 minutes.
 
 Measured on synthetic drums: tempo within 0.3 %, every beat within 20 ms of its hit (0.5 ms on
 average, after moving the frame time a hop later — 11 ms early without it). A 30 s track takes
@@ -75,6 +90,19 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 
 ## 3. The cuts (`src/lib/reels/cuts.ts`)
 
+- **"Podle písničky"** (the default since 2026-10-28, `src/lib/reels/follow.ts`): the photo
+  lengths follow the song. Each beat's intensity is its busyness (onsets, weighted 0.65) and
+  loudness (0.35), averaged per bar and ranked against the song itself; a song that hardly changes
+  stays even. The target length runs from half the usual (~a beat at 100–130 BPM) where the song is
+  busiest to ~1.4× where it is sparsest. A dynamic programme (Ellis' kind, one level up) picks the
+  chain of cuts from the first bar to the last that lands on the hardest hits while keeping each
+  photo near its target: bar starts are preferred, a change of section (Foote novelty on bar
+  intensity) and a stab (a hit 2.5× the beats around it) get a cut of their own, off-beats are
+  candidates where something is hit there, lengths of 1, 2, 4, 8 beats cost nothing and others
+  a little, nothing under 0.3 s. "Se zrychlením" asks 0.7× the length. With fewer photos than cuts
+  the usual length grows by 1.4× until they fit. On "Shut It Down" (103 BPM): 1.17 s in the verse,
+  every beat (0.58 s) from the chorus's first bar, a bar's hold over the break and the next cut on
+  the hit after it.
 - **Pace** → beats per cut: the musical group (1, 2, 4, 8, 16 beats) nearest the pace — "Rychle"
   ~0.5 s, "Co vteřina, to fotka" ~1 s, "Klidněji" ~2 s. At 128 BPM "a second" is 2 beats (0.94 s);
   at 70 BPM it is 1 beat; at 174 it is 4.

@@ -5,10 +5,12 @@
 // with no fade, because a cut on the beat is the point.
 
 import type { BeatAnalysis } from "@/lib/reels/beats";
+import { followCuts, positionTime, type CutPosition } from "@/lib/reels/follow";
 import { FPS, type Timeline } from "@/lib/social-video/timeline";
 
-/** Roughly how long a photo stays, in seconds; the beat decides exactly. */
-export const PACES = { fast: 0.5, beat: 1, calm: 2 } as const;
+/** Roughly how long a photo stays, in seconds; the beat decides exactly.
+ * "song" varies it with the music around a second (src/lib/reels/follow.ts). */
+export const PACES = { song: 1, fast: 0.5, beat: 1, calm: 2 } as const;
 export type Pace = keyof typeof PACES;
 
 export const REEL_LENGTHS = [15, 20, 30] as const;
@@ -121,7 +123,10 @@ export interface ReelPlan {
   offset: number;
   startBeat: number;
   endBeat: number;
+  /** The usual beats per photo — the median when the cuts follow the song. */
   beatsPerCut: number;
+  /** The cuts follow the song: their lengths vary with it. */
+  adaptive: boolean;
   /** One slide per photo; `fade` 0. */
   timeline: Timeline;
   /** How long the music fades out at the end — the last photo's hold. */
@@ -150,6 +155,10 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   );
 
   const maxPhotos = Math.max(1, options.maxPhotos);
+  if (options.pace === "song") {
+    const followed = planFollowing(analysis, s, end, beat, hold, maxPhotos, options.accents);
+    if (followed) return followed;
+  }
   let perCut = beatsPerCut(beat, options.pace);
   let cuts = cutBeats(s, end, perCut, options.accents);
   // Too few photos for the pace: cut less often; at the slowest, end sooner.
@@ -174,6 +183,47 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
     startBeat: s,
     endBeat: end,
     beatsPerCut: perCut,
+    adaptive: false,
+    timeline: { slides, duration, fade: 0 },
+    fadeOut: hold,
+  };
+}
+
+/**
+ * Cuts that follow the song, from the bar at `s` to the bar at `end`; with
+ * fewer photos than its cuts, each photo is asked to stay longer. Null when
+ * it cannot be done — the even pace takes over.
+ */
+function planFollowing(
+  analysis: BeatAnalysis,
+  s: number,
+  end: number,
+  beat: number,
+  hold: number,
+  maxPhotos: number,
+  faster: boolean,
+): ReelPlan | null {
+  let base = beatsPerCut(beat, "beat") * beat;
+  let cuts: CutPosition[] | null = null;
+  for (let attempt = 0; attempt < 6; attempt++, base *= 1.4) {
+    cuts = followCuts(analysis, { startBeat: s, endBeat: end, base, faster });
+    if (!cuts || cuts.length <= maxPhotos) break;
+  }
+  if (!cuts || cuts.length > maxPhotos) return null;
+  const zero = analysis.beats[s] ?? 0;
+  const starts = cuts.map((p) => frameSnap(positionTime(analysis, p) - zero));
+  const duration = frameSnap(starts.at(-1)! + hold);
+  const slides = starts.map((start, i) => {
+    const slideEnd = starts[i + 1] ?? duration;
+    return { start, end: slideEnd, moveEnd: slideEnd };
+  });
+  const lengths = cuts.slice(1).map((p, i) => p - cuts[i]!);
+  return {
+    offset: zero,
+    startBeat: s,
+    endBeat: end,
+    beatsPerCut: lengths.length > 0 ? lengths.toSorted((a, b) => a - b)[lengths.length >> 1]! : 1,
+    adaptive: true,
     timeline: { slides, duration, fade: 0 },
     fadeOut: hold,
   };

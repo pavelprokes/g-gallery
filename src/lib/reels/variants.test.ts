@@ -36,12 +36,15 @@ function gallery(id: string, count: number): ReelSource {
 const song: BeatAnalysis = (() => {
   const beats = Array.from({ length: 400 }, (_, i) => (i * 60) / 128);
   return {
-    v: 1,
+    v: 2,
     duration: 190,
     bpm: 128,
     beats,
     downbeat: 0,
     energy: beats.map((t) => (t > 90 ? 1 : 0.4)),
+    strength: beats.map(() => 0.5),
+    offbeat: beats.map(() => 0),
+    density: beats.map((t) => (t > 90 ? 1 : 0.4)),
   };
 })();
 

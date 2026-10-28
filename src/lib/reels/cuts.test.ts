@@ -10,7 +10,17 @@ function grid(
   { downbeat = 0, loud = () => 0.5 }: { downbeat?: number; loud?: (t: number) => number } = {},
 ): BeatAnalysis {
   const beats = Array.from({ length: Math.floor((seconds * bpm) / 60) }, (_, i) => (i * 60) / bpm);
-  return { v: 1, duration: seconds, bpm, beats, downbeat, energy: beats.map(loud) };
+  return {
+    v: 2,
+    duration: seconds,
+    bpm,
+    beats,
+    downbeat,
+    energy: beats.map(loud),
+    strength: beats.map(() => 0.5),
+    offbeat: beats.map(() => 0),
+    density: beats.map(loud),
+  };
 }
 
 describe("beatsPerCut", () => {
