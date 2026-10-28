@@ -12,7 +12,7 @@ import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
-import { slidesAt, type Timeline } from "@/lib/social-video/timeline";
+import { slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
 import type { Box } from "@/lib/social-video/face-tags";
 import { sourceUrl } from "@/components/admin/face-scan";
 
@@ -46,15 +46,6 @@ export function reelSlides(
       },
     ];
   });
-}
-
-/** The photos on screen at `t` and the one after — what must be decoded. */
-export function onScreen<T>(timeline: Timeline, slides: readonly T[], t: number): T[] {
-  const visible = slidesAt(timeline, t).map((v) => v.index);
-  const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
-  return [...new Set([...visible, next])]
-    .filter((i) => i >= 0 && i < slides.length)
-    .map((i) => slides[i]!);
 }
 
 export function reelFramePlan(
@@ -132,7 +123,7 @@ export async function renderReel({
       signal,
       onProgress: (share) => onProgress({ step: "render", share }),
       drawAt: async (ctx, t) => {
-        const wanted = onScreen(timeline, slides, t);
+        const wanted = slidesToDecode(timeline, slides, t);
         const key = wanted.map((p) => p.id).join();
         if (key !== windowKey) {
           windowKey = key;

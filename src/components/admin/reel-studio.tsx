@@ -17,12 +17,14 @@ import {
 import { reelVariants, type ReelSource, type ReelVariant } from "@/lib/reels/variants";
 import { FORMATS, type VideoFormat } from "@/lib/social-video/camera";
 import { chooseCodec, type EncodeCodec } from "@/lib/social-video/encode";
+import { formatDuration } from "@/lib/video";
+import { startHint } from "@/lib/reels/start-hint";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
+import { slidesToDecode } from "@/lib/social-video/timeline";
 import {
-  onScreen,
   reelFramePlan,
   reelSlides,
   renderReel,
@@ -69,15 +71,7 @@ const PACE_LABEL: Record<Pace, string> = {
 
 const LAST_TRACK_KEY = "g-gallery:reels:track";
 
-function clock(seconds: number) {
-  const s = Math.max(0, Math.round(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** A microphone hears the room; every other source is the song itself. */
-function soundByDefault(track: MusicTrack): boolean {
-  return !(kindOf(track) === "listened" && track.listenSource === "mic");
-}
+const clock = (seconds: number) => formatDuration(seconds * 1000);
 
 function trackNote(track: MusicTrack): string {
   switch (kindOf(track)) {
@@ -212,23 +206,26 @@ export function ReelStudio({
   }, []);
 
   const track = tracks.find((t) => t.id === trackId) ?? null;
+  // Keyed on the song, not on its row: editing its note makes a new object
+  // for the same song, which must neither re-decode it nor reset its choices.
+  const trackBlob = track?.blob ?? null;
   useEffect(() => {
     // Silence until the new song is decoded, rather than the old one under new cuts.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the sound follows the track
     setBuffer(null);
-    if (!track) return;
+    if (!trackId || !trackBlob) return;
     let live = true;
-    let pending = decoded.current.get(track.id);
+    let pending = decoded.current.get(trackId);
     if (!pending) {
-      pending = decodeTrack(track.blob);
-      pending.catch(() => decoded.current.delete(track.id));
-      decoded.current.set(track.id, pending);
+      pending = decodeTrack(trackBlob);
+      pending.catch(() => decoded.current.delete(trackId));
+      decoded.current.set(trackId, pending);
     }
     pending.then((b) => live && setBuffer(b)).catch(() => live && setBuffer(null));
     return () => {
       live = false;
     };
-  }, [track]);
+  }, [trackId, trackBlob]);
 
   /** Decoded, its beat found, kept in this browser and chosen. Throws when
    * the browser cannot decode it. */
@@ -236,7 +233,7 @@ export function ReelStudio({
     blob: Blob,
     name: string,
     kind: TrackKind,
-    extra: Pick<MusicTrack, "origin" | "audioId" | "listenSource"> = {},
+    extra: Pick<MusicTrack, "origin" | "audioId" | "listenSource" | "startAt" | "durationMs"> = {},
   ): Promise<void> => {
     const audio = await decodeTrack(blob);
     const entry: MusicTrack = {
@@ -278,11 +275,16 @@ export function ReelStudio({
     setAdding(null);
   };
 
-  const addInstagram = async (blob: Blob, name: string, audioId: string) => {
+  const addInstagram = async (
+    blob: Blob,
+    name: string,
+    audioId: string,
+    durationMs: number | null,
+  ) => {
     setLibraryError(null);
     setAdding(`Hledám rytmus: ${name}`);
     try {
-      await addTrack(blob, name, "instagram", { audioId });
+      await addTrack(blob, name, "instagram", { audioId, durationMs: durationMs ?? undefined });
     } catch {
       setLibraryError(`${name}: zvuk z Instagramu se nepodařilo přečíst.`);
     }
@@ -293,12 +295,12 @@ export function ReelStudio({
     blob: Blob,
     name: string,
     listenSource: "mic" | "tab",
-    origin?: string,
+    details: Pick<MusicTrack, "origin" | "startAt">,
   ) => {
     setLibraryError(null);
     setAdding("Hledám rytmus v poslechu…");
     try {
-      await addTrack(blob, name, "listened", { origin, listenSource });
+      await addTrack(blob, name, "listened", { ...details, listenSource });
     } catch {
       setLibraryError("Z poslechu se nepodařilo nic přečíst. Zkus to znovu a hlasitěji.");
     }
@@ -313,9 +315,10 @@ export function ReelStudio({
   };
 
   const updateSource = (id: string, source: string) => {
-    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, source } : t)));
     const entry = tracks.find((t) => t.id === id);
-    if (entry && entry.source !== source) void saveTrack({ ...entry, source }).catch(() => {});
+    if (!entry || entry.source === source) return;
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, source } : t)));
+    void saveTrack({ ...entry, source }).catch(() => {});
   };
 
   // ---- Settings and variants ----
@@ -329,13 +332,19 @@ export function ReelStudio({
 
   const analysis = track?.analysis ?? null;
   const trackKind = track ? kindOf(track) : null;
+  // Plain values read off the song, so nothing below hands the song itself to
+  // a function (the React Compiler then keeps the memos).
+  const defaultSound = !(trackKind === "listened" && track?.listenSource === "mic");
+  const trackStartAt = track?.startAt;
+  const trackDurationMs = track?.durationMs;
+  const decodedMs = (track?.analysis.duration ?? 0) * 1000;
   // The file with the song's sound, or silent for the song to be added in
   // Instagram (Pavel, 2026-10-28). A microphone's room recording starts silent.
   const [withSound, setWithSound] = useState(true);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- each song starts from its own default
-    setWithSound(track ? soundByDefault(track) : true);
-  }, [track]);
+    setWithSound(defaultSound);
+  }, [trackId, defaultSound]);
   const variants = useMemo(
     () =>
       analysis
@@ -395,6 +404,17 @@ export function ReelStudio({
   const [results, setResults] = useState<Result[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
+  // The variants on screen, for a render that ends after its variant changed:
+  // its file belongs to nothing and is released at once.
+  const liveSignatures = useRef(new Set<string>());
+  // Every file still held, released when the page goes.
+  const heldUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const held = heldUrls.current;
+    return () => {
+      for (const url of held) URL.revokeObjectURL(url);
+    };
+  }, []);
 
   const silent = !withSound;
   const render = async (variant: ReelVariant) => {
@@ -416,11 +436,18 @@ export function ReelStudio({
         onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
       });
       const signature = signatureOf(variant, trackId, withSound);
-      setResults((prev) => [
-        ...prev.filter((r) => r.signature !== signature),
-        { signature, url: URL.createObjectURL(file), file },
-      ]);
       setRenderState({ kind: "idle" });
+      if (!liveSignatures.current.has(signature)) return;
+      const url = URL.createObjectURL(file);
+      heldUrls.current.add(url);
+      setResults((prev) => {
+        for (const r of prev) {
+          if (r.signature !== signature) continue;
+          URL.revokeObjectURL(r.url);
+          heldUrls.current.delete(r.url);
+        }
+        return [...prev.filter((r) => r.signature !== signature), { signature, url, file }];
+      });
     } catch (cause) {
       if (controller.signal.aborted) setRenderState({ kind: "idle" });
       else {
@@ -434,12 +461,16 @@ export function ReelStudio({
   // A changed variant is a different video: its old file goes.
   useEffect(() => {
     const live = new Set(variants.map((v) => signatureOf(v, trackId, withSound)));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- dropping files of variants that changed
     setResults((prev) => {
       const kept = prev.filter((r) => live.has(r.signature));
-      for (const r of prev) if (!kept.includes(r)) URL.revokeObjectURL(r.url);
+      for (const r of prev) {
+        if (kept.includes(r)) continue;
+        URL.revokeObjectURL(r.url);
+        heldUrls.current.delete(r.url);
+      }
       return kept.length === prev.length ? prev : kept;
     });
+    liveSignatures.current = live;
   }, [variants, trackId, withSound]);
 
   return (
@@ -671,6 +702,9 @@ export function ReelStudio({
                 canRender={codec != null && buffer !== null}
                 silent={silent}
                 trackKind={trackKind}
+                hintStartAt={trackStartAt}
+                hintDurationMs={trackDurationMs}
+                hintDecodedMs={decodedMs}
                 renderState={renderState}
                 result={
                   results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
@@ -736,6 +770,9 @@ function VariantCard({
   canRender,
   silent,
   trackKind,
+  hintStartAt,
+  hintDurationMs,
+  hintDecodedMs,
   renderState,
   result,
   onRender,
@@ -755,6 +792,10 @@ function VariantCard({
   /** The file is made without sound. */
   silent: boolean;
   trackKind: TrackKind | null;
+  /** What `startHint` needs to say where to slide the song in Instagram. */
+  hintStartAt: number | undefined;
+  hintDurationMs: number | undefined;
+  hintDecodedMs: number;
   renderState: RenderState;
   result: Result | null;
   onRender(): void;
@@ -812,7 +853,7 @@ function VariantCard({
           t = 0;
         }
       }
-      const wanted = onScreen(timeline, slides, t);
+      const wanted = slidesToDecode(timeline, slides, t);
       const key = wanted.map((p) => p.id).join();
       if (key !== windowKey) {
         windowKey = key;
@@ -984,10 +1025,17 @@ function VariantCard({
             </a>
             {silent && (
               <p className="text-admin-muted text-caption dark:text-neutral-400">
-                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň na{" "}
-                {clock(plan.offset)}
-                {trackKind === "listened" ? " od místa, odkud jsi ji pouštěl" : ""} — první střih
-                padne na první dobu taktu.
+                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň{" "}
+                {startHint(
+                  {
+                    kind: trackKind ?? "file",
+                    startAt: hintStartAt,
+                    durationMs: hintDurationMs,
+                    decodedMs: hintDecodedMs,
+                  },
+                  plan.offset,
+                )}{" "}
+                — první střih padne na první dobu taktu. Doladíš uchem.
               </p>
             )}
           </div>

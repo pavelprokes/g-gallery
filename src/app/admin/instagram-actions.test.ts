@@ -47,11 +47,23 @@ describe("searchInstagramAudio", () => {
     expect(url.searchParams.get("user_id")).toBe("ig-9");
   });
 
-  it("refuses what the page should never send", async () => {
-    await expect(
-      searchInstagramAudio({ kind: "anything" as "music", query: "x" }),
-    ).rejects.toThrow();
-    await expect(searchInstagramAudio({ kind: "music", query: "x".repeat(101) })).rejects.toThrow();
+  it("says what is wrong instead of throwing into the page", async () => {
+    expect(await searchInstagramAudio({ kind: "anything" as "music", query: "x" })).toMatchObject({
+      ok: false,
+    });
+    expect(await searchInstagramAudio({ kind: "music", query: "x".repeat(101) })).toMatchObject({
+      ok: false,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    expect(await searchInstagramAudio({ kind: "music" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("neodpovídá"),
+    });
   });
 
   it("asks to connect when there is no account", async () => {

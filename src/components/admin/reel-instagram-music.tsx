@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { disconnectInstagram, searchInstagramAudio } from "@/app/admin/instagram-actions";
 import type { InstagramStatus } from "@/lib/instagram/connection";
 import type { AudioKind, InstagramAudio } from "@/lib/instagram/graph";
+import { formatDuration } from "@/lib/video";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
 
@@ -42,11 +43,7 @@ const OUTCOME: Record<string, { tone: "success" | "warning"; text: string }> = {
   graph: { tone: "warning", text: "Meta při připojování vrátila chybu. Zkus to znovu za chvíli." },
 };
 
-function length(ms: number | null) {
-  if (!ms) return null;
-  const s = Math.round(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+const length = (ms: number | null) => (ms ? formatDuration(ms) : null);
 
 /**
  * Instagram's own music for a reel (docs/INSTAGRAM-AUDIO.md): search the
@@ -63,7 +60,7 @@ export function InstagramMusic({
   /** This page with its galleries — where the sign-in brings the photographer back. */
   returnTo: string;
   disabled: boolean;
-  onPicked(blob: Blob, name: string, audioId: string): Promise<void>;
+  onPicked(blob: Blob, name: string, audioId: string, durationMs: number | null): Promise<void>;
 }) {
   const [kind, setKind] = useState<AudioKind>("music");
   const [query, setQuery] = useState("");
@@ -71,7 +68,18 @@ export function InstagramMusic({
   const [error, setError] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
   const [taking, setTaking] = useState<string | null>(null);
-  const outcome = state.outcome ? OUTCOME[state.outcome] : null;
+  // The sign-in's outcome is said once: kept here, taken off the address so a
+  // reload or a later disconnect does not repeat it.
+  const [outcomeKey, setOutcomeKey] = useState(state.outcome);
+  useEffect(() => {
+    if (!state.outcome) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("instagram");
+    window.history.replaceState(window.history.state, "", url);
+  }, [state.outcome]);
+  const outcome = outcomeKey ? OUTCOME[outcomeKey] : null;
+  // Open on arrival from the sign-in, then the photographer's to open and close.
+  const [expanded, setExpanded] = useState(state.outcome !== null);
 
   const search = () =>
     startSearch(async () => {
@@ -89,7 +97,7 @@ export function InstagramMusic({
       const response = await fetch(item.downloadUrl, { mode: "cors", credentials: "omit" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const name = [item.title, item.artist].filter(Boolean).join(" · ");
-      await onPicked(await response.blob(), name, item.audioId);
+      await onPicked(await response.blob(), name, item.audioId, item.durationMs);
     } catch (cause) {
       console.warn("[g-gallery/instagram] audio fetch failed", cause);
       setError(
@@ -101,7 +109,7 @@ export function InstagramMusic({
   };
 
   return (
-    <details className="mt-4" open={state.outcome !== null || undefined}>
+    <details className="mt-4" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary className="cursor-pointer text-sm font-semibold">Hudba z Instagramu</summary>
       <div className="mt-3 space-y-3 text-sm">
         {outcome && (
@@ -137,7 +145,7 @@ export function InstagramMusic({
                   · {state.account.pageName}
                 </span>
               </p>
-              <form action={disconnectInstagram}>
+              <form action={disconnectInstagram} onSubmit={() => setOutcomeKey(null)}>
                 <Button size="sm" variant="secondary" type="submit">
                   Odpojit Instagram
                 </Button>
@@ -175,6 +183,7 @@ export function InstagramMusic({
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && search()}
                 placeholder="Písnička nebo interpret (prázdné = populární)"
+                maxLength={100}
                 aria-label="Hledat hudbu na Instagramu"
                 className="border-admin-border min-h-11 min-w-0 flex-1 rounded-lg border px-3 dark:border-neutral-700 dark:bg-neutral-900"
               />

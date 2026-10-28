@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getAdminSession } from "@/lib/auth-guard";
 import { authorizeUrl, metaApp, metaConfigured } from "@/lib/instagram/config";
 import {
@@ -16,6 +17,9 @@ import { publicOrigin } from "@/lib/mcp/oauth/config";
 // "Připojit Instagram" (docs/INSTAGRAM-AUDIO.md): the admin is sent to
 // Facebook's sign-in with a fresh `state`; Meta returns to the callback.
 export const dynamic = "force-dynamic";
+
+/** Only where to return to — checked again by `safeReturn`. */
+const params = z.object({ next: z.string().max(1100).optional() });
 
 export async function GET(request: Request): Promise<Response> {
   const origin = publicOrigin(request.headers);
@@ -34,7 +38,8 @@ export async function GET(request: Request): Promise<Response> {
     maxAge: STATE_MAX_AGE_SECONDS,
   };
   jar.set(STATE_COOKIE, state, options);
-  jar.set(RETURN_COOKIE, safeReturn(new URL(request.url).searchParams.get("next")), options);
+  const query = params.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  jar.set(RETURN_COOKIE, safeReturn(query.success ? query.data.next : null), options);
   return NextResponse.redirect(
     authorizeUrl({
       appId: metaApp().id,

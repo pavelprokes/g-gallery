@@ -6,6 +6,7 @@ import {
   HOLD_SECONDS,
   photoCountFor,
   slidesAt,
+  slidesToDecode,
 } from "@/lib/social-video/timeline";
 
 describe("photoCountFor", () => {
@@ -65,5 +66,17 @@ describe("a pacing of its own", () => {
     expect(t.slides[1]).toMatchObject({ start: 1.6 });
     expect(t.slides[1]!.end).toBeCloseTo(1.6 + 1.2 + 0.2, 5);
     expect(slidesAt(t, 1.7).at(-1)!.alpha).toBeCloseTo(0.5, 5);
+  });
+});
+
+describe("slidesToDecode", () => {
+  it("is what is on screen and the slide after it", () => {
+    const timeline = buildTimeline(4, 15);
+    const slides = ["a", "b", "c", "d"];
+    expect(slidesToDecode(timeline, slides, 0)).toEqual(["a", "b"]);
+    // During a crossfade both slides show, plus the next.
+    const fade = timeline.slides[1]!.start + 0.1;
+    expect(slidesToDecode(timeline, slides, fade)).toEqual(["a", "b", "c"]);
+    expect(slidesToDecode(timeline, slides, timeline.duration)).toEqual(["d"]);
   });
 });

@@ -28,6 +28,11 @@ export interface MusicTrack {
   listenSource?: "mic" | "tab";
   /** For "instagram": Meta's id of the track. */
   audioId?: string;
+  /** For "instagram": the whole song's length, per Meta — longer than the
+   * decoded sound when `download_url` was an excerpt. */
+  durationMs?: number;
+  /** For a YouTube listening: the second of the video it started from. */
+  startAt?: number;
 }
 
 /** "instagram": from Instagram's own catalogue (docs/INSTAGRAM-AUDIO.md). */

@@ -44,10 +44,14 @@ export async function viewerPrintSelections(
  * photo can be marked by more than one guest, and the photographer needs one
  * number to order, not a per-person breakdown.
  */
-export async function printTotals(galleryId: string): Promise<Map<string, number>> {
+export async function printTotals(
+  galleryId: string | readonly string[],
+): Promise<Map<string, number>> {
   const grouped = await prisma.printSelection.groupBy({
     by: ["photoId"],
-    where: { photo: { galleryId } },
+    where: {
+      photo: { galleryId: typeof galleryId === "string" ? galleryId : { in: [...galleryId] } },
+    },
     _sum: { quantity: true },
   });
   return new Map(grouped.map((row) => [row.photoId, row._sum.quantity ?? 0]));

@@ -32,7 +32,10 @@ function failure(error: unknown): { ok: false; error: string; reconnect?: boolea
     console.warn("[g-gallery/instagram]", error.code, error.subcode, error.message);
     return { ok: false, error: `Instagram odmítl: ${error.message}` };
   }
-  throw error;
+  // A network failure and the like: said in the page, not thrown into it —
+  // the search runs in a transition, and a throw would replace the whole page.
+  console.error("[g-gallery/instagram]", error);
+  return { ok: false, error: "Instagram teď neodpovídá. Zkus to za chvíli znovu." };
 }
 
 const NOT_CONNECTED = { ok: false as const, error: "Instagram není připojený.", reconnect: true };
@@ -51,7 +54,9 @@ const searchSchema = z.object({
 export async function searchInstagramAudio(
   input: z.input<typeof searchSchema>,
 ): Promise<ActionResult<{ items: InstagramAudio[] }>> {
-  const { kind, query } = searchSchema.parse(input);
+  const parsed = searchSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Hledaný text je moc dlouhý." };
+  const { kind, query } = parsed.data;
   const ig = await account();
   if (!ig) return NOT_CONNECTED;
   try {

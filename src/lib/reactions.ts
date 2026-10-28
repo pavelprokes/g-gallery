@@ -81,10 +81,14 @@ export async function galleryReactions(
 }
 
 /** Total reactions per photo, for the admin grid. */
-export async function reactionTotals(galleryId: string): Promise<Map<string, number>> {
+export async function reactionTotals(
+  galleryId: string | readonly string[],
+): Promise<Map<string, number>> {
   const grouped = await prisma.reaction.groupBy({
     by: ["photoId"],
-    where: { photo: { galleryId } },
+    where: {
+      photo: { galleryId: typeof galleryId === "string" ? galleryId : { in: [...galleryId] } },
+    },
     _count: { _all: true },
   });
   return new Map(grouped.map((row) => [row.photoId, row._count._all]));

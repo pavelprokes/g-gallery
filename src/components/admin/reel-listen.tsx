@@ -15,6 +15,7 @@ import {
   youtubeEmbedUrl,
   youtubeId,
 } from "@/lib/reels/youtube";
+import { formatDuration } from "@/lib/video";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
@@ -24,10 +25,7 @@ const MIN_SECONDS = 10;
  * a 30 s reel and room to choose its loudest stretch. */
 const LISTEN_CHOICES = [30, 45, 60, 90] as const;
 
-function clock(seconds: number) {
-  const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+const clock = (seconds: number) => formatDuration(seconds * 1000);
 
 /**
  * The song listened to rather than added as a file (docs/REELS.md §2): from a
@@ -39,7 +37,12 @@ export function ListenPanel({
   onHeard,
 }: {
   disabled: boolean;
-  onHeard(blob: Blob, name: string, source: ListenSource, origin?: string): Promise<void>;
+  onHeard(
+    blob: Blob,
+    name: string,
+    source: ListenSource,
+    details: { origin?: string; startAt?: number },
+  ): Promise<void>;
 }) {
   // What the browser offers is only known in the browser.
   const [sources, setSources] = useState({ mic: false, tab: false });
@@ -60,26 +63,37 @@ export function ListenPanel({
   const [videoId, setVideoId] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
   const [state, setState] = useState<{ source: ListenSource; since: number } | null>(null);
+  // Between the click and the browser's answer (a permission prompt, the
+  // share picker): a second click must not start a second recorder.
+  const [starting, setStarting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const listening = useRef<Listening | null>(null);
   // The same as `state`, for the end the browser reports (sharing stopped, the
-  // time limit) — that callback was made before `state` was set.
-  const started = useRef<{ source: ListenSource; since: number } | null>(null);
+  // time limit) — that callback was made before `state` was set. `startAt` is
+  // where the YouTube player was sent.
+  const started = useRef<{ source: ListenSource; since: number; startAt?: number } | null>(null);
 
   useEffect(() => {
     if (!state) return;
     const timer = setInterval(() => setElapsed((Date.now() - state.since) / 1000), 250);
     return () => clearInterval(timer);
   }, [state]);
-  useEffect(() => () => listening.current?.cancel(), []);
+  const autoStop = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Leaving the page drops a listening in progress, its timer with it.
+  useEffect(
+    () => () => {
+      clearTimeout(autoStop.current ?? undefined);
+      listening.current?.cancel();
+    },
+    [],
+  );
 
   /** Tells the YouTube player on the page what to do (its IFrame API). */
   const command = (...message: Parameters<typeof playerCommand>) => {
     player.current?.contentWindow?.postMessage(playerCommand(...message), YOUTUBE_PLAYER_ORIGIN);
   };
-  const autoStop = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => clearTimeout(autoStop.current ?? undefined), []);
 
   const showVideo = () => {
     const id = youtubeId(link);
@@ -87,9 +101,21 @@ export function ListenPanel({
     setVideoId(id);
   };
 
+  /** Ends the listening without keeping it: recorder, timer and player. */
+  const cancel = () => {
+    clearTimeout(autoStop.current ?? undefined);
+    autoStop.current = null;
+    if (started.current?.startAt !== undefined) command("pauseVideo");
+    listening.current?.cancel();
+    listening.current = null;
+    started.current = null;
+    setState(null);
+  };
+
   const finish = async () => {
     clearTimeout(autoStop.current ?? undefined);
-    if (videoId) command("pauseVideo");
+    autoStop.current = null;
+    if (started.current?.startAt !== undefined) command("pauseVideo");
     const current = listening.current;
     const was = started.current;
     listening.current = null;
@@ -114,25 +140,27 @@ export function ListenPanel({
         : was.source === "tab"
           ? `Poslech karty · ${when}`
           : `Poslech mikrofonem · ${when}`;
-    await onHeard(
-      blob,
-      name,
-      was.source,
-      was.source === "tab" && videoId ? `https://youtu.be/${videoId}` : undefined,
-    );
+    await onHeard(blob, name, was.source, {
+      origin: was.startAt !== undefined && videoId ? `https://youtu.be/${videoId}` : undefined,
+      startAt: was.startAt,
+    });
   };
 
   const start = async (source: ListenSource) => {
+    if (starting || listening.current) return;
     setError(null);
+    setStarting(true);
     try {
       listening.current = await listen(source, () => void finish());
       setElapsed(0);
-      started.current = { source, since: Date.now() };
+      const youtube = source === "tab" && videoId !== null;
+      const startAt = youtube ? (parseClock(from) ?? 0) : undefined;
+      started.current = { source, since: Date.now(), startAt };
       setState(started.current);
-      if (source === "tab" && videoId) {
+      if (youtube) {
         // The player starts once the page hears the tab, from the chosen
         // second, and the listening stops on its own.
-        command("seekTo", [parseClock(from) ?? 0, true]);
+        command("seekTo", [startAt, true]);
         command("playVideo");
         autoStop.current = setTimeout(() => void finish(), listenFor * 1000);
       }
@@ -150,13 +178,21 @@ export function ListenPanel({
         console.warn("[g-gallery/reels] listening failed", cause);
         setError("Poslech se nepodařilo spustit.");
       }
+    } finally {
+      setStarting(false);
     }
   };
 
   if (!sources.mic && !sources.tab) return null;
 
   return (
-    <details className="mt-4" open={state !== null || undefined}>
+    // Opened by the photographer, it stays open when a listening ends — React
+    // owning `open` would close it the moment the listening's state cleared.
+    <details
+      className="mt-4"
+      open={expanded || state !== null}
+      onToggle={(e) => setExpanded(e.currentTarget.open)}
+    >
       <summary className="cursor-pointer text-sm font-semibold">
         Nebo písničku poslechnout (YouTube, Instagram, reproduktor)
       </summary>
@@ -246,15 +282,7 @@ export function ListenPanel({
             </p>
             <div className="flex gap-2">
               <Button onClick={() => void finish()}>Hotovo</Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  listening.current?.cancel();
-                  listening.current = null;
-                  started.current = null;
-                  setState(null);
-                }}
-              >
+              <Button variant="secondary" onClick={cancel}>
                 Zrušit
               </Button>
             </div>
@@ -262,12 +290,20 @@ export function ListenPanel({
         ) : (
           <div className="flex flex-wrap gap-2">
             {sources.tab && (
-              <Button variant="secondary" disabled={disabled} onClick={() => void start("tab")}>
+              <Button
+                variant="secondary"
+                disabled={disabled || starting}
+                onClick={() => void start("tab")}
+              >
                 Poslouchat kartu
               </Button>
             )}
             {sources.mic && (
-              <Button variant="secondary" disabled={disabled} onClick={() => void start("mic")}>
+              <Button
+                variant="secondary"
+                disabled={disabled || starting}
+                onClick={() => void start("mic")}
+              >
                 Poslouchat mikrofonem
               </Button>
             )}

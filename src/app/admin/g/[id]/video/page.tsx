@@ -4,6 +4,7 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { CHAPTER_START_SELECT, chapterStartOf } from "@/lib/photo-order";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
 import {
+  guestTallies,
   STUDIO_PHOTO_SELECT,
   STUDIO_PHOTO_WHERE,
   toStudioPhotos,
@@ -42,7 +43,7 @@ export default async function SocialVideoPage(props: PageProps<"/admin/g/[id]/vi
   if (!gallery) notFound();
 
   const order = gallery.photoOrder;
-  const photos = await toStudioPhotos(gallery.id, order, gallery.photos);
+  const photos = toStudioPhotos(order, gallery.photos, await guestTallies([gallery.id]));
 
   return (
     <div className="space-y-6">

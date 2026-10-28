@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { reelsCrumbs } from "@/lib/admin-breadcrumbs";
 import { CHAPTER_START_SELECT, chapterStartOf } from "@/lib/photo-order";
 import {
+  guestTallies,
   STUDIO_PHOTO_SELECT,
   STUDIO_PHOTO_WHERE,
   toStudioPhotos,
@@ -104,22 +105,22 @@ export default async function ReelsPage(props: PageProps<"/admin/reels">) {
     })),
   ];
 
-  // In the order the photographer ticked them: the reel follows it.
+  // In the order the photographer ticked them: the reel follows it. The
+  // guests' tallies come in one round for every chosen gallery.
   const byId = new Map(chosen.map((g) => [g.id, g]));
-  const galleries: ReelGallery[] = await Promise.all(
-    selected.flatMap((id) => {
-      const gallery = byId.get(id);
-      if (!gallery) return [];
-      return [
-        toStudioPhotos(gallery.id, gallery.photoOrder, gallery.photos).then((photos) => ({
-          id: gallery.id,
-          title: gallery.title,
-          chapterStarts: gallery.chapters.map((c) => chapterStartOf(gallery.photoOrder, c)),
-          photos,
-        })),
-      ];
-    }),
-  );
+  const tallies = await guestTallies(chosen.map((g) => g.id));
+  const galleries: ReelGallery[] = selected.flatMap((id) => {
+    const gallery = byId.get(id);
+    if (!gallery) return [];
+    return [
+      {
+        id: gallery.id,
+        title: gallery.title,
+        chapterStarts: gallery.chapters.map((c) => chapterStartOf(gallery.photoOrder, c)),
+        photos: toStudioPhotos(gallery.photoOrder, gallery.photos, tallies),
+      },
+    ];
+  });
 
   return (
     <div className="space-y-6">

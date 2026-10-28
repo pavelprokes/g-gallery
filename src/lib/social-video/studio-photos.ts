@@ -53,19 +53,29 @@ type StudioPhotoRow = Parameters<typeof toHighlightCandidate>[1] & {
   _count: { favorites: number };
 };
 
+export interface GuestTallies {
+  viewers: Awaited<ReturnType<typeof photoCounts>>;
+  reactions: Map<string, number>;
+  prints: Map<string, number>;
+}
+
+/** What the guests took to (docs/SOCIAL-VIDEO.md §3) — the same tallies the
+ * gallery's own admin page shows — for one gallery or several in one go. */
+export async function guestTallies(galleryIds: readonly string[]): Promise<GuestTallies> {
+  const [viewers, reactions, prints] = await Promise.all([
+    photoCounts(galleryIds),
+    reactionTotals(galleryIds),
+    printTotals(galleryIds),
+  ]);
+  return { viewers, reactions, prints };
+}
+
 /** The rows of one gallery, sorted and scored. */
-export async function toStudioPhotos(
-  galleryId: string,
+export function toStudioPhotos(
   order: PhotoOrder,
   rows: readonly StudioPhotoRow[],
-): Promise<StudioPhoto[]> {
-  // What the guests took to (docs/SOCIAL-VIDEO.md §3) — the same tallies the
-  // gallery's own admin page shows.
-  const [viewers, reactions, prints] = await Promise.all([
-    photoCounts(galleryId),
-    reactionTotals(galleryId),
-    printTotals(galleryId),
-  ]);
+  { viewers, reactions, prints }: GuestTallies,
+): StudioPhoto[] {
   return rows
     .toSorted((a, b) => compareTimeline(positionOf(order, a), positionOf(order, b)))
     .map((photo) => ({
