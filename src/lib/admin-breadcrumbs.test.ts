@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   eventCrumbs,
+  eventEngravingCrumbs,
   eventSignCrumbs,
   galleryCrumbs,
+  galleryEngravingCrumbs,
   gallerySignCrumbs,
   updatesCrumbs,
 } from "@/lib/admin-breadcrumbs";
@@ -57,5 +59,15 @@ describe("admin breadcrumbs", () => {
     expectWellFormed(sign);
     expect(sign.map((c) => c.label)).toEqual(["Přehled", "Anna a Petr", "Cedulka k tisku"]);
     expect(sign[1]?.href).toBe("/admin/e/evt1");
+  });
+
+  it("builds the engraving trails from both parents", () => {
+    const fromWedding = eventEngravingCrumbs(EVENT);
+    expectWellFormed(fromWedding);
+    expect(fromWedding.map((c) => c.label)).toEqual(["Přehled", "Anna a Petr", "Gravírování"]);
+    const fromGallery = galleryEngravingCrumbs(HOSTED);
+    expectWellFormed(fromGallery);
+    expect(fromGallery[2]?.href).toBe("/admin/g/gal1");
+    expect(fromGallery.at(-1)?.label).toBe("Gravírování");
   });
 });

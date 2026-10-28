@@ -124,6 +124,13 @@ export default async function AdminEventPage(props: PageProps<"/admin/e/[id]">) 
         }
         actions={
           <>
+            {/* docs/ENGRAVING.md — the couple's names and date in the leaf frame, for the laser. */}
+            <Link
+              href={`/admin/e/${event.id}/engraving`}
+              className={buttonClasses("secondary", "md")}
+            >
+              Gravírování
+            </Link>
             <EventSettings
               eventId={event.id}
               title={event.title}

@@ -41,6 +41,9 @@ couple's comments behind a per-link PIN; read it before touching `PhotoComment`,
 **`docs/SLIDESHOW-MAKER.md`** is the authority for the public slideshow maker (`/video-z-fotek`, built
 2026-10-20) — everything runs in the visitor's browser and nothing is uploaded; read it before
 touching `src/lib/slideshow/*`, `src/components/slideshow/*` or adding any server step to it.
+**`docs/ENGRAVING.md`** is the authority for the engraving plate (`/admin/e|g/[id]/engraving`, built
+2026-10-27) — read it before touching `src/lib/engraving/*` or `public/vendor/engraving/` (the leaf
+frame is traced from Pavel's template, the text layout is measured from it).
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
