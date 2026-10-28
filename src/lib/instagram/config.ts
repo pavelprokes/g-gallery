@@ -10,13 +10,15 @@ export const DEFAULT_GRAPH_VERSION = "v26.0";
  * (docs/INSTAGRAM-AUDIO.md): the professional account through the Page it is
  * linked to. `instagram_content_publish` although nothing is published: the
  * Audio API is part of Content Publishing; whether search alone needs it is
- * still to be read on Meta's page (U6).
+ * still to be read on Meta's page (U6). `business_management` because a Page
+ * held in a business portfolio is otherwise missing from `/me/accounts`.
  */
 export const INSTAGRAM_SCOPES = [
   "instagram_basic",
   "instagram_content_publish",
   "pages_show_list",
   "pages_read_engagement",
+  "business_management",
 ] as const;
 
 export function graphVersion(): string {
