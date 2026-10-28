@@ -82,15 +82,18 @@ export function InstagramMusic({
     if (!item.downloadUrl) return;
     player.current ??= new Audio();
     const audio = player.current;
-    audio.onended = () => setHearing(null);
+    // Only this item's own end clears the button: a play cut short by the
+    // next item's would otherwise clear that one's.
+    const done = () => setHearing((h) => (h === item.audioId ? null : h));
+    audio.onended = done;
     audio.onerror = () => {
-      setHearing(null);
+      done();
       setError("Ukázku se nepodařilo přehrát.");
     };
     audio.src = item.downloadUrl;
     setError(null);
     setHearing(item.audioId);
-    void audio.play().catch(() => setHearing(null));
+    void audio.play().catch(done);
   };
   // The sign-in's outcome is said once: kept here, taken off the address so a
   // reload or a later disconnect does not repeat it.

@@ -18,7 +18,6 @@ function grid(
     downbeat,
     energy: beats.map(loud),
     strength: beats.map(() => 0.5),
-    offbeat: beats.map(() => 0),
     hits: [],
     hitStrength: [],
     density: beats.map(loud),

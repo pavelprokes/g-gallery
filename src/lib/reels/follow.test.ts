@@ -36,7 +36,6 @@ function song({
     downbeat: 0,
     energy: beats.map((t) => (quiet(t) ? 0.2 : busy(t) ? 0.95 : 0.75)),
     strength: beats.map((t) => hits.get(t) ?? 0),
-    offbeat: beats.map((t) => hits.get(t + 0.25) ?? 0),
     density: beats.map((t) => (quiet(t) ? 0.02 : busy(t) ? 0.65 : 0.22)),
     hits: sorted.map(([t]) => t),
     hitStrength: sorted.map(([, s]) => s),

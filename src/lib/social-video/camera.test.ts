@@ -287,12 +287,29 @@ describe("planShot for a reel", () => {
     // 24 MP: the pixels for the full REEL_ZOOM.
     const large = { width: 6000, height: 4000, faces };
     const shot = reel(large);
-    expect((4000 * (9 / 16)) / shot.from.w).toBeCloseTo(1.8, 1);
+    expect((4000 * (9 / 16)) / shot.to.w).toBeCloseTo(1.8, 1);
+    // Still a move: the wide end a few per cent out.
+    expect(shot.from.w / shot.to.w).toBeGreaterThan(1.02);
     expect(eyesInSafeArea(large, shot.to, VERTICAL)).toBe(true);
     // 6 MP: its cover frame is about the output's width, so it is enlarged
     // no more than MAX_UPSCALE.
     const small = reel(landscape(...faces));
-    expect((2000 * (9 / 16)) / small.from.w).toBeCloseTo(1.41, 1);
+    expect((2000 * (9 / 16)) / small.to.w).toBeCloseTo(1.41, 1);
+    expect(small.from.w / small.to.w).toBeGreaterThan(1.02);
+  });
+
+  it("stays clear of a head it left out, even one right beside the kept face", () => {
+    // A large face, and one close beside it that a crop holding both would have to cut.
+    const photo = landscape(
+      face(0.2, 0.3, 0.1, 1.5),
+      face(0.36, 0.32, 0.07, 1.5),
+      face(0.6, 0.3, 0.06, 1.5),
+      face(0.8, 0.34, 0.06, 1.5),
+    );
+    const shot = reel(photo);
+    for (const r of [shot.from, shot.to]) {
+      for (const f of photo.faces) expect(cut(r, head(f, photo))).toBe(false);
+    }
   });
 
   it("frames the sharp part of a photo with no face", () => {

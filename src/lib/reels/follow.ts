@@ -58,6 +58,27 @@ export function intensity(analysis: BeatAnalysis): number[] {
  * in loudness and busyness (Foote's novelty, on two bars either side).
  */
 export function changes(analysis: BeatAnalysis): Set<number> {
+  return remembered(changeCache, analysis, findChanges);
+}
+
+/** Per analysis, computed once: every variant and every drag of the song's part asks again. */
+const changeCache = new WeakMap<BeatAnalysis, Set<number>>();
+const salienceCache = new WeakMap<BeatAnalysis, number[]>();
+
+function remembered<T>(
+  cache: WeakMap<BeatAnalysis, T>,
+  analysis: BeatAnalysis,
+  of: (a: BeatAnalysis) => T,
+): T {
+  let value = cache.get(analysis);
+  if (value === undefined) {
+    value = of(analysis);
+    cache.set(analysis, value);
+  }
+  return value;
+}
+
+function findChanges(analysis: BeatAnalysis): Set<number> {
   const level = intensity(analysis);
   const bars: number[] = [];
   for (let i = analysis.downbeat; i < analysis.beats.length; i += BEATS_PER_BAR) bars.push(i);
@@ -114,6 +135,10 @@ const ON_BAR = 0.15;
  * chorus's loud one and a stab after a break counts most.
  */
 export function salience(analysis: BeatAnalysis): number[] {
+  return remembered(salienceCache, analysis, findSalience);
+}
+
+function findSalience(analysis: BeatAnalysis): number[] {
   const { hits, hitStrength } = analysis;
   let lo = 0;
   let hi = 0;

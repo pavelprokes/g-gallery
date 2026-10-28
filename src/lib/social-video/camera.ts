@@ -248,36 +248,60 @@ function reelShot(photo: PhotoForShot, format: VideoFormat, coverW: number): Sho
   // the pixels (`sourceWidth`); a frame no smaller than MAX_UPSCALE of them.
   const fetched = Math.min(1, (REEL_ZOOM * format.width) / coverW);
   const minW = Math.min(coverW, Math.max(coverW / REEL_ZOOM, format.width / MAX_UPSCALE / fetched));
-  const sized = (need: number) => Math.min(coverW, Math.max(minW, need));
-  const push = (wide: Rect, tight: Rect): Shot => ({ kind: "push", from: wide, to: tight });
+  // Where the frame may lie: the whole photo, or — when faces were left out —
+  // the band between them, so no frame reaches into a head it did not keep.
+  let band = { left: 0, right: W };
+  /** The tight frame, and the wide one a few per cent out — never the same. */
+  const shot = (w: number, place: (w: number) => Rect): Shot => {
+    const room = band.right - band.left;
+    const tightW = Math.min(room, Math.max(minW, w));
+    const wideW = Math.min(coverW, room, tightW * REEL_PUSH);
+    const tight = wideW / tightW < 1.02 ? wideW / REEL_PUSH : tightW;
+    const into = (r: Rect): Rect => ({
+      ...r,
+      x: clamp(r.x, band.left, band.right - r.w),
+    });
+    return { kind: "push", from: into(place(wideW)), to: into(place(tight)) };
+  };
 
   let subject = subjectOf(photo);
   if (subject && subject.box.w * REEL_MARGIN > coverW) {
     const kept = facesInWindow(photo, coverW / REEL_MARGIN);
-    if (kept.length > 0) subject = subjectOf({ ...photo, faces: kept });
+    if (kept.length > 0) {
+      const narrowed = subjectOf({ ...photo, faces: kept })!;
+      band = clearOf(photo, kept, narrowed.box);
+      subject = narrowed;
+    }
   }
   if (subject) {
     const { box } = subject;
-    const w = sized(Math.max(box.w, box.h * a) * REEL_MARGIN);
+    const keep = subject;
     const cx = box.x + box.w / 2;
-    return push(
-      atEyeLine(photo, a, w, cx, subject, format.eyeLine),
-      atEyeLine(photo, a, Math.max(minW, w / REEL_PUSH), cx, subject, format.eyeLine),
+    return shot(Math.max(box.w, box.h * a) * REEL_MARGIN, (w) =>
+      atEyeLine(photo, a, w, cx, keep, format.eyeLine),
     );
   }
   if (photo.focus) {
     const f = photo.focus;
     const cx = (f.x + f.w / 2) * W;
     const cy = (f.y + f.h / 2) * H;
-    const w = sized(Math.max(f.w * W, f.h * H * a) * REEL_MARGIN);
-    return push(frame(photo, a, w, cx, cy), frame(photo, a, Math.max(minW, w / REEL_PUSH), cx, cy));
+    return shot(Math.max(f.w * W, f.h * H * a) * REEL_MARGIN, (w) => frame(photo, a, w, cx, cy));
   }
   // Nothing known to aim at: the cover frame, a third down the photo.
-  const cy = H * FACELESS_AIM;
-  return push(
-    frame(photo, a, coverW, W / 2, cy),
-    frame(photo, a, Math.max(minW, coverW / REEL_PUSH), W / 2, cy),
-  );
+  return shot(coverW / REEL_PUSH, (w) => frame(photo, a, w, W / 2, H * FACELESS_AIM));
+}
+
+/** The horizontal band around `box` that reaches into none of the framed heads left out. */
+function clearOf(photo: PhotoForShot, kept: readonly Face[], box: Rect) {
+  let left = 0;
+  let right = photo.width;
+  for (const f of framedFaces(photo.faces)) {
+    if (kept.includes(f)) continue;
+    const head = headAndShoulders(f, photo.width, photo.height);
+    if (head.x + head.w <= box.x) left = Math.max(left, head.x + head.w);
+    else if (head.x >= box.x + box.w) right = Math.min(right, head.x);
+  }
+  return { left, right };
 }
 
 /**

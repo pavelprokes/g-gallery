@@ -96,9 +96,13 @@ export function SongSection({
     };
   }, [playing, buffer, contextFor, offset, length, fadeOut, total]);
 
-  const move = (bars: number) => onChoose(shiftSection(analysis, start, bars));
+  // A drag fires many times a bar: only a new bar is news (every variant is re-planned on it).
+  const choose = (bar: number) => {
+    if (bar !== chosen) onChoose(bar);
+  };
+  const move = (bars: number) => choose(shiftSection(analysis, start, bars));
   /** A place in the song: the bar nearest it that still leaves the reel room to play. */
-  const chooseAt = (t: number) => onChoose(barAt(analysis, Math.min(t, total - length)));
+  const chooseAt = (t: number) => choose(barAt(analysis, Math.min(t, total - length)));
 
   return (
     <Card as="section" aria-label="Část písničky">

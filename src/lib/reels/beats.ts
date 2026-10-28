@@ -21,8 +21,6 @@ export interface BeatAnalysis {
   energy: number[];
   /** How hard each beat is hit — the onset at it, 0–1 against the song's hardest. */
   strength: number[];
-  /** The same for the off-beat halfway to the next beat: a snare or a fill between beats. */
-  offbeat: number[];
   /** How busy the music is from each beat to the next — its mean onset, 0–1 against the busiest. */
   density: number[];
   /** Every hit heard — a peak of the onset envelope — seconds, wherever it falls against the beat. */
@@ -69,7 +67,6 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatAna
   }
   const beats = frames.map(frameTime).filter((t) => t < duration);
   const frameAt = (t: number) => (t * rate - FRAME / 2) / HOP - 1;
-  const halfway = beats.map((t, i) => (t + (beats[i + 1] ?? t + 60 / bpm)) / 2);
   const strength = beats.map((t) => onsetNear(onset, frameAt(t)));
   const energy = beatEnergy(samples, sampleRate, beats);
   return {
@@ -80,7 +77,6 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatAna
     downbeat: downbeatOf(strength, energy),
     energy,
     strength,
-    offbeat: halfway.map((t) => onsetNear(onset, frameAt(t))),
     density: beatDensity(onset, beats.map(frameAt), frameAt(duration)),
     ...hitsOf(onset, frameTime, duration),
   };
@@ -232,7 +228,10 @@ function tempoPeriod(onset: Float32Array, fps: number): number {
   }
   if (best === 0) return fallback;
   // To a tenth of a BPM around the winner: the beats are placed on its period.
-  for (let bpm = best - 1; bpm <= best + 1; bpm += 0.1) {
+  const winner = best;
+  for (let tenth = -10; tenth <= 10; tenth++) {
+    const bpm = winner + tenth / 10;
+    if (bpm < MIN_BPM || bpm > MAX_BPM) continue;
     const score = resonance(bpm);
     if (score > bestScore) [best, bestScore] = [bpm, score];
   }

@@ -51,6 +51,26 @@ export function guestPool(candidates: readonly VideoCandidate[], size: number): 
   return candidates.filter((c) => kept.has(c.id));
 }
 
+/**
+ * The same photos in another order, the same for the same `seed`: the first
+ * and last stay — the suggestion chose them as the strong ends — the rest
+ * are shuffled.
+ */
+export function reordered(ids: readonly string[], seed: number): string[] {
+  if (ids.length < 4) return [...ids];
+  let state = (seed * 2654435761 + 1) >>> 0;
+  const random = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 2 ** 32;
+  };
+  const middle = ids.slice(1, -1);
+  for (let i = middle.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [middle[i], middle[j]] = [middle[j]!, middle[i]!];
+  }
+  return [ids[0]!, ...middle, ids.at(-1)!];
+}
+
 /** `count` split as evenly as the galleries allow — a small one gives its spare to the rest. */
 export function shareOut(sizes: readonly number[], count: number): number[] {
   const out = sizes.map(() => 0);
@@ -208,14 +228,22 @@ export function reelVariants({
     };
     // The slots first, then as many photos; a gallery with fewer gets a plan for what it has.
     let plan = planReel(analysis, { ...options, maxPhotos: available });
-    const photoIds = pickReelPhotos(sources, format, plan.timeline.slides.length, {
-      // Photos picked by hand are the whole choice: every variant may use them all.
-      avoid: (recipe.fresh || round > 0) && !only?.size ? avoid : undefined,
+    const slots = plan.timeline.slides.length;
+    // Photos picked by hand are the whole choice: a variant passes over the
+    // ones shown only where there are enough others — otherwise it shows the
+    // same photos in another order.
+    const handPicked = Boolean(only?.size);
+    const roomToAvoid = !handPicked || available >= 2 * slots;
+    let photoIds = pickReelPhotos(sources, format, slots, {
+      avoid: (recipe.fresh || round > 0) && roomToAvoid ? avoid : undefined,
       exclude,
       mix: (mixGalleries || recipe.mix) && sources.length > 1,
       byGuests,
       only,
     });
+    if (handPicked && !roomToAvoid && (i > 0 || round > 0)) {
+      photoIds = reordered(photoIds, round * RECIPES.length + i);
+    }
     if (photoIds.length < plan.timeline.slides.length) {
       plan = planReel(analysis, { ...options, maxPhotos: photoIds.length });
     }

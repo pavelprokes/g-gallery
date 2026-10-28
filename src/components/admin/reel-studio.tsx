@@ -154,7 +154,9 @@ interface Result {
 }
 
 const signatureOf = (v: ReelVariant, trackId: string | null, withSound: boolean) =>
-  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.slides
+    .map((slide) => slide.start)
+    .join()}|${v.plan.timeline.duration}`;
 
 export function ReelStudio({
   galleries,
@@ -221,7 +223,6 @@ export function ReelStudio({
     writePicked(pickKey, [...next]);
   };
   const only = manual && picked.size > 0 ? picked : undefined;
-  const ownPhotos = only ? only.size : allOwn;
 
   // ---- Music: this browser's library ----
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
@@ -237,18 +238,25 @@ export function ReelStudio({
     void (async () => {
       try {
         const list = await listTracks();
-        // A track analysed by an older build gets its beat found again.
-        const current = await Promise.all(
-          list.map(async (t) => {
-            if (isCurrent(t)) return t;
-            const fresh = { ...t, analysis: analyzeTrack(await decodeTrack(t.blob)) };
-            await saveTrack(fresh).catch(() => {});
-            return fresh;
-          }),
-        );
+        const last = readLastTrack();
+        // A track analysed by an older build gets its beat found again — one
+        // at a time: a whole library decoded at once is gigabytes of samples.
+        // The song that will be chosen keeps its decode for the preview.
+        const current: MusicTrack[] = [];
+        for (const t of list) {
+          if (!live) return;
+          if (isCurrent(t)) {
+            current.push(t);
+            continue;
+          }
+          const audio = await decodeTrack(t.blob);
+          const fresh = { ...t, analysis: analyzeTrack(audio) };
+          if (t.id === (last ?? list[0]?.id)) decoded.current.set(t.id, Promise.resolve(audio));
+          await saveTrack(fresh).catch(() => {});
+          current.push(fresh);
+        }
         if (!live) return;
         setTracks(current);
-        const last = readLastTrack();
         setTrackId(current.find((t) => t.id === last)?.id ?? current[0]?.id ?? null);
       } catch {
         if (live) {
@@ -385,6 +393,11 @@ export function ReelStudio({
   const [seconds, setSeconds] = useState<ReelLength>(15);
   const [pace, setPace] = useState<Pace>("song");
   const [exclude, setExclude] = useState<Set<string>>(() => new Set());
+  // The photos the variants can show: the ones picked by hand, or every own
+  // photo — less the ones taken out.
+  const ownPhotos = only
+    ? [...only].filter((id) => !exclude.has(id)).length
+    : allOwn - [...exclude].filter((id) => photos.get(id)?.studio.candidate.own).length;
   const [round, setRound] = useState(0);
   const [shown, setShown] = useState<Set<string>>(() => new Set());
   const [startBeats, setStartBeats] = useState<Record<string, number>>({});

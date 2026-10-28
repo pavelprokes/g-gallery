@@ -76,8 +76,9 @@ microphone fed a 126 BPM track: found 126 BPM from the recording.
    Loudness, not onsets, because it reads the same at 44.1 and 48 kHz: on Pavel's test song
    (d.higgs, "Shut It Down") the onset-only phase moved by two beats between the two rates.
 6. **Energy**: RMS from each beat to the next, against the loudest.
-7. **Strength, off-beat, density** (`BEATS_VERSION` 2): the onset at each beat and halfway to the
-   next (±35 ms), and the mean onset from beat to beat — what the cuts follow (§3).
+7. **Strength, density, hits** (`BEATS_VERSION` 3): the onset at each beat (±35 ms; the downbeat
+   reads it), the mean onset from beat to beat (sections, §3), and every onset peak with its
+   strength — what the cuts land on (§3).
 
 The Web Audio `AnalyserNode` (suggested 2026-10-28) is not used: it gives FFT snapshots of sound
 playing in real time, so a 3-minute song would take 3 minutes to read and its frames would land

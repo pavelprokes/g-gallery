@@ -43,7 +43,6 @@ const song: BeatAnalysis = (() => {
     downbeat: 0,
     energy: beats.map((t) => (t > 90 ? 1 : 0.4)),
     strength: beats.map(() => 0.5),
-    offbeat: beats.map(() => 0),
     hits: [],
     hitStrength: [],
     density: beats.map((t) => (t > 90 ? 1 : 0.4)),
@@ -148,6 +147,16 @@ describe("reelVariants", () => {
     }
     // As many as the cuts fit: an even pace may leave one over.
     expect(variants[0]!.photoIds.length).toBeGreaterThanOrEqual(only.size - 1);
+  });
+
+  it("shows a few hand-picked photos in another order in each variant and round", () => {
+    const only = new Set(
+      Array.from({ length: 12 }, (_, i) => `a-${String(i * 7).padStart(4, "0")}`),
+    );
+    const orders = [0, 1].flatMap((round) =>
+      reelVariants({ ...base, round, only, songStart: 40 }).map((v) => v.photoIds.join()),
+    );
+    expect(new Set(orders).size).toBe(orders.length);
   });
 
   it("fits the cuts to a gallery too small for them", () => {
