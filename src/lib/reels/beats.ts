@@ -6,7 +6,7 @@
 // (docs/REELS.md §3). Pure and client-safe: it reads samples, nothing else.
 
 /** Bumped when the analysis gains a field: a stored track is analysed again. */
-export const BEATS_VERSION = 2;
+export const BEATS_VERSION = 3;
 
 export interface BeatAnalysis {
   v: typeof BEATS_VERSION;
@@ -25,6 +25,10 @@ export interface BeatAnalysis {
   offbeat: number[];
   /** How busy the music is from each beat to the next — its mean onset, 0–1 against the busiest. */
   density: number[];
+  /** Every hit heard — a peak of the onset envelope — seconds, wherever it falls against the beat. */
+  hits: number[];
+  /** How hard each of `hits` is, 0–1 against the song's hardest. */
+  hitStrength: number[];
 }
 
 /** The rate the envelope is computed at — plenty for onsets, a quarter of the work. */
@@ -78,7 +82,31 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatAna
     strength,
     offbeat: halfway.map((t) => onsetNear(onset, frameAt(t))),
     density: beatDensity(onset, beats.map(frameAt), frameAt(duration)),
+    ...hitsOf(onset, frameTime, duration),
   };
+}
+
+/** The faintest onset peak kept as a hit — below it is the noise of a sustained note. */
+const HIT_FLOOR = 0.05;
+
+/** The onset envelope's peaks: a frame higher than the two either side of it. */
+function hitsOf(onset: Float32Array, frameTime: (f: number) => number, duration: number) {
+  const hits: number[] = [];
+  const hitStrength: number[] = [];
+  for (let f = 0; f < onset.length; f++) {
+    const v = onset[f]!;
+    if (v < HIT_FLOOR) continue;
+    let peak = true;
+    for (let k = f - 2; k <= f + 2 && peak; k++) {
+      if (k !== f && k >= 0 && k < onset.length && (onset[k]! > v || (onset[k]! === v && k < f)))
+        peak = false;
+    }
+    const t = frameTime(f);
+    if (!peak || t >= duration) continue;
+    hits.push(Math.round(t * 1000) / 1000);
+    hitStrength.push(Math.round(v * 1000) / 1000);
+  }
+  return { hits, hitStrength };
 }
 
 /** The strongest onset within ±35 ms of a frame — a hit a hair off the grid still counts. */

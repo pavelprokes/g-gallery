@@ -42,6 +42,7 @@ import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { ListenPanel } from "@/components/admin/reel-listen";
 import { SongSection } from "@/components/admin/reel-section";
+import { ReelPhotoPick } from "@/components/admin/reel-photo-pick";
 import { reelsHref } from "@/lib/reels/sources";
 import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
 import { Alert } from "@/components/ui/alert";
@@ -79,6 +80,26 @@ const PACE_LABEL: Record<Pace, string> = {
 };
 
 const LAST_TRACK_KEY = "g-gallery:reels:track";
+/** The photos clicked for a set of galleries, per browser (a convenience, not a record). */
+const PICKED_KEY = "g-gallery:reels:picked";
+
+function readPicked(key: string): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePicked(key: string, ids: string[]) {
+  try {
+    if (ids.length > 0) localStorage.setItem(key, JSON.stringify(ids));
+    else localStorage.removeItem(key);
+  } catch {
+    // A convenience only.
+  }
+}
 /** What `playing` holds while the song's part is heard rather than a variant. */
 const SECTION_KEY = "section";
 
@@ -178,10 +199,29 @@ export function ReelStudio({
     [galleries],
   );
   const title = galleries.length === 1 ? galleries[0]!.title : "svatby";
-  const ownPhotos = galleries.reduce(
-    (n, g) => n + g.photos.filter((p) => p.candidate.own).length,
-    0,
-  );
+  const allOwn = galleries.reduce((n, g) => n + g.photos.filter((p) => p.candidate.own).length, 0);
+
+  // ---- Which photos: the suggestion's, or the ones clicked in each gallery ----
+  const pickKey = `${PICKED_KEY}:${galleries
+    .map((g) => g.id)
+    .toSorted()
+    .join(",")}`;
+  const [manual, setManual] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [mixGalleries, setMixGalleries] = useState(true);
+  useEffect(() => {
+    // The photos clicked last time for these galleries, if this browser kept them.
+    const kept = readPicked(pickKey).filter((id) => photos.has(id));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restored once per set of galleries
+    setPicked(new Set(kept));
+    setManual(kept.length > 0);
+  }, [pickKey, photos]);
+  const changePicked = (next: Set<string>) => {
+    setPicked(next);
+    writePicked(pickKey, [...next]);
+  };
+  const only = manual && picked.size > 0 ? picked : undefined;
+  const ownPhotos = only ? only.size : allOwn;
 
   // ---- Music: this browser's library ----
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
@@ -381,9 +421,24 @@ export function ReelStudio({
             startBeats,
             songStart,
             byGuests,
+            mixGalleries,
+            only,
           })
         : [],
-    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, songStart, byGuests],
+    [
+      analysis,
+      sources,
+      seconds,
+      pace,
+      exclude,
+      shown,
+      round,
+      startBeats,
+      songStart,
+      byGuests,
+      mixGalleries,
+      only,
+    ],
   );
   const loudest = useMemo(
     () => (analysis ? (sections(analysis, seconds, 1)[0] ?? 0) : 0),
@@ -640,7 +695,10 @@ export function ReelStudio({
               ? "Střihy jdou s písničkou: v klidné části fotka chvíli vydrží, v refrénu se mění na každou dobu, nová část i výrazný úder dostanou vlastní střih."
               : "Střih vždy padne na dobu, v pravidelném rytmu."}{" "}
             Video začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající
-            hudbou. Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
+            hudbou.{" "}
+            {only
+              ? `Bere se jen ${pluralize(ownPhotos, FORMS.photo)}, které jsi vybral.`
+              : `Vybírá se z ${pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.`}
           </p>
           <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
             <input
@@ -713,10 +771,25 @@ export function ReelStudio({
         />
       )}
 
+      <ReelPhotoPick
+        galleries={galleries}
+        manual={manual}
+        onManual={setManual}
+        picked={picked}
+        onPicked={changePicked}
+        mixGalleries={mixGalleries}
+        onMixGalleries={setMixGalleries}
+        wanted={Math.round(seconds * 1.3)}
+      />
+
       {!analysis ? (
         <Alert tone="info">Vyber nebo přidej písničku — varianty se pak objeví tady.</Alert>
       ) : ownPhotos < 2 ? (
-        <Alert>Ve vybraných galeriích nejsou aspoň dvě tvoje fotky.</Alert>
+        <Alert>
+          {only
+            ? "Vyber aspoň dvě fotky — nebo nech vybírat samo."
+            : "Ve vybraných galeriích nejsou aspoň dvě tvoje fotky."}
+        </Alert>
       ) : (
         <section aria-label="Varianty">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -773,7 +846,7 @@ export function ReelStudio({
   );
 }
 
-/** Where music that may go into a business's Reels comes from (docs/REELS.md §6). */
+/** Where music that may go into a business's Reels comes from (docs/REELS.md §7). */
 function MusicSources() {
   return (
     <details className="text-caption mt-4">
@@ -857,7 +930,7 @@ function VariantCard({
   const { timeline } = plan;
   const slides = useMemo(() => reelSlides(variant, photos, PREVIEW_FORMAT), [variant, photos]);
   const shots = useMemo(
-    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline),
+    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline, { reel: true }),
     [slides, faces, timeline],
   );
   const store = useMemo(() => new SlideImages(), []);

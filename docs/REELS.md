@@ -90,19 +90,22 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 
 ## 3. The cuts (`src/lib/reels/cuts.ts`)
 
-- **"Podle písničky"** (the default since 2026-10-28, `src/lib/reels/follow.ts`): the photo
-  lengths follow the song. Each beat's intensity is its busyness (onsets, weighted 0.65) and
-  loudness (0.35), averaged per bar and ranked against the song itself; a song that hardly changes
-  stays even. The target length runs from half the usual (~a beat at 100–130 BPM) where the song is
-  busiest to ~1.4× where it is sparsest. A dynamic programme (Ellis' kind, one level up) picks the
-  chain of cuts from the first bar to the last that lands on the hardest hits while keeping each
-  photo near its target: bar starts are preferred, a change of section (Foote novelty on bar
-  intensity) and a stab (a hit 2.5× the beats around it) get a cut of their own, off-beats are
-  candidates where something is hit there, lengths of 1, 2, 4, 8 beats cost nothing and others
-  a little, nothing under 0.3 s. "Se zrychlením" asks 0.7× the length. With fewer photos than cuts
-  the usual length grows by 1.4× until they fit. On "Shut It Down" (103 BPM): 1.17 s in the verse,
-  every beat (0.58 s) from the chorus's first bar, a bar's hold over the break and the next cut on
-  the hit after it.
+- **"Podle písničky"** (the default since 2026-10-28, `src/lib/reels/follow.ts`): **a cut on every
+  hit that stands out** — Pavel: "opravdu se trefovat do těch úderů". The analysis keeps every
+  onset peak (`hits`, `hitStrength`, `BEATS_VERSION` 3); a hit's salience is its strength against
+  the 75th percentile of the hits in the 3 s before it (and 0.3 s after), so a verse's soft kick
+  counts like a chorus's loud one, the chorus's first hit stands out from the verse, and the hit
+  after a break counts most. A dynamic programme (Ellis' kind, one level up) picks the chain from
+  the first bar to the last: each cut earns its hit's salience minus a cost (0.6; 0.45 for "Se
+  zrychlením"), a little more on a bar start (+0.15) and much more on a change of section (+1.2,
+  Foote novelty on bar intensity); no photo shorter than 0.42 s (0.27 s faster) — at 140 BPM and
+  above that is every other beat; a hold past 3 s costs, so a silent break holds a photo but an
+  intro of faint hits still moves. Not a grid: a syncopated riff, a waltz or a drifting tempo is cut
+  where it is heard. **Fewer photos than hits** (photos picked by hand): exactly as many cuts as
+  photos, still on hits, each near an even share of the reel — the same programme over (cut,
+  count). Measured on nine songs (below): 13–28 photos per 15 s, median length 0.43–0.83 s; in the
+  rendered MP4s every cut lies within 24 ms of a hit in the file's own sound (median 7–12 ms; a
+  frame is 33 ms).
 - **Pace** → beats per cut: the musical group (1, 2, 4, 8, 16 beats) nearest the pace — "Rychle"
   ~0.5 s, "Co vteřina, to fotka" ~1 s, "Klidněji" ~2 s. At 128 BPM "a second" is 2 beats (0.94 s);
   at 70 BPM it is 1 beat; at 174 it is 4.
@@ -140,16 +143,39 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
   spare to the others, `shareOut`); inside each, the social video's `suggestPhotos` — pins, stars,
   the guests' favourites, every chapter, the shape for 9:16, strong first and last photos. **Only
   the photographer's own photos**, never guests'.
+- **"Fotky"** (2026-10-28, `reel-photo-pick.tsx`): "Vybrat samo" — the suggestion — or "Naklikat
+  ručně": every gallery's own photos as tiles to click; the reel then shows only those (`only` in
+  `reelVariants`), the guests' ranking does not narrow them and every variant may use them all.
+  Fewer picked than the reel's length wants (~1.3 per second) and the page says each will stay
+  longer. The clicks are kept in this browser per set of galleries (localStorage, a convenience).
+  **"Promíchat alba"** (on): every variant takes the galleries in turn; off — album by album.
 - **Variants**, three per round:
   - A "Nejlepší výběr" — the suggestion, on the loudest stretch;
   - B "Jiné fotky" — passing over A's photos, on the second loudest;
-  - C "Se zrychlením" — passing over A's and B's, with accents, the galleries taken in turn.
+  - C "Se zrychlením" — passing over A's and B's, with faster cuts.
 - **"Další varianty"** passes over every photo shown so far and moves on through the song's loud
   stretches; "Zpět na první návrh" returns to round 0.
 - **×** on a photo takes it out of every variant (and the gap is filled); "Vrátit vyřazené fotky"
   brings them back. Nothing is stored on the server.
 
-## 5. Sound in the file
+## 5. Framing — the reel's camera
+
+`shotsFor(…, { reel: true })` → `reelShot` (`src/lib/social-video/camera.ts`). A photo is on
+screen for half a second to a second, so a slideshow's slow push is invisible and a landscape photo
+shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je špatně vidět").
+
+- **Close on the subject**: the faces' head-and-shoulders box (or, with no face to frame, the
+  photo's sharp part — `focus`) with 1.25× air, as close as **1.8×** past the cover frame — or as
+  the photo's pixels allow: never enlarged past `MAX_UPSCALE` of what is fetched. The fetch is
+  sized for it (`sourceWidth(…, zoom)`), so a 24 MP photo gets the full 1.8×.
+- **No head cut**: a subject wider than the crop keeps the faces a crop can hold whole
+  (`facesInWindow`): of every place for the crop — each head at either edge — the one keeping the
+  most face area, a head it would cut through costing twice its area; ties to the centre.
+- Eyes on the eye line as everywhere; then a 4 % push in or out (`directShots` alternates).
+- A photo with no face and no sharp part known: the cover frame, a third down — as before. The
+  sharp part exists only where the gallery's face scan ran ("Najít tváře").
+
+## 6. Sound in the file
 
 `encodeVideo` (`src/lib/social-video/encode.ts`) takes an optional `AudioBuffer`. The reel's sound
 is cut by `reelAudio` (`src/lib/reels/audio.ts`): `OfflineAudioContext` at 48 kHz, the track from
@@ -173,7 +199,7 @@ the encoder alone does a 15 s reel of flat frames in ~24 s; the page, with photo
 the three previews redrawing a standing frame 60 times a second it took 68 s, so a preview that is
 not playing draws once its photo is in and stops.
 
-## 6. Where the music comes from (what the page says)
+## 7. Where the music comes from (what the page says)
 
 Checked 2026-10-28 from search results (the providers' own pages could not be opened from the
 build session; to re-check before relying on it):
@@ -194,7 +220,7 @@ build session; to re-check before relying on it):
 
 Fast cuts suit songs around 120–130 BPM (2 beats ≈ 1 s).
 
-## 7. Instagram's own music through its API (not built)
+## 8. Instagram's own music through its API (not built)
 
 **Built as docs/INSTAGRAM-AUDIO.md** (2026-10-28): Instagram's music as a source of sound and beat,
 without publishing — Pavel posts the file himself. This section is the first reading, kept for its
@@ -214,7 +240,7 @@ https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/refe
 "No copyright" music (NoCopyrightSounds and the like) is usually free with credit for creators;
 for a business's marketing NCS points to its own licence (ncs.io/UsagePolicy, to read before use).
 
-## 8. Later
+## 9. Later
 
 - Words over the reel (names, place) — none now, as in the social video.
 - A flash or zoom punch on the downbeats as a style.

@@ -5,7 +5,7 @@
 // with no fade, because a cut on the beat is the point.
 
 import type { BeatAnalysis } from "@/lib/reels/beats";
-import { followCuts, positionTime, type CutPosition } from "@/lib/reels/follow";
+import { followCuts } from "@/lib/reels/follow";
 import { FPS, type Timeline } from "@/lib/social-video/timeline";
 
 /** Roughly how long a photo stays, in seconds; the beat decides exactly.
@@ -156,7 +156,7 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
 
   const maxPhotos = Math.max(1, options.maxPhotos);
   if (options.pace === "song") {
-    const followed = planFollowing(analysis, s, end, beat, hold, maxPhotos, options.accents);
+    const followed = planFollowing(analysis, s, end, hold, maxPhotos, options.accents);
     if (followed) return followed;
   }
   let perCut = beatsPerCut(beat, options.pace);
@@ -190,39 +190,35 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
 }
 
 /**
- * Cuts that follow the song, from the bar at `s` to the bar at `end`; with
- * fewer photos than its cuts, each photo is asked to stay longer. Null when
- * it cannot be done — the even pace takes over.
+ * Cuts on the song's hits, from the bar at `s` to the bar at `end`, no more
+ * of them than there are photos. Null when it cannot be done — the even pace
+ * takes over.
  */
 function planFollowing(
   analysis: BeatAnalysis,
   s: number,
   end: number,
-  beat: number,
   hold: number,
   maxPhotos: number,
   faster: boolean,
 ): ReelPlan | null {
-  let base = beatsPerCut(beat, "beat") * beat;
-  let cuts: CutPosition[] | null = null;
-  for (let attempt = 0; attempt < 6; attempt++, base *= 1.4) {
-    cuts = followCuts(analysis, { startBeat: s, endBeat: end, base, faster });
-    if (!cuts || cuts.length <= maxPhotos) break;
-  }
+  const cuts = followCuts(analysis, { startBeat: s, endBeat: end, faster, photos: maxPhotos });
   if (!cuts || cuts.length > maxPhotos) return null;
-  const zero = analysis.beats[s] ?? 0;
-  const starts = cuts.map((p) => frameSnap(positionTime(analysis, p) - zero));
+  const zero = cuts[0]!;
+  const starts = cuts.map((t) => frameSnap(t - zero));
   const duration = frameSnap(starts.at(-1)! + hold);
   const slides = starts.map((start, i) => {
     const slideEnd = starts[i + 1] ?? duration;
     return { start, end: slideEnd, moveEnd: slideEnd };
   });
-  const lengths = cuts.slice(1).map((p, i) => p - cuts[i]!);
+  const beat = beatSeconds(analysis);
+  const lengths = cuts.slice(1).map((t, i) => (t - cuts[i]!) / beat);
   return {
     offset: zero,
     startBeat: s,
     endBeat: end,
-    beatsPerCut: lengths.length > 0 ? lengths.toSorted((a, b) => a - b)[lengths.length >> 1]! : 1,
+    beatsPerCut:
+      lengths.length > 0 ? Math.round(lengths.toSorted((a, b) => a - b)[lengths.length >> 1]!) : 1,
     adaptive: true,
     timeline: { slides, duration, fade: 0 },
     fadeOut: hold,

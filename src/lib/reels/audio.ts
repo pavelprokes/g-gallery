@@ -1,6 +1,6 @@
 "use client";
 
-// A reel's music in the admin's browser (docs/REELS.md §2, §5): the track
+// A reel's music in the admin's browser (docs/REELS.md §2, §6): the track
 // decoded once, its beat found, and the stretch the reel plays cut out with
 // a short fade in and the last photo's fade out — by the Web Audio API, so
 // the preview and the file hear the same thing.

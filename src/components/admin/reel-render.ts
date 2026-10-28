@@ -1,12 +1,12 @@
-// A reel to an MP4 (docs/REELS.md §5): every photo fetched at the full
-// format's size, the music cut and faded, then the social video's own
+// A reel to an MP4 (docs/REELS.md §6): every photo fetched at the full
+// format's size and enough over it for the reel's closer framing, the music cut and faded, then the social video's own
 // encoder, frame by frame, with the sound alongside — or none, for a song
 // that was only listened to.
 
 import { slugify } from "@/lib/gallery-slug";
 import { reelAudio } from "@/lib/reels/audio";
 import type { ReelVariant } from "@/lib/reels/variants";
-import type { VideoFormat } from "@/lib/social-video/camera";
+import { REEL_ZOOM, type VideoFormat } from "@/lib/social-video/camera";
 import { encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
@@ -42,7 +42,8 @@ export function reelSlides(
         width: photo.width,
         height: photo.height,
         coupleTags: photo.coupleTags,
-        url: sourceUrl(photo.objectKey, photo, format),
+        // Fetched for the reel's closer framing (camera.ts, REEL_ZOOM).
+        url: sourceUrl(photo.objectKey, photo, format, REEL_ZOOM),
       },
     ];
   });
@@ -95,7 +96,7 @@ export async function renderReel({
 }): Promise<File> {
   const slides = reelSlides(variant, photos, format);
   const { timeline } = variant.plan;
-  const shots = shotsFor(slides, faces, format, timeline);
+  const shots = shotsFor(slides, faces, format, timeline, { reel: true });
   const store = new SlideImages();
   try {
     // Every photo first: a cut to black on the beat is worse than a wait.

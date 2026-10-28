@@ -11,7 +11,7 @@ function grid(
 ): BeatAnalysis {
   const beats = Array.from({ length: Math.floor((seconds * bpm) / 60) }, (_, i) => (i * 60) / bpm);
   return {
-    v: 2,
+    v: 3,
     duration: seconds,
     bpm,
     beats,
@@ -19,6 +19,8 @@ function grid(
     energy: beats.map(loud),
     strength: beats.map(() => 0.5),
     offbeat: beats.map(() => 0),
+    hits: [],
+    hitStrength: [],
     density: beats.map(loud),
   };
 }
