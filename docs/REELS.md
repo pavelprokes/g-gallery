@@ -154,6 +154,9 @@ Fast cuts suit songs around 120–130 BPM (2 beats ≈ 1 s).
 
 ## 7. Instagram's own music through its API (not built)
 
+**Planned in docs/INSTAGRAM-PUBLISH.md** (2026-10-28) — the facts, sources and phases live there;
+this section is the first reading, kept for its history.
+
 Asked 2026-10-28. Meta has an **Instagram Audio API** (2026): with Facebook Login, a Reel
 published through the Content Publishing API can carry licensed audio searched for and attached by
 an `audio_configuration` parameter (`audio_name` alone only renames original audio). What could
