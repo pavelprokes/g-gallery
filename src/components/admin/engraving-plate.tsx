@@ -322,8 +322,9 @@ export function EngravingPlate({
         </div>
         <div className="text-admin-muted mx-auto max-w-xl space-y-1 text-sm dark:text-neutral-400">
           <p>
-            {PLATE_WIDTH} × {PLATE_HEIGHT} px při {PLATE_DPI} dpi, stejně jako předloha. SVG
-            s&nbsp;křivkami gravírka přečte bez fontu a nemá pozadí, JPG je na bílé.
+            Ořezané do krajů: {PLATE_WIDTH} × {PLATE_HEIGHT} px při {PLATE_DPI} dpi, kresba ve
+            stejném měřítku jako předloha. SVG s&nbsp;křivkami gravírka přečte bez fontu a&nbsp;nemá
+            pozadí, JPG je na bílé.
           </p>
           <p>
             SVG s textem jde dál upravovat v Affinity, jen musíš mít písmo nainstalované:{" "}
