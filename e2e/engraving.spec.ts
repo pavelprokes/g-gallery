@@ -49,7 +49,7 @@ test("the photographer downloads the plate for a wedding", async ({ page }) => {
   await expect(preview).toHaveAccessibleName("Náhled gravírování: Pavel & Patricie, 12. 8. 2026");
 
   const svgDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Stáhnout SVG (křivky)" }).click();
+  await page.getByRole("button", { name: "Stáhnout SVG (křivky)" }).first().click();
   const svgFile = await svgDownload;
   expect(svgFile.suggestedFilename()).toBe("gravirovani-pavel-patricie-2026-08-12.svg");
   const svg = fs.readFileSync((await svgFile.path())!, "utf8");
@@ -59,7 +59,7 @@ test("the photographer downloads the plate for a wedding", async ({ page }) => {
   expect(svg).not.toContain("<text");
 
   const jpgDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Stáhnout JPG" }).click();
+  await page.getByRole("button", { name: "Stáhnout JPG" }).first().click();
   const jpgFile = await jpgDownload;
   expect(jpgFile.suggestedFilename()).toBe("gravirovani-pavel-patricie-2026-08-12.jpg");
   const jpg = fs.readFileSync((await jpgFile.path())!);
@@ -70,7 +70,7 @@ test("the photographer downloads the plate for a wedding", async ({ page }) => {
 
 test("a script face keeps the date in Playfair", async ({ page }) => {
   await page.goto(`/admin/e/${seed.weddingId}/engraving`);
-  await page.getByLabel("Font").selectOption({ label: "Great Vibes (psací)" });
+  await page.getByLabel("Font").first().selectOption({ label: "Great Vibes (psací)" });
   await expect(page.getByText("Datum zůstává v Playfair Display")).toBeVisible();
 
   const textDownload = page.waitForEvent("download");
@@ -79,4 +79,36 @@ test("a script face keeps the date in Playfair", async ({ page }) => {
   expect(svg).toContain('font-family="Great Vibes"');
   expect(svg).toContain('font-family="Playfair Display"');
   expect(svg).toContain(">12. 8. 2026</text>");
+});
+
+test("the photographer downloads the couple's monogram at 25 mm", async ({ page }) => {
+  await page.goto(`/admin/e/${seed.weddingId}/engraving`);
+
+  // "Pavel a Patricie": the initials follow the names until typed over.
+  await expect(page.getByLabel("První iniciála")).toHaveValue("P");
+  await expect(page.getByLabel("Druhá iniciála")).toHaveValue("P");
+  await expect(page.getByLabel("Šířka v mm")).toHaveValue("25");
+  await page.getByLabel("Druhé jméno").fill("Romana");
+  await expect(page.getByLabel("Druhá iniciála")).toHaveValue("R");
+
+  const preview = page.getByRole("img", { name: /^Náhled monogramu: P&R, 25 × [\d,]+ mm$/ });
+  await expect(preview.locator("svg #monogram")).toBeAttached();
+
+  const svgDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Stáhnout SVG (křivky)" }).nth(1).click();
+  const svgFile = await svgDownload;
+  expect(svgFile.suggestedFilename()).toBe("monogram-p-r-2026-08-12.svg");
+  const svg = fs.readFileSync((await svgFile.path())!, "utf8");
+  expect(svg).toContain('width="25mm"');
+  expect(svg).not.toContain("<text");
+
+  const jpgDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Stáhnout JPG" }).nth(1).click();
+  const jpg = fs.readFileSync((await (await jpgDownload).path())!);
+  // 25 mm at 600 dpi.
+  expect(jpegSize(jpg).width).toBe(591);
+  expect([...jpg.subarray(13, 18)]).toEqual([1, 0x02, 0x58, 0x02, 0x58]);
+
+  await page.getByLabel("Šířka v mm").fill("40");
+  await expect(page.getByRole("img", { name: /^Náhled monogramu: P&R, 40 × / })).toBeVisible();
 });
