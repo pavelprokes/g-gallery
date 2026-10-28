@@ -61,8 +61,11 @@ at a local mock in tests.
 "Hudba z Instagramu" (`reel-instagram-music.tsx`): music or original sounds, trending or a search.
 "Použít" fetches `download_url` **in the browser**, the beat is found like any track's, and it is
 kept in IndexedDB as `kind: "instagram"` with its `audioId`. From there it is a track like a file:
-the variants start on the loudest stretch, can be moved by bars, and the file is made **with its
-sound or without** — the reels page's "Se zvukem / Bez zvuku".
+the variants start on the loudest stretch or on the part Pavel picks ("Část písničky", docs/REELS.md
+§3), can be moved by bars, and the file is made **with its sound or without** — the reels page's
+"Se zvukem / Bez zvuku". Each result with a `download_url` has a play button: an `<audio>` plays it
+straight from Meta's address (no CORS needed, nothing kept), one at a time, stopped by a new search
+or by "Použít".
 
 ### 3.4 Where the bytes go
 
@@ -73,12 +76,12 @@ file into a short-lived R2 key — not built until a real account shows it is ne
 
 ## 4. Open — only Pavel's account can answer
 
-| #   | Question                                                                                                                          |
-| --- | --------------------------------------------------------------------------------------------------------------------------------- |
-| U1  | Is `download_url` the whole track (`duration_in_ms`) or a clip? The track row shows both lengths' effect: a clip decodes shorter. |
-| U3  | Does Meta's CDN allow a browser `fetch` of `download_url` (CORS)?                                                                 |
-| U4  | What does `/ig_audio` return to a business account — licensed music, or the Sound Collection?                                     |
-| U6  | Which permissions does search alone need — is `instagram_content_publish` required?                                               |
+| #   | Question                                                                                      | Answer (production, Pavel's account, 2026-10-28)                                                                    |
+| --- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| U1  | Is `download_url` the whole track (`duration_in_ms`) or a clip?                               | The whole track: "Shut It Down (Instrumental)" listed 1:42 and decoded 1:42.                                        |
+| U3  | Does Meta's CDN allow a browser `fetch` of `download_url` (CORS)?                             | Yes — "Použít" fetched it in Chrome; the Worker fallback (§3.4) is not needed.                                      |
+| U4  | What does `/ig_audio` return to a business account — licensed music, or the Sound Collection? | Artists' own catalogue for a search (d.higgs: several tracks, with covers); whether it is all of it is not checked. |
+| U6  | Which permissions does search alone need — is `instagram_content_publish` required?           | Open: the app asks for all five, and search works with them.                                                        |
 
 (U2 and U5 belonged to publishing and went with it.)
 

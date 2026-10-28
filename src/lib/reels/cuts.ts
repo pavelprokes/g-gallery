@@ -5,10 +5,12 @@
 // with no fade, because a cut on the beat is the point.
 
 import type { BeatAnalysis } from "@/lib/reels/beats";
+import { followCuts } from "@/lib/reels/follow";
 import { FPS, type Timeline } from "@/lib/social-video/timeline";
 
-/** Roughly how long a photo stays, in seconds; the beat decides exactly. */
-export const PACES = { fast: 0.5, beat: 1, calm: 2 } as const;
+/** Roughly how long a photo stays, in seconds; the beat decides exactly.
+ * "song" varies it with the music around a second (src/lib/reels/follow.ts). */
+export const PACES = { song: 1, fast: 0.5, beat: 1, calm: 2 } as const;
 export type Pace = keyof typeof PACES;
 
 export const REEL_LENGTHS = [15, 20, 30] as const;
@@ -39,7 +41,7 @@ export function beatsPerCut(beat: number, pace: Pace): number {
 }
 
 /** Beat indices that start a bar. */
-function barStarts(analysis: BeatAnalysis): number[] {
+export function barStarts(analysis: BeatAnalysis): number[] {
   const out: number[] = [];
   for (let i = analysis.downbeat; i < analysis.beats.length; i += BEATS_PER_BAR) out.push(i);
   return out.length > 0 ? out : [0];
@@ -82,6 +84,30 @@ export function shiftSection(analysis: BeatAnalysis, startBeat: number, bars: nu
   return starts[Math.min(starts.length - 1, Math.max(0, at + bars))]!;
 }
 
+/** The bar start nearest `seconds` into the track — where a click on the song lands. */
+export function barAt(analysis: BeatAnalysis, seconds: number): number {
+  const at = (i: number) => analysis.beats[i] ?? 0;
+  return barStarts(analysis).reduce((best, i) =>
+    Math.abs(at(i) - seconds) < Math.abs(at(best) - seconds) ? i : best,
+  );
+}
+
+/**
+ * The song's loudness in `columns` slices of its length, 0–1 — the shape the
+ * section picker draws. A slice takes its loudest beat; one with no beat
+ * (the silence before the first) stays 0.
+ */
+export function loudness(analysis: BeatAnalysis, columns: number): number[] {
+  const out = Array.from({ length: columns }, () => 0);
+  if (analysis.duration <= 0) return out;
+  analysis.beats.forEach((t, i) => {
+    const column = Math.min(columns - 1, Math.floor((t / analysis.duration) * columns));
+    out[column] = Math.max(out[column]!, analysis.energy[i] ?? 0);
+  });
+  const peak = Math.max(...out);
+  return peak > 0 ? out.map((v) => v / peak) : out;
+}
+
 export interface ReelPlanOptions {
   startBeat: number;
   seconds: number;
@@ -97,7 +123,10 @@ export interface ReelPlan {
   offset: number;
   startBeat: number;
   endBeat: number;
+  /** The usual beats per photo — the median when the cuts follow the song. */
   beatsPerCut: number;
+  /** The cuts follow the song: their lengths vary with it. */
+  adaptive: boolean;
   /** One slide per photo; `fade` 0. */
   timeline: Timeline;
   /** How long the music fades out at the end — the last photo's hold. */
@@ -126,6 +155,10 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   );
 
   const maxPhotos = Math.max(1, options.maxPhotos);
+  if (options.pace === "song") {
+    const followed = planFollowing(analysis, s, end, hold, maxPhotos, options.accents);
+    if (followed) return followed;
+  }
   let perCut = beatsPerCut(beat, options.pace);
   let cuts = cutBeats(s, end, perCut, options.accents);
   // Too few photos for the pace: cut less often; at the slowest, end sooner.
@@ -150,6 +183,43 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
     startBeat: s,
     endBeat: end,
     beatsPerCut: perCut,
+    adaptive: false,
+    timeline: { slides, duration, fade: 0 },
+    fadeOut: hold,
+  };
+}
+
+/**
+ * Cuts on the song's hits, from the bar at `s` to the bar at `end`, no more
+ * of them than there are photos. Null when it cannot be done — the even pace
+ * takes over.
+ */
+function planFollowing(
+  analysis: BeatAnalysis,
+  s: number,
+  end: number,
+  hold: number,
+  maxPhotos: number,
+  faster: boolean,
+): ReelPlan | null {
+  const cuts = followCuts(analysis, { startBeat: s, endBeat: end, faster, photos: maxPhotos });
+  if (!cuts || cuts.length > maxPhotos) return null;
+  const zero = cuts[0]!;
+  const starts = cuts.map((t) => frameSnap(t - zero));
+  const duration = frameSnap(starts.at(-1)! + hold);
+  const slides = starts.map((start, i) => {
+    const slideEnd = starts[i + 1] ?? duration;
+    return { start, end: slideEnd, moveEnd: slideEnd };
+  });
+  const beat = beatSeconds(analysis);
+  const lengths = cuts.slice(1).map((t, i) => (t - cuts[i]!) / beat);
+  return {
+    offset: zero,
+    startBeat: s,
+    endBeat: end,
+    beatsPerCut:
+      lengths.length > 0 ? Math.round(lengths.toSorted((a, b) => a - b)[lengths.length >> 1]!) : 1,
+    adaptive: true,
     timeline: { slides, duration, fade: 0 },
     fadeOut: hold,
   };

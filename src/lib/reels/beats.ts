@@ -1,10 +1,12 @@
 // The beat of a song, found in the photographer's browser (docs/REELS.md §2):
 // an onset envelope from spectral flux, the tempo from its autocorrelation,
 // the beats by Ellis' dynamic programme (the one librosa ships as
-// `beat_track`), the bar's first beat, and how loud each beat is. Pure and
-// client-safe: it reads samples, nothing else.
+// `beat_track`), the bar's first beat, how loud each beat is and how hard it
+// and the off-beat after it are hit — what lets the cuts follow the song
+// (docs/REELS.md §3). Pure and client-safe: it reads samples, nothing else.
 
-export const BEATS_VERSION = 1;
+/** Bumped when the analysis gains a field: a stored track is analysed again. */
+export const BEATS_VERSION = 3;
 
 export interface BeatAnalysis {
   v: typeof BEATS_VERSION;
@@ -17,6 +19,14 @@ export interface BeatAnalysis {
   downbeat: number;
   /** How loud the music is from each beat to the next, 0–1 against the loudest. */
   energy: number[];
+  /** How hard each beat is hit — the onset at it, 0–1 against the song's hardest. */
+  strength: number[];
+  /** How busy the music is from each beat to the next — its mean onset, 0–1 against the busiest. */
+  density: number[];
+  /** Every hit heard — a peak of the onset envelope — seconds, wherever it falls against the beat. */
+  hits: number[];
+  /** How hard each of `hits` is, 0–1 against the song's hardest. */
+  hitStrength: number[];
 }
 
 /** The rate the envelope is computed at — plenty for onsets, a quarter of the work. */
@@ -56,14 +66,66 @@ export function analyzeBeats(samples: Float32Array, sampleRate: number): BeatAna
     );
   }
   const beats = frames.map(frameTime).filter((t) => t < duration);
+  const frameAt = (t: number) => (t * rate - FRAME / 2) / HOP - 1;
+  const strength = beats.map((t) => onsetNear(onset, frameAt(t)));
+  const energy = beatEnergy(samples, sampleRate, beats);
   return {
     v: BEATS_VERSION,
     duration,
     bpm: Math.round(bpm * 10) / 10,
     beats,
-    downbeat: downbeatOf(frames, onset),
-    energy: beatEnergy(samples, sampleRate, beats),
+    downbeat: downbeatOf(strength, energy),
+    energy,
+    strength,
+    density: beatDensity(onset, beats.map(frameAt), frameAt(duration)),
+    ...hitsOf(onset, frameTime, duration),
   };
+}
+
+/** The faintest onset peak kept as a hit — below it is the noise of a sustained note. */
+const HIT_FLOOR = 0.05;
+
+/** The onset envelope's peaks: a frame higher than the two either side of it. */
+function hitsOf(onset: Float32Array, frameTime: (f: number) => number, duration: number) {
+  const hits: number[] = [];
+  const hitStrength: number[] = [];
+  for (let f = 0; f < onset.length; f++) {
+    const v = onset[f]!;
+    if (v < HIT_FLOOR) continue;
+    let peak = true;
+    for (let k = f - 2; k <= f + 2 && peak; k++) {
+      if (k !== f && k >= 0 && k < onset.length && (onset[k]! > v || (onset[k]! === v && k < f)))
+        peak = false;
+    }
+    const t = frameTime(f);
+    if (!peak || t >= duration) continue;
+    hits.push(Math.round(t * 1000) / 1000);
+    hitStrength.push(Math.round(v * 1000) / 1000);
+  }
+  return { hits, hitStrength };
+}
+
+/** The strongest onset within ±35 ms of a frame — a hit a hair off the grid still counts. */
+function onsetNear(onset: Float32Array, frame: number): number {
+  const reach = 3;
+  let best = 0;
+  for (let f = Math.round(frame) - reach; f <= Math.round(frame) + reach; f++) {
+    if (f >= 0 && f < onset.length) best = Math.max(best, onset[f]!);
+  }
+  return Math.round(best * 1000) / 1000;
+}
+
+/** The mean onset from each beat to the next, against the busiest stretch. */
+function beatDensity(onset: Float32Array, frames: readonly number[], last: number): number[] {
+  const means = frames.map((from, i) => {
+    const a = Math.max(0, Math.round(from));
+    const b = Math.min(onset.length, Math.round(frames[i + 1] ?? last));
+    let sum = 0;
+    for (let f = a; f < b; f++) sum += onset[f]!;
+    return b > a ? sum / (b - a) : 0;
+  });
+  const busiest = Math.max(0, ...means);
+  return means.map((m) => (busiest > 0 ? Math.round((m / busiest) * 1000) / 1000 : 0));
 }
 
 /** Averaged down by a whole factor to about ANALYSIS_RATE. */
@@ -120,8 +182,64 @@ export function onsetEnvelope(signal: Float32Array, rate: number): Float32Array 
   return out;
 }
 
-/** The beat period in frames: the autocorrelation's best lag under the tempo prior. */
+/**
+ * The beat period in frames, by comb-filter resonance (Davies & Plumbley,
+ * "Context-Dependent Beat Tracking of Musical Audio", TASLP 2007, eq. 5): a
+ * tempo scores the onset's autocorrelation at its period and the next three
+ * multiples, each widened by its own tolerance — the bar's structure votes,
+ * not only the next beat — under a Rayleigh weighting that peaks at 120 BPM.
+ * After @audio/beat's `combTempo` (MIT, github.com/audiojs/beat), which
+ * measured it against the plain autocorrelation: 87 % against 70 %.
+ */
 function tempoPeriod(onset: Float32Array, fps: number): number {
+  const n = onset.length;
+  const fallback = (60 * fps) / PRIOR_BPM;
+  const maxLag = Math.min(n - 1, Math.ceil((4 * 60 * fps) / MIN_BPM) + 4);
+  if (maxLag < (60 * fps) / MAX_BPM + 2) return autocorrelationPeriod(onset, fps);
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += onset[i]!;
+  mean /= n;
+  const acf = new Float64Array(maxLag + 2);
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i + lag < n; i++) sum += (onset[i]! - mean) * (onset[i + lag]! - mean);
+    acf[lag] = sum / (n - lag);
+  }
+  const at = (t: number) => {
+    const k = Math.floor(t);
+    const f = t - k;
+    return k + 1 > maxLag || k < 0 ? 0 : acf[k]! * (1 - f) + acf[k + 1]! * f;
+  };
+  const beta = (60 * fps) / PRIOR_BPM;
+  const resonance = (bpm: number) => {
+    const period = (60 * fps) / bpm;
+    let sum = 0;
+    for (let a = 1; a <= 4; a++) {
+      for (let b = 1 - a; b <= a - 1; b++) sum += at(a * period + b) / (2 * a - 1);
+    }
+    const r = period / beta;
+    return Math.max(0, sum) * r * Math.exp(-0.5 * (r * r - 1));
+  };
+  let best = 0;
+  let bestScore = 0;
+  for (let bpm = MIN_BPM; bpm <= MAX_BPM; bpm++) {
+    const score = resonance(bpm);
+    if (score > bestScore) [best, bestScore] = [bpm, score];
+  }
+  if (best === 0) return fallback;
+  // To a tenth of a BPM around the winner: the beats are placed on its period.
+  const winner = best;
+  for (let tenth = -10; tenth <= 10; tenth++) {
+    const bpm = winner + tenth / 10;
+    if (bpm < MIN_BPM || bpm > MAX_BPM) continue;
+    const score = resonance(bpm);
+    if (score > bestScore) [best, bestScore] = [bpm, score];
+  }
+  return (60 * fps) / best;
+}
+
+/** The beat period in frames: the autocorrelation's best lag under the tempo prior. */
+function autocorrelationPeriod(onset: Float32Array, fps: number): number {
   const minLag = Math.floor((60 * fps) / MAX_BPM);
   const maxLag = Math.min(onset.length - 1, Math.ceil((60 * fps) / MIN_BPM));
   const fallback = (60 * fps) / PRIOR_BPM;
@@ -198,20 +316,33 @@ function trackBeats(onset: Float32Array, period: number): number[] {
   return first > 0 ? frames.slice(first) : frames;
 }
 
-/** The phase of the bar — of every fourth beat, the one the onsets hit hardest. */
-function downbeatOf(frames: readonly number[], onset: Float32Array): number {
+/**
+ * The phase of the bar: of every fourth beat, the one the music hits hardest
+ * and — weighted more — the one where it gets louder. A song's parts change
+ * on a bar's first beat (a chorus does not start on the third), and on a
+ * mastered track that is firmer evidence than which beat the kick is loudest
+ * on. Loudness rather than onsets: it reads the same whatever rate the
+ * browser decodes the file at.
+ */
+function downbeatOf(strength: readonly number[], energy: readonly number[]): number {
+  // How much louder beat i is than the two before it.
+  const rise = energy.map((e, i) =>
+    i < 2 ? 0 : Math.max(0, e - (energy[i - 1]! + energy[i - 2]!) / 2),
+  );
   let best = 0;
-  let bestSum = -1;
+  let bestScore = -1;
   for (let phase = 0; phase < 4; phase++) {
-    let sum = 0;
+    let hit = 0;
+    let lift = 0;
     let count = 0;
-    for (let i = phase; i < frames.length; i += 4) {
-      sum += onset[frames[i]!] ?? 0;
+    for (let i = phase; i < strength.length; i += 4) {
+      hit += strength[i]!;
+      lift += rise[i]!;
       count += 1;
     }
-    const mean = count > 0 ? sum / count : 0;
-    if (mean > bestSum) {
-      bestSum = mean;
+    const score = count > 0 ? (hit + 4 * lift) / count : 0;
+    if (score > bestScore) {
+      bestScore = score;
       best = phase;
     }
   }

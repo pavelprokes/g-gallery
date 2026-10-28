@@ -36,12 +36,16 @@ function gallery(id: string, count: number): ReelSource {
 const song: BeatAnalysis = (() => {
   const beats = Array.from({ length: 400 }, (_, i) => (i * 60) / 128);
   return {
-    v: 1,
+    v: 3,
     duration: 190,
     bpm: 128,
     beats,
     downbeat: 0,
     energy: beats.map((t) => (t > 90 ? 1 : 0.4)),
+    strength: beats.map(() => 0.5),
+    hits: [],
+    hitStrength: [],
+    density: beats.map((t) => (t > 90 ? 1 : 0.4)),
   };
 })();
 
@@ -114,6 +118,45 @@ describe("reelVariants", () => {
   it("keeps a start the photographer moved", () => {
     const [first] = reelVariants({ ...base, round: 0, startBeats: { "0-0": 64 } });
     expect(first!.plan.startBeat).toBe(64);
+  });
+
+  it("starts every variant on the part of the song the photographer chose", () => {
+    const variants = reelVariants({ ...base, round: 0, songStart: 40 });
+    expect(variants.map((v) => v.plan.startBeat)).toEqual([40, 40, 40]);
+    // A variant moved on its own still keeps its move.
+    const moved = reelVariants({ ...base, round: 0, songStart: 40, startBeats: { "0-1": 64 } });
+    expect(moved.map((v) => v.plan.startBeat)).toEqual([40, 64, 40]);
+  });
+
+  it("mixes the galleries' photos in every variant, or keeps them album by album", () => {
+    const albumOf = (id: string) => id[0];
+    const changesOf = (ids: string[]) =>
+      ids.slice(1).filter((id, i) => albumOf(id) !== albumOf(ids[i]!)).length;
+    const [mixed] = reelVariants({ ...base, round: 0 });
+    const [apart] = reelVariants({ ...base, round: 0, mixGalleries: false });
+    expect(changesOf(mixed!.photoIds)).toBeGreaterThan(mixed!.photoIds.length / 2);
+    expect(changesOf(apart!.photoIds)).toBe(1);
+  });
+
+  it("shows only the photos picked by hand, from both galleries", () => {
+    const only = new Set(["a-0003", "a-0010", "a-0042", "b-0005", "b-0007", "b-0100"]);
+    const variants = reelVariants({ ...base, round: 0, only, byGuests: true });
+    for (const v of variants) {
+      expect(v.photoIds.every((id) => only.has(id))).toBe(true);
+      expect(v.photoIds).toHaveLength(v.plan.timeline.slides.length);
+    }
+    // As many as the cuts fit: an even pace may leave one over.
+    expect(variants[0]!.photoIds.length).toBeGreaterThanOrEqual(only.size - 1);
+  });
+
+  it("shows a few hand-picked photos in another order in each variant and round", () => {
+    const only = new Set(
+      Array.from({ length: 12 }, (_, i) => `a-${String(i * 7).padStart(4, "0")}`),
+    );
+    const orders = [0, 1].flatMap((round) =>
+      reelVariants({ ...base, round, only, songStart: 40 }).map((v) => v.photoIds.join()),
+    );
+    expect(new Set(orders).size).toBe(orders.length);
   });
 
   it("fits the cuts to a gallery too small for them", () => {

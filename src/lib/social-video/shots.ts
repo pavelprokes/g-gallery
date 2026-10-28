@@ -29,6 +29,9 @@ export interface ShotsOptions {
   /** Show a photo turned the other way whole, over a blurred copy of itself,
    * instead of cutting the video's shape out of it (docs/SLIDESHOW-MAKER.md §2). */
   fitAcross?: boolean;
+  /** A reel's framing: close on the faces or the sharp part, no head cut,
+   * never the photo small over its blur (docs/REELS.md §5). */
+  reel?: boolean;
 }
 
 export function shotsFor(
@@ -36,7 +39,7 @@ export function shotsFor(
   faces: Readonly<Record<string, PhotoFaces | null | undefined>>,
   format: VideoFormat,
   timeline: Timeline,
-  { fitAcross = false }: ShotsOptions = {},
+  { fitAcross = false, reel = false }: ShotsOptions = {},
 ): Shot[] {
   const seconds = moveSeconds(timeline);
   const aimed = photos.map((p) =>
@@ -50,6 +53,7 @@ export function shotsFor(
             { width: p.width, height: p.height, faces: aimed[i]!, focus: faces[p.id]?.focus },
             format,
             seconds[i] ?? seconds.at(-1) ?? 3,
+            { reel },
           ),
     ),
     // A detail in front of soft faces is not a group: counted as the camera aims.

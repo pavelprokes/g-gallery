@@ -61,12 +61,28 @@ microphone fed a 126 BPM track: found 126 BPM from the recording.
    mono, averaged down to ~22 kHz.
 2. **Onset envelope**: log-magnitude spectral flux (1024-sample Hann frames, 256 hop, bins up to
    8 kHz), half-wave rectified, minus its ±0.5 s mean, normalised.
-3. **Tempo**: the envelope's autocorrelation between 60 and 200 BPM under a log-Gaussian prior
-   centred on 120 BPM, one octave wide (librosa's defaults), refined between lags by a parabola.
+3. **Tempo** (since 2026-10-28): comb-filter resonance (Davies & Plumbley 2007, eq. 5) — each
+   tempo 60–200 BPM scores the envelope's autocorrelation at its period and three multiples, each
+   widened by its tolerance, under a Rayleigh weighting peaking at 120 BPM; then to 0.1 BPM. After
+   `@audio/beat`'s `combTempo` (MIT, github.com/audiojs/beat — found by Pavel), ported rather than
+   installed: the rest of that package is the same spectral flux and Ellis DP as here. On our own
+   synthetic set (`beats.styles.test.ts`, 9 styles × 70–180 BPM) it lifted exact tempo from 64 % to
+   70 % and tempo-or-octave from 88 % to 96 %; the plain autocorrelation (librosa's prior) remains
+   for a clip too short for the comb.
 4. **Beats**: Ellis' dynamic programme (2007, librosa's `beat_track`) — tightness 100, onsets
    smeared by a Gaussian of period/32; beats before the first real onset (a silent intro) dropped.
-5. **Bars**: 4/4 assumed; the downbeat is the phase of every fourth beat with the strongest onsets.
+5. **Bars**: 4/4 assumed; the downbeat is the phase of every fourth beat that is hit hardest and,
+   weighted four times more, where the song gets louder — a chorus starts on a bar's first beat.
+   Loudness, not onsets, because it reads the same at 44.1 and 48 kHz: on Pavel's test song
+   (d.higgs, "Shut It Down") the onset-only phase moved by two beats between the two rates.
 6. **Energy**: RMS from each beat to the next, against the loudest.
+7. **Strength, density, hits** (`BEATS_VERSION` 3): the onset at each beat (±35 ms; the downbeat
+   reads it), the mean onset from beat to beat (sections, §3), and every onset peak with its
+   strength — what the cuts land on (§3).
+
+The Web Audio `AnalyserNode` (suggested 2026-10-28) is not used: it gives FFT snapshots of sound
+playing in real time, so a 3-minute song would take 3 minutes to read and its frames would land
+on animation ticks, not on samples. The decoded file is read whole instead, ~1.5 s for 3 minutes.
 
 Measured on synthetic drums: tempo within 0.3 %, every beat within 20 ms of its hit (0.5 ms on
 average, after moving the frame time a hop later — 11 ms early without it). A 30 s track takes
@@ -75,12 +91,35 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 
 ## 3. The cuts (`src/lib/reels/cuts.ts`)
 
+- **"Podle písničky"** (the default since 2026-10-28, `src/lib/reels/follow.ts`): **a cut on every
+  hit that stands out** — Pavel: "opravdu se trefovat do těch úderů". The analysis keeps every
+  onset peak (`hits`, `hitStrength`, `BEATS_VERSION` 3); a hit's salience is its strength against
+  the 75th percentile of the hits in the 3 s before it (and 0.3 s after), so a verse's soft kick
+  counts like a chorus's loud one, the chorus's first hit stands out from the verse, and the hit
+  after a break counts most. A dynamic programme (Ellis' kind, one level up) picks the chain from
+  the first bar to the last: each cut earns its hit's salience minus a cost (0.6; 0.45 for "Se
+  zrychlením"), a little more on a bar start (+0.15) and much more on a change of section (+1.2,
+  Foote novelty on bar intensity); no photo shorter than 0.42 s (0.27 s faster) — at 140 BPM and
+  above that is every other beat; a hold past 3 s costs, so a silent break holds a photo but an
+  intro of faint hits still moves. Not a grid: a syncopated riff, a waltz or a drifting tempo is cut
+  where it is heard. **Fewer photos than hits** (photos picked by hand): exactly as many cuts as
+  photos, still on hits, each near an even share of the reel — the same programme over (cut,
+  count). Measured on nine songs (below): 13–28 photos per 15 s, median length 0.43–0.83 s; in the
+  rendered MP4s every cut lies within 24 ms of a hit in the file's own sound (median 7–12 ms; a
+  frame is 33 ms).
 - **Pace** → beats per cut: the musical group (1, 2, 4, 8, 16 beats) nearest the pace — "Rychle"
   ~0.5 s, "Co vteřina, to fotka" ~1 s, "Klidněji" ~2 s. At 128 BPM "a second" is 2 beats (0.94 s);
   at 70 BPM it is 1 beat; at 174 it is 4.
 - **Start**: the first beat of a bar. `sections` ranks bar starts by the loudness of the next
   `seconds` and keeps those at least half a reel apart — a reel opens where the song is already
   going, not on its intro. Each variant can move its music by four bars ("◀ dřív / později ▶").
+- **"Část písničky"** (`reel-section.tsx`, added 2026-10-28 at Pavel's ask): the song's loudness
+  drawn across its length (`loudness`), the reel's stretch marked on it. A click or a drag puts the
+  start at the nearest bar start that leaves the reel room (`barAt`); the arrows move it a bar,
+  PageUp/PageDown four. The chosen part is every variant's start (`songStart` in `reelVariants`) —
+  a variant's own "dřív / později" still moves it from there; "Vybrat samo" goes back to the loudest
+  stretches. "Poslechnout tuhle část" plays exactly what a variant would, envelope included, with a
+  playhead on the strip. A new song starts from its loudest stretch again.
 - **End**: on the first beat of a bar — the one that, with the hold, comes nearest the length —
   where the last photo stays for about a bar (1.5–2.5 s) while the music fades out over it.
 - **Accents** (variant C): the last cut of every four-bar phrase is split in two — the fill.
@@ -105,16 +144,39 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
   spare to the others, `shareOut`); inside each, the social video's `suggestPhotos` — pins, stars,
   the guests' favourites, every chapter, the shape for 9:16, strong first and last photos. **Only
   the photographer's own photos**, never guests'.
+- **"Fotky"** (2026-10-28, `reel-photo-pick.tsx`): "Vybrat samo" — the suggestion — or "Naklikat
+  ručně": every gallery's own photos as tiles to click; the reel then shows only those (`only` in
+  `reelVariants`), the guests' ranking does not narrow them and every variant may use them all.
+  Fewer picked than the reel's length wants (~1.3 per second) and the page says each will stay
+  longer. The clicks are kept in this browser per set of galleries (localStorage, a convenience).
+  **"Promíchat alba"** (on): every variant takes the galleries in turn; off — album by album.
 - **Variants**, three per round:
   - A "Nejlepší výběr" — the suggestion, on the loudest stretch;
   - B "Jiné fotky" — passing over A's photos, on the second loudest;
-  - C "Se zrychlením" — passing over A's and B's, with accents, the galleries taken in turn.
+  - C "Se zrychlením" — passing over A's and B's, with faster cuts.
 - **"Další varianty"** passes over every photo shown so far and moves on through the song's loud
   stretches; "Zpět na první návrh" returns to round 0.
 - **×** on a photo takes it out of every variant (and the gap is filled); "Vrátit vyřazené fotky"
   brings them back. Nothing is stored on the server.
 
-## 5. Sound in the file
+## 5. Framing — the reel's camera
+
+`shotsFor(…, { reel: true })` → `reelShot` (`src/lib/social-video/camera.ts`). A photo is on
+screen for half a second to a second, so a slideshow's slow push is invisible and a landscape photo
+shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je špatně vidět").
+
+- **Close on the subject**: the faces' head-and-shoulders box (or, with no face to frame, the
+  photo's sharp part — `focus`) with 1.25× air, as close as **1.8×** past the cover frame — or as
+  the photo's pixels allow: never enlarged past `MAX_UPSCALE` of what is fetched. The fetch is
+  sized for it (`sourceWidth(…, zoom)`), so a 24 MP photo gets the full 1.8×.
+- **No head cut**: a subject wider than the crop keeps the faces a crop can hold whole
+  (`facesInWindow`): of every place for the crop — each head at either edge — the one keeping the
+  most face area, a head it would cut through costing twice its area; ties to the centre.
+- Eyes on the eye line as everywhere; then a 4 % push in or out (`directShots` alternates).
+- A photo with no face and no sharp part known: the cover frame, a third down — as before. The
+  sharp part exists only where the gallery's face scan ran ("Najít tváře").
+
+## 6. Sound in the file
 
 `encodeVideo` (`src/lib/social-video/encode.ts`) takes an optional `AudioBuffer`. The reel's sound
 is cut by `reelAudio` (`src/lib/reels/audio.ts`): `OfflineAudioContext` at 48 kHz, the track from
@@ -138,7 +200,7 @@ the encoder alone does a 15 s reel of flat frames in ~24 s; the page, with photo
 the three previews redrawing a standing frame 60 times a second it took 68 s, so a preview that is
 not playing draws once its photo is in and stops.
 
-## 6. Where the music comes from (what the page says)
+## 7. Where the music comes from (what the page says)
 
 Checked 2026-10-28 from search results (the providers' own pages could not be opened from the
 build session; to re-check before relying on it):
@@ -159,7 +221,7 @@ build session; to re-check before relying on it):
 
 Fast cuts suit songs around 120–130 BPM (2 beats ≈ 1 s).
 
-## 7. Instagram's own music through its API (not built)
+## 8. Instagram's own music through its API (not built)
 
 **Built as docs/INSTAGRAM-AUDIO.md** (2026-10-28): Instagram's music as a source of sound and beat,
 without publishing — Pavel posts the file himself. This section is the first reading, kept for its
@@ -179,7 +241,7 @@ https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/refe
 "No copyright" music (NoCopyrightSounds and the like) is usually free with credit for creators;
 for a business's marketing NCS points to its own licence (ncs.io/UsagePolicy, to read before use).
 
-## 8. Later
+## 9. Later
 
 - Words over the reel (names, place) — none now, as in the social video.
 - A flash or zoom punch on the downbeats as a style.

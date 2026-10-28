@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { disconnectInstagram, searchInstagramAudio } from "@/app/admin/instagram-actions";
 import type { InstagramStatus } from "@/lib/instagram/connection";
 import type { AudioKind, InstagramAudio } from "@/lib/instagram/graph";
@@ -68,6 +68,33 @@ export function InstagramMusic({
   const [error, setError] = useState<string | null>(null);
   const [searching, startSearch] = useTransition();
   const [taking, setTaking] = useState<string | null>(null);
+  // One song heard at a time, straight from Meta's address — an <audio> needs
+  // no CORS, and nothing is kept until "Použít".
+  const player = useRef<HTMLAudioElement | null>(null);
+  const [hearing, setHearing] = useState<string | null>(null);
+  const stopHearing = () => {
+    player.current?.pause();
+    setHearing(null);
+  };
+  useEffect(() => () => player.current?.pause(), []);
+  const hear = (item: InstagramAudio) => {
+    if (hearing === item.audioId) return stopHearing();
+    if (!item.downloadUrl) return;
+    player.current ??= new Audio();
+    const audio = player.current;
+    // Only this item's own end clears the button: a play cut short by the
+    // next item's would otherwise clear that one's.
+    const done = () => setHearing((h) => (h === item.audioId ? null : h));
+    audio.onended = done;
+    audio.onerror = () => {
+      done();
+      setError("Ukázku se nepodařilo přehrát.");
+    };
+    audio.src = item.downloadUrl;
+    setError(null);
+    setHearing(item.audioId);
+    void audio.play().catch(done);
+  };
   // The sign-in's outcome is said once: kept here, taken off the address so a
   // reload or a later disconnect does not repeat it.
   const [outcomeKey, setOutcomeKey] = useState(state.outcome);
@@ -83,6 +110,7 @@ export function InstagramMusic({
 
   const search = () =>
     startSearch(async () => {
+      stopHearing();
       setError(null);
       const result = await searchInstagramAudio({ kind, query });
       if (result.ok) setItems(result.items);
@@ -91,6 +119,7 @@ export function InstagramMusic({
 
   const take = async (item: InstagramAudio) => {
     if (!item.downloadUrl) return;
+    stopHearing();
     setError(null);
     setTaking(item.audioId);
     try {
@@ -219,6 +248,28 @@ export function InstagramMusic({
                           .join(" · ")}
                       </span>
                     </span>
+                    {item.downloadUrl && (
+                      <button
+                        type="button"
+                        onClick={() => hear(item)}
+                        aria-pressed={hearing === item.audioId}
+                        aria-label={
+                          hearing === item.audioId
+                            ? `Zastavit ukázku: ${item.title}`
+                            : `Přehrát ukázku: ${item.title}`
+                        }
+                        className="border-admin-border hover:bg-admin-accent-soft grid size-11 shrink-0 place-items-center rounded-full border dark:border-neutral-700"
+                      >
+                        {/* Drawn, not "▶": some systems paint that as a colour emoji. */}
+                        <svg viewBox="0 0 24 24" aria-hidden className="size-5 fill-current">
+                          {hearing === item.audioId ? (
+                            <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+                          ) : (
+                            <path d="M8 5v14l11-7z" />
+                          )}
+                        </svg>
+                      </button>
+                    )}
                     {item.downloadUrl ? (
                       <Button
                         size="sm"

@@ -26,6 +26,8 @@ export interface PickOptions {
   mix?: boolean;
   /** Choose among what the guests took to most (docs/REELS.md §4). */
   byGuests?: boolean;
+  /** The photos the photographer picked by hand: only these, when there are any. */
+  only?: ReadonlySet<string>;
 }
 
 /** With guests deciding, the suggestion picks from this many times the
@@ -49,6 +51,26 @@ export function guestPool(candidates: readonly VideoCandidate[], size: number): 
   return candidates.filter((c) => kept.has(c.id));
 }
 
+/**
+ * The same photos in another order, the same for the same `seed`: the first
+ * and last stay — the suggestion chose them as the strong ends — the rest
+ * are shuffled.
+ */
+export function reordered(ids: readonly string[], seed: number): string[] {
+  if (ids.length < 4) return [...ids];
+  let state = (seed * 2654435761 + 1) >>> 0;
+  const random = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 2 ** 32;
+  };
+  const middle = ids.slice(1, -1);
+  for (let i = middle.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [middle[i], middle[j]] = [middle[j]!, middle[i]!];
+  }
+  return [ids[0]!, ...middle, ids.at(-1)!];
+}
+
 /** `count` split as evenly as the galleries allow — a small one gives its spare to the rest. */
 export function shareOut(sizes: readonly number[], count: number): number[] {
   const out = sizes.map(() => 0);
@@ -70,15 +92,25 @@ export function shareOut(sizes: readonly number[], count: number): number[] {
   return out;
 }
 
+/** A photo a reel may show: the photographer's own, not taken out, and — when
+ * photos were picked by hand — one of them. */
+function usableFor(
+  c: { id: string; own?: boolean },
+  exclude: ReadonlySet<string>,
+  only: ReadonlySet<string> | undefined,
+): boolean {
+  return Boolean(c.own) && !exclude.has(c.id) && (!only || only.size === 0 || only.has(c.id));
+}
+
 export function pickReelPhotos(
   sources: readonly ReelSource[],
   format: VideoFormat,
   count: number,
-  { avoid = new Set(), exclude = new Set(), mix = false, byGuests = false }: PickOptions = {},
+  { avoid = new Set(), exclude = new Set(), mix = false, byGuests = false, only }: PickOptions = {},
 ): string[] {
   const usable = sources.map((s) => ({
     ...s,
-    candidates: s.candidates.filter((c) => c.own && !exclude.has(c.id)),
+    candidates: s.candidates.filter((c) => usableFor(c, exclude, only)),
   }));
   const quotas = shareOut(
     usable.map((s) => s.candidates.length),
@@ -89,7 +121,11 @@ export function pickReelPhotos(
     if (quota === 0) return [];
     // Photos already shown count towards the pool: "Další varianty" still
     // has the guests' next favourites to reach for.
-    const pool = byGuests ? guestPool(s.candidates, quota * GUEST_POOL + avoid.size) : s.candidates;
+    // Photos picked by hand are all wanted: the guests do not narrow them.
+    const pool =
+      byGuests && !only?.size
+        ? guestPool(s.candidates, quota * GUEST_POOL + avoid.size)
+        : s.candidates;
     return suggestPhotos(pool, s.chapterStarts, format, quota, { avoid });
   });
   if (!mix) return lists.flat();
@@ -146,7 +182,10 @@ export function reelVariants({
   shown,
   round,
   startBeats,
+  songStart = null,
   byGuests = false,
+  mixGalleries = true,
+  only,
 }: {
   sources: readonly ReelSource[];
   format: VideoFormat;
@@ -158,10 +197,17 @@ export function reelVariants({
   round: number;
   /** A start the photographer moved a variant's music to, by key. */
   startBeats?: Readonly<Record<string, number>>;
+  /** The part of the song the photographer chose for every variant; null
+   * leaves each recipe its own loud stretch. */
+  songStart?: number | null;
   byGuests?: boolean;
+  /** Every variant takes the galleries in turn — their photos mixed — rather than one after another. */
+  mixGalleries?: boolean;
+  /** The photos picked by hand; empty or missing — the suggestion picks. */
+  only?: ReadonlySet<string>;
 }): ReelVariant[] {
   const available = sources.reduce(
-    (n, s) => n + s.candidates.filter((c) => c.own && !exclude.has(c.id)).length,
+    (n, s) => n + s.candidates.filter((c) => usableFor(c, exclude, only)).length,
     0,
   );
   const starts = sections(analysis, settings.seconds, RECIPES.length + round);
@@ -169,7 +215,11 @@ export function reelVariants({
   return RECIPES.map((recipe, i) => {
     const key = `${round}-${i}`;
     const startBeat =
-      startBeats?.[key] ?? starts[(recipe.section + round) % starts.length] ?? starts[0] ?? 0;
+      startBeats?.[key] ??
+      songStart ??
+      starts[(recipe.section + round) % starts.length] ??
+      starts[0] ??
+      0;
     const options = {
       startBeat,
       seconds: settings.seconds,
@@ -178,12 +228,22 @@ export function reelVariants({
     };
     // The slots first, then as many photos; a gallery with fewer gets a plan for what it has.
     let plan = planReel(analysis, { ...options, maxPhotos: available });
-    const photoIds = pickReelPhotos(sources, format, plan.timeline.slides.length, {
-      avoid: recipe.fresh || round > 0 ? avoid : undefined,
+    const slots = plan.timeline.slides.length;
+    // Photos picked by hand are the whole choice: a variant passes over the
+    // ones shown only where there are enough others — otherwise it shows the
+    // same photos in another order.
+    const handPicked = Boolean(only?.size);
+    const roomToAvoid = !handPicked || available >= 2 * slots;
+    let photoIds = pickReelPhotos(sources, format, slots, {
+      avoid: (recipe.fresh || round > 0) && roomToAvoid ? avoid : undefined,
       exclude,
-      mix: recipe.mix && sources.length > 1,
+      mix: (mixGalleries || recipe.mix) && sources.length > 1,
       byGuests,
+      only,
     });
+    if (handPicked && !roomToAvoid && (i > 0 || round > 0)) {
+      photoIds = reordered(photoIds, round * RECIPES.length + i);
+    }
     if (photoIds.length < plan.timeline.slides.length) {
       plan = planReel(analysis, { ...options, maxPhotos: photoIds.length });
     }

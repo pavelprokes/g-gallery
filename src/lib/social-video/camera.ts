@@ -151,7 +151,12 @@ function headAndShoulders(f: Face, W: number, H: number): Rect {
  * frame (or the left end of a pan). `seconds` is how long the camera moves —
  * the speed caps scale with it.
  */
-export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: number): Shot {
+export function planShot(
+  photo: PhotoForShot,
+  format: VideoFormat,
+  seconds: number,
+  { reel = false }: { reel?: boolean } = {},
+): Shot {
   const { width: W, height: H } = photo;
   const a = format.width / format.height;
   const coverW = Math.min(W, H * a);
@@ -160,6 +165,7 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   // MAX_UPSCALE (Instagram's own re-encode hides that), no more. The fetch
   // sizes the source so the cover frame is at least the output (sourceWidth).
   const minW = Math.max(coverW / maxZoom, Math.min(coverW, format.width / MAX_UPSCALE));
+  if (reel) return reelShot(photo, format, coverW);
   const subject = subjectOf(photo);
 
   if (!subject && photo.focus) {
@@ -218,6 +224,129 @@ export function planShot(photo: PhotoForShot, format: VideoFormat, seconds: numb
   }
   const whole = { x: 0, y: 0, w: W, h: H };
   return { kind: "fit", from: whole, to: whole };
+}
+
+/** A reel's photo is on screen for half a second to a second: closer in than a
+ * slideshow's, at most this far past the cover frame… */
+export const REEL_ZOOM = 1.8;
+/** …with this much air around the heads (head and shoulders already in). */
+const REEL_MARGIN = 1.25;
+/** The cut's own small push: a still frame on the beat reads as a freeze. */
+const REEL_PUSH = 1.04;
+
+/**
+ * A reel's shot (docs/REELS.md §5): close on the faces — or, without a face
+ * to frame, on the sharp part — as close as REEL_ZOOM and the photo's own
+ * pixels allow, eyes on the eye line, no head cut: a subject wider than the
+ * crop keeps the faces that fit whole (`facesInWindow`), never the photo
+ * shown small over its blur. Then the slightest push, in or out.
+ */
+function reelShot(photo: PhotoForShot, format: VideoFormat, coverW: number): Shot {
+  const { width: W, height: H } = photo;
+  const a = format.width / format.height;
+  // The source is fetched REEL_ZOOM times the cover's size where the photo has
+  // the pixels (`sourceWidth`); a frame no smaller than MAX_UPSCALE of them.
+  const fetched = Math.min(1, (REEL_ZOOM * format.width) / coverW);
+  const minW = Math.min(coverW, Math.max(coverW / REEL_ZOOM, format.width / MAX_UPSCALE / fetched));
+  // Where the frame may lie: the whole photo, or — when faces were left out —
+  // the band between them, so no frame reaches into a head it did not keep.
+  let band = { left: 0, right: W };
+  /** The tight frame, and the wide one a few per cent out — never the same. */
+  const shot = (w: number, place: (w: number) => Rect): Shot => {
+    const room = band.right - band.left;
+    const tightW = Math.min(room, Math.max(minW, w));
+    const wideW = Math.min(coverW, room, tightW * REEL_PUSH);
+    const tight = wideW / tightW < 1.02 ? wideW / REEL_PUSH : tightW;
+    const into = (r: Rect): Rect => ({
+      ...r,
+      x: clamp(r.x, band.left, band.right - r.w),
+    });
+    return { kind: "push", from: into(place(wideW)), to: into(place(tight)) };
+  };
+
+  let subject = subjectOf(photo);
+  if (subject && subject.box.w * REEL_MARGIN > coverW) {
+    const kept = facesInWindow(photo, coverW / REEL_MARGIN);
+    if (kept.length > 0) {
+      const narrowed = subjectOf({ ...photo, faces: kept })!;
+      band = clearOf(photo, kept, narrowed.box);
+      subject = narrowed;
+    }
+  }
+  if (subject) {
+    const { box } = subject;
+    const keep = subject;
+    const cx = box.x + box.w / 2;
+    return shot(Math.max(box.w, box.h * a) * REEL_MARGIN, (w) =>
+      atEyeLine(photo, a, w, cx, keep, format.eyeLine),
+    );
+  }
+  if (photo.focus) {
+    const f = photo.focus;
+    const cx = (f.x + f.w / 2) * W;
+    const cy = (f.y + f.h / 2) * H;
+    return shot(Math.max(f.w * W, f.h * H * a) * REEL_MARGIN, (w) => frame(photo, a, w, cx, cy));
+  }
+  // Nothing known to aim at: the cover frame, a third down the photo.
+  return shot(coverW / REEL_PUSH, (w) => frame(photo, a, w, W / 2, H * FACELESS_AIM));
+}
+
+/** The horizontal band around `box` that reaches into none of the framed heads left out. */
+function clearOf(photo: PhotoForShot, kept: readonly Face[], box: Rect) {
+  let left = 0;
+  let right = photo.width;
+  for (const f of framedFaces(photo.faces)) {
+    if (kept.includes(f)) continue;
+    const head = headAndShoulders(f, photo.width, photo.height);
+    if (head.x + head.w <= box.x) left = Math.max(left, head.x + head.w);
+    else if (head.x >= box.x + box.w) right = Math.min(right, head.x);
+  }
+  return { left, right };
+}
+
+/**
+ * The faces a full-height crop `width` wide can hold whole: of every place to
+ * put it — each framed head at either edge — the one keeping the most face
+ * (by area: the nearer, larger faces first), with any head it would cut
+ * through costing twice what it holds. Ties go to the window nearer the
+ * photo's centre. Which faces count was settled before (`aimFaces`).
+ */
+function facesInWindow(photo: PhotoForShot, width: number): Face[] {
+  const { width: W, height: H } = photo;
+  const faces = framedFaces(photo.faces);
+  const heads = faces.map((f) => headAndShoulders(f, W, H));
+  const weight = (f: Face) => f.w * f.h;
+  const places = new Set<number>([0, W - width]);
+  for (const head of heads) {
+    places.add(head.x);
+    places.add(head.x + head.w - width);
+  }
+  let best: Face[] = [];
+  let bestScore = -Infinity;
+  let bestOff = Infinity;
+  for (const raw of places) {
+    const x = clamp(raw, 0, W - width);
+    let score = 0;
+    const kept: Face[] = [];
+    heads.forEach((head, i) => {
+      const left = Math.max(head.x, x);
+      const right = Math.min(head.x + head.w, x + width);
+      if (right <= left) return;
+      if (left <= head.x + 0.5 && right >= head.x + head.w - 0.5) {
+        score += weight(faces[i]!);
+        kept.push(faces[i]!);
+      } else {
+        score -= 2 * weight(faces[i]!);
+      }
+    });
+    const off = Math.abs(x + width / 2 - W / 2);
+    if (score > bestScore + 1e-12 || (Math.abs(score - bestScore) <= 1e-12 && off < bestOff)) {
+      best = kept;
+      bestScore = score;
+      bestOff = off;
+    }
+  }
+  return best;
 }
 
 /** A frame of aspect `a` and width `w`, centred on (cx, cy), inside the photo. */
@@ -315,9 +444,13 @@ const SOURCE_STEP = 256;
  * The width to fetch a photo at so that its cover frame is at least the
  * output's size — never more than the photo itself.
  */
-export function sourceWidth(photo: { width: number; height: number }, format: VideoFormat): number {
+export function sourceWidth(
+  photo: { width: number; height: number },
+  format: VideoFormat,
+  zoom = 1,
+): number {
   const a = format.width / format.height;
   const coverW = Math.min(photo.width, photo.height * a);
-  const scale = Math.min(1, format.width / coverW);
+  const scale = Math.min(1, (zoom * format.width) / coverW);
   return Math.min(photo.width, Math.ceil((photo.width * scale) / SOURCE_STEP) * SOURCE_STEP);
 }

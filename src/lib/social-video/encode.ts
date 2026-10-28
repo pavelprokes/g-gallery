@@ -37,13 +37,13 @@ const AUDIO_BITRATE = 192_000;
 
 /** FFmpeg's AAC encoder opens with one frame of silence it does not signal:
  * Mediabunny writes no edit list for it, so every player starts the sound
- * this many samples late (measured: 21.3 ms at 48 kHz, docs/REELS.md §5). */
+ * this many samples late (measured: 21.3 ms at 48 kHz, docs/REELS.md §6). */
 const WASM_AAC_PRIMING = 1024;
 
 let aacRegistered: Promise<number> | null = null;
 
 /** AAC from the browser's own encoder where it has one, else Mediabunny's
- * WASM build of FFmpeg's, loaded only then (docs/REELS.md §5). Resolves to
+ * WASM build of FFmpeg's, loaded only then (docs/REELS.md §6). Resolves to
  * the samples of the sound to skip so it lands in time. */
 function ensureAac(channels: number, sampleRate: number): Promise<number> {
   aacRegistered ??= (async () => {

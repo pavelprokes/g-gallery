@@ -43,8 +43,9 @@ export function sourceUrl(
   objectKey: string,
   size: { width: number; height: number },
   format: VideoFormat,
+  zoom = 1,
 ) {
-  return imageLoader({ src: objectKey, width: sourceWidth(size, format), quality: QUALITY });
+  return imageLoader({ src: objectKey, width: sourceWidth(size, format, zoom), quality: QUALITY });
 }
 
 /** A photo's bytes at the size a 9:16 video fetches it — the default format,

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimelinePosition } from "@/lib/gallery-chapters";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { analyzeTrack, applyEnvelope, decodeTrack } from "@/lib/reels/audio";
-import { PACES, REEL_LENGTHS, shiftSection, type Pace, type ReelLength } from "@/lib/reels/cuts";
+import {
+  PACES,
+  REEL_LENGTHS,
+  sections,
+  shiftSection,
+  type Pace,
+  type ReelLength,
+} from "@/lib/reels/cuts";
 import {
   deleteTrack,
   isCurrent,
@@ -23,7 +30,7 @@ import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
-import { slidesToDecode } from "@/lib/social-video/timeline";
+import { slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
 import {
   reelFramePlan,
   reelSlides,
@@ -34,6 +41,8 @@ import {
 import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { ListenPanel } from "@/components/admin/reel-listen";
+import { SongSection } from "@/components/admin/reel-section";
+import { ReelPhotoPick } from "@/components/admin/reel-photo-pick";
 import { reelsHref } from "@/lib/reels/sources";
 import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
 import { Alert } from "@/components/ui/alert";
@@ -64,14 +73,46 @@ const PREVIEW_FORMAT: VideoFormat = {
 const MAX_TRACK_BYTES = 60 * 1024 * 1024;
 
 const PACE_LABEL: Record<Pace, string> = {
+  song: "Podle písničky",
   fast: "Rychle · cca ½ s",
   beat: "Co vteřina, to fotka",
   calm: "Klidněji · cca 2 s",
 };
 
 const LAST_TRACK_KEY = "g-gallery:reels:track";
+/** The photos clicked for a set of galleries, per browser (a convenience, not a record). */
+const PICKED_KEY = "g-gallery:reels:picked";
+
+function readPicked(key: string): string[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePicked(key: string, ids: string[]) {
+  try {
+    if (ids.length > 0) localStorage.setItem(key, JSON.stringify(ids));
+    else localStorage.removeItem(key);
+  } catch {
+    // A convenience only.
+  }
+}
+/** What `playing` holds while the song's part is heard rather than a variant. */
+const SECTION_KEY = "section";
 
 const clock = (seconds: number) => formatDuration(seconds * 1000);
+
+/** "0,6–1,7 s": the shortest and longest photo, the held last one aside. */
+function lengthRange(timeline: Timeline): string {
+  const lengths = timeline.slides.slice(0, -1).map((s) => s.end - s.start);
+  if (lengths.length === 0) return `${timeline.duration.toFixed(1)} s`;
+  const f = (v: number) => v.toLocaleString("cs", { maximumFractionDigits: 1 });
+  const [lo, hi] = [Math.min(...lengths), Math.max(...lengths)];
+  return lo.toFixed(1) === hi.toFixed(1) ? `${f(lo)} s` : `${f(lo)}–${f(hi)} s`;
+}
 
 function trackNote(track: MusicTrack): string {
   switch (kindOf(track)) {
@@ -113,7 +154,9 @@ interface Result {
 }
 
 const signatureOf = (v: ReelVariant, trackId: string | null, withSound: boolean) =>
-  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.slides
+    .map((slide) => slide.start)
+    .join()}|${v.plan.timeline.duration}`;
 
 export function ReelStudio({
   galleries,
@@ -158,10 +201,28 @@ export function ReelStudio({
     [galleries],
   );
   const title = galleries.length === 1 ? galleries[0]!.title : "svatby";
-  const ownPhotos = galleries.reduce(
-    (n, g) => n + g.photos.filter((p) => p.candidate.own).length,
-    0,
-  );
+  const allOwn = galleries.reduce((n, g) => n + g.photos.filter((p) => p.candidate.own).length, 0);
+
+  // ---- Which photos: the suggestion's, or the ones clicked in each gallery ----
+  const pickKey = `${PICKED_KEY}:${galleries
+    .map((g) => g.id)
+    .toSorted()
+    .join(",")}`;
+  const [manual, setManual] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [mixGalleries, setMixGalleries] = useState(true);
+  useEffect(() => {
+    // The photos clicked last time for these galleries, if this browser kept them.
+    const kept = readPicked(pickKey).filter((id) => photos.has(id));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restored once per set of galleries
+    setPicked(new Set(kept));
+    setManual(kept.length > 0);
+  }, [pickKey, photos]);
+  const changePicked = (next: Set<string>) => {
+    setPicked(next);
+    writePicked(pickKey, [...next]);
+  };
+  const only = manual && picked.size > 0 ? picked : undefined;
 
   // ---- Music: this browser's library ----
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
@@ -177,18 +238,25 @@ export function ReelStudio({
     void (async () => {
       try {
         const list = await listTracks();
-        // A track analysed by an older build gets its beat found again.
-        const current = await Promise.all(
-          list.map(async (t) => {
-            if (isCurrent(t)) return t;
-            const fresh = { ...t, analysis: analyzeTrack(await decodeTrack(t.blob)) };
-            await saveTrack(fresh).catch(() => {});
-            return fresh;
-          }),
-        );
+        const last = readLastTrack();
+        // A track analysed by an older build gets its beat found again — one
+        // at a time: a whole library decoded at once is gigabytes of samples.
+        // The song that will be chosen keeps its decode for the preview.
+        const current: MusicTrack[] = [];
+        for (const t of list) {
+          if (!live) return;
+          if (isCurrent(t)) {
+            current.push(t);
+            continue;
+          }
+          const audio = await decodeTrack(t.blob);
+          const fresh = { ...t, analysis: analyzeTrack(audio) };
+          if (t.id === (last ?? list[0]?.id)) decoded.current.set(t.id, Promise.resolve(audio));
+          await saveTrack(fresh).catch(() => {});
+          current.push(fresh);
+        }
         if (!live) return;
         setTracks(current);
-        const last = readLastTrack();
         setTrackId(current.find((t) => t.id === last)?.id ?? current[0]?.id ?? null);
       } catch {
         if (live) {
@@ -323,11 +391,18 @@ export function ReelStudio({
 
   // ---- Settings and variants ----
   const [seconds, setSeconds] = useState<ReelLength>(15);
-  const [pace, setPace] = useState<Pace>("beat");
+  const [pace, setPace] = useState<Pace>("song");
   const [exclude, setExclude] = useState<Set<string>>(() => new Set());
+  // The photos the variants can show: the ones picked by hand, or every own
+  // photo — less the ones taken out.
+  const ownPhotos = only
+    ? [...only].filter((id) => !exclude.has(id)).length
+    : allOwn - [...exclude].filter((id) => photos.get(id)?.studio.candidate.own).length;
   const [round, setRound] = useState(0);
   const [shown, setShown] = useState<Set<string>>(() => new Set());
   const [startBeats, setStartBeats] = useState<Record<string, number>>({});
+  // The part of the song every variant plays, once the photographer picks one.
+  const [songStart, setSongStart] = useState<number | null>(null);
   const [byGuests, setByGuests] = useState(true);
 
   const analysis = track?.analysis ?? null;
@@ -357,11 +432,39 @@ export function ReelStudio({
             shown,
             round,
             startBeats,
+            songStart,
             byGuests,
+            mixGalleries,
+            only,
           })
         : [],
-    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests],
+    [
+      analysis,
+      sources,
+      seconds,
+      pace,
+      exclude,
+      shown,
+      round,
+      startBeats,
+      songStart,
+      byGuests,
+      mixGalleries,
+      only,
+    ],
   );
+  const loudest = useMemo(
+    () => (analysis ? (sections(analysis, seconds, 1)[0] ?? 0) : 0),
+    [analysis, seconds],
+  );
+  const chooseSongStart = (beat: number | null) => {
+    setSongStart(beat);
+    setStartBeats({});
+  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a chosen part belongs to one song
+    setSongStart(null);
+  }, [trackId]);
 
   // A new song or length starts the music where the song is loudest again.
   useEffect(() => {
@@ -601,9 +704,14 @@ export function ReelStudio({
             ))}
           </div>
           <p className="text-admin-muted text-caption mt-3 dark:text-neutral-400">
-            Střih vždy padne na dobu: u rychlé písničky po dvou dobách, u pomalé po jedné. Video
-            začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající hudbou.
-            Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
+            {pace === "song"
+              ? "Střihy jdou s písničkou: v klidné části fotka chvíli vydrží, v refrénu se mění na každou dobu, nová část i výrazný úder dostanou vlastní střih."
+              : "Střih vždy padne na dobu, v pravidelném rytmu."}{" "}
+            Video začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající
+            hudbou.{" "}
+            {only
+              ? `Bere se jen ${pluralize(ownPhotos, FORMS.photo)}, které jsi vybral.`
+              : `Vybírá se z ${pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.`}
           </p>
           <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
             <input
@@ -661,10 +769,40 @@ export function ReelStudio({
         </Alert>
       )}
 
+      {analysis && (
+        <SongSection
+          analysis={analysis}
+          buffer={buffer}
+          seconds={seconds}
+          pace={pace}
+          chosen={songStart}
+          automatic={loudest}
+          onChoose={chooseSongStart}
+          playing={playing === SECTION_KEY}
+          onTogglePlay={() => setPlaying((p) => (p === SECTION_KEY ? null : SECTION_KEY))}
+          contextFor={contextFor}
+        />
+      )}
+
+      <ReelPhotoPick
+        galleries={galleries}
+        manual={manual}
+        onManual={setManual}
+        picked={picked}
+        onPicked={changePicked}
+        mixGalleries={mixGalleries}
+        onMixGalleries={setMixGalleries}
+        wanted={Math.round(seconds * 1.3)}
+      />
+
       {!analysis ? (
         <Alert tone="info">Vyber nebo přidej písničku — varianty se pak objeví tady.</Alert>
       ) : ownPhotos < 2 ? (
-        <Alert>Ve vybraných galeriích nejsou aspoň dvě tvoje fotky.</Alert>
+        <Alert>
+          {only
+            ? "Vyber aspoň dvě fotky — nebo nech vybírat samo."
+            : "Ve vybraných galeriích nejsou aspoň dvě tvoje fotky."}
+        </Alert>
       ) : (
         <section aria-label="Varianty">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -721,7 +859,7 @@ export function ReelStudio({
   );
 }
 
-/** Where music that may go into a business's Reels comes from (docs/REELS.md §6). */
+/** Where music that may go into a business's Reels comes from (docs/REELS.md §7). */
 function MusicSources() {
   return (
     <details className="text-caption mt-4">
@@ -805,7 +943,7 @@ function VariantCard({
   const { timeline } = plan;
   const slides = useMemo(() => reelSlides(variant, photos, PREVIEW_FORMAT), [variant, photos]);
   const shots = useMemo(
-    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline),
+    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline, { reel: true }),
     [slides, faces, timeline],
   );
   const store = useMemo(() => new SlideImages(), []);
@@ -908,9 +1046,12 @@ function VariantCard({
         </button>
       </div>
       <p className="text-caption mt-3 tabular-nums">
-        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s · střih{" "}
-        {perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`} ({Math.round(bpm)} BPM)
-        {variant.accents && " · zrychlení na konci frází"}
+        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s ·{" "}
+        {plan.adaptive
+          ? `střihy podle hudby, ${lengthRange(timeline)}`
+          : `střih ${perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`}`}{" "}
+        ({Math.round(bpm)} BPM)
+        {variant.accents && (plan.adaptive ? " · rychlejší" : " · zrychlení na konci frází")}
       </p>
       <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
         <span>
