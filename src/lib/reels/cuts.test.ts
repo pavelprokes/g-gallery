@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BeatAnalysis } from "@/lib/reels/beats";
-import { beatsPerCut, planReel, sections, shiftSection } from "@/lib/reels/cuts";
+import { barAt, beatsPerCut, loudness, planReel, sections, shiftSection } from "@/lib/reels/cuts";
 import { FPS, slidesAt } from "@/lib/social-video/timeline";
 
 /** A steady grid: `bpm` for `seconds`, bars from `downbeat`, loud where `loud` says. */
@@ -133,5 +133,30 @@ describe("shiftSection", () => {
     expect(shiftSection(song, 9, 4)).toBe(25);
     expect(shiftSection(song, 9, -10)).toBe(1);
     expect(shiftSection(song, 9, 1000)).toBe(song.beats.length - ((song.beats.length - 2) % 4) - 1);
+  });
+});
+
+describe("barAt", () => {
+  it("lands on the bar start nearest the time", () => {
+    // 120 BPM: a beat every 0.5 s, bars from beat 1 (0.5 s, 2.5 s, 4.5 s…).
+    const song = grid(120, 60, { downbeat: 1 });
+    expect(barAt(song, 2.4)).toBe(5);
+    expect(barAt(song, 3.6)).toBe(9);
+    expect(barAt(song, 0)).toBe(1);
+    expect(barAt(song, 999)).toBe(song.beats.length - ((song.beats.length - 2) % 4) - 1);
+  });
+});
+
+describe("loudness", () => {
+  it("is the song's shape, scaled to its loudest slice", () => {
+    const song = grid(120, 60, { loud: (t) => (t >= 30 ? 0.8 : 0.2) });
+    const shape = loudness(song, 6);
+    expect(shape).toHaveLength(6);
+    expect(shape.slice(3)).toEqual([1, 1, 1]);
+    expect(shape[0]).toBeCloseTo(0.25);
+  });
+
+  it("is flat zero for silence", () => {
+    expect(loudness(grid(120, 10, { loud: () => 0 }), 4)).toEqual([0, 0, 0, 0]);
   });
 });

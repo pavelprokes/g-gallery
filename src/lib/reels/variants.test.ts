@@ -116,6 +116,14 @@ describe("reelVariants", () => {
     expect(first!.plan.startBeat).toBe(64);
   });
 
+  it("starts every variant on the part of the song the photographer chose", () => {
+    const variants = reelVariants({ ...base, round: 0, songStart: 40 });
+    expect(variants.map((v) => v.plan.startBeat)).toEqual([40, 40, 40]);
+    // A variant moved on its own still keeps its move.
+    const moved = reelVariants({ ...base, round: 0, songStart: 40, startBeats: { "0-1": 64 } });
+    expect(moved.map((v) => v.plan.startBeat)).toEqual([40, 64, 40]);
+  });
+
   it("fits the cuts to a gallery too small for them", () => {
     const variants = reelVariants({ ...base, sources: [gallery("s", 6)], round: 0 });
     for (const v of variants) {

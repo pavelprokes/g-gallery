@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimelinePosition } from "@/lib/gallery-chapters";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { analyzeTrack, applyEnvelope, decodeTrack } from "@/lib/reels/audio";
-import { PACES, REEL_LENGTHS, shiftSection, type Pace, type ReelLength } from "@/lib/reels/cuts";
+import {
+  PACES,
+  REEL_LENGTHS,
+  sections,
+  shiftSection,
+  type Pace,
+  type ReelLength,
+} from "@/lib/reels/cuts";
 import {
   deleteTrack,
   isCurrent,
@@ -34,6 +41,7 @@ import {
 import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { ListenPanel } from "@/components/admin/reel-listen";
+import { SongSection } from "@/components/admin/reel-section";
 import { reelsHref } from "@/lib/reels/sources";
 import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
 import { Alert } from "@/components/ui/alert";
@@ -70,6 +78,8 @@ const PACE_LABEL: Record<Pace, string> = {
 };
 
 const LAST_TRACK_KEY = "g-gallery:reels:track";
+/** What `playing` holds while the song's part is heard rather than a variant. */
+const SECTION_KEY = "section";
 
 const clock = (seconds: number) => formatDuration(seconds * 1000);
 
@@ -328,6 +338,8 @@ export function ReelStudio({
   const [round, setRound] = useState(0);
   const [shown, setShown] = useState<Set<string>>(() => new Set());
   const [startBeats, setStartBeats] = useState<Record<string, number>>({});
+  // The part of the song every variant plays, once the photographer picks one.
+  const [songStart, setSongStart] = useState<number | null>(null);
   const [byGuests, setByGuests] = useState(true);
 
   const analysis = track?.analysis ?? null;
@@ -357,11 +369,24 @@ export function ReelStudio({
             shown,
             round,
             startBeats,
+            songStart,
             byGuests,
           })
         : [],
-    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests],
+    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, songStart, byGuests],
   );
+  const loudest = useMemo(
+    () => (analysis ? (sections(analysis, seconds, 1)[0] ?? 0) : 0),
+    [analysis, seconds],
+  );
+  const chooseSongStart = (beat: number | null) => {
+    setSongStart(beat);
+    setStartBeats({});
+  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a chosen part belongs to one song
+    setSongStart(null);
+  }, [trackId]);
 
   // A new song or length starts the music where the song is loudest again.
   useEffect(() => {
@@ -659,6 +684,21 @@ export function ReelStudio({
           Tenhle prohlížeč neumí video vytvořit (chybí WebCodecs). Otevři stránku v Chrome nebo v
           Safari 26+.
         </Alert>
+      )}
+
+      {analysis && (
+        <SongSection
+          analysis={analysis}
+          buffer={buffer}
+          seconds={seconds}
+          pace={pace}
+          chosen={songStart}
+          automatic={loudest}
+          onChoose={chooseSongStart}
+          playing={playing === SECTION_KEY}
+          onTogglePlay={() => setPlaying((p) => (p === SECTION_KEY ? null : SECTION_KEY))}
+          contextFor={contextFor}
+        />
       )}
 
       {!analysis ? (

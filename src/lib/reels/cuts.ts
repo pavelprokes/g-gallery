@@ -39,7 +39,7 @@ export function beatsPerCut(beat: number, pace: Pace): number {
 }
 
 /** Beat indices that start a bar. */
-function barStarts(analysis: BeatAnalysis): number[] {
+export function barStarts(analysis: BeatAnalysis): number[] {
   const out: number[] = [];
   for (let i = analysis.downbeat; i < analysis.beats.length; i += BEATS_PER_BAR) out.push(i);
   return out.length > 0 ? out : [0];
@@ -80,6 +80,30 @@ export function shiftSection(analysis: BeatAnalysis, startBeat: number, bars: nu
     starts.findIndex((i) => i >= startBeat),
   );
   return starts[Math.min(starts.length - 1, Math.max(0, at + bars))]!;
+}
+
+/** The bar start nearest `seconds` into the track — where a click on the song lands. */
+export function barAt(analysis: BeatAnalysis, seconds: number): number {
+  const at = (i: number) => analysis.beats[i] ?? 0;
+  return barStarts(analysis).reduce((best, i) =>
+    Math.abs(at(i) - seconds) < Math.abs(at(best) - seconds) ? i : best,
+  );
+}
+
+/**
+ * The song's loudness in `columns` slices of its length, 0–1 — the shape the
+ * section picker draws. A slice takes its loudest beat; one with no beat
+ * (the silence before the first) stays 0.
+ */
+export function loudness(analysis: BeatAnalysis, columns: number): number[] {
+  const out = Array.from({ length: columns }, () => 0);
+  if (analysis.duration <= 0) return out;
+  analysis.beats.forEach((t, i) => {
+    const column = Math.min(columns - 1, Math.floor((t / analysis.duration) * columns));
+    out[column] = Math.max(out[column]!, analysis.energy[i] ?? 0);
+  });
+  const peak = Math.max(...out);
+  return peak > 0 ? out.map((v) => v / peak) : out;
 }
 
 export interface ReelPlanOptions {

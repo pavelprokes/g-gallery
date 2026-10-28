@@ -146,6 +146,7 @@ export function reelVariants({
   shown,
   round,
   startBeats,
+  songStart = null,
   byGuests = false,
 }: {
   sources: readonly ReelSource[];
@@ -158,6 +159,9 @@ export function reelVariants({
   round: number;
   /** A start the photographer moved a variant's music to, by key. */
   startBeats?: Readonly<Record<string, number>>;
+  /** The part of the song the photographer chose for every variant; null
+   * leaves each recipe its own loud stretch. */
+  songStart?: number | null;
   byGuests?: boolean;
 }): ReelVariant[] {
   const available = sources.reduce(
@@ -169,7 +173,11 @@ export function reelVariants({
   return RECIPES.map((recipe, i) => {
     const key = `${round}-${i}`;
     const startBeat =
-      startBeats?.[key] ?? starts[(recipe.section + round) % starts.length] ?? starts[0] ?? 0;
+      startBeats?.[key] ??
+      songStart ??
+      starts[(recipe.section + round) % starts.length] ??
+      starts[0] ??
+      0;
     const options = {
       startBeat,
       seconds: settings.seconds,

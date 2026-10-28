@@ -81,6 +81,13 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 - **Start**: the first beat of a bar. `sections` ranks bar starts by the loudness of the next
   `seconds` and keeps those at least half a reel apart — a reel opens where the song is already
   going, not on its intro. Each variant can move its music by four bars ("◀ dřív / později ▶").
+- **"Část písničky"** (`reel-section.tsx`, added 2026-10-28 at Pavel's ask): the song's loudness
+  drawn across its length (`loudness`), the reel's stretch marked on it. A click or a drag puts the
+  start at the nearest bar start that leaves the reel room (`barAt`); the arrows move it a bar,
+  PageUp/PageDown four. The chosen part is every variant's start (`songStart` in `reelVariants`) —
+  a variant's own "dřív / později" still moves it from there; "Vybrat samo" goes back to the loudest
+  stretches. "Poslechnout tuhle část" plays exactly what a variant would, envelope included, with a
+  playhead on the strip. A new song starts from its loudest stretch again.
 - **End**: on the first beat of a bar — the one that, with the hold, comes nearest the length —
   where the last photo stays for about a bar (1.5–2.5 s) while the music fades out over it.
 - **Accents** (variant C): the last cut of every four-bar phrase is split in two — the fill.
