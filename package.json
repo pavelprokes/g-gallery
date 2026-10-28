@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "^0.8.13",
+    "@mediabunny/aac-encoder": "1.61.6",
     "@mediapipe/tasks-vision": "1.1.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",

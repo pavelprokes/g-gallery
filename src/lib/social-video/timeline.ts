@@ -104,7 +104,8 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
     visible.push({
       index,
       progress: span > 0 ? Math.min(1, (t - slide.start) / span) : 1,
-      alpha: index === 0 ? 1 : Math.min(1, (t - slide.start) / timeline.fade),
+      // A hard cut (a reel's, docs/REELS.md) has no fade to rise through.
+      alpha: index === 0 || timeline.fade <= 0 ? 1 : Math.min(1, (t - slide.start) / timeline.fade),
     });
   });
   // At the very end `t` equals the duration; keep the last frame drawn.

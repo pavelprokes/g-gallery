@@ -23,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Přehled", exact: true },
   { href: "/admin/updates", label: "Aktivita", exact: false },
   { href: "/admin/promo", label: "Reklama", exact: false },
+  { href: "/admin/reels", label: "Reels", exact: false },
 ];
 
 export function isNavActive(pathname: string, href: string, exact: boolean): boolean {

@@ -28,6 +28,9 @@ the key a download delivers, or the lightbox player. On a video row `objectKey` 
 the admin's `/admin/g/[id]/video`, or the
 self-hosted face detection (YuNet in `public/vendor/yunet/`, MediaPipe's blink model under
 `public/vendor/mediapipe/`).
+**`docs/REELS.md`** is the authority for the reels cut to music (`/admin/reels`, built 2026-10-28) —
+several galleries at once, cuts on the song's beat, the music kept in the photographer's browser and
+never uploaded; read it before touching `src/lib/reels/*` or the sound in `encodeVideo`.
 **`docs/ADMIN-FILTERS.md`** is the authority for the admin grid's filters and sort (adopted
 2026-10-19) — every choice lives in the URL; read it before touching `/admin/g/[id]`'s photo grid.
 **`docs/REPLACE-PHOTOS.md`** is the authority for replacing delivered photos with a corrected export

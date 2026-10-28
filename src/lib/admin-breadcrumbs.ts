@@ -23,6 +23,11 @@ export function rescanCrumbs(): Crumb[] {
   return [OVERVIEW, { label: "Přepočet fotek" }];
 }
 
+/** Přehled / Reels s hudbou */
+export function reelsCrumbs(): Crumb[] {
+  return [OVERVIEW, { label: "Reels s hudbou" }];
+}
+
 /** Přehled / {wedding} */
 export function eventCrumbs(event: EventRef): Crumb[] {
   return [OVERVIEW, { label: event.title }];
