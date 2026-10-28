@@ -22,6 +22,8 @@ import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
 import {
+  beatsInVideo,
+  drawBeatFlash,
   onScreen,
   reelFramePlan,
   reelSlides,
@@ -32,6 +34,9 @@ import {
 import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { ListenPanel } from "@/components/admin/reel-listen";
+import { reelsHref } from "@/lib/reels/sources";
+import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
+import { InstagramPublish } from "@/components/admin/reel-instagram-publish";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -98,12 +103,19 @@ interface Result {
   signature: string;
   url: string;
   file: File;
+  codec: EncodeCodec;
 }
 
-const signatureOf = (v: ReelVariant, trackId: string | null) =>
-  `${trackId}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+const signatureOf = (v: ReelVariant, trackId: string | null, flash: boolean) =>
+  `${trackId}|${flash}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
 
-export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
+export function ReelStudio({
+  galleries,
+  instagram,
+}: {
+  galleries: ReelGallery[];
+  instagram: InstagramState;
+}) {
   // ---- The photos, from every chosen gallery ----
   const photos = useMemo(() => {
     const map = new Map<string, ReelPhoto & { studio: StudioPhoto }>();
@@ -212,7 +224,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
     blob: Blob,
     name: string,
     kind: TrackKind,
-    origin?: string,
+    extra: { origin?: string; audioId?: string } = {},
   ): Promise<void> => {
     const audio = await decodeTrack(blob);
     const entry: MusicTrack = {
@@ -223,7 +235,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
       blob,
       analysis: analyzeTrack(audio),
       kind,
-      origin,
+      ...extra,
     };
     decoded.current.set(entry.id, Promise.resolve(audio));
     await saveTrack(entry).catch(() =>
@@ -254,11 +266,22 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
     setAdding(null);
   };
 
+  const addInstagram = async (blob: Blob, name: string, audioId: string) => {
+    setLibraryError(null);
+    setAdding(`Hledám rytmus: ${name}`);
+    try {
+      await addTrack(blob, name, "instagram", { audioId });
+    } catch {
+      setLibraryError(`${name}: zvuk z Instagramu se nepodařilo přečíst.`);
+    }
+    setAdding(null);
+  };
+
   const addHeard = async (blob: Blob, name: string, origin?: string) => {
     setLibraryError(null);
     setAdding("Hledám rytmus v poslechu…");
     try {
-      await addTrack(blob, name, "listened", origin);
+      await addTrack(blob, name, "listened", { origin });
     } catch {
       setLibraryError("Z poslechu se nepodařilo nic přečíst. Zkus to znovu a hlasitěji.");
     }
@@ -288,6 +311,11 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const [byGuests, setByGuests] = useState(true);
 
   const analysis = track?.analysis ?? null;
+  const trackKind = track ? kindOf(track) : null;
+  // Instagram's music plays from a point the API cannot set: from the start.
+  const fromTrackStart = trackKind === "instagram";
+  // The sync test: a white flash on every beat (docs/INSTAGRAM-PUBLISH.md §4, phase 2).
+  const [flashTest, setFlashTest] = useState(false);
   const variants = useMemo(
     () =>
       analysis
@@ -301,9 +329,10 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
             round,
             startBeats,
             byGuests,
+            fromTrackStart,
           })
         : [],
-    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests],
+    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests, fromTrackStart],
   );
 
   // A new song or length starts the music where the song is loudest again.
@@ -348,7 +377,8 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const silent = track !== null && kindOf(track) === "listened";
+  // Listened to, or Instagram's own: the file is made without sound.
+  const silent = trackKind === "listened" || trackKind === "instagram";
   const render = async (variant: ReelVariant) => {
     if (!buffer || !codec || renderState.kind === "busy") return;
     setPlaying(null);
@@ -365,13 +395,17 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
         track: silent ? null : buffer,
         codec,
         title,
+        flashes:
+          flashTest && analysis
+            ? beatsInVideo(analysis.beats, variant.plan.offset, variant.plan.timeline.duration)
+            : undefined,
         signal: controller.signal,
         onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
       });
-      const signature = signatureOf(variant, trackId);
+      const signature = signatureOf(variant, trackId, flashTest);
       setResults((prev) => [
         ...prev.filter((r) => r.signature !== signature),
-        { signature, url: URL.createObjectURL(file), file },
+        { signature, url: URL.createObjectURL(file), file, codec },
       ]);
       setRenderState({ kind: "idle" });
     } catch (cause) {
@@ -386,14 +420,14 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   };
   // A changed variant is a different video: its old file goes.
   useEffect(() => {
-    const live = new Set(variants.map((v) => signatureOf(v, trackId)));
+    const live = new Set(variants.map((v) => signatureOf(v, trackId, flashTest)));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- dropping files of variants that changed
     setResults((prev) => {
       const kept = prev.filter((r) => live.has(r.signature));
       for (const r of prev) if (!kept.includes(r)) URL.revokeObjectURL(r.url);
       return kept.length === prev.length ? prev : kept;
     });
-  }, [variants, trackId]);
+  }, [variants, trackId, flashTest]);
 
   return (
     <div className="space-y-6">
@@ -434,6 +468,8 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                             <span className="text-admin-muted text-caption dark:text-neutral-400">
                               {Math.round(t.analysis.bpm)} BPM · {clock(t.analysis.duration)}
                               {kindOf(t) === "listened" && " · poslech, video bude bez zvuku"}
+                              {kindOf(t) === "instagram" &&
+                                " · z Instagramu, připojí se při publikování"}
                             </span>
                           </span>
                         </label>
@@ -473,6 +509,12 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                 />
               </label>
               <ListenPanel disabled={adding !== null} onHeard={addHeard} />
+              <InstagramMusic
+                state={instagram}
+                returnTo={reelsHref(galleries.map((g) => g.id))}
+                disabled={adding !== null}
+                onPicked={addInstagram}
+              />
               {adding && (
                 <p className="text-caption mt-2" role="status">
                   {adding}
@@ -536,6 +578,21 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
               </span>
             </span>
           </label>
+          <label className="mt-1 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={flashTest}
+              onChange={(e) => setFlashTest(e.target.checked)}
+              className="accent-brand-primary mt-0.5 size-5 shrink-0"
+            />
+            <span>
+              Zkušební video: bliknout na každé době
+              <span className="text-admin-muted text-caption block dark:text-neutral-400">
+                Bílé bliknutí tam, kde podle nás padá doba. Na Instagramu pak hned uvidíš, jestli
+                hudba sedí. Jen pro test, ne pro skutečný reel.
+              </span>
+            </span>
+          </label>
           {exclude.size > 0 && (
             <Button
               size="sm"
@@ -596,8 +653,15 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                 onExclude={excludePhoto}
                 canRender={codec != null && buffer !== null}
                 silent={silent}
+                trackKind={trackKind}
+                beats={flashTest ? analysis.beats : null}
+                instagramUser={instagram.account?.username ?? null}
+                audioId={trackKind === "instagram" ? (track?.audioId ?? null) : null}
                 renderState={renderState}
-                result={results.find((r) => r.signature === signatureOf(variant, trackId)) ?? null}
+                result={
+                  results.find((r) => r.signature === signatureOf(variant, trackId, flashTest)) ??
+                  null
+                }
                 onRender={() => void render(variant)}
                 onCancel={() => abortRef.current?.abort()}
               />
@@ -657,6 +721,10 @@ function VariantCard({
   onExclude,
   canRender,
   silent,
+  trackKind,
+  beats,
+  instagramUser,
+  audioId,
   renderState,
   result,
   onRender,
@@ -673,8 +741,15 @@ function VariantCard({
   onShift(bars: number): void;
   onExclude(id: string): void;
   canRender: boolean;
-  /** The song was only listened to: the file is made without sound. */
+  /** The song was listened to or is Instagram's: the file is made without sound. */
   silent: boolean;
+  trackKind: TrackKind | null;
+  /** The track's beats, when the sync test flashes on them. */
+  beats: readonly number[] | null;
+  /** The connected account, when there is one. */
+  instagramUser: string | null;
+  /** Instagram's track to attach when publishing. */
+  audioId: string | null;
   renderState: RenderState;
   result: Result | null;
   onRender(): void;
@@ -689,6 +764,11 @@ function VariantCard({
   );
   const store = useMemo(() => new SlideImages(), []);
   useEffect(() => () => store.close(), [store]);
+
+  const flashes = useMemo(
+    () => (beats ? beatsInVideo(beats, plan.offset, timeline.duration) : null),
+    [beats, plan.offset, timeline.duration],
+  );
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -744,6 +824,7 @@ function VariantCard({
       const ready = wanted.every((p) => store.imageOf(p.id) !== null);
       if (playing || !drawnStill) {
         drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
+        if (flashes) drawBeatFlash(ctx, flashes, t, PREVIEW_FORMAT.width, PREVIEW_FORMAT.height);
         drawnStill = !playing && ready;
       }
       frame = requestAnimationFrame(tick);
@@ -753,7 +834,18 @@ function VariantCard({
       cancelAnimationFrame(frame);
       source?.stop();
     };
-  }, [playing, buffer, contextFor, timeline, plan.offset, plan.fadeOut, slides, shots, store]);
+  }, [
+    playing,
+    buffer,
+    contextFor,
+    timeline,
+    plan.offset,
+    plan.fadeOut,
+    slides,
+    shots,
+    store,
+    flashes,
+  ]);
 
   const busyHere = renderState.kind === "busy" && renderState.key === variant.key;
   const busyElsewhere = renderState.kind === "busy" && !busyHere;
@@ -791,27 +883,31 @@ function VariantCard({
         {perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`} ({Math.round(bpm)} BPM)
         {variant.accents && " · zrychlení na konci frází"}
       </p>
-      <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
-        <span>
-          {silent ? `Od ${plan.offset.toFixed(1)} s poslechu` : `Hudba od ${clock(plan.offset)}`}
-        </span>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => onShift(-4)}
-          aria-label="Hudba o čtyři takty dřív"
-        >
-          ← dřív
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => onShift(4)}
-          aria-label="Hudba o čtyři takty později"
-        >
-          později →
-        </Button>
-      </div>
+      {trackKind === "instagram" ? (
+        <p className="text-caption mt-2">Hudba od začátku skladby, jak ji pustí Instagram.</p>
+      ) : (
+        <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
+          <span>
+            {silent ? `Od ${plan.offset.toFixed(1)} s poslechu` : `Hudba od ${clock(plan.offset)}`}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onShift(-4)}
+            aria-label="Hudba o čtyři takty dřív"
+          >
+            ← dřív
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onShift(4)}
+            aria-label="Hudba o čtyři takty později"
+          >
+            později →
+          </Button>
+        </div>
+      )}
 
       <details className="mt-3">
         <summary className="text-caption cursor-pointer font-semibold">
@@ -900,11 +996,20 @@ function VariantCard({
             >
               Stáhnout MP4 ({(result.file.size / 1024 / 1024).toFixed(0)} MB)
             </a>
-            {silent && (
+            {trackKind === "listened" && (
               <p className="text-admin-muted text-caption dark:text-neutral-400">
                 Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň na místo,
                 odkud jsi ji pouštěl — první střih padne na první dobu taktu.
               </p>
+            )}
+            {instagramUser && (
+              <InstagramPublish
+                file={result.file}
+                username={instagramUser}
+                audioId={audioId}
+                silent={silent}
+                h264={result.codec === "avc"}
+              />
             )}
           </div>
         )}

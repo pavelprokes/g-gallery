@@ -10,6 +10,8 @@ import {
   toStudioPhotos,
 } from "@/lib/social-video/studio-photos";
 import { MAX_REEL_GALLERIES } from "@/lib/reels/sources";
+import { metaConfigured } from "@/lib/instagram/config";
+import { instagramStatus } from "@/lib/instagram/connection";
 import { ReelSourcePicker, type PickerGroup } from "@/components/admin/reel-source-picker";
 import { ReelStudio, type ReelGallery } from "@/components/admin/reel-studio";
 import { PageHeader } from "@/components/ui/page-header";
@@ -34,11 +36,19 @@ export default async function ReelsPage(props: PageProps<"/admin/reels">) {
   if (!session) redirect("/sign-in?next=/admin/reels");
   const ownerId = session.user.id;
 
-  const raw = (await props.searchParams).g;
+  const search = await props.searchParams;
+  const raw = search.g;
   const selected = galleryIds.parse(typeof raw === "string" ? raw : "");
+  // What the Instagram sign-in just did (src/app/api/instagram/callback).
+  const outcome =
+    z
+      .string()
+      .regex(/^[a-z-]{1,32}$/)
+      .catch("")
+      .parse(search.instagram) || null;
 
   const usable = { _count: { select: { photos: { where: STUDIO_PHOTO_WHERE } } } } as const;
-  const [events, standalone, chosen] = await Promise.all([
+  const [events, standalone, chosen, instagramAccount] = await Promise.all([
     prisma.event.findMany({
       where: { ownerId, trashedAt: null },
       orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
@@ -70,6 +80,7 @@ export default async function ReelsPage(props: PageProps<"/admin/reels">) {
             photos: { where: STUDIO_PHOTO_WHERE, select: STUDIO_PHOTO_SELECT },
           },
         }),
+    instagramStatus(ownerId),
   ]);
 
   const groups: PickerGroup[] = [
@@ -118,7 +129,12 @@ export default async function ReelsPage(props: PageProps<"/admin/reels">) {
         subtitle="Rychlé video na výšku z jedné nebo více svateb: co střih, to fotka, střihy na doby písničky. Několik variant vedle sebe."
       />
       <ReelSourcePicker groups={groups} selected={galleries.map((g) => g.id)} />
-      {galleries.length > 0 && <ReelStudio galleries={galleries} />}
+      {galleries.length > 0 && (
+        <ReelStudio
+          galleries={galleries}
+          instagram={{ configured: metaConfigured(), account: instagramAccount, outcome }}
+        />
+      )}
     </div>
   );
 }

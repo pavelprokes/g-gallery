@@ -23,9 +23,14 @@ export interface MusicTrack {
   kind?: TrackKind;
   /** Where a listened song played — a YouTube address, when it was one. */
   origin?: string;
+  /** For "instagram": the id Meta attaches the song to a Reel by
+   * (docs/INSTAGRAM-PUBLISH.md F8). */
+  audioId?: string;
 }
 
-export type TrackKind = "file" | "listened";
+/** "instagram": from Instagram's own catalogue — the video is made without
+ * sound and the song is attached when the reel is published. */
+export type TrackKind = "file" | "listened" | "instagram";
 
 export function kindOf(track: MusicTrack): TrackKind {
   return track.kind ?? "file";

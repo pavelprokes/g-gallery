@@ -147,6 +147,7 @@ export function reelVariants({
   round,
   startBeats,
   byGuests = false,
+  fromTrackStart = false,
 }: {
   sources: readonly ReelSource[];
   format: VideoFormat;
@@ -159,6 +160,8 @@ export function reelVariants({
   /** A start the photographer moved a variant's music to, by key. */
   startBeats?: Readonly<Record<string, number>>;
   byGuests?: boolean;
+  /** Instagram's own music: every variant starts with the track (see `fromTrackStart`). */
+  fromTrackStart?: boolean;
 }): ReelVariant[] {
   const available = sources.reduce(
     (n, s) => n + s.candidates.filter((c) => c.own && !exclude.has(c.id)).length,
@@ -168,13 +171,16 @@ export function reelVariants({
   const avoid = new Set(shown);
   return RECIPES.map((recipe, i) => {
     const key = `${round}-${i}`;
-    const startBeat =
-      startBeats?.[key] ?? starts[(recipe.section + round) % starts.length] ?? starts[0] ?? 0;
+    // From the track's start, the first bar is the only start there is.
+    const startBeat = fromTrackStart
+      ? (analysis.downbeat ?? 0)
+      : (startBeats?.[key] ?? starts[(recipe.section + round) % starts.length] ?? starts[0] ?? 0);
     const options = {
       startBeat,
       seconds: settings.seconds,
       pace: settings.pace,
       accents: recipe.accents,
+      fromTrackStart,
     };
     // The slots first, then as many photos; a gallery with fewer gets a plan for what it has.
     let plan = planReel(analysis, { ...options, maxPhotos: available });

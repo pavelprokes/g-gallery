@@ -77,6 +77,34 @@ export function reelFramePlan(
   };
 }
 
+/** How long the test flash stays on a beat — two frames at 30 fps. */
+const FLASH_SECONDS = 2 / 30;
+
+/**
+ * The beats of the reel's music in the video's own time — for the test that
+ * shows where Instagram starts its music (docs/INSTAGRAM-PUBLISH.md §2, U2).
+ */
+export function beatsInVideo(beats: readonly number[], offset: number, duration: number): number[] {
+  return beats.map((b) => b - offset).filter((t) => t >= 0 && t < duration);
+}
+
+/** A white flash over the frame on each beat, if `t` is on one. */
+export function drawBeatFlash(
+  ctx: CanvasRenderingContext2D,
+  flashes: readonly number[],
+  t: number,
+  width: number,
+  height: number,
+): void {
+  // From the frame nearest the beat — the same rounding the cuts use.
+  const lead = 1 / 60;
+  if (!flashes.some((b) => t >= b - lead && t < b - lead + FLASH_SECONDS)) return;
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalAlpha = 1;
+}
+
 export type RenderProgress =
   { step: "photos"; done: number; total: number } | { step: "render"; share: number };
 
@@ -88,6 +116,7 @@ export async function renderReel({
   track,
   codec,
   title,
+  flashes,
   onProgress,
   signal,
 }: {
@@ -99,6 +128,8 @@ export async function renderReel({
   track: AudioBuffer | null;
   codec: EncodeCodec;
   title: string;
+  /** Beats to flash on (`beatsInVideo`) — the sync test; none for a real reel. */
+  flashes?: readonly number[];
   onProgress(progress: RenderProgress): void;
   signal: AbortSignal;
 }): Promise<File> {
@@ -139,10 +170,11 @@ export async function renderReel({
           await store.keepOnly(wanted);
         }
         drawFrame(ctx, reelFramePlan(store, slides, shots, format, timeline), t);
+        if (flashes) drawBeatFlash(ctx, flashes, t, format.width, format.height);
       },
     });
     const seconds = Math.round(timeline.duration);
-    const name = `${slugify(title) || "reel"}-${slugify(variant.label)}-${seconds}s${track ? "" : "-bez-zvuku"}.mp4`;
+    const name = `${slugify(title) || "reel"}-${slugify(variant.label)}-${seconds}s${flashes ? "-test-dob" : ""}${track ? "" : "-bez-zvuku"}.mp4`;
     return new File([blob], name, { type: "video/mp4" });
   } finally {
     store.close();

@@ -1,13 +1,14 @@
 # Publishing reels to Instagram with Instagram's own music — plan
 
-**Status: proposed 2026-10-28, nothing built.** Pavel asked for reels (docs/REELS.md) to carry
-Instagram's licensed music, cut on its beat. This is the plan: what is known and from where (§1),
-what only a test on his account can answer (§2), the design (§3), the phases (§4), what Pavel has to
-do and where (§5), risks (§6). Every Meta fact below was checked against at least two independent
-sources where two existed; the confidence column says so. Meta's own developer pages could not be
-opened from the build session (developers.facebook.com is outside its network) — they were read
-through search results and through code that others wrote against them. **Before phase 1 starts,
-each row marked "single" or "unverified" is re-read on Meta's page itself.**
+**Status: phases 1–2 built 2026-10-28 (§7); phase 3 waits on the sync test with Pavel's account.**
+Pavel asked for reels (docs/REELS.md) to carry Instagram's licensed music, cut on its beat. This is
+the plan and the record of what was built: what is known and from where (§1), what only a test on
+his account can answer (§2), the design (§3), the phases (§4), what Pavel has to do and where (§5),
+risks (§6), what was built and how it was tested (§7). Every Meta fact below was checked against at
+least two independent sources where two existed; the confidence column says so. Meta's own
+developer pages could not be opened from the build session (developers.facebook.com is outside its
+network) — they were read through search results and through code that others wrote against them.
+**Each row marked "single" or "unverified" is still to be re-read on Meta's page itself.**
 
 ## 1. What is known
 
@@ -154,6 +155,52 @@ Never through Vercel (CLAUDE.md invariant 1 in spirit; also Vercel's 4.5 MB body
 - **Graph versions** retire after about two years — one constant, Meta's changelog.
 - **Publishing is public and immediate** — a confirmation step with the caption and the account's
   name before the call; deletion (F9) only if verified in phase 0.
+
+## 7. Built (2026-10-28)
+
+What exists, and where it departs from §3:
+
+- **Connection** — `/api/instagram/connect` and `/callback` (§3.1), `src/lib/instagram/config.ts`
+  (Graph v26.0, scopes, the dialog URL — `META_LOGIN_CONFIG_ID` switches to a Facebook Login for
+  Business configuration), `oauth-state.ts` (`state` cookie compared in constant time, a return
+  address limited to `/admin/reels?g=…`), `connection.ts`. **The token is probed, not assumed**
+  (Meta's pages disagree, F3): the Page token is tried on the account's own profile first, then the
+  long-lived user token; `InstagramConnection.tokenKind` records which one Instagram accepted. Both
+  tokens are stored only through `encryptToken`; no key, no connection (`no-cipher`).
+- **Graph client** — `src/lib/instagram/graph.ts`: every call carries `appsecret_proof`; every
+  response is Zod-parsed (an unknown `status_code` is an error, not a guess); Meta's error `code`
+  is kept, 190 becomes "connect again".
+- **Music** — "Hudba z Instagramu" in the reels page (`reel-instagram-music.tsx`): trending or a
+  search, music or original sounds. "Použít" fetches `download_url` **in the browser** (§3.4 option
+  1). The Worker fallback (option 2) is not built: whether the browser may fetch it (U3) is the
+  spike's first answer. A track from Instagram is `kind: "instagram"` with its `audioId`; its
+  variants start at the track's 0 s (`fromTrackStart` in `planReel`, U2 assumed until tested) and
+  cannot be shifted; the file is rendered without sound.
+- **The sync test** (phase 2) is not throwaway code but a switch: "Zkušební video: bliknout na každé
+  době" draws a white flash on each beat, in the preview and in the file (`drawBeatFlash`). Published
+  with the Instagram track, the flashes either land on the beats in the app or show by how much
+  they miss.
+- **Publishing** — `reel-instagram-publish.tsx` + `src/app/admin/instagram-actions.ts`: a
+  confirmation step, a presigned PUT to `reels/<uuid>.mp4` (the server mints the name), the
+  object checked to exist and be ≤ 300 MB, the container created with the bucket's public address
+  (`videoSrc`) and `audio_configuration` (`video_volume` 0), the status polled every 10 s for at
+  most 5 minutes, published, the permalink shown. H.264 only — a VP9 render says why it cannot go.
+  A reel with its own music (a file) is published without `audio_configuration`.
+- **`/smazani-dat`** — the data-deletion instructions Meta's Live mode needs (§3.7), cs and en.
+- **Env** — `META_APP_ID`, `META_APP_SECRET`, optional `META_LOGIN_CONFIG_ID`,
+  `META_GRAPH_VERSION`; `META_GRAPH_BASE_URL` / `META_DIALOG_BASE_URL` only for tests
+  (docs/VERCEL-ENV.md).
+
+**Tested:** unit tests for the dialog URL, `state` and the return address (open redirects
+refused), the Graph client against Meta's response shapes (fields, the `audio`/`data` envelope,
+error 190, an unknown status refused, `audio_configuration` as JSON), and the publishing actions
+(server-minted names only, a missing or 301 MB upload refused, numeric container ids only,
+"connect again"). In the browser, against a local mock of Meta's dialog and Graph API: a forged
+`state` refused before any call to Meta; connect → back on the same galleries → the account
+shown; trending → a track taken, its beat found (126 BPM); the sync test rendered without sound;
+disconnect. The database held both tokens encrypted (`v1.…`), the Page token chosen by the probe.
+**Not tested — needs Pavel's account:** U1–U5, the real dialog and permissions, publishing (the
+build session's Chromium has no H.264).
 
 ## Sources
 

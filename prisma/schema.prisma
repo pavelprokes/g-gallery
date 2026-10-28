@@ -41,6 +41,7 @@ model User {
   pushSubscriptions PushSubscription[]
   promoCards        PromoCard[]
   mcpGrants         McpGrant[]
+  instagram         InstagramConnection?
 
   @@map("user")
   @@schema("g_gallery")
@@ -928,5 +929,33 @@ model McpGrant {
   createdAt           DateTime  @default(now())
 
   @@index([userId])
+  @@schema("g_gallery")
+}
+
+/// The photographer's Instagram account, connected through Facebook Login so
+/// reels can be published with Instagram's own music (docs/INSTAGRAM-PUBLISH.md
+/// §3.1). One per owner; disconnecting deletes the row. Tokens are stored only
+/// AES-256-GCM encrypted (src/lib/token-cipher.ts) — never in the clear.
+model InstagramConnection {
+  id                 String    @id @default(cuid())
+  ownerId            String    @unique
+  owner              User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// The professional account's id — the `{ig-user-id}` of every call.
+  igUserId           String
+  igUsername         String
+  /// The Facebook Page the account is linked to.
+  pageId             String
+  pageName           String
+  /// The long-lived user token (about 60 days, `userTokenExpiresAt`).
+  userTokenCipher    String
+  userTokenExpiresAt DateTime?
+  /// The Page token derived from it — no expiry of its own.
+  pageTokenCipher    String?
+  /// Which of the two the Instagram calls accepted when connecting: "page" or
+  /// "user". Probed, not assumed — Meta's pages disagree on it.
+  tokenKind          String
+  connectedAt        DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
   @@schema("g_gallery")
 }
