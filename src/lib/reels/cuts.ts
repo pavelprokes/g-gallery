@@ -115,10 +115,11 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   // nearest the length asked for.
   const ends: number[] = [];
   for (let e = s + BEATS_PER_BAR; e < beats.length; e += BEATS_PER_BAR) ends.push(e);
+  const zero = beats[s] ?? 0;
   let end = ends.reduce(
     (best, e) =>
-      Math.abs(beats[e]! - beats[s]! + hold - options.seconds) <
-      Math.abs(beats[best]! - beats[s]! + hold - options.seconds)
+      Math.abs(beats[e]! - zero + hold - options.seconds) <
+      Math.abs(beats[best]! - zero + hold - options.seconds)
         ? e
         : best,
     ends[0] ?? s,
@@ -138,15 +139,14 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   }
   cuts = cuts.slice(0, maxPhotos);
 
-  const origin = beats[s] ?? 0;
-  const starts = cuts.map((i) => frameSnap((beats[i] ?? origin) - origin));
+  const starts = cuts.map((i) => frameSnap((beats[i] ?? zero) - zero));
   const duration = frameSnap(starts.at(-1)! + hold);
   const slides = starts.map((start, i) => {
     const slideEnd = starts[i + 1] ?? duration;
     return { start, end: slideEnd, moveEnd: slideEnd };
   });
   return {
-    offset: origin,
+    offset: zero,
     startBeat: s,
     endBeat: end,
     beatsPerCut: perCut,

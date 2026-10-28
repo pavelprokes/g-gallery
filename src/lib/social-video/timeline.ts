@@ -115,6 +115,16 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
   return visible;
 }
 
+/** The slides on screen at `t` and the one after — what must be decoded
+ * (src/lib/social-video/slide-images.ts keeps only those in memory). */
+export function slidesToDecode<T>(timeline: Timeline, slides: readonly T[], t: number): T[] {
+  const visible = slidesAt(timeline, t).map((v) => v.index);
+  const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
+  return [...new Set([...visible, next])]
+    .filter((i) => i >= 0 && i < slides.length)
+    .map((i) => slides[i]!);
+}
+
 /** How long each slide's camera moves — what `planShot` caps speeds by. */
 export function moveSeconds(timeline: Timeline): number[] {
   return timeline.slides.map((s) => s.moveEnd - s.start);

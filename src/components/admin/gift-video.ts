@@ -11,7 +11,12 @@ import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
 import { suggestPhotos, type VideoCandidate } from "@/lib/social-video/suggest";
-import { buildTimeline, photoCountFor, slidesAt, type Length } from "@/lib/social-video/timeline";
+import {
+  buildTimeline,
+  photoCountFor,
+  slidesToDecode,
+  type Length,
+} from "@/lib/social-video/timeline";
 import { sourceUrl } from "@/components/admin/face-scan";
 
 export interface GiftPhoto {
@@ -118,11 +123,7 @@ export async function makeGiftVideo({
       signal,
       onProgress: (share) => onProgress({ step: "render", share }),
       drawAt: async (ctx, t) => {
-        const visible = slidesAt(timeline, t).map((v) => v.index);
-        const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
-        const wanted = [...new Set([...visible, next])]
-          .filter((i) => i >= 0 && i < slides.length)
-          .map((i) => slides[i]!);
+        const wanted = slidesToDecode(timeline, slides, t);
         const key = wanted.map((p) => p.id).join();
         if (key !== windowKey) {
           windowKey = key;

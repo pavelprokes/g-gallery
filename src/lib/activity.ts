@@ -106,15 +106,24 @@ export async function galleryCounts(galleryId: string): Promise<ViewerCounts> {
  * Per-photo views and unique viewers, in one grouped query per metric rather
  * than N queries per photo.
  */
-export async function photoCounts(galleryId: string): Promise<Map<string, ViewerCounts>> {
+export async function photoCounts(
+  galleryId: string | readonly string[],
+): Promise<Map<string, ViewerCounts>> {
+  // Several galleries at once for the reels page: photo ids are unique across
+  // galleries, so one map holds them all.
+  const where = {
+    galleryId: typeof galleryId === "string" ? galleryId : { in: [...galleryId] },
+    type: "PHOTO_VIEW" as const,
+    photoId: { not: null },
+  };
   const [views, uniques] = await Promise.all([
     prisma.activityEvent.groupBy({
       by: ["photoId"],
-      where: { galleryId, type: "PHOTO_VIEW", photoId: { not: null } },
+      where,
       _count: { _all: true },
     }),
     prisma.activityEvent.findMany({
-      where: { galleryId, type: "PHOTO_VIEW", photoId: { not: null } },
+      where,
       distinct: ["photoId", "viewerId"],
       select: { photoId: true },
     }),

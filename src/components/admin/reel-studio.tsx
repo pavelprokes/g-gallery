@@ -17,12 +17,14 @@ import {
 import { reelVariants, type ReelSource, type ReelVariant } from "@/lib/reels/variants";
 import { FORMATS, type VideoFormat } from "@/lib/social-video/camera";
 import { chooseCodec, type EncodeCodec } from "@/lib/social-video/encode";
+import { formatDuration } from "@/lib/video";
+import { startHint } from "@/lib/reels/start-hint";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
+import { slidesToDecode } from "@/lib/social-video/timeline";
 import {
-  onScreen,
   reelFramePlan,
   reelSlides,
   renderReel,
@@ -32,6 +34,8 @@ import {
 import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { ListenPanel } from "@/components/admin/reel-listen";
+import { reelsHref } from "@/lib/reels/sources";
+import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -67,9 +71,17 @@ const PACE_LABEL: Record<Pace, string> = {
 
 const LAST_TRACK_KEY = "g-gallery:reels:track";
 
-function clock(seconds: number) {
-  const s = Math.max(0, Math.round(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const clock = (seconds: number) => formatDuration(seconds * 1000);
+
+function trackNote(track: MusicTrack): string {
+  switch (kindOf(track)) {
+    case "listened":
+      return track.listenSource === "mic" ? " · poslech mikrofonem" : " · poslech karty";
+    case "instagram":
+      return " · z Instagramu";
+    default:
+      return "";
+  }
 }
 
 function readLastTrack(): string | null {
@@ -100,10 +112,16 @@ interface Result {
   file: File;
 }
 
-const signatureOf = (v: ReelVariant, trackId: string | null) =>
-  `${trackId}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+const signatureOf = (v: ReelVariant, trackId: string | null, withSound: boolean) =>
+  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
 
-export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
+export function ReelStudio({
+  galleries,
+  instagram,
+}: {
+  galleries: ReelGallery[];
+  instagram: InstagramState;
+}) {
   // ---- The photos, from every chosen gallery ----
   const photos = useMemo(() => {
     const map = new Map<string, ReelPhoto & { studio: StudioPhoto }>();
@@ -188,23 +206,26 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   }, []);
 
   const track = tracks.find((t) => t.id === trackId) ?? null;
+  // Keyed on the song, not on its row: editing its note makes a new object
+  // for the same song, which must neither re-decode it nor reset its choices.
+  const trackBlob = track?.blob ?? null;
   useEffect(() => {
     // Silence until the new song is decoded, rather than the old one under new cuts.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the sound follows the track
     setBuffer(null);
-    if (!track) return;
+    if (!trackId || !trackBlob) return;
     let live = true;
-    let pending = decoded.current.get(track.id);
+    let pending = decoded.current.get(trackId);
     if (!pending) {
-      pending = decodeTrack(track.blob);
-      pending.catch(() => decoded.current.delete(track.id));
-      decoded.current.set(track.id, pending);
+      pending = decodeTrack(trackBlob);
+      pending.catch(() => decoded.current.delete(trackId));
+      decoded.current.set(trackId, pending);
     }
     pending.then((b) => live && setBuffer(b)).catch(() => live && setBuffer(null));
     return () => {
       live = false;
     };
-  }, [track]);
+  }, [trackId, trackBlob]);
 
   /** Decoded, its beat found, kept in this browser and chosen. Throws when
    * the browser cannot decode it. */
@@ -212,7 +233,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
     blob: Blob,
     name: string,
     kind: TrackKind,
-    origin?: string,
+    extra: Pick<MusicTrack, "origin" | "audioId" | "listenSource" | "startAt" | "durationMs"> = {},
   ): Promise<void> => {
     const audio = await decodeTrack(blob);
     const entry: MusicTrack = {
@@ -223,7 +244,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
       blob,
       analysis: analyzeTrack(audio),
       kind,
-      origin,
+      ...extra,
     };
     decoded.current.set(entry.id, Promise.resolve(audio));
     await saveTrack(entry).catch(() =>
@@ -254,11 +275,32 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
     setAdding(null);
   };
 
-  const addHeard = async (blob: Blob, name: string, origin?: string) => {
+  const addInstagram = async (
+    blob: Blob,
+    name: string,
+    audioId: string,
+    durationMs: number | null,
+  ) => {
+    setLibraryError(null);
+    setAdding(`Hledám rytmus: ${name}`);
+    try {
+      await addTrack(blob, name, "instagram", { audioId, durationMs: durationMs ?? undefined });
+    } catch {
+      setLibraryError(`${name}: zvuk z Instagramu se nepodařilo přečíst.`);
+    }
+    setAdding(null);
+  };
+
+  const addHeard = async (
+    blob: Blob,
+    name: string,
+    listenSource: "mic" | "tab",
+    details: Pick<MusicTrack, "origin" | "startAt">,
+  ) => {
     setLibraryError(null);
     setAdding("Hledám rytmus v poslechu…");
     try {
-      await addTrack(blob, name, "listened", origin);
+      await addTrack(blob, name, "listened", { ...details, listenSource });
     } catch {
       setLibraryError("Z poslechu se nepodařilo nic přečíst. Zkus to znovu a hlasitěji.");
     }
@@ -273,9 +315,10 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   };
 
   const updateSource = (id: string, source: string) => {
-    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, source } : t)));
     const entry = tracks.find((t) => t.id === id);
-    if (entry && entry.source !== source) void saveTrack({ ...entry, source }).catch(() => {});
+    if (!entry || entry.source === source) return;
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, source } : t)));
+    void saveTrack({ ...entry, source }).catch(() => {});
   };
 
   // ---- Settings and variants ----
@@ -288,6 +331,20 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const [byGuests, setByGuests] = useState(true);
 
   const analysis = track?.analysis ?? null;
+  const trackKind = track ? kindOf(track) : null;
+  // Plain values read off the song, so nothing below hands the song itself to
+  // a function (the React Compiler then keeps the memos).
+  const defaultSound = !(trackKind === "listened" && track?.listenSource === "mic");
+  const trackStartAt = track?.startAt;
+  const trackDurationMs = track?.durationMs;
+  const decodedMs = (track?.analysis.duration ?? 0) * 1000;
+  // The file with the song's sound, or silent for the song to be added in
+  // Instagram (Pavel, 2026-10-28). A microphone's room recording starts silent.
+  const [withSound, setWithSound] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- each song starts from its own default
+    setWithSound(defaultSound);
+  }, [trackId, defaultSound]);
   const variants = useMemo(
     () =>
       analysis
@@ -347,8 +404,19 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const [results, setResults] = useState<Result[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
+  // The variants on screen, for a render that ends after its variant changed:
+  // its file belongs to nothing and is released at once.
+  const liveSignatures = useRef(new Set<string>());
+  // Every file still held, released when the page goes.
+  const heldUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const held = heldUrls.current;
+    return () => {
+      for (const url of held) URL.revokeObjectURL(url);
+    };
+  }, []);
 
-  const silent = track !== null && kindOf(track) === "listened";
+  const silent = !withSound;
   const render = async (variant: ReelVariant) => {
     if (!buffer || !codec || renderState.kind === "busy") return;
     setPlaying(null);
@@ -361,19 +429,25 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
         photos,
         faces,
         format: FORMAT,
-        // A song only listened to stays out of the file: it is added in Instagram.
-        track: silent ? null : buffer,
+        track: withSound ? buffer : null,
         codec,
         title,
         signal: controller.signal,
         onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
       });
-      const signature = signatureOf(variant, trackId);
-      setResults((prev) => [
-        ...prev.filter((r) => r.signature !== signature),
-        { signature, url: URL.createObjectURL(file), file },
-      ]);
+      const signature = signatureOf(variant, trackId, withSound);
       setRenderState({ kind: "idle" });
+      if (!liveSignatures.current.has(signature)) return;
+      const url = URL.createObjectURL(file);
+      heldUrls.current.add(url);
+      setResults((prev) => {
+        for (const r of prev) {
+          if (r.signature !== signature) continue;
+          URL.revokeObjectURL(r.url);
+          heldUrls.current.delete(r.url);
+        }
+        return [...prev.filter((r) => r.signature !== signature), { signature, url, file }];
+      });
     } catch (cause) {
       if (controller.signal.aborted) setRenderState({ kind: "idle" });
       else {
@@ -386,14 +460,18 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   };
   // A changed variant is a different video: its old file goes.
   useEffect(() => {
-    const live = new Set(variants.map((v) => signatureOf(v, trackId)));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- dropping files of variants that changed
+    const live = new Set(variants.map((v) => signatureOf(v, trackId, withSound)));
     setResults((prev) => {
       const kept = prev.filter((r) => live.has(r.signature));
-      for (const r of prev) if (!kept.includes(r)) URL.revokeObjectURL(r.url);
+      for (const r of prev) {
+        if (kept.includes(r)) continue;
+        URL.revokeObjectURL(r.url);
+        heldUrls.current.delete(r.url);
+      }
       return kept.length === prev.length ? prev : kept;
     });
-  }, [variants, trackId]);
+    liveSignatures.current = live;
+  }, [variants, trackId, withSound]);
 
   return (
     <div className="space-y-6">
@@ -433,7 +511,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                             <span className="block truncate font-semibold">{t.name}</span>
                             <span className="text-admin-muted text-caption dark:text-neutral-400">
                               {Math.round(t.analysis.bpm)} BPM · {clock(t.analysis.duration)}
-                              {kindOf(t) === "listened" && " · poslech, video bude bez zvuku"}
+                              {trackNote(t)}
                             </span>
                           </span>
                         </label>
@@ -473,6 +551,12 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                 />
               </label>
               <ListenPanel disabled={adding !== null} onHeard={addHeard} />
+              <InstagramMusic
+                state={instagram}
+                returnTo={reelsHref(galleries.map((g) => g.id))}
+                disabled={adding !== null}
+                onPicked={addInstagram}
+              />
               {adding && (
                 <p className="text-caption mt-2" role="status">
                   {adding}
@@ -536,6 +620,27 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
               </span>
             </span>
           </label>
+          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Zvuk ve videu">
+            {(
+              [
+                [true, "Se zvukem"],
+                [false, "Bez zvuku"],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={label}
+                role="radio"
+                aria-checked={withSound === value}
+                variant={withSound === value ? "primary" : "secondary"}
+                onClick={() => setWithSound(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-admin-muted text-caption mt-2 dark:text-neutral-400">
+            Bez zvuku přidáš písničku až v Instagramu — z jeho knihovny, licencovanou.
+          </p>
           {exclude.size > 0 && (
             <Button
               size="sm"
@@ -596,8 +701,15 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                 onExclude={excludePhoto}
                 canRender={codec != null && buffer !== null}
                 silent={silent}
+                trackKind={trackKind}
+                hintStartAt={trackStartAt}
+                hintDurationMs={trackDurationMs}
+                hintDecodedMs={decodedMs}
                 renderState={renderState}
-                result={results.find((r) => r.signature === signatureOf(variant, trackId)) ?? null}
+                result={
+                  results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
+                  null
+                }
                 onRender={() => void render(variant)}
                 onCancel={() => abortRef.current?.abort()}
               />
@@ -657,6 +769,10 @@ function VariantCard({
   onExclude,
   canRender,
   silent,
+  trackKind,
+  hintStartAt,
+  hintDurationMs,
+  hintDecodedMs,
   renderState,
   result,
   onRender,
@@ -673,8 +789,13 @@ function VariantCard({
   onShift(bars: number): void;
   onExclude(id: string): void;
   canRender: boolean;
-  /** The song was only listened to: the file is made without sound. */
+  /** The file is made without sound. */
   silent: boolean;
+  trackKind: TrackKind | null;
+  /** What `startHint` needs to say where to slide the song in Instagram. */
+  hintStartAt: number | undefined;
+  hintDurationMs: number | undefined;
+  hintDecodedMs: number;
   renderState: RenderState;
   result: Result | null;
   onRender(): void;
@@ -732,7 +853,7 @@ function VariantCard({
           t = 0;
         }
       }
-      const wanted = onScreen(timeline, slides, t);
+      const wanted = slidesToDecode(timeline, slides, t);
       const key = wanted.map((p) => p.id).join();
       if (key !== windowKey) {
         windowKey = key;
@@ -793,7 +914,9 @@ function VariantCard({
       </p>
       <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
         <span>
-          {silent ? `Od ${plan.offset.toFixed(1)} s poslechu` : `Hudba od ${clock(plan.offset)}`}
+          {trackKind === "listened"
+            ? `Od ${plan.offset.toFixed(1)} s poslechu`
+            : `Hudba od ${clock(plan.offset)}`}
         </span>
         <Button
           size="sm"
@@ -876,7 +999,7 @@ function VariantCard({
               ? "Vytvořit znovu"
               : silent
                 ? "Vytvořit video bez zvuku"
-                : "Vytvořit video s hudbou"}
+                : "Vytvořit video se zvukem"}
           </Button>
         )}
         {renderState.kind === "error" && renderState.key === variant.key && (
@@ -902,8 +1025,17 @@ function VariantCard({
             </a>
             {silent && (
               <p className="text-admin-muted text-caption dark:text-neutral-400">
-                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň na místo,
-                odkud jsi ji pouštěl — první střih padne na první dobu taktu.
+                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň{" "}
+                {startHint(
+                  {
+                    kind: trackKind ?? "file",
+                    startAt: hintStartAt,
+                    durationMs: hintDurationMs,
+                    decodedMs: hintDecodedMs,
+                  },
+                  plan.offset,
+                )}{" "}
+                — první střih padne na první dobu taktu. Doladíš uchem.
               </p>
             )}
           </div>
