@@ -17,19 +17,20 @@ export interface MusicTrack {
   blob: Blob;
   analysis: BeatAnalysis;
   /** "file": added from the computer, and its sound goes into the video.
-   * "listened": heard through the microphone or a shared tab, for its beat
-   * only — the video is made without sound and the song is added in
-   * Instagram (docs/REELS.md §2). Absent on tracks from before listening. */
+   * "listened": heard through the microphone or a shared tab — a YouTube
+   * player on the page (docs/REELS.md §2). Absent on tracks from before
+   * listening. */
   kind?: TrackKind;
   /** Where a listened song played — a YouTube address, when it was one. */
   origin?: string;
-  /** For "instagram": the id Meta attaches the song to a Reel by
-   * (docs/INSTAGRAM-PUBLISH.md F8). */
+  /** How a listened song was heard: a shared tab is the song itself, a
+   * microphone is the room — its sound stays out of the video by default. */
+  listenSource?: "mic" | "tab";
+  /** For "instagram": Meta's id of the track. */
   audioId?: string;
 }
 
-/** "instagram": from Instagram's own catalogue — the video is made without
- * sound and the song is attached when the reel is published. */
+/** "instagram": from Instagram's own catalogue (docs/INSTAGRAM-AUDIO.md). */
 export type TrackKind = "file" | "listened" | "instagram";
 
 export function kindOf(track: MusicTrack): TrackKind {

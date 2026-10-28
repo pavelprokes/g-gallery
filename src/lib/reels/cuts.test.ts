@@ -135,23 +135,3 @@ describe("shiftSection", () => {
     expect(shiftSection(song, 9, 1000)).toBe(song.beats.length - ((song.beats.length - 2) % 4) - 1);
   });
 });
-
-describe("planReel from the track's start", () => {
-  it("puts the video's 0 s on the track's 0 s and still cuts on the beats", () => {
-    const song = grid(120, 60, { downbeat: 1 });
-    const plan = planReel(song, {
-      startBeat: 1,
-      seconds: 15,
-      pace: "beat",
-      accents: false,
-      maxPhotos: 100,
-      fromTrackStart: true,
-    });
-    expect(plan.offset).toBe(0);
-    const [first, second] = plan.timeline.slides;
-    expect(first!.start).toBe(0);
-    // The second photo starts on a beat of the track itself (0.5 s apart).
-    expect((second!.start / 0.5) % 1).toBeCloseTo(0);
-    expect(Math.abs(plan.timeline.duration - 15)).toBeLessThan(1.5);
-  });
-});

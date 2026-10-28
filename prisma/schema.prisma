@@ -933,7 +933,7 @@ model McpGrant {
 }
 
 /// The photographer's Instagram account, connected through Facebook Login so
-/// reels can be published with Instagram's own music (docs/INSTAGRAM-PUBLISH.md
+/// reels can use Instagram's own music (docs/INSTAGRAM-AUDIO.md
 /// §3.1). One per owner; disconnecting deletes the row. Tokens are stored only
 /// AES-256-GCM encrypted (src/lib/token-cipher.ts) — never in the clear.
 model InstagramConnection {

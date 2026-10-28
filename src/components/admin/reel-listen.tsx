@@ -8,12 +8,21 @@ import {
   type Listening,
   type ListenSource,
 } from "@/lib/reels/listen";
-import { youtubeEmbedUrl, youtubeId } from "@/lib/reels/youtube";
+import {
+  parseClock,
+  playerCommand,
+  YOUTUBE_PLAYER_ORIGIN,
+  youtubeEmbedUrl,
+  youtubeId,
+} from "@/lib/reels/youtube";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 /** Fewer seconds than this rarely hold a tempo worth trusting. */
 const MIN_SECONDS = 10;
+/** How long a YouTube song is listened to before the page stops on its own —
+ * a 30 s reel and room to choose its loudest stretch. */
+const LISTEN_CHOICES = [30, 45, 60, 90] as const;
 
 function clock(seconds: number) {
   const s = Math.max(0, Math.floor(seconds));
@@ -22,15 +31,15 @@ function clock(seconds: number) {
 
 /**
  * The song listened to rather than added as a file (docs/REELS.md §2): from a
- * YouTube player on this page, any other tab, or the microphone. Only its
- * beat is kept for the cuts; the reel is made without sound.
+ * YouTube player on this page, any other tab, or the microphone. What is
+ * heard gives the beat, and — for a tab — can be the reel's sound as well.
  */
 export function ListenPanel({
   disabled,
   onHeard,
 }: {
   disabled: boolean;
-  onHeard(blob: Blob, name: string, origin?: string): Promise<void>;
+  onHeard(blob: Blob, name: string, source: ListenSource, origin?: string): Promise<void>;
 }) {
   // What the browser offers is only known in the browser.
   const [sources, setSources] = useState({ mic: false, tab: false });
@@ -40,6 +49,14 @@ export function ListenPanel({
   }, []);
 
   const [link, setLink] = useState("");
+  const [from, setFrom] = useState("");
+  const [listenFor, setListenFor] = useState<(typeof LISTEN_CHOICES)[number]>(45);
+  const player = useRef<HTMLIFrameElement>(null);
+  const [pageOrigin, setPageOrigin] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the origin exists only client-side
+    setPageOrigin(window.location.origin);
+  }, []);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
   const [state, setState] = useState<{ source: ListenSource; since: number } | null>(null);
@@ -57,6 +74,13 @@ export function ListenPanel({
   }, [state]);
   useEffect(() => () => listening.current?.cancel(), []);
 
+  /** Tells the YouTube player on the page what to do (its IFrame API). */
+  const command = (...message: Parameters<typeof playerCommand>) => {
+    player.current?.contentWindow?.postMessage(playerCommand(...message), YOUTUBE_PLAYER_ORIGIN);
+  };
+  const autoStop = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => clearTimeout(autoStop.current ?? undefined), []);
+
   const showVideo = () => {
     const id = youtubeId(link);
     setLinkError(id === null);
@@ -64,6 +88,8 @@ export function ListenPanel({
   };
 
   const finish = async () => {
+    clearTimeout(autoStop.current ?? undefined);
+    if (videoId) command("pauseVideo");
     const current = listening.current;
     const was = started.current;
     listening.current = null;
@@ -91,6 +117,7 @@ export function ListenPanel({
     await onHeard(
       blob,
       name,
+      was.source,
       was.source === "tab" && videoId ? `https://youtu.be/${videoId}` : undefined,
     );
   };
@@ -102,6 +129,13 @@ export function ListenPanel({
       setElapsed(0);
       started.current = { source, since: Date.now() };
       setState(started.current);
+      if (source === "tab" && videoId) {
+        // The player starts once the page hears the tab, from the chosen
+        // second, and the listening stops on its own.
+        command("seekTo", [parseClock(from) ?? 0, true]);
+        command("playVideo");
+        autoStop.current = setTimeout(() => void finish(), listenFor * 1000);
+      }
     } catch (cause) {
       listening.current = null;
       if (cause instanceof NoTabAudioError) {
@@ -128,8 +162,8 @@ export function ListenPanel({
       </summary>
       <div className="mt-3 space-y-3 text-sm">
         <p className="text-admin-muted text-caption dark:text-neutral-400">
-          Stránka si písničku jen poslechne, najde rytmus a střihy na něj nastaví. Video pak bude{" "}
-          <strong>bez zvuku</strong> — stejnou písničku přidáš až v Instagramu, kde je licencovaná.
+          Stránka písničku poslechne, najde rytmus a střihy na něj nastaví. Poslech karty může jít
+          do videa i jako zvuk; z YouTube nic nestahuje — jen slyší, co karta hraje.
         </p>
 
         {sources.tab && (
@@ -154,8 +188,40 @@ export function ListenPanel({
               <p className="text-admin-danger text-caption">Tohle není odkaz na video z YouTube.</p>
             )}
             {videoId && (
+              <div className="flex flex-wrap gap-3">
+                <label className="text-caption">
+                  <span className="font-semibold">Začít od</span>
+                  <input
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    placeholder="0:00"
+                    inputMode="numeric"
+                    aria-invalid={from.trim() !== "" && parseClock(from) === null}
+                    className="border-admin-border mt-1 block min-h-11 w-24 rounded-lg border px-3 aria-invalid:border-red-500 dark:border-neutral-700 dark:bg-neutral-900"
+                  />
+                </label>
+                <label className="text-caption">
+                  <span className="font-semibold">Poslouchat</span>
+                  <select
+                    value={listenFor}
+                    onChange={(e) =>
+                      setListenFor(Number(e.target.value) as (typeof LISTEN_CHOICES)[number])
+                    }
+                    className="border-admin-border mt-1 block min-h-11 rounded-lg border px-3 dark:border-neutral-700 dark:bg-neutral-900"
+                  >
+                    {LISTEN_CHOICES.map((s) => (
+                      <option key={s} value={s}>
+                        {s} s
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            {videoId && (
               <iframe
-                src={youtubeEmbedUrl(videoId)}
+                ref={player}
+                src={youtubeEmbedUrl(videoId, pageOrigin)}
                 title="Přehrávač YouTube"
                 allow="autoplay; encrypted-media; picture-in-picture"
                 referrerPolicy="strict-origin-when-cross-origin"
@@ -172,9 +238,11 @@ export function ListenPanel({
           >
             <p className="font-semibold tabular-nums">Poslouchám… {clock(elapsed)}</p>
             <p className="text-caption">
-              {state.source === "tab"
-                ? "Pusť písničku od místa, kde má video začít. Stačí 30–60 sekund."
-                : "Pusť písničku nahlas poblíž mikrofonu, od místa, kde má video začít. Stačí 30–60 sekund."}
+              {state.source === "tab" && videoId
+                ? `Video z YouTube se pustí samo a poslech skončí po ${listenFor} s. Když se nepustí, klikni na Přehrát v přehrávači.`
+                : state.source === "tab"
+                  ? "Pusť písničku od místa, kde má video začít. Stačí 30–60 sekund."
+                  : "Pusť písničku nahlas poblíž mikrofonu, od místa, kde má video začít. Stačí 30–60 sekund."}
             </p>
             <div className="flex gap-2">
               <Button onClick={() => void finish()}>Hotovo</Button>
@@ -208,7 +276,8 @@ export function ListenPanel({
         {sources.tab && !state && (
           <p className="text-admin-muted text-caption dark:text-neutral-400">
             „Poslouchat kartu“: v okně sdílení vyber <strong>tuto kartu</strong> (nebo kartu s
-            písničkou) a zapni <strong>Sdílet i zvuk karty</strong>. Pak pusť video.
+            písničkou) a zapni <strong>Sdílet i zvuk karty</strong>.
+            {videoId ? " Video z YouTube se pak pustí samo." : " Pak pusť písničku."}
           </p>
         )}
         {error && (

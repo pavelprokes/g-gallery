@@ -3,7 +3,7 @@ import { MAIN_SITE_URL } from "@/lib/site-url";
 import { Card } from "@/components/ui/card";
 
 // The data-deletion instructions Meta asks every app for before it goes Live
-// (docs/INSTAGRAM-PUBLISH.md §3.7, §5 step 8). The Instagram connection serves
+// (docs/INSTAGRAM-AUDIO.md). The Instagram connection serves
 // the photographer's own account only; this says what it keeps and how to
 // remove it, in Czech and in English. Static — Meta's crawler must reach it.
 
@@ -21,8 +21,8 @@ export default function DataDeletionPage() {
       <Card as="section" lang="cs">
         <h1 className="mb-3 text-xl font-semibold">Smazání dat z propojení s Instagramem</h1>
         <p className="mb-3">
-          Administrace galerií fotografa Pavla Prokeše umí publikovat krátká videa na jeho vlastní
-          instagramový účet. Pro to si po přihlášení přes Facebook ukládá:
+          Administrace galerií fotografa Pavla Prokeše umí vyhledávat hudbu v knihovně Instagramu
+          pro jeho vlastní krátká videa. Pro to si po přihlášení přes Facebook ukládá:
         </p>
         <ul className="mb-3 list-disc space-y-1 pl-5">
           <li>
@@ -64,10 +64,10 @@ export default function DataDeletionPage() {
       <Card as="section" lang="en">
         <h2 className="mb-3 text-lg font-semibold">Deleting data from the Instagram connection</h2>
         <p className="mb-3">
-          The gallery admin of photographer Pavel Prokeš can publish short videos to his own
-          Instagram account. After signing in with Facebook it stores the Instagram account&apos;s
-          id and username, the linked Facebook Page&apos;s name, and Meta&apos;s access tokens —
-          encrypted only. It stores no data about anyone else.
+          The gallery admin of photographer Pavel Prokeš can search Instagram&apos;s music library
+          for his own short videos. After signing in with Facebook it stores the Instagram
+          account&apos;s id and username, the linked Facebook Page&apos;s name, and Meta&apos;s
+          access tokens — encrypted only. It stores no data about anyone else.
         </p>
         <p>
           To delete it: choose &ldquo;Odpojit Instagram&rdquo; (Disconnect Instagram) on the Reels

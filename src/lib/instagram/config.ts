@@ -1,4 +1,4 @@
-// Where the Meta API is and what the app asks for (docs/INSTAGRAM-PUBLISH.md
+// Where the Meta API is and what the app asks for (docs/INSTAGRAM-AUDIO.md
 // §3.1). One version for every call; overridable so a test can point the whole
 // client at a local mock, and so a retired version is one variable away.
 
@@ -7,8 +7,10 @@ export const DEFAULT_GRAPH_VERSION = "v26.0";
 
 /**
  * The Instagram API with Facebook Login — the only path with the music API
- * (docs/INSTAGRAM-PUBLISH.md F3): the professional account through the Page
- * it is linked to.
+ * (docs/INSTAGRAM-AUDIO.md): the professional account through the Page it is
+ * linked to. `instagram_content_publish` although nothing is published: the
+ * Audio API is part of Content Publishing; whether search alone needs it is
+ * still to be read on Meta's page (U6).
  */
 export const INSTAGRAM_SCOPES = [
   "instagram_basic",

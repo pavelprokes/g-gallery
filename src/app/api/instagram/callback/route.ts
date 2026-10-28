@@ -14,7 +14,7 @@ import {
 } from "@/lib/instagram/oauth-state";
 import { publicOrigin } from "@/lib/mcp/oauth/config";
 
-// Where Facebook's sign-in returns (docs/INSTAGRAM-PUBLISH.md §3.1). The
+// Where Facebook's sign-in returns (docs/INSTAGRAM-AUDIO.md). The
 // session is re-verified (CLAUDE.md invariant #3), the `state` must match the
 // cookie set by /connect, and only then is the code exchanged.
 export const dynamic = "force-dynamic";

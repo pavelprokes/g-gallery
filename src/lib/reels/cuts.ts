@@ -90,13 +90,6 @@ export interface ReelPlanOptions {
   accents: boolean;
   /** Photos there are to show: fewer slots than this, or slower cuts. */
   maxPhotos: number;
-  /**
-   * The video's 0 s is the track's 0 s, not `startBeat`'s: Instagram plays
-   * its own music from a point the API cannot set (docs/INSTAGRAM-PUBLISH.md
-   * F8), assumed to be the track's start until the test says otherwise. The
-   * first photo covers everything before the first cut.
-   */
-  fromTrackStart?: boolean;
 }
 
 export interface ReelPlan {
@@ -122,7 +115,7 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   // nearest the length asked for.
   const ends: number[] = [];
   for (let e = s + BEATS_PER_BAR; e < beats.length; e += BEATS_PER_BAR) ends.push(e);
-  const zero = options.fromTrackStart ? 0 : (beats[s] ?? 0);
+  const zero = beats[s] ?? 0;
   let end = ends.reduce(
     (best, e) =>
       Math.abs(beats[e]! - zero + hold - options.seconds) <
@@ -147,7 +140,6 @@ export function planReel(analysis: BeatAnalysis, options: ReelPlanOptions): Reel
   cuts = cuts.slice(0, maxPhotos);
 
   const starts = cuts.map((i) => frameSnap((beats[i] ?? zero) - zero));
-  starts[0] = 0;
   const duration = frameSnap(starts.at(-1)! + hold);
   const slides = starts.map((start, i) => {
     const slideEnd = starts[i + 1] ?? duration;

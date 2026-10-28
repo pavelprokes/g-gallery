@@ -1,4 +1,4 @@
-// The `state` of the Facebook sign-in (docs/INSTAGRAM-PUBLISH.md §3.1): a
+// The `state` of the Facebook sign-in (docs/INSTAGRAM-AUDIO.md): a
 // random value in a short-lived cookie, compared in constant time when Meta
 // sends the person back — a callback someone else started is refused.
 

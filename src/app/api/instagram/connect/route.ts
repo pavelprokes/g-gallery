@@ -13,7 +13,7 @@ import {
 } from "@/lib/instagram/oauth-state";
 import { publicOrigin } from "@/lib/mcp/oauth/config";
 
-// "Připojit Instagram" (docs/INSTAGRAM-PUBLISH.md §3.1): the admin is sent to
+// "Připojit Instagram" (docs/INSTAGRAM-AUDIO.md): the admin is sent to
 // Facebook's sign-in with a fresh `state`; Meta returns to the callback.
 export const dynamic = "force-dynamic";
 

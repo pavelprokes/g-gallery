@@ -1,12 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  containerStatus,
-  createReelContainer,
-  GraphError,
-  pagesOf,
-  searchAudio,
-} from "@/lib/instagram/graph";
+import { GraphError, instagramProfile, pagesOf, searchAudio } from "@/lib/instagram/graph";
 
 const calls: { url: string; init?: RequestInit }[] = [];
 
@@ -111,39 +105,8 @@ describe("errors", () => {
   });
 
   it("refuses a response it does not recognise rather than guessing", async () => {
-    respond(200, { id: "c1", status_code: "SOMETHING_NEW" });
-    await expect(containerStatus("1", "tok")).rejects.toBeInstanceOf(GraphError);
-  });
-});
-
-describe("createReelContainer", () => {
-  it("posts a Reel with the public video and Instagram's track as JSON", async () => {
-    respond(200, { id: "1789" });
-    const result = await createReelContainer("ig-9", "tok", {
-      videoUrl: "https://cdn.test/reels/a.mp4",
-      caption: "Svatba",
-      audio: { audioId: "587", audioVolume: 100, videoVolume: 0 },
-    });
-    expect(result.id).toBe("1789");
-    expect(calls[0]!.url).toBe("https://graph.facebook.com/v26.0/ig-9/media");
-    expect(calls[0]!.init?.method).toBe("POST");
-    const body = new URLSearchParams(String(calls[0]!.init?.body));
-    expect(body.get("media_type")).toBe("REELS");
-    expect(body.get("video_url")).toBe("https://cdn.test/reels/a.mp4");
-    expect(body.get("caption")).toBe("Svatba");
-    expect(JSON.parse(body.get("audio_configuration")!)).toEqual({
-      audio_id: "587",
-      audio_volume: 100,
-      video_volume: 0,
-    });
-  });
-
-  it("sends no audio configuration for a reel with its own sound", async () => {
-    respond(200, { id: "1" });
-    await createReelContainer("ig", "tok", { videoUrl: "https://cdn.test/v.mp4", caption: "" });
-    expect(new URLSearchParams(String(calls[0]!.init?.body)).has("audio_configuration")).toBe(
-      false,
-    );
+    respond(200, { id: "ig-1" });
+    await expect(instagramProfile("ig-1", "tok")).rejects.toBeInstanceOf(GraphError);
   });
 });
 

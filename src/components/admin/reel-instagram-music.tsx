@@ -25,7 +25,7 @@ const OUTCOME: Record<string, { tone: "success" | "warning"; text: string }> = {
   "bad-request": { tone: "warning", text: "Facebook vrátil neúplnou odpověď. Zkus to znovu." },
   "no-instagram": {
     tone: "warning",
-    text: "Na žádné tvé facebookové stránce není připojený firemní Instagram (docs/INSTAGRAM-PUBLISH.md §5, kroky 2–3).",
+    text: "Na žádné tvé facebookové stránce není připojený firemní Instagram (docs/INSTAGRAM-AUDIO.md, kroky 2–3).",
   },
   "token-rejected": {
     tone: "warning",
@@ -49,9 +49,9 @@ function length(ms: number | null) {
 }
 
 /**
- * Instagram's own music for a reel (docs/INSTAGRAM-PUBLISH.md §3.3): search
- * the catalogue Meta offers to the connected account, take a track's sound
- * for its beat, and attach the track itself when the reel is published.
+ * Instagram's own music for a reel (docs/INSTAGRAM-AUDIO.md): search the
+ * catalogue Meta offers to the connected account and take a track's sound —
+ * for its beat, and into the video if the photographer wants it there.
  */
 export function InstagramMusic({
   state,
@@ -93,7 +93,7 @@ export function InstagramMusic({
     } catch (cause) {
       console.warn("[g-gallery/instagram] audio fetch failed", cause);
       setError(
-        "Skladbu se nepodařilo stáhnout do prohlížeče (Instagram ji nejspíš nepustí přímo — plán §3.4, otázka U3). Dej mi vědět, přidám stahování přes náš Cloudflare worker.",
+        "Skladbu se nepodařilo stáhnout do prohlížeče — Meta ji nejspíš nepouští přímo (docs/INSTAGRAM-AUDIO.md, otázka U3).",
       );
     } finally {
       setTaking(null);
@@ -112,13 +112,13 @@ export function InstagramMusic({
         {!state.configured ? (
           <p className="text-admin-muted text-caption dark:text-neutral-400">
             Napojení na Instagram ještě není nastavené — chybí aplikace u Mety a její klíče ve
-            Vercelu (docs/INSTAGRAM-PUBLISH.md §5).
+            Vercelu (docs/INSTAGRAM-AUDIO.md).
           </p>
         ) : !state.account ? (
           <div className="space-y-2">
             <p className="text-admin-muted text-caption dark:text-neutral-400">
               Po připojení vybereš hudbu přímo z knihovny Instagramu: střihy se nastaví na její
-              rytmus, video vznikne bez zvuku a písnička se k němu připojí při publikování.
+              rytmus a video vznikne se zvukem, nebo bez — jak zvolíš. Nic se odsud nepublikuje.
             </p>
             {/* A link, not a button: the sign-in is a full-page trip to Facebook. */}
             <a
@@ -227,8 +227,8 @@ export function InstagramMusic({
               </ul>
             )}
             <p className="text-admin-muted text-caption dark:text-neutral-400">
-              Instagram neumí nastavit, odkud písnička hraje — video proto začíná na začátku
-              skladby. Zkušební video s bliknutím na každé době ověří, že to sedí.
+              Zvuk je ukázka, kterou Meta k písničce dává. Pokud je kratší než celá skladba, uvidíš
+              to na délce u písničky v seznamu.
             </p>
           </>
         )}

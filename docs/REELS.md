@@ -35,17 +35,24 @@ cancelling, noise suppression or gain riding — they flatten the drum hits), 10
 
 - **"Poslouchat kartu"** — `getDisplayMedia` with the tab's sound, hinted to offer this very tab
   (`preferCurrentTab`); the picture is dropped at once. A pasted YouTube link (`youtubeId`,
-  `src/lib/reels/youtube.ts`) shows YouTube's privacy-enhanced player (`youtube-nocookie.com`)
-  on the page, so the song plays in the tab being shared. Desktop Chrome and Edge only — phones
-  have no `getDisplayMedia`, and the option is not shown there.
+  `src/lib/reels/youtube.ts`) shows YouTube's privacy-enhanced player (`youtube-nocookie.com`,
+  IFrame API on) on the page, so the song plays in the tab being shared: once the tab is heard the
+  page seeks the player to "Začít od", starts it (`postMessage` commands — `playerCommand`) and
+  stops listening after the chosen 30–90 s. If the player ignores the command, Pavel presses play.
+  Nothing is downloaded from YouTube. Desktop Chrome and Edge only — phones have no
+  `getDisplayMedia`, and the option is not shown there.
 - **"Poslouchat mikrofonem"** — `getUserMedia`; works on phones too. A speaker in the room is
   enough for the beat; the onset envelope only needs the hits to stand out.
 
-A listened track is stored like a file (`kind: "listened"`, the YouTube address as `origin`), its
-beat found the same way, and its recording plays under the previews — but **the rendered file has
-no sound** (`-bez-zvuku.mp4`): what was heard is a room or tab recording of someone else's song.
-The variant shows where in the recording its music starts; in Instagram Pavel adds the same song
-and slides its start to the place he played it from, by ear. Tested headless with Chromium's fake
+A listened track is stored like a file (`kind: "listened"`, `listenSource` "tab" or "mic", the
+YouTube address as `origin`), its beat found the same way, and its recording plays under the
+previews.
+
+**With sound or without** (Pavel, 2026-10-28 — "výsledek bude jen video bez zvuku nebo se
+zvukem"): every track — a file, a tab, Instagram's library — can go into the MP4 as its sound;
+"Bez zvuku" leaves it out (`-bez-zvuku.mp4`) for the song to be added in Instagram, where the
+page tells the start to slide it to. A microphone's recording is the room, so it starts on "Bez
+zvuku"; everything else on "Se zvukem". The licence is Pavel's ("no copyright" music, §6). Tested headless with Chromium's fake
 microphone fed a 126 BPM track: found 126 BPM from the recording.
 
 **The beat** (`src/lib/reels/beats.ts`, pure, tested on drum machines at 96–140 BPM):
@@ -154,8 +161,9 @@ Fast cuts suit songs around 120–130 BPM (2 beats ≈ 1 s).
 
 ## 7. Instagram's own music through its API (not built)
 
-**Planned in docs/INSTAGRAM-PUBLISH.md** (2026-10-28) — the facts, sources and phases live there;
-this section is the first reading, kept for its history.
+**Built as docs/INSTAGRAM-AUDIO.md** (2026-10-28): Instagram's music as a source of sound and beat,
+without publishing — Pavel posts the file himself. This section is the first reading, kept for its
+history.
 
 Asked 2026-10-28. Meta has an **Instagram Audio API** (2026): with Facebook Login, a Reel
 published through the Content Publishing API can carry licensed audio searched for and attached by

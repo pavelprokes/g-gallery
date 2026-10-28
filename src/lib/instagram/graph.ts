@@ -1,7 +1,7 @@
 import "server-only";
 
-// The Graph API calls the Instagram publishing needs (docs/INSTAGRAM-PUBLISH.md
-// §3.2): sign-in, the account, the music search, and a Reel's three steps.
+// The Graph API calls Instagram's music needs (docs/INSTAGRAM-AUDIO.md §3.2):
+// sign-in, the account, and the music search. Nothing is published.
 // Every response is Zod-parsed — Meta's shapes are read, never trusted — and
 // every error keeps Meta's code, so the admin can say "connect again" for an
 // expired token and the real message otherwise.
@@ -157,7 +157,7 @@ export function instagramProfile(igUserId: string, token: string) {
   );
 }
 
-// ---- Music (the Audio API, docs/INSTAGRAM-PUBLISH.md F7) ----
+// ---- Music (the Audio API, docs/INSTAGRAM-AUDIO.md) ----
 
 const audioItem = z.object({
   audio_id: z.union([z.string(), z.number()]).transform(String),
@@ -225,88 +225,4 @@ export async function searchAudio(
       },
     ];
   });
-}
-
-// ---- A Reel: container → status → publish (F1, F8) ----
-
-export interface AudioConfiguration {
-  audioId: string;
-  /** 0–100. */
-  audioVolume: number;
-  /** 0–100; 0 for a silent render. */
-  videoVolume: number;
-}
-
-const idResponse = z.object({ id: z.string() });
-
-export function createReelContainer(
-  igUserId: string,
-  token: string,
-  { videoUrl, caption, audio }: { videoUrl: string; caption: string; audio?: AudioConfiguration },
-) {
-  return call(
-    "POST",
-    `/${encodeURIComponent(igUserId)}/media`,
-    {
-      media_type: "REELS",
-      video_url: videoUrl,
-      caption,
-      // Meta's examples send the object as JSON in a form field.
-      audio_configuration: audio
-        ? JSON.stringify({
-            audio_id: audio.audioId,
-            audio_volume: audio.audioVolume,
-            video_volume: audio.videoVolume,
-          })
-        : undefined,
-    },
-    idResponse,
-    token,
-  );
-}
-
-export const CONTAINER_STATUSES = [
-  "IN_PROGRESS",
-  "FINISHED",
-  "ERROR",
-  "EXPIRED",
-  "PUBLISHED",
-] as const;
-
-const statusResponse = z.object({
-  id: z.string(),
-  status_code: z.enum(CONTAINER_STATUSES),
-  status: z.string().optional(),
-});
-
-export function containerStatus(containerId: string, token: string) {
-  return call(
-    "GET",
-    `/${encodeURIComponent(containerId)}`,
-    { fields: "id,status_code,status" },
-    statusResponse,
-    token,
-  );
-}
-
-export function publishContainer(igUserId: string, token: string, containerId: string) {
-  return call(
-    "POST",
-    `/${encodeURIComponent(igUserId)}/media_publish`,
-    { creation_id: containerId },
-    idResponse,
-    token,
-  );
-}
-
-const permalinkResponse = z.object({ id: z.string(), permalink: z.string().url().optional() });
-
-export function mediaPermalink(mediaId: string, token: string) {
-  return call(
-    "GET",
-    `/${encodeURIComponent(mediaId)}`,
-    { fields: "id,permalink" },
-    permalinkResponse,
-    token,
-  );
 }

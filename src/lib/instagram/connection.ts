@@ -1,6 +1,6 @@
 import "server-only";
 
-// The connected Instagram account (docs/INSTAGRAM-PUBLISH.md §3.1): made from
+// The connected Instagram account (docs/INSTAGRAM-AUDIO.md): made from
 // a sign-in's code, kept with its tokens encrypted, read back with the one
 // token the Instagram calls accept.
 

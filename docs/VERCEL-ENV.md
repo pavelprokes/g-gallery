@@ -173,7 +173,7 @@ Hobby allows one run per day and rejects anything more frequent at deploy time.
 | `NOTIFY_EMAIL_TO`                   | runtime   |                                                                                                        |
 | `SUPABASE_URL`                      | runtime   | Keep-alive falls back to a plain Prisma write                                                          |
 | `SUPABASE_SERVICE_ROLE_KEY`         | runtime   | **Legacy JWT-style key**, not `sb_secret_…` — PostgREST needs a JWT                                    |
-| `META_APP_ID`                       | runtime   | Reels cannot connect Instagram; the page says the app is not set up (docs/INSTAGRAM-PUBLISH.md §5)     |
+| `META_APP_ID`                       | runtime   | Reels cannot connect Instagram; the page says the app is not set up (docs/INSTAGRAM-AUDIO.md)          |
 | `META_APP_SECRET`                   | runtime   | Same. Never in the chat or the repo — Vercel only                                                      |
 | `META_LOGIN_CONFIG_ID`              | runtime   | The sign-in asks for the classic `scope` list instead of a Facebook Login for Business configuration   |
 | `META_GRAPH_VERSION`                | runtime   | `v26.0` — set only to move off a version Meta retires                                                  |
