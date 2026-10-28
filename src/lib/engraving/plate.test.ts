@@ -97,25 +97,26 @@ describe("layoutPlate", () => {
   });
 
   // Measured on the photographer's own export of the same plate: names ink
-  // x 447–1254, y 858–960; date ink x 677–1024, y 1043–1099.
+  // x 447–1254, y 858–960; date ink x 677–1024, y 1043–1099 — on the plate,
+  // less the crop's corner (203, 312).
   it("reproduces the photographer's Affinity export in Playfair", () => {
     expect(template.names!.size).toBeCloseTo(128, 1);
-    expect(template.names!.baseline).toBeCloseTo(958, 1);
+    expect(template.names!.baseline).toBeCloseTo(958 - 312, 1);
     expect(template.date!.size).toBeCloseTo(76, 1);
-    expect(template.date!.baseline).toBeCloseTo(1098, 1);
+    expect(template.date!.baseline).toBeCloseTo(1098 - 312, 1);
 
     const names = inkBox(playfair, template.names!);
-    expect(Math.abs(names.x1 - 447)).toBeLessThan(4);
-    expect(Math.abs(names.x2 - 1254)).toBeLessThan(4);
+    expect(Math.abs(names.x1 - (447 - 203))).toBeLessThan(4);
+    expect(Math.abs(names.x2 - (1254 - 203))).toBeLessThan(4);
     const date = inkBox(playfair, template.date!);
-    expect(Math.abs(date.x1 - 677)).toBeLessThan(4);
-    expect(Math.abs(date.x2 - 1024)).toBeLessThan(4);
+    expect(Math.abs(date.x1 - (677 - 203))).toBeLessThan(4);
+    expect(Math.abs(date.x2 - (1024 - 203))).toBeLessThan(4);
   });
 
   it("centres each line on its ink", () => {
     for (const line of [template.names!, template.date!]) {
       const box = inkBox(playfair, line);
-      expect((box.x1 + box.x2) / 2).toBeCloseTo(851, 0);
+      expect((box.x1 + box.x2) / 2).toBeCloseTo(851 - 203, 0);
     }
   });
 
@@ -181,10 +182,13 @@ describe("layoutPlate", () => {
       });
       const names = inkBox(font, layout.names!);
       const date = inkBox(dateFont, layout.date!);
-      // Inside the band between the lines (y 763–1188), names above the date.
-      expect(names.y1).toBeGreaterThan(763);
+      // Inside the band between the lines (y 451–876 on the plate), names above the date.
+      expect(names.y1).toBeGreaterThan(451);
       expect(names.y2).toBeLessThan(date.y1);
-      expect(date.y2).toBeLessThan(1188);
+      expect(date.y2).toBeLessThan(876);
+      // Edge to edge: nothing may be cut off by the crop.
+      expect(names.x1).toBeGreaterThan(0);
+      expect(names.x2).toBeLessThan(1296);
     },
   );
 });
@@ -202,7 +206,7 @@ describe("plateSvg", () => {
 
   it("outlines the text and keeps the frame", () => {
     const svg = plateSvg(layout, "M0 0h1v1z");
-    expect(svg).toContain('width="1702" height="1815"');
+    expect(svg).toContain('width="1296" height="1193" viewBox="0 0 1296 1193"');
     expect(svg).toContain('<path id="ramecek" d="M0 0h1v1z"/>');
     expect(svg).toContain('<path id="jmena" d="M');
     expect(svg).not.toContain("<text");
@@ -216,8 +220,10 @@ describe("plateSvg", () => {
     expect(svg).toContain('font-family="Playfair Display" font-weight="500"');
   });
 
-  it("reads the committed frame", () => {
-    const d = framePathData(readFileSync(join(PUBLIC, "vendor/engraving/leaf-frame.svg"), "utf8"));
+  it("reads the committed frame, drawn in the plate's own coordinates", () => {
+    const svg = readFileSync(join(PUBLIC, "vendor/engraving/leaf-frame.svg"), "utf8");
+    expect(svg).toContain('viewBox="0 0 1296 1193"');
+    const d = framePathData(svg);
     expect(d.startsWith("M")).toBe(true);
     expect(d.length).toBeGreaterThan(10_000);
   });

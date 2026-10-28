@@ -5,7 +5,7 @@ import { test, expect } from "./fixtures";
 /**
  * The engraving plate (docs/ENGRAVING.md): reached from the wedding, prefilled
  * from its title and date, downloaded as outlined SVG and as a JPG at the
- * template's size and resolution. Reads only — the seeded wedding is shared.
+ * template's resolution, cropped edge to edge. Reads only — the seeded wedding is shared.
  */
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   adminCookie: { name: string; value: string };
@@ -53,7 +53,7 @@ test("the photographer downloads the plate for a wedding", async ({ page }) => {
   const svgFile = await svgDownload;
   expect(svgFile.suggestedFilename()).toBe("gravirovani-pavel-patricie-2026-08-12.svg");
   const svg = fs.readFileSync((await svgFile.path())!, "utf8");
-  expect(svg).toContain('width="1702" height="1815"');
+  expect(svg).toContain('width="1296" height="1193"');
   expect(svg).toContain('<path id="jmena" d="M');
   // Outlines only: a laser without the font engraves the same.
   expect(svg).not.toContain("<text");
@@ -63,7 +63,7 @@ test("the photographer downloads the plate for a wedding", async ({ page }) => {
   const jpgFile = await jpgDownload;
   expect(jpgFile.suggestedFilename()).toBe("gravirovani-pavel-patricie-2026-08-12.jpg");
   const jpg = fs.readFileSync((await jpgFile.path())!);
-  expect(jpegSize(jpg)).toEqual({ width: 1702, height: 1815 });
+  expect(jpegSize(jpg)).toEqual({ width: 1296, height: 1193 });
   // JFIF density: dots per inch, 144 × 144.
   expect([...jpg.subarray(13, 18)]).toEqual([1, 0, 144, 0, 144]);
 });

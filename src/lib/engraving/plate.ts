@@ -7,30 +7,38 @@ import type { Font } from "opentype.js";
  * Every number here is measured from the photographer's own Affinity file
  * (`TM_2025_12x-100.af`, the "Alice a Martin" export): a 1702 × 1815 px canvas
  * at 144 dpi, names in Playfair Display Medium at 128 px on a baseline at
- * y = 958, the date at 76 px on y = 1098, both centred on their ink. Set in
- * Playfair, the generator reproduces that export to the pixel; other faces keep
- * its cap height, its figure height and its gap, so the block sits in the same
- * place whichever face is picked.
+ * y = 958, the date at 76 px on y = 1098, both centred on their ink at x = 851.
+ * Set in Playfair, the generator reproduces that export to the pixel; other
+ * faces keep its cap height, its figure height and its gap, so the block sits
+ * in the same place whichever face is picked.
+ *
+ * The plate itself is that canvas cropped to the frame's ink — the photographer
+ * wanted the image edge to edge, with no white around it — so every template
+ * measurement is shifted by the crop's corner, `TEMPLATE_CROP_X/Y`.
  */
 
-export const PLATE_WIDTH = 1702;
-export const PLATE_HEIGHT = 1815;
+/** Where the frame's ink starts on the template canvas: the lines' left end, the top leaf's tip. */
+const TEMPLATE_CROP_X = 203;
+const TEMPLATE_CROP_Y = 312;
+/** The lines' right end (1499) and the lowest leaf's tip (1504.25) on the template, less the corner. */
+export const PLATE_WIDTH = 1296;
+export const PLATE_HEIGHT = 1193;
 /** The source JPEG's resolution — the JPG export carries it so the size reads the same. */
 export const PLATE_DPI = 144;
 
-const CENTER_X = PLATE_WIDTH / 2;
+const CENTER_X = 851 - TEMPLATE_CROP_X;
 /** Playfair Display Medium at the template's 128 px: 0.708 em cap height. */
 const NAMES_CAP_HEIGHT = 128 * 0.708;
 /** Playfair's old-style 8 at the template's 76 px: 0.722 em. */
 const DATE_FIGURE_HEIGHT = 76 * 0.722;
-const NAMES_BASELINE = 958;
-const DATE_BASELINE = 1098;
+const NAMES_BASELINE = 958 - TEMPLATE_CROP_Y;
+const DATE_BASELINE = 1098 - TEMPLATE_CROP_Y;
 /** From the names' baseline to the top of the date's tallest figure. */
 const GAP = DATE_BASELINE - DATE_FIGURE_HEIGHT - NAMES_BASELINE;
 /** Middle of the block (cap top of the names → baseline of the date). */
 const BLOCK_CENTER_Y = (NAMES_BASELINE - NAMES_CAP_HEIGHT + DATE_BASELINE) / 2;
 /**
- * The lines run x = 203…1498; text wider than this would crowd their ends.
+ * The lines run the plate's full width; text wider than this would crowd their ends.
  * Long names shrink to fit rather than run off the plate.
  */
 export const MAX_TEXT_WIDTH = 1180;
