@@ -1,0 +1,1046 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TimelinePosition } from "@/lib/gallery-chapters";
+import { FORMS, pluralize } from "@/lib/czech-plural";
+import { analyzeTrack, applyEnvelope, decodeTrack } from "@/lib/reels/audio";
+import { PACES, REEL_LENGTHS, shiftSection, type Pace, type ReelLength } from "@/lib/reels/cuts";
+import {
+  deleteTrack,
+  isCurrent,
+  kindOf,
+  listTracks,
+  saveTrack,
+  type MusicTrack,
+  type TrackKind,
+} from "@/lib/reels/music-library";
+import { reelVariants, type ReelSource, type ReelVariant } from "@/lib/reels/variants";
+import { FORMATS, type VideoFormat } from "@/lib/social-video/camera";
+import { chooseCodec, type EncodeCodec } from "@/lib/social-video/encode";
+import { formatDuration } from "@/lib/video";
+import { startHint } from "@/lib/reels/start-hint";
+import type { PhotoFaces } from "@/lib/social-video/faces";
+import { drawFrame } from "@/lib/social-video/frame";
+import { shotsFor } from "@/lib/social-video/shots";
+import { SlideImages } from "@/lib/social-video/slide-images";
+import { slidesToDecode } from "@/lib/social-video/timeline";
+import {
+  reelFramePlan,
+  reelSlides,
+  renderReel,
+  type ReelPhoto,
+  type RenderProgress,
+} from "@/components/admin/reel-render";
+import type { StudioPhoto } from "@/components/admin/social-video-studio";
+import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
+import { ListenPanel } from "@/components/admin/reel-listen";
+import { reelsHref } from "@/lib/reels/sources";
+import { InstagramMusic, type InstagramState } from "@/components/admin/reel-instagram-music";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+
+// docs/REELS.md is the flow: galleries (the picker above), a song, the
+// length and pace, three variants cut on its beat, one rendered with the
+// music. The beat, the cuts and the picking live in src/lib/reels/; the
+// camera, the frame and the encoder are the social video's.
+
+export interface ReelGallery {
+  id: string;
+  title: string;
+  chapterStarts: TimelinePosition[];
+  photos: StudioPhoto[];
+}
+
+const FORMAT = FORMATS["9:16"];
+/** The previews are drawn at this share of the output's size — three of them play side by side. */
+const PREVIEW_SCALE = 0.4;
+const PREVIEW_FORMAT: VideoFormat = {
+  ...FORMAT,
+  width: Math.round(FORMAT.width * PREVIEW_SCALE),
+  height: Math.round(FORMAT.height * PREVIEW_SCALE),
+};
+/** A song file larger than this is not a song (or not one a reel needs). */
+const MAX_TRACK_BYTES = 60 * 1024 * 1024;
+
+const PACE_LABEL: Record<Pace, string> = {
+  fast: "Rychle · cca ½ s",
+  beat: "Co vteřina, to fotka",
+  calm: "Klidněji · cca 2 s",
+};
+
+const LAST_TRACK_KEY = "g-gallery:reels:track";
+
+const clock = (seconds: number) => formatDuration(seconds * 1000);
+
+function trackNote(track: MusicTrack): string {
+  switch (kindOf(track)) {
+    case "listened":
+      return track.listenSource === "mic" ? " · poslech mikrofonem" : " · poslech karty";
+    case "instagram":
+      return " · z Instagramu";
+    default:
+      return "";
+  }
+}
+
+function readLastTrack(): string | null {
+  try {
+    return localStorage.getItem(LAST_TRACK_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastTrack(id: string) {
+  try {
+    localStorage.setItem(LAST_TRACK_KEY, id);
+  } catch {
+    // A convenience only.
+  }
+}
+
+type RenderState =
+  | { kind: "idle" }
+  | { kind: "busy"; key: string; progress: RenderProgress }
+  | { kind: "error"; key: string };
+
+interface Result {
+  /** What the file was made from: a variant that has changed since is another video. */
+  signature: string;
+  url: string;
+  file: File;
+}
+
+const signatureOf = (v: ReelVariant, trackId: string | null, withSound: boolean) =>
+  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+
+export function ReelStudio({
+  galleries,
+  instagram,
+}: {
+  galleries: ReelGallery[];
+  instagram: InstagramState;
+}) {
+  // ---- The photos, from every chosen gallery ----
+  const photos = useMemo(() => {
+    const map = new Map<string, ReelPhoto & { studio: StudioPhoto }>();
+    for (const gallery of galleries) {
+      for (const photo of gallery.photos) {
+        const { width, height, coupleTags } = photo.candidate;
+        if (!width || !height) continue;
+        map.set(photo.id, {
+          id: photo.id,
+          objectKey: photo.objectKey,
+          width,
+          height,
+          coupleTags,
+          studio: photo,
+        });
+      }
+    }
+    return map;
+  }, [galleries]);
+  const faces = useMemo(
+    () =>
+      Object.fromEntries(
+        galleries.flatMap((g) => g.photos.map((p) => [p.id, p.candidate.faces] as const)),
+      ) as Record<string, PhotoFaces | null>,
+    [galleries],
+  );
+  const sources: ReelSource[] = useMemo(
+    () =>
+      galleries.map((g) => ({
+        id: g.id,
+        chapterStarts: g.chapterStarts,
+        candidates: g.photos.map((p) => p.candidate),
+      })),
+    [galleries],
+  );
+  const title = galleries.length === 1 ? galleries[0]!.title : "svatby";
+  const ownPhotos = galleries.reduce(
+    (n, g) => n + g.photos.filter((p) => p.candidate.own).length,
+    0,
+  );
+
+  // ---- Music: this browser's library ----
+  const [tracks, setTracks] = useState<MusicTrack[]>([]);
+  const [libraryReady, setLibraryReady] = useState(false);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [trackId, setTrackId] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const decoded = useRef(new Map<string, Promise<AudioBuffer>>());
+  const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const list = await listTracks();
+        // A track analysed by an older build gets its beat found again.
+        const current = await Promise.all(
+          list.map(async (t) => {
+            if (isCurrent(t)) return t;
+            const fresh = { ...t, analysis: analyzeTrack(await decodeTrack(t.blob)) };
+            await saveTrack(fresh).catch(() => {});
+            return fresh;
+          }),
+        );
+        if (!live) return;
+        setTracks(current);
+        const last = readLastTrack();
+        setTrackId(current.find((t) => t.id === last)?.id ?? current[0]?.id ?? null);
+      } catch {
+        if (live) {
+          setLibraryError(
+            "Prohlížeč si hudbu nepamatuje (soukromé okno?) — skladby platí jen do zavření stránky.",
+          );
+        }
+      } finally {
+        if (live) setLibraryReady(true);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const track = tracks.find((t) => t.id === trackId) ?? null;
+  // Keyed on the song, not on its row: editing its note makes a new object
+  // for the same song, which must neither re-decode it nor reset its choices.
+  const trackBlob = track?.blob ?? null;
+  useEffect(() => {
+    // Silence until the new song is decoded, rather than the old one under new cuts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the sound follows the track
+    setBuffer(null);
+    if (!trackId || !trackBlob) return;
+    let live = true;
+    let pending = decoded.current.get(trackId);
+    if (!pending) {
+      pending = decodeTrack(trackBlob);
+      pending.catch(() => decoded.current.delete(trackId));
+      decoded.current.set(trackId, pending);
+    }
+    pending.then((b) => live && setBuffer(b)).catch(() => live && setBuffer(null));
+    return () => {
+      live = false;
+    };
+  }, [trackId, trackBlob]);
+
+  /** Decoded, its beat found, kept in this browser and chosen. Throws when
+   * the browser cannot decode it. */
+  const addTrack = async (
+    blob: Blob,
+    name: string,
+    kind: TrackKind,
+    extra: Pick<MusicTrack, "origin" | "audioId" | "listenSource" | "startAt" | "durationMs"> = {},
+  ): Promise<void> => {
+    const audio = await decodeTrack(blob);
+    const entry: MusicTrack = {
+      id: crypto.randomUUID(),
+      name,
+      source: "",
+      addedAt: Date.now(),
+      blob,
+      analysis: analyzeTrack(audio),
+      kind,
+      ...extra,
+    };
+    decoded.current.set(entry.id, Promise.resolve(audio));
+    await saveTrack(entry).catch(() =>
+      setLibraryError("Skladbu se nepodařilo uložit v prohlížeči — platí jen do zavření stránky."),
+    );
+    setTracks((prev) => [entry, ...prev]);
+    setTrackId(entry.id);
+    writeLastTrack(entry.id);
+  };
+
+  const addFiles = async (files: FileList | null) => {
+    if (!files) return;
+    setLibraryError(null);
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_TRACK_BYTES) {
+        setLibraryError(`${file.name}: soubor je větší než 60 MB.`);
+        continue;
+      }
+      setAdding(`Hledám rytmus: ${file.name}`);
+      try {
+        await addTrack(file, file.name.replace(/\.[^.]+$/, ""), "file");
+      } catch {
+        setLibraryError(
+          `${file.name}: tenhle soubor prohlížeč nepřehraje. Zkus MP3, M4A nebo WAV.`,
+        );
+      }
+    }
+    setAdding(null);
+  };
+
+  const addInstagram = async (
+    blob: Blob,
+    name: string,
+    audioId: string,
+    durationMs: number | null,
+  ) => {
+    setLibraryError(null);
+    setAdding(`Hledám rytmus: ${name}`);
+    try {
+      await addTrack(blob, name, "instagram", { audioId, durationMs: durationMs ?? undefined });
+    } catch {
+      setLibraryError(`${name}: zvuk z Instagramu se nepodařilo přečíst.`);
+    }
+    setAdding(null);
+  };
+
+  const addHeard = async (
+    blob: Blob,
+    name: string,
+    listenSource: "mic" | "tab",
+    details: Pick<MusicTrack, "origin" | "startAt">,
+  ) => {
+    setLibraryError(null);
+    setAdding("Hledám rytmus v poslechu…");
+    try {
+      await addTrack(blob, name, "listened", { ...details, listenSource });
+    } catch {
+      setLibraryError("Z poslechu se nepodařilo nic přečíst. Zkus to znovu a hlasitěji.");
+    }
+    setAdding(null);
+  };
+
+  const removeTrack = async (id: string) => {
+    setTracks((prev) => prev.filter((t) => t.id !== id));
+    if (trackId === id) setTrackId(null);
+    decoded.current.delete(id);
+    await deleteTrack(id).catch(() => {});
+  };
+
+  const updateSource = (id: string, source: string) => {
+    const entry = tracks.find((t) => t.id === id);
+    if (!entry || entry.source === source) return;
+    setTracks((prev) => prev.map((t) => (t.id === id ? { ...t, source } : t)));
+    void saveTrack({ ...entry, source }).catch(() => {});
+  };
+
+  // ---- Settings and variants ----
+  const [seconds, setSeconds] = useState<ReelLength>(15);
+  const [pace, setPace] = useState<Pace>("beat");
+  const [exclude, setExclude] = useState<Set<string>>(() => new Set());
+  const [round, setRound] = useState(0);
+  const [shown, setShown] = useState<Set<string>>(() => new Set());
+  const [startBeats, setStartBeats] = useState<Record<string, number>>({});
+  const [byGuests, setByGuests] = useState(true);
+
+  const analysis = track?.analysis ?? null;
+  const trackKind = track ? kindOf(track) : null;
+  // Plain values read off the song, so nothing below hands the song itself to
+  // a function (the React Compiler then keeps the memos).
+  const defaultSound = !(trackKind === "listened" && track?.listenSource === "mic");
+  const trackStartAt = track?.startAt;
+  const trackDurationMs = track?.durationMs;
+  const decodedMs = (track?.analysis.duration ?? 0) * 1000;
+  // The file with the song's sound, or silent for the song to be added in
+  // Instagram (Pavel, 2026-10-28). A microphone's room recording starts silent.
+  const [withSound, setWithSound] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- each song starts from its own default
+    setWithSound(defaultSound);
+  }, [trackId, defaultSound]);
+  const variants = useMemo(
+    () =>
+      analysis
+        ? reelVariants({
+            sources,
+            format: FORMAT,
+            analysis,
+            settings: { seconds, pace },
+            exclude,
+            shown,
+            round,
+            startBeats,
+            byGuests,
+          })
+        : [],
+    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests],
+  );
+
+  // A new song or length starts the music where the song is loudest again.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- moved starts belong to one song
+    setStartBeats({});
+  }, [trackId, seconds]);
+
+  const moreVariants = () => {
+    setShown((prev) => new Set([...prev, ...variants.flatMap((v) => v.photoIds)]));
+    setRound((r) => r + 1);
+    setStartBeats({});
+  };
+  const resetVariants = () => {
+    setShown(new Set());
+    setRound(0);
+    setStartBeats({});
+  };
+  const excludePhoto = (id: string) => setExclude((prev) => new Set([...prev, id]));
+
+  // ---- Playback: one variant at a time, with its music ----
+  const [playing, setPlaying] = useState<string | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
+  const contextFor = useCallback(() => {
+    audioContext.current ??= new AudioContext();
+    void audioContext.current.resume();
+    return audioContext.current;
+  }, []);
+  useEffect(() => () => void audioContext.current?.close(), []);
+
+  // ---- Render ----
+  const [codec, setCodec] = useState<EncodeCodec | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void chooseCodec(FORMAT.width, FORMAT.height).then((c) => live && setCodec(c));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const [renderState, setRenderState] = useState<RenderState>({ kind: "idle" });
+  const [results, setResults] = useState<Result[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+  // The variants on screen, for a render that ends after its variant changed:
+  // its file belongs to nothing and is released at once.
+  const liveSignatures = useRef(new Set<string>());
+  // Every file still held, released when the page goes.
+  const heldUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const held = heldUrls.current;
+    return () => {
+      for (const url of held) URL.revokeObjectURL(url);
+    };
+  }, []);
+
+  const silent = !withSound;
+  const render = async (variant: ReelVariant) => {
+    if (!buffer || !codec || renderState.kind === "busy") return;
+    setPlaying(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setRenderState({ kind: "busy", key: variant.key, progress: { step: "render", share: 0 } });
+    try {
+      const file = await renderReel({
+        variant,
+        photos,
+        faces,
+        format: FORMAT,
+        track: withSound ? buffer : null,
+        codec,
+        title,
+        signal: controller.signal,
+        onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
+      });
+      const signature = signatureOf(variant, trackId, withSound);
+      setRenderState({ kind: "idle" });
+      if (!liveSignatures.current.has(signature)) return;
+      const url = URL.createObjectURL(file);
+      heldUrls.current.add(url);
+      setResults((prev) => {
+        for (const r of prev) {
+          if (r.signature !== signature) continue;
+          URL.revokeObjectURL(r.url);
+          heldUrls.current.delete(r.url);
+        }
+        return [...prev.filter((r) => r.signature !== signature), { signature, url, file }];
+      });
+    } catch (cause) {
+      if (controller.signal.aborted) setRenderState({ kind: "idle" });
+      else {
+        console.error("[g-gallery/reels] render failed", cause);
+        setRenderState({ kind: "error", key: variant.key });
+      }
+    } finally {
+      abortRef.current = null;
+    }
+  };
+  // A changed variant is a different video: its old file goes.
+  useEffect(() => {
+    const live = new Set(variants.map((v) => signatureOf(v, trackId, withSound)));
+    setResults((prev) => {
+      const kept = prev.filter((r) => live.has(r.signature));
+      for (const r of prev) {
+        if (kept.includes(r)) continue;
+        URL.revokeObjectURL(r.url);
+        heldUrls.current.delete(r.url);
+      }
+      return kept.length === prev.length ? prev : kept;
+    });
+    liveSignatures.current = live;
+  }, [variants, trackId, withSound]);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card as="section">
+          <CardTitle>Hudba</CardTitle>
+          {!libraryReady ? (
+            <p className="text-sm">Načítám…</p>
+          ) : (
+            <>
+              {tracks.length === 0 ? (
+                <p className="mb-3 text-sm">
+                  Přidej písničku z počítače, nebo ji nech stránku poslechnout — rytmus se najde sám
+                  a střihy padnou na doby. Skladby zůstávají jen v tomhle prohlížeči, nikam se
+                  nenahrávají.
+                </p>
+              ) : (
+                <ul className="mb-3 space-y-2" role="radiogroup" aria-label="Písnička">
+                  {tracks.map((t) => (
+                    <li
+                      key={t.id}
+                      className="border-admin-border has-checked:border-brand-primary has-checked:ring-brand-primary rounded-lg border p-2 has-checked:ring-1 dark:border-neutral-700"
+                    >
+                      <div className="flex items-center gap-3">
+                        <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3">
+                          <input
+                            type="radio"
+                            name="reel-track"
+                            checked={t.id === trackId}
+                            onChange={() => {
+                              setTrackId(t.id);
+                              writeLastTrack(t.id);
+                            }}
+                            className="accent-brand-primary size-5 shrink-0"
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold">{t.name}</span>
+                            <span className="text-admin-muted text-caption dark:text-neutral-400">
+                              {Math.round(t.analysis.bpm)} BPM · {clock(t.analysis.duration)}
+                              {trackNote(t)}
+                            </span>
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => void removeTrack(t.id)}
+                          aria-label={`Odebrat skladbu ${t.name}`}
+                          className="text-admin-muted hover:text-admin-danger grid size-11 shrink-0 place-items-center rounded-lg"
+                        >
+                          <span aria-hidden>×</span>
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        defaultValue={t.source}
+                        onBlur={(e) => updateSource(t.id, e.target.value.trim())}
+                        placeholder="Odkud je a jaká licence (pro tebe)"
+                        aria-label={`Odkud je skladba ${t.name}`}
+                        className="border-admin-border text-caption mt-1 min-h-11 w-full rounded border px-2 dark:border-neutral-700 dark:bg-neutral-900"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="border-brand-primary text-brand-primary-dark hover:bg-admin-accent-soft inline-flex min-h-11 cursor-pointer items-center rounded-lg border px-4 text-sm font-semibold">
+                {adding ? "Pracuji…" : "Přidat písničku…"}
+                <input
+                  type="file"
+                  accept="audio/*,.mp3,.m4a,.wav,.aac"
+                  multiple
+                  disabled={adding !== null}
+                  className="sr-only"
+                  onChange={(e) => {
+                    void addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <ListenPanel disabled={adding !== null} onHeard={addHeard} />
+              <InstagramMusic
+                state={instagram}
+                returnTo={reelsHref(galleries.map((g) => g.id))}
+                disabled={adding !== null}
+                onPicked={addInstagram}
+              />
+              {adding && (
+                <p className="text-caption mt-2" role="status">
+                  {adding}
+                </p>
+              )}
+              {libraryError && (
+                <Alert tone="warning" compact className="mt-3">
+                  {libraryError}
+                </Alert>
+              )}
+              <MusicSources />
+            </>
+          )}
+        </Card>
+
+        <Card as="section">
+          <CardTitle>Délka a tempo</CardTitle>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Délka">
+            {REEL_LENGTHS.map((l) => (
+              <Button
+                key={l}
+                role="radio"
+                aria-checked={seconds === l}
+                variant={seconds === l ? "primary" : "secondary"}
+                onClick={() => setSeconds(l)}
+              >
+                {l} s
+              </Button>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Tempo střihů">
+            {(Object.keys(PACES) as Pace[]).map((p) => (
+              <Button
+                key={p}
+                role="radio"
+                aria-checked={pace === p}
+                variant={pace === p ? "primary" : "secondary"}
+                onClick={() => setPace(p)}
+              >
+                {PACE_LABEL[p]}
+              </Button>
+            ))}
+          </div>
+          <p className="text-admin-muted text-caption mt-3 dark:text-neutral-400">
+            Střih vždy padne na dobu: u rychlé písničky po dvou dobách, u pomalé po jedné. Video
+            začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající hudbou.
+            Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
+          </p>
+          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={byGuests}
+              onChange={(e) => setByGuests(e.target.checked)}
+              className="accent-brand-primary mt-0.5 size-5 shrink-0"
+            />
+            <span>
+              Fotky podle hostů
+              <span className="text-admin-muted text-caption block dark:text-neutral-400">
+                Bere hlavně ty, které si hosté nejvíc prohlíželi, dávali do tisku, do oblíbených a
+                reagovali na ně. Kde o nich hosté ještě nic neřekli, vybírá podle tvých hvězdiček.
+              </span>
+            </span>
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Zvuk ve videu">
+            {(
+              [
+                [true, "Se zvukem"],
+                [false, "Bez zvuku"],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={label}
+                role="radio"
+                aria-checked={withSound === value}
+                variant={withSound === value ? "primary" : "secondary"}
+                onClick={() => setWithSound(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          <p className="text-admin-muted text-caption mt-2 dark:text-neutral-400">
+            Bez zvuku přidáš písničku až v Instagramu — z jeho knihovny, licencovanou.
+          </p>
+          {exclude.size > 0 && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="mt-3"
+              onClick={() => setExclude(new Set())}
+            >
+              Vrátit vyřazené fotky ({exclude.size})
+            </Button>
+          )}
+        </Card>
+      </div>
+
+      {codec === null && (
+        <Alert>
+          Tenhle prohlížeč neumí video vytvořit (chybí WebCodecs). Otevři stránku v Chrome nebo v
+          Safari 26+.
+        </Alert>
+      )}
+
+      {!analysis ? (
+        <Alert tone="info">Vyber nebo přidej písničku — varianty se pak objeví tady.</Alert>
+      ) : ownPhotos < 2 ? (
+        <Alert>Ve vybraných galeriích nejsou aspoň dvě tvoje fotky.</Alert>
+      ) : (
+        <section aria-label="Varianty">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Varianty</h2>
+            <div className="flex flex-wrap gap-2">
+              {round > 0 && (
+                <Button size="sm" variant="secondary" onClick={resetVariants}>
+                  Zpět na první návrh
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" onClick={moreVariants}>
+                Další varianty
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {variants.map((variant) => (
+              <VariantCard
+                key={variant.key}
+                variant={variant}
+                photos={photos}
+                faces={faces}
+                buffer={buffer}
+                bpm={analysis.bpm}
+                playing={playing === variant.key}
+                onTogglePlay={() => setPlaying((p) => (p === variant.key ? null : variant.key))}
+                contextFor={contextFor}
+                onShift={(bars) =>
+                  setStartBeats((prev) => ({
+                    ...prev,
+                    [variant.key]: shiftSection(analysis, variant.plan.startBeat, bars),
+                  }))
+                }
+                onExclude={excludePhoto}
+                canRender={codec != null && buffer !== null}
+                silent={silent}
+                trackKind={trackKind}
+                hintStartAt={trackStartAt}
+                hintDurationMs={trackDurationMs}
+                hintDecodedMs={decodedMs}
+                renderState={renderState}
+                result={
+                  results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
+                  null
+                }
+                onRender={() => void render(variant)}
+                onCancel={() => abortRef.current?.abort()}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Where music that may go into a business's Reels comes from (docs/REELS.md §6). */
+function MusicSources() {
+  return (
+    <details className="text-caption mt-4">
+      <summary className="cursor-pointer font-semibold">
+        Kde vzít hudbu, aby Instagram video neztlumil
+      </summary>
+      <div className="mt-2 space-y-2 leading-relaxed">
+        <p>
+          Firemní účet smí použít jen hudbu, na kterou má licenci. Písnička ze Spotify nebo z CD
+          video ztlumí nebo zablokuje.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>Meta Sound Collection</strong> — zdarma, i komerčně, ale jen pro Facebook a
+            Instagram. Business Suite → Všechny nástroje → Sound Collection, stáhnout na počítači.
+          </li>
+          <li>
+            <strong>Mixkit</strong> — zdarma, komerční použití i bez uvedení autora.
+          </li>
+          <li>
+            <strong>Epidemic Sound</strong> — placené, pro firmu tarif Business; po propojení účtů
+            se video nezablokuje.
+          </li>
+          <li>
+            Skladby pod <strong>CC BY</strong> (Kevin MacLeod, Free Music Archive) — autora uveď v
+            popisku příspěvku. CC BY-NC na reklamu nejde.
+          </li>
+        </ul>
+        <p>Pro rychlé střihy sedí písničky kolem 120–130 BPM.</p>
+      </div>
+    </details>
+  );
+}
+
+function VariantCard({
+  variant,
+  photos,
+  faces,
+  buffer,
+  bpm,
+  playing,
+  onTogglePlay,
+  contextFor,
+  onShift,
+  onExclude,
+  canRender,
+  silent,
+  trackKind,
+  hintStartAt,
+  hintDurationMs,
+  hintDecodedMs,
+  renderState,
+  result,
+  onRender,
+  onCancel,
+}: {
+  variant: ReelVariant;
+  photos: ReadonlyMap<string, ReelPhoto & { studio: StudioPhoto }>;
+  faces: Readonly<Record<string, PhotoFaces | null>>;
+  buffer: AudioBuffer | null;
+  bpm: number;
+  playing: boolean;
+  onTogglePlay(): void;
+  contextFor(): AudioContext;
+  onShift(bars: number): void;
+  onExclude(id: string): void;
+  canRender: boolean;
+  /** The file is made without sound. */
+  silent: boolean;
+  trackKind: TrackKind | null;
+  /** What `startHint` needs to say where to slide the song in Instagram. */
+  hintStartAt: number | undefined;
+  hintDurationMs: number | undefined;
+  hintDecodedMs: number;
+  renderState: RenderState;
+  result: Result | null;
+  onRender(): void;
+  onCancel(): void;
+}) {
+  const { plan } = variant;
+  const { timeline } = plan;
+  const slides = useMemo(() => reelSlides(variant, photos, PREVIEW_FORMAT), [variant, photos]);
+  const shots = useMemo(
+    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline),
+    [slides, faces, timeline],
+  );
+  const store = useMemo(() => new SlideImages(), []);
+  useEffect(() => () => store.close(), [store]);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx || timeline.duration === 0) return;
+    canvas.width = PREVIEW_FORMAT.width;
+    canvas.height = PREVIEW_FORMAT.height;
+
+    // The music is the clock: the picture follows the sound, never the other way.
+    let audio: AudioContext | null = null;
+    let source: AudioBufferSourceNode | null = null;
+    let startedAt = 0;
+    const startSound = () => {
+      if (!audio || !buffer) return;
+      source?.stop();
+      const gain = audio.createGain();
+      startedAt = audio.currentTime + 0.05;
+      applyEnvelope(gain.gain, startedAt, timeline.duration, plan.fadeOut);
+      source = audio.createBufferSource();
+      source.buffer = buffer;
+      source.connect(gain).connect(audio.destination);
+      source.start(startedAt, plan.offset, timeline.duration);
+    };
+    if (playing) {
+      audio = contextFor();
+      if (buffer) startSound();
+      else startedAt = audio.currentTime;
+    }
+
+    let frame = 0;
+    let windowKey = "";
+    let drawnStill = false;
+    const tick = () => {
+      let t = 0;
+      if (playing && audio) {
+        t = Math.max(0, audio.currentTime - startedAt);
+        if (t >= timeline.duration) {
+          if (buffer) startSound();
+          else startedAt = audio.currentTime;
+          t = 0;
+        }
+      }
+      const wanted = slidesToDecode(timeline, slides, t);
+      const key = wanted.map((p) => p.id).join();
+      if (key !== windowKey) {
+        windowKey = key;
+        void store.keepOnly(wanted).catch(() => {});
+      }
+      // Standing still, the first frame is drawn once its photo is in — three
+      // previews redrawing an unchanged frame 60 times a second slowed a
+      // render in the same tab to a third of its speed.
+      const ready = wanted.every((p) => store.imageOf(p.id) !== null);
+      if (playing || !drawnStill) {
+        drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
+        drawnStill = !playing && ready;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      source?.stop();
+    };
+  }, [playing, buffer, contextFor, timeline, plan.offset, plan.fadeOut, slides, shots, store]);
+
+  const busyHere = renderState.kind === "busy" && renderState.key === variant.key;
+  const busyElsewhere = renderState.kind === "busy" && !busyHere;
+  const perCut = plan.beatsPerCut;
+
+  return (
+    <Card as="section" aria-label={`Varianta ${variant.label}`} className="min-w-0">
+      <CardTitle as="h3">{variant.label}</CardTitle>
+      <div className="relative mx-auto aspect-[9/16] max-w-[15rem] overflow-hidden rounded bg-black">
+        <canvas
+          ref={canvasRef}
+          className="size-full"
+          role="img"
+          aria-label={`Náhled: ${variant.label}`}
+        />
+        <button
+          type="button"
+          onClick={onTogglePlay}
+          aria-pressed={playing}
+          aria-label={playing ? "Zastavit náhled" : "Přehrát náhled s hudbou"}
+          className="absolute inset-0 grid place-items-center text-white"
+        >
+          {!playing && (
+            <span aria-hidden className="grid size-14 place-items-center rounded-full bg-black/55">
+              {/* Drawn, not "▶": some systems paint that as a colour emoji. */}
+              <svg viewBox="0 0 24 24" className="ml-1 size-6 fill-current">
+                <path d="M7 4.5v15l12.5-7.5z" />
+              </svg>
+            </span>
+          )}
+        </button>
+      </div>
+      <p className="text-caption mt-3 tabular-nums">
+        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s · střih{" "}
+        {perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`} ({Math.round(bpm)} BPM)
+        {variant.accents && " · zrychlení na konci frází"}
+      </p>
+      <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
+        <span>
+          {trackKind === "listened"
+            ? `Od ${plan.offset.toFixed(1)} s poslechu`
+            : `Hudba od ${clock(plan.offset)}`}
+        </span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => onShift(-4)}
+          aria-label="Hudba o čtyři takty dřív"
+        >
+          ← dřív
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => onShift(4)}
+          aria-label="Hudba o čtyři takty později"
+        >
+          později →
+        </Button>
+      </div>
+
+      <details className="mt-3">
+        <summary className="text-caption cursor-pointer font-semibold">
+          Fotky ve variantě ({variant.photoIds.length})
+        </summary>
+        <p className="text-admin-muted text-caption mt-1 dark:text-neutral-400">
+          × fotku vyřadí ze všech variant a nahradí jinou.
+        </p>
+        <ul className="mt-2 grid grid-cols-4 gap-1.5">
+          {variant.photoIds.map((id, i) => {
+            const photo = photos.get(id)?.studio;
+            if (!photo) return null;
+            return (
+              <li key={id} className="bg-brand-tint relative aspect-square overflow-hidden rounded">
+                <AdminPhotoImage
+                  objectKey={photo.objectKey}
+                  thumbObjectKey={photo.thumbObjectKey}
+                  alt={photo.fileName}
+                  sizes="80px"
+                />
+                <span className="text-caption absolute bottom-0.5 left-0.5 rounded-full bg-black/60 px-1.5 font-semibold text-white tabular-nums">
+                  {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onExclude(id)}
+                  aria-label={`Vyřadit fotku ${photo.fileName}`}
+                  className="absolute top-0.5 right-0.5 grid size-8 place-items-center rounded-full bg-black/55 text-white pointer-coarse:size-11"
+                >
+                  <span aria-hidden>×</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+
+      <div className="mt-4 space-y-2">
+        {busyHere ? (
+          <div className="space-y-2" role="status">
+            <p className="text-sm">
+              {renderState.progress.step === "photos"
+                ? `Načítám fotky ${renderState.progress.done}/${renderState.progress.total}`
+                : `Vykresluji… ${Math.round(renderState.progress.share * 100)} %`}
+            </p>
+            <progress
+              className="w-full"
+              value={
+                renderState.progress.step === "photos"
+                  ? renderState.progress.done / Math.max(1, renderState.progress.total)
+                  : renderState.progress.share
+              }
+              max={1}
+            />
+            <Button size="sm" variant="secondary" onClick={onCancel}>
+              Zrušit
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full" disabled={!canRender || busyElsewhere} onClick={onRender}>
+            {result
+              ? "Vytvořit znovu"
+              : silent
+                ? "Vytvořit video bez zvuku"
+                : "Vytvořit video se zvukem"}
+          </Button>
+        )}
+        {renderState.kind === "error" && renderState.key === variant.key && (
+          <Alert tone="danger" compact>
+            Video se nepodařilo vytvořit — nejspíš se nenačetla některá fotka. Zkus to znovu,
+            případně v Chrome.
+          </Alert>
+        )}
+        {result && (
+          <div className="space-y-2">
+            <video
+              src={result.url}
+              controls
+              playsInline
+              className="mx-auto w-full max-w-[15rem] rounded bg-black"
+            />
+            <a
+              href={result.url}
+              download={result.file.name}
+              className="border-brand-primary bg-brand-primary hover:bg-brand-primary-dark flex min-h-11 items-center justify-center rounded-lg border px-5 text-sm font-semibold text-white"
+            >
+              Stáhnout MP4 ({(result.file.size / 1024 / 1024).toFixed(0)} MB)
+            </a>
+            {silent && (
+              <p className="text-admin-muted text-caption dark:text-neutral-400">
+                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň{" "}
+                {startHint(
+                  {
+                    kind: trackKind ?? "file",
+                    startAt: hintStartAt,
+                    durationMs: hintDurationMs,
+                    decodedMs: hintDecodedMs,
+                  },
+                  plan.offset,
+                )}{" "}
+                — první střih padne na první dobu taktu. Doladíš uchem.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}

@@ -16,7 +16,7 @@ import {
   buildTimeline,
   LENGTHS,
   photoCountFor,
-  slidesAt,
+  slidesToDecode,
   type Length,
 } from "@/lib/social-video/timeline";
 import { runUploads } from "@/lib/upload-run";
@@ -361,13 +361,7 @@ export function SocialVideoStudio({
 
   /** The photos on screen at `t` and the one after — what must be decoded. */
   const onScreen = useCallback(
-    (t: number) => {
-      const visible = slidesAt(timeline, t).map((v) => v.index);
-      const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
-      return [...new Set([...visible, next])]
-        .filter((i) => i >= 0 && i < slidePhotos.length)
-        .map((i) => slidePhotos[i]!);
-    },
+    (t: number) => slidesToDecode(timeline, slidePhotos, t),
     [timeline, slidePhotos],
   );
 

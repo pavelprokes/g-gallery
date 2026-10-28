@@ -28,6 +28,13 @@ the key a download delivers, or the lightbox player. On a video row `objectKey` 
 the admin's `/admin/g/[id]/video`, or the
 self-hosted face detection (YuNet in `public/vendor/yunet/`, MediaPipe's blink model under
 `public/vendor/mediapipe/`).
+**`docs/REELS.md`** is the authority for the reels cut to music (`/admin/reels`, built 2026-10-28) —
+several galleries at once, cuts on the song's beat, the music kept in the photographer's browser and
+never uploaded; read it before touching `src/lib/reels/*` or the sound in `encodeVideo`.
+**`docs/INSTAGRAM-AUDIO.md`** is the authority for Instagram's own music in the reels (Meta's Audio
+API, built 2026-10-28) — read it before touching `src/lib/instagram/*`, `InstagramConnection` or
+`/api/instagram/*`. Nothing is published to Instagram from the app (Pavel's decision); Meta facts
+there carry their sources — re-check them on Meta's pages before relying on one.
 **`docs/ADMIN-FILTERS.md`** is the authority for the admin grid's filters and sort (adopted
 2026-10-19) — every choice lives in the URL; read it before touching `/admin/g/[id]`'s photo grid.
 **`docs/REPLACE-PHOTOS.md`** is the authority for replacing delivered photos with a corrected export

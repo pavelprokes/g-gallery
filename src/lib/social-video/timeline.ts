@@ -104,7 +104,8 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
     visible.push({
       index,
       progress: span > 0 ? Math.min(1, (t - slide.start) / span) : 1,
-      alpha: index === 0 ? 1 : Math.min(1, (t - slide.start) / timeline.fade),
+      // A hard cut (a reel's, docs/REELS.md) has no fade to rise through.
+      alpha: index === 0 || timeline.fade <= 0 ? 1 : Math.min(1, (t - slide.start) / timeline.fade),
     });
   });
   // At the very end `t` equals the duration; keep the last frame drawn.
@@ -112,6 +113,16 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
     visible.push({ index: timeline.slides.length - 1, progress: 1, alpha: 1 });
   }
   return visible;
+}
+
+/** The slides on screen at `t` and the one after — what must be decoded
+ * (src/lib/social-video/slide-images.ts keeps only those in memory). */
+export function slidesToDecode<T>(timeline: Timeline, slides: readonly T[], t: number): T[] {
+  const visible = slidesAt(timeline, t).map((v) => v.index);
+  const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
+  return [...new Set([...visible, next])]
+    .filter((i) => i >= 0 && i < slides.length)
+    .map((i) => slides[i]!);
 }
 
 /** How long each slide's camera moves — what `planShot` caps speeds by. */
