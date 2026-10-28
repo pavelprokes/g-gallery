@@ -1,9 +1,9 @@
 "use client";
 
 // The photographer's music for reels, kept in this browser's IndexedDB
-// (docs/REELS.md §2): the file as added and its beat, found once. Nothing is
-// uploaded — a licence covers the photographer's use, not a copy on our
-// storage — so another computer starts with an empty list.
+// (docs/REELS.md §2): the file as added — or a song only listened to — and its
+// beat, found once. Nothing is uploaded — a licence covers the photographer's
+// use, not a copy on our storage — so another computer starts with an empty list.
 
 import { BEATS_VERSION, type BeatAnalysis } from "@/lib/reels/beats";
 
@@ -16,6 +16,19 @@ export interface MusicTrack {
   addedAt: number;
   blob: Blob;
   analysis: BeatAnalysis;
+  /** "file": added from the computer, and its sound goes into the video.
+   * "listened": heard through the microphone or a shared tab, for its beat
+   * only — the video is made without sound and the song is added in
+   * Instagram (docs/REELS.md §2). Absent on tracks from before listening. */
+  kind?: TrackKind;
+  /** Where a listened song played — a YouTube address, when it was one. */
+  origin?: string;
+}
+
+export type TrackKind = "file" | "listened";
+
+export function kindOf(track: MusicTrack): TrackKind {
+  return track.kind ?? "file";
 }
 
 const DB_NAME = "g-gallery-music";

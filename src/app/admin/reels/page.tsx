@@ -23,7 +23,9 @@ const galleryIds = z
   .catch([]);
 
 /**
- * A vertical reel cut to music from one or more weddings (docs/REELS.md): the
+ * A vertical reel cut to music from one or more weddings (docs/REELS.md) —
+ * published galleries only: what the guests have seen is what the reel
+ * shows, and their prints and views pick the photos. The
  * galleries are chosen in the address (`?g=`), the music and everything heavy
  * — the beat, the frames, the encoding — stay in the photographer's browser.
  */
@@ -45,21 +47,21 @@ export default async function ReelsPage(props: PageProps<"/admin/reels">) {
         title: true,
         eventDate: true,
         galleries: {
-          where: { trashedAt: null },
+          where: { trashedAt: null, status: "PUBLISHED" },
           orderBy: [{ position: "asc" }, { title: "asc" }],
           select: { id: true, title: true, ...usable },
         },
       },
     }),
     prisma.gallery.findMany({
-      where: { ownerId, trashedAt: null, eventId: null },
+      where: { ownerId, trashedAt: null, eventId: null, status: "PUBLISHED" },
       orderBy: [{ eventDate: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
       select: { id: true, title: true, eventDate: true, ...usable },
     }),
     selected.length === 0
       ? []
       : prisma.gallery.findMany({
-          where: { id: { in: selected }, ownerId, trashedAt: null },
+          where: { id: { in: selected }, ownerId, trashedAt: null, status: "PUBLISHED" },
           select: {
             id: true,
             title: true,

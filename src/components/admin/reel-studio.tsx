@@ -8,9 +8,11 @@ import { PACES, REEL_LENGTHS, shiftSection, type Pace, type ReelLength } from "@
 import {
   deleteTrack,
   isCurrent,
+  kindOf,
   listTracks,
   saveTrack,
   type MusicTrack,
+  type TrackKind,
 } from "@/lib/reels/music-library";
 import { reelVariants, type ReelSource, type ReelVariant } from "@/lib/reels/variants";
 import { FORMATS, type VideoFormat } from "@/lib/social-video/camera";
@@ -29,6 +31,7 @@ import {
 } from "@/components/admin/reel-render";
 import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
+import { ListenPanel } from "@/components/admin/reel-listen";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -97,8 +100,8 @@ interface Result {
   file: File;
 }
 
-const signatureOf = (v: ReelVariant) =>
-  `${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
+const signatureOf = (v: ReelVariant, trackId: string | null) =>
+  `${trackId}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.duration}`;
 
 export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   // ---- The photos, from every chosen gallery ----
@@ -203,6 +206,34 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
     };
   }, [track]);
 
+  /** Decoded, its beat found, kept in this browser and chosen. Throws when
+   * the browser cannot decode it. */
+  const addTrack = async (
+    blob: Blob,
+    name: string,
+    kind: TrackKind,
+    origin?: string,
+  ): Promise<void> => {
+    const audio = await decodeTrack(blob);
+    const entry: MusicTrack = {
+      id: crypto.randomUUID(),
+      name,
+      source: "",
+      addedAt: Date.now(),
+      blob,
+      analysis: analyzeTrack(audio),
+      kind,
+      origin,
+    };
+    decoded.current.set(entry.id, Promise.resolve(audio));
+    await saveTrack(entry).catch(() =>
+      setLibraryError("Skladbu se nepodařilo uložit v prohlížeči — platí jen do zavření stránky."),
+    );
+    setTracks((prev) => [entry, ...prev]);
+    setTrackId(entry.id);
+    writeLastTrack(entry.id);
+  };
+
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
     setLibraryError(null);
@@ -213,29 +244,23 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
       }
       setAdding(`Hledám rytmus: ${file.name}`);
       try {
-        const audio = await decodeTrack(file);
-        const entry: MusicTrack = {
-          id: crypto.randomUUID(),
-          name: file.name.replace(/\.[^.]+$/, ""),
-          source: "",
-          addedAt: Date.now(),
-          blob: file,
-          analysis: analyzeTrack(audio),
-        };
-        decoded.current.set(entry.id, Promise.resolve(audio));
-        await saveTrack(entry).catch(() =>
-          setLibraryError(
-            "Skladbu se nepodařilo uložit v prohlížeči — platí jen do zavření stránky.",
-          ),
-        );
-        setTracks((prev) => [entry, ...prev]);
-        setTrackId(entry.id);
-        writeLastTrack(entry.id);
+        await addTrack(file, file.name.replace(/\.[^.]+$/, ""), "file");
       } catch {
         setLibraryError(
           `${file.name}: tenhle soubor prohlížeč nepřehraje. Zkus MP3, M4A nebo WAV.`,
         );
       }
+    }
+    setAdding(null);
+  };
+
+  const addHeard = async (blob: Blob, name: string, origin?: string) => {
+    setLibraryError(null);
+    setAdding("Hledám rytmus v poslechu…");
+    try {
+      await addTrack(blob, name, "listened", origin);
+    } catch {
+      setLibraryError("Z poslechu se nepodařilo nic přečíst. Zkus to znovu a hlasitěji.");
     }
     setAdding(null);
   };
@@ -260,6 +285,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const [round, setRound] = useState(0);
   const [shown, setShown] = useState<Set<string>>(() => new Set());
   const [startBeats, setStartBeats] = useState<Record<string, number>>({});
+  const [byGuests, setByGuests] = useState(true);
 
   const analysis = track?.analysis ?? null;
   const variants = useMemo(
@@ -274,9 +300,10 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
             shown,
             round,
             startBeats,
+            byGuests,
           })
         : [],
-    [analysis, sources, seconds, pace, exclude, shown, round, startBeats],
+    [analysis, sources, seconds, pace, exclude, shown, round, startBeats, byGuests],
   );
 
   // A new song or length starts the music where the song is loudest again.
@@ -321,6 +348,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  const silent = track !== null && kindOf(track) === "listened";
   const render = async (variant: ReelVariant) => {
     if (!buffer || !codec || renderState.kind === "busy") return;
     setPlaying(null);
@@ -333,13 +361,14 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
         photos,
         faces,
         format: FORMAT,
-        track: buffer,
+        // A song only listened to stays out of the file: it is added in Instagram.
+        track: silent ? null : buffer,
         codec,
         title,
         signal: controller.signal,
         onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
       });
-      const signature = signatureOf(variant);
+      const signature = signatureOf(variant, trackId);
       setResults((prev) => [
         ...prev.filter((r) => r.signature !== signature),
         { signature, url: URL.createObjectURL(file), file },
@@ -357,14 +386,14 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
   };
   // A changed variant is a different video: its old file goes.
   useEffect(() => {
-    const live = new Set(variants.map(signatureOf));
+    const live = new Set(variants.map((v) => signatureOf(v, trackId)));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- dropping files of variants that changed
     setResults((prev) => {
       const kept = prev.filter((r) => live.has(r.signature));
       for (const r of prev) if (!kept.includes(r)) URL.revokeObjectURL(r.url);
       return kept.length === prev.length ? prev : kept;
     });
-  }, [variants]);
+  }, [variants, trackId]);
 
   return (
     <div className="space-y-6">
@@ -377,8 +406,9 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
             <>
               {tracks.length === 0 ? (
                 <p className="mb-3 text-sm">
-                  Přidej písničku z počítače — rytmus se najde sám a střihy padnou na doby. Skladby
-                  zůstávají jen v tomhle prohlížeči, nikam se nenahrávají.
+                  Přidej písničku z počítače, nebo ji nech stránku poslechnout — rytmus se najde sám
+                  a střihy padnou na doby. Skladby zůstávají jen v tomhle prohlížeči, nikam se
+                  nenahrávají.
                 </p>
               ) : (
                 <ul className="mb-3 space-y-2" role="radiogroup" aria-label="Písnička">
@@ -403,6 +433,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                             <span className="block truncate font-semibold">{t.name}</span>
                             <span className="text-admin-muted text-caption dark:text-neutral-400">
                               {Math.round(t.analysis.bpm)} BPM · {clock(t.analysis.duration)}
+                              {kindOf(t) === "listened" && " · poslech, video bude bez zvuku"}
                             </span>
                           </span>
                         </label>
@@ -441,6 +472,7 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                   }}
                 />
               </label>
+              <ListenPanel disabled={adding !== null} onHeard={addHeard} />
               {adding && (
                 <p className="text-caption mt-2" role="status">
                   {adding}
@@ -489,6 +521,21 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
             začne na první době taktu tam, kde písnička hraje naplno, a skončí s doznívající hudbou.
             Vybírá se z {pluralize(ownPhotos, FORMS.photo)} — tvé fotky, ne fotky hostů.
           </p>
+          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={byGuests}
+              onChange={(e) => setByGuests(e.target.checked)}
+              className="accent-brand-primary mt-0.5 size-5 shrink-0"
+            />
+            <span>
+              Fotky podle hostů
+              <span className="text-admin-muted text-caption block dark:text-neutral-400">
+                Bere hlavně ty, které si hosté nejvíc prohlíželi, dávali do tisku, do oblíbených a
+                reagovali na ně. Kde o nich hosté ještě nic neřekli, vybírá podle tvých hvězdiček.
+              </span>
+            </span>
+          </label>
           {exclude.size > 0 && (
             <Button
               size="sm"
@@ -548,8 +595,9 @@ export function ReelStudio({ galleries }: { galleries: ReelGallery[] }) {
                 }
                 onExclude={excludePhoto}
                 canRender={codec != null && buffer !== null}
+                silent={silent}
                 renderState={renderState}
-                result={results.find((r) => r.signature === signatureOf(variant)) ?? null}
+                result={results.find((r) => r.signature === signatureOf(variant, trackId)) ?? null}
                 onRender={() => void render(variant)}
                 onCancel={() => abortRef.current?.abort()}
               />
@@ -608,6 +656,7 @@ function VariantCard({
   onShift,
   onExclude,
   canRender,
+  silent,
   renderState,
   result,
   onRender,
@@ -624,6 +673,8 @@ function VariantCard({
   onShift(bars: number): void;
   onExclude(id: string): void;
   canRender: boolean;
+  /** The song was only listened to: the file is made without sound. */
+  silent: boolean;
   renderState: RenderState;
   result: Result | null;
   onRender(): void;
@@ -670,6 +721,7 @@ function VariantCard({
 
     let frame = 0;
     let windowKey = "";
+    let drawnStill = false;
     const tick = () => {
       let t = 0;
       if (playing && audio) {
@@ -686,7 +738,14 @@ function VariantCard({
         windowKey = key;
         void store.keepOnly(wanted).catch(() => {});
       }
-      drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
+      // Standing still, the first frame is drawn once its photo is in — three
+      // previews redrawing an unchanged frame 60 times a second slowed a
+      // render in the same tab to a third of its speed.
+      const ready = wanted.every((p) => store.imageOf(p.id) !== null);
+      if (playing || !drawnStill) {
+        drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
+        drawnStill = !playing && ready;
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -733,7 +792,9 @@ function VariantCard({
         {variant.accents && " · zrychlení na konci frází"}
       </p>
       <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
-        <span>Hudba od {clock(plan.offset)}</span>
+        <span>
+          {silent ? `Od ${plan.offset.toFixed(1)} s poslechu` : `Hudba od ${clock(plan.offset)}`}
+        </span>
         <Button
           size="sm"
           variant="secondary"
@@ -811,7 +872,11 @@ function VariantCard({
           </div>
         ) : (
           <Button className="w-full" disabled={!canRender || busyElsewhere} onClick={onRender}>
-            {result ? "Vytvořit znovu" : "Vytvořit video s hudbou"}
+            {result
+              ? "Vytvořit znovu"
+              : silent
+                ? "Vytvořit video bez zvuku"
+                : "Vytvořit video s hudbou"}
           </Button>
         )}
         {renderState.kind === "error" && renderState.key === variant.key && (
@@ -835,6 +900,12 @@ function VariantCard({
             >
               Stáhnout MP4 ({(result.file.size / 1024 / 1024).toFixed(0)} MB)
             </a>
+            {silent && (
+              <p className="text-admin-muted text-caption dark:text-neutral-400">
+                Video je bez zvuku. V Instagramu přidej stejnou písničku a začátek posuň na místo,
+                odkud jsi ji pouštěl — první střih padne na první dobu taktu.
+              </p>
+            )}
           </div>
         )}
       </div>

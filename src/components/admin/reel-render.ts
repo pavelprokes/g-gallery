@@ -1,6 +1,7 @@
 // A reel to an MP4 (docs/REELS.md §5): every photo fetched at the full
 // format's size, the music cut and faded, then the social video's own
-// encoder, frame by frame, with the sound alongside.
+// encoder, frame by frame, with the sound alongside — or none, for a song
+// that was only listened to.
 
 import { slugify } from "@/lib/gallery-slug";
 import { reelAudio } from "@/lib/reels/audio";
@@ -94,7 +95,8 @@ export async function renderReel({
   photos: ReadonlyMap<string, ReelPhoto>;
   faces: Readonly<Record<string, PhotoFaces | null>>;
   format: VideoFormat;
-  track: AudioBuffer;
+  /** The song, or null for a reel without sound — its song is added in Instagram. */
+  track: AudioBuffer | null;
   codec: EncodeCodec;
   title: string;
   onProgress(progress: RenderProgress): void;
@@ -117,12 +119,9 @@ export async function renderReel({
       }),
     );
     signal.throwIfAborted();
-    const audio = await reelAudio(
-      track,
-      variant.plan.offset,
-      timeline.duration,
-      variant.plan.fadeOut,
-    );
+    const audio = track
+      ? await reelAudio(track, variant.plan.offset, timeline.duration, variant.plan.fadeOut)
+      : undefined;
     let windowKey = "";
     const blob = await encodeVideo({
       width: format.width,
@@ -143,7 +142,7 @@ export async function renderReel({
       },
     });
     const seconds = Math.round(timeline.duration);
-    const name = `${slugify(title) || "reel"}-${slugify(variant.label)}-${seconds}s.mp4`;
+    const name = `${slugify(title) || "reel"}-${slugify(variant.label)}-${seconds}s${track ? "" : "-bez-zvuku"}.mp4`;
     return new File([blob], name, { type: "video/mp4" });
   } finally {
     store.close();

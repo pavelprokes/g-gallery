@@ -4,7 +4,7 @@
 // of the day, the format's shape — and this only shares the count out and
 // puts the galleries together.
 
-import type { TimelinePosition } from "@/lib/gallery-chapters";
+import { compareTimeline, type TimelinePosition } from "@/lib/gallery-chapters";
 import type { BeatAnalysis } from "@/lib/reels/beats";
 import { planReel, sections, type Pace, type ReelPlan } from "@/lib/reels/cuts";
 import type { VideoFormat } from "@/lib/social-video/camera";
@@ -24,6 +24,29 @@ export interface PickOptions {
   exclude?: ReadonlySet<string>;
   /** Galleries taken in turn rather than one after another. */
   mix?: boolean;
+  /** Choose among what the guests took to most (docs/REELS.md §4). */
+  byGuests?: boolean;
+}
+
+/** With guests deciding, the suggestion picks from this many times the
+ * photos it needs — room for its spread over the day and the format's shape. */
+const GUEST_POOL = 3;
+
+/**
+ * The photos the guests looked at, printed, loved and reacted to most
+ * (`likedScore`), `size` of them — or every photo, while too few have been
+ * noticed at all to fill it: the photographer's own marks decide then.
+ */
+export function guestPool(candidates: readonly VideoCandidate[], size: number): VideoCandidate[] {
+  const noticed = candidates.filter((c) => (c.liked ?? 0) > 0);
+  if (noticed.length < size) return [...candidates];
+  const kept = new Set(
+    noticed
+      .toSorted((a, b) => b.liked! - a.liked! || compareTimeline(a, b))
+      .slice(0, size)
+      .map((c) => c.id),
+  );
+  return candidates.filter((c) => kept.has(c.id));
 }
 
 /** `count` split as evenly as the galleries allow — a small one gives its spare to the rest. */
@@ -51,7 +74,7 @@ export function pickReelPhotos(
   sources: readonly ReelSource[],
   format: VideoFormat,
   count: number,
-  { avoid = new Set(), exclude = new Set(), mix = false }: PickOptions = {},
+  { avoid = new Set(), exclude = new Set(), mix = false, byGuests = false }: PickOptions = {},
 ): string[] {
   const usable = sources.map((s) => ({
     ...s,
@@ -61,11 +84,14 @@ export function pickReelPhotos(
     usable.map((s) => s.candidates.length),
     count,
   );
-  const lists = usable.map((s, i) =>
-    quotas[i]! > 0
-      ? suggestPhotos(s.candidates, s.chapterStarts, format, quotas[i]!, { avoid })
-      : [],
-  );
+  const lists = usable.map((s, i) => {
+    const quota = quotas[i]!;
+    if (quota === 0) return [];
+    // Photos already shown count towards the pool: "Další varianty" still
+    // has the guests' next favourites to reach for.
+    const pool = byGuests ? guestPool(s.candidates, quota * GUEST_POOL + avoid.size) : s.candidates;
+    return suggestPhotos(pool, s.chapterStarts, format, quota, { avoid });
+  });
   if (!mix) return lists.flat();
   const total = lists.reduce((n, list) => n + list.length, 0);
   const out: string[] = [];
@@ -120,6 +146,7 @@ export function reelVariants({
   shown,
   round,
   startBeats,
+  byGuests = false,
 }: {
   sources: readonly ReelSource[];
   format: VideoFormat;
@@ -131,6 +158,7 @@ export function reelVariants({
   round: number;
   /** A start the photographer moved a variant's music to, by key. */
   startBeats?: Readonly<Record<string, number>>;
+  byGuests?: boolean;
 }): ReelVariant[] {
   const available = sources.reduce(
     (n, s) => n + s.candidates.filter((c) => c.own && !exclude.has(c.id)).length,
@@ -154,6 +182,7 @@ export function reelVariants({
       avoid: recipe.fresh || round > 0 ? avoid : undefined,
       exclude,
       mix: recipe.mix && sources.length > 1,
+      byGuests,
     });
     if (photoIds.length < plan.timeline.slides.length) {
       plan = planReel(analysis, { ...options, maxPhotos: photoIds.length });

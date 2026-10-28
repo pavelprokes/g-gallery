@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { BeatAnalysis } from "@/lib/reels/beats";
-import { pickReelPhotos, reelVariants, shareOut, type ReelSource } from "@/lib/reels/variants";
+import {
+  guestPool,
+  pickReelPhotos,
+  reelVariants,
+  shareOut,
+  type ReelSource,
+} from "@/lib/reels/variants";
 import { FORMATS } from "@/lib/social-video/camera";
 import type { VideoCandidate } from "@/lib/social-video/suggest";
 
@@ -116,5 +122,35 @@ describe("reelVariants", () => {
       expect(v.photoIds.length).toBeLessThanOrEqual(6);
       expect(v.photoIds).toHaveLength(v.plan.timeline.slides.length);
     }
+  });
+});
+
+describe("by the guests", () => {
+  const liked = (source: ReelSource, ids: number[]): ReelSource => ({
+    ...source,
+    candidates: source.candidates.map((c, i) => ({ ...c, liked: ids.includes(i) ? 10 + i : 0 })),
+  });
+
+  it("keeps the guests' favourites, most noticed first", () => {
+    const source = liked(gallery("g", 50), [3, 7, 20, 30, 41]);
+    expect(guestPool(source.candidates, 3).map((c) => c.id)).toEqual([
+      "g-0020",
+      "g-0030",
+      "g-0041",
+    ]);
+  });
+
+  it("leaves the choice to the photographer while too few were noticed", () => {
+    const source = liked(gallery("g", 50), [3]);
+    expect(guestPool(source.candidates, 3)).toHaveLength(50);
+  });
+
+  it("takes the reel's photos from among them", () => {
+    const favourites = Array.from({ length: 30 }, (_, i) => i * 3);
+    const source = liked(gallery("g", 100), favourites);
+    const ids = pickReelPhotos([source], VERTICAL, 10, { byGuests: true });
+    expect(ids).toHaveLength(10);
+    const noticed = new Set(favourites.map((i) => `g-${String(i).padStart(4, "0")}`));
+    expect(ids.every((id) => noticed.has(id))).toBe(true);
   });
 });

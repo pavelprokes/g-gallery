@@ -9,16 +9,18 @@ on the beat, several galleries at once and the variants.
 
 ## 1. Decisions (2026-10-28)
 
-| Question          | Decision                                                                                                                                                                                                  |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Where             | `/admin/reels`, "Reels" in the admin's top bar — not per gallery: a reel is often several weddings.                                                                                                       |
-| Format            | 9:16 only, 1080×1920, 30 fps; 15, 20 or 30 s.                                                                                                                                                             |
-| Cuts              | Hard cuts, one photo per cut, every cut on a beat (§3). No crossfade.                                                                                                                                     |
-| Sound             | **Music in the file** — a change from the social video's "no sound": that one is a gift and a silent clip; this one is cut to the song, so the song belongs to it. AAC 192 kbit/s, 48 kHz.                |
-| Where music lives | **In the photographer's browser** (IndexedDB), never uploaded (§2). The licence is Pavel's; a copy on our storage would be ours to answer for.                                                            |
-| Which music       | Whatever file Pavel adds. The page lists where licensed music comes from (§6); we ship none — the session that built this could not reach any music library, and a bundled track would be redistribution. |
-| Variants          | Three at a time, side by side, each playing with its music; "Další varianty" for three more (§4).                                                                                                         |
-| Output            | Download only. Not added to a gallery: it is marketing, and often several couples' photos.                                                                                                                |
+| Question          | Decision                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where             | `/admin/reels`, "Reels" in the admin's top bar — not per gallery: a reel is often several weddings.                                                                                                                                                                                                                                                                                          |
+| Format            | 9:16 only, 1080×1920, 30 fps; 15, 20 or 30 s.                                                                                                                                                                                                                                                                                                                                                |
+| Cuts              | Hard cuts, one photo per cut, every cut on a beat (§3). No crossfade.                                                                                                                                                                                                                                                                                                                        |
+| Sound             | **Music in the file** when it came as a file — a change from the social video's "no sound": that one is a gift and a silent clip; this one is cut to the song, so the song belongs to it. AAC 192 kbit/s, 48 kHz. **No sound** when the song was only listened to (§2): its music is added in Instagram (Pavel, 2026-10-28).                                                                 |
+| Where music lives | **In the photographer's browser** (IndexedDB), never uploaded (§2). The licence is Pavel's; a copy on our storage would be ours to answer for.                                                                                                                                                                                                                                               |
+| Which music       | Whatever file Pavel adds, or a song the page listens to — from a YouTube player on the page, another tab or the microphone (§2). The page lists where licensed music comes from (§6); we ship none — the session that built this could not reach any music library, and a bundled track would be redistribution.                                                                             |
+| YouTube           | **Never downloaded** (Pavel asked for "a YouTube link → its music", 2026-10-28): the browser cannot fetch YouTube's audio at all, a server would need yt-dlp off Vercel against YouTube's terms and its blocking of data-centre addresses, and a song on YouTube is rarely licensed for a business's Reel. The page shows YouTube's own embedded player and listens to it for the beat (§2). |
+| Galleries         | **Published ones only**, the photos chosen by what the guests looked at and printed (§4, Pavel 2026-10-28).                                                                                                                                                                                                                                                                                  |
+| Variants          | Three at a time, side by side, each playing with its music; "Další varianty" for three more (§4).                                                                                                                                                                                                                                                                                            |
+| Output            | Download only. Not added to a gallery: it is marketing, and often several couples' photos.                                                                                                                                                                                                                                                                                                   |
 
 ## 2. The music
 
@@ -26,6 +28,25 @@ on the beat, several galleries at once and the variants.
 "where it is from and under what licence", and its beat analysis — in this browser's IndexedDB
 (`g-gallery-music`). Another computer starts with an empty list; a private window keeps tracks until
 the page closes and says so. A track analysed by an older `BEATS_VERSION` is analysed again on load.
+
+**Listening instead of a file** (`src/lib/reels/listen.ts`, `src/components/admin/reel-listen.tsx`):
+the song plays somewhere and the page records what it hears with `MediaRecorder`, raw (no echo
+cancelling, noise suppression or gain riding — they flatten the drum hits), 10 s to 3 min:
+
+- **"Poslouchat kartu"** — `getDisplayMedia` with the tab's sound, hinted to offer this very tab
+  (`preferCurrentTab`); the picture is dropped at once. A pasted YouTube link (`youtubeId`,
+  `src/lib/reels/youtube.ts`) shows YouTube's privacy-enhanced player (`youtube-nocookie.com`)
+  on the page, so the song plays in the tab being shared. Desktop Chrome and Edge only — phones
+  have no `getDisplayMedia`, and the option is not shown there.
+- **"Poslouchat mikrofonem"** — `getUserMedia`; works on phones too. A speaker in the room is
+  enough for the beat; the onset envelope only needs the hits to stand out.
+
+A listened track is stored like a file (`kind: "listened"`, the YouTube address as `origin`), its
+beat found the same way, and its recording plays under the previews — but **the rendered file has
+no sound** (`-bez-zvuku.mp4`): what was heard is a room or tab recording of someone else's song.
+The variant shows where in the recording its music starts; in Instagram Pavel adds the same song
+and slides its start to the place he played it from, by ear. Tested headless with Chromium's fake
+microphone fed a 126 BPM track: found 126 BPM from the recording.
 
 **The beat** (`src/lib/reels/beats.ts`, pure, tested on drum machines at 96–140 BPM):
 
@@ -65,8 +86,14 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 ## 4. Photos and variants (`src/lib/reels/variants.ts`)
 
 - **Galleries in the address**: `?g=id,id` (at most 10, `src/lib/reels/sources.ts`), ticked in
-  "Odkud fotky" by wedding (all its albums) or album. The server loads only the ticked galleries'
-  photos, through the same loader as the gallery's video page (`src/lib/social-video/studio-photos.ts`).
+  "Odkud fotky" by wedding (all its albums) or album. **Only published galleries** are listed or
+  loaded. The server loads only the ticked galleries' photos, through the same loader as the
+  gallery's video page (`src/lib/social-video/studio-photos.ts`).
+- **"Fotky podle hostů"** (on by default): inside each gallery the suggestion chooses only among
+  the photos the guests took to most — `likedScore`: favourites ×3, reactions and print copies ×2,
+  unique viewers ×1 — three times as many as the gallery's share, plus as many as earlier rounds
+  showed (`guestPool`). Where fewer photos than that were noticed at all, every photo stays in and
+  the photographer's own marks decide, as without the switch.
 - **The pick**: the slots' count shared out evenly between the galleries (a small one gives its
   spare to the others, `shareOut`); inside each, the social video's `suggestPhotos` — pins, stars,
   the guests' favourites, every chapter, the shape for 9:16, strong first and last photos. **Only
@@ -99,8 +126,10 @@ clock.
   Mac; even uncorrected, ~20–45 ms of late sound is below what people notice.
 - Video: H.264 where the browser encodes it, VP9 in MP4 otherwise (as in docs/SOCIAL-VIDEO.md §6).
 
-Measured 2026-10-28 in Playwright's Chromium (VP9 + WASM AAC), 4 vCPU: a 15 s reel renders in
-~20 s including the photos.
+Measured 2026-10-28 in Playwright's Chromium (VP9 software, WASM AAC), 4 vCPU, against `pnpm dev`:
+the encoder alone does a 15 s reel of flat frames in ~24 s; the page, with photos, in ~39 s. With
+the three previews redrawing a standing frame 60 times a second it took 68 s, so a preview that is
+not playing draws once its photo is in and stops.
 
 ## 6. Where the music comes from (what the page says)
 
@@ -123,7 +152,23 @@ build session; to re-check before relying on it):
 
 Fast cuts suit songs around 120–130 BPM (2 beats ≈ 1 s).
 
-## 7. Later
+## 7. Instagram's own music through its API (not built)
+
+Asked 2026-10-28. Meta has an **Instagram Audio API** (2026): with Facebook Login, a Reel
+published through the Content Publishing API can carry licensed audio searched for and attached by
+an `audio_configuration` parameter (`audio_name` alone only renames original audio). What could
+not be confirmed — developers.facebook.com is outside the build session's network — is whether a
+business account gets anything beyond the Sound Collection, whether a start time can be set, and
+what app review it needs. It would mean publishing from the admin (a Meta app, Facebook Login,
+`instagram_content_publish`, the video at a public URL) — a project of its own. The beat would still
+come from listening (§2): the API hands out ids, not audio. Sources:
+https://developers.facebook.com/docs/instagram-platform/content-publishing/audio-api/ ,
+https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media
+
+"No copyright" music (NoCopyrightSounds and the like) is usually free with credit for creators;
+for a business's marketing NCS points to its own licence (ncs.io/UsagePolicy, to read before use).
+
+## 8. Later
 
 - Words over the reel (names, place) — none now, as in the social video.
 - A flash or zoom punch on the downbeats as a style.

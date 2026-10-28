@@ -87,7 +87,10 @@ export function ReelSourcePicker({
             />
           )}
           {groups.length === 0 ? (
-            <p className="text-sm">Zatím tu není žádná galerie s fotkami.</p>
+            <p className="text-sm">
+              Zatím tu není žádná zveřejněná galerie. Reels se dělají jen ze zveřejněných — tam, kde
+              je už viděli hosté.
+            </p>
           ) : (
             <ul className="divide-admin-border max-h-[26rem] divide-y overflow-y-auto dark:divide-neutral-800">
               {shown.map((group) => {
