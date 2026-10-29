@@ -1,12 +1,12 @@
 // A reel to an MP4 (docs/REELS.md §6): every photo fetched at the full
-// format's size and enough over it for the reel's closer framing, the music cut and faded, then the social video's own
+// format's size and as far over it as its shot goes in, the music cut and faded, then the social video's own
 // encoder, frame by frame, with the sound alongside — or none, for a song
 // that was only listened to.
 
 import { slugify } from "@/lib/gallery-slug";
 import { reelAudio } from "@/lib/reels/audio";
 import type { ReelVariant } from "@/lib/reels/variants";
-import { REEL_ZOOM, type VideoFormat } from "@/lib/social-video/camera";
+import { shotZoom, type Shot, type VideoFormat } from "@/lib/social-video/camera";
 import { encodeVideo, type EncodeCodec } from "@/lib/social-video/encode";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
@@ -26,27 +26,33 @@ export interface ReelPhoto {
 
 /** Photos fetched at once — the studio's own pace. */
 const FETCH_CONCURRENCY = 4;
+/** Seconds of slides decoded ahead of the frame being encoded. */
+const RENDER_AHEAD = 1;
 
-/** A reel's slides, fetched at `format`'s size — the preview's or the file's. */
+/**
+ * A reel's slides and their shots at `format` — the preview's or the file's.
+ * The shots first: each photo is then fetched just large enough for how
+ * close its own shot goes (docs/REELS.md §5), not every one at the most.
+ */
 export function reelSlides(
   variant: ReelVariant,
   photos: ReadonlyMap<string, ReelPhoto>,
+  faces: Readonly<Record<string, PhotoFaces | null>>,
   format: VideoFormat,
-): (SlidePhoto & { coupleTags?: readonly Box[] })[] {
-  return variant.photoIds.flatMap((id) => {
+): { slides: (SlidePhoto & { coupleTags?: readonly Box[] })[]; shots: Shot[] } {
+  const chosen = variant.photoIds.flatMap((id) => {
     const photo = photos.get(id);
-    if (!photo) return [];
-    return [
-      {
-        id,
-        width: photo.width,
-        height: photo.height,
-        coupleTags: photo.coupleTags,
-        // Fetched for the reel's closer framing (camera.ts, REEL_ZOOM).
-        url: sourceUrl(photo.objectKey, photo, format, REEL_ZOOM),
-      },
-    ];
+    return photo ? [photo] : [];
   });
+  const shots = shotsFor(chosen, faces, format, variant.plan.timeline, { reel: true });
+  const slides = chosen.map((photo, i) => ({
+    id: photo.id,
+    width: photo.width,
+    height: photo.height,
+    coupleTags: photo.coupleTags,
+    url: sourceUrl(photo.objectKey, photo, format, shotZoom(photo, shots[i]!, format)),
+  }));
+  return { slides, shots };
 }
 
 export function reelFramePlan(
@@ -94,9 +100,8 @@ export async function renderReel({
   onProgress(progress: RenderProgress): void;
   signal: AbortSignal;
 }): Promise<File> {
-  const slides = reelSlides(variant, photos, format);
+  const { slides, shots } = reelSlides(variant, photos, faces, format);
   const { timeline } = variant.plan;
-  const shots = shotsFor(slides, faces, format, timeline, { reel: true });
   const store = new SlideImages();
   try {
     // Every photo first: a cut to black on the beat is worse than a wait.
@@ -124,7 +129,8 @@ export async function renderReel({
       signal,
       onProgress: (share) => onProgress({ step: "render", share }),
       drawAt: async (ctx, t) => {
-        const wanted = slidesToDecode(timeline, slides, t);
+        // The next second's photos decode alongside the frames being encoded.
+        const wanted = slidesToDecode(timeline, slides, t, RENDER_AHEAD);
         const key = wanted.map((p) => p.id).join();
         if (key !== windowKey) {
           windowKey = key;

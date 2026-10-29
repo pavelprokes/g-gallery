@@ -78,5 +78,11 @@ describe("slidesToDecode", () => {
     const fade = timeline.slides[1]!.start + 0.1;
     expect(slidesToDecode(timeline, slides, fade)).toEqual(["a", "b", "c"]);
     expect(slidesToDecode(timeline, slides, timeline.duration)).toEqual(["d"]);
+    // With a look-ahead, every slide starting within it as well.
+    expect(slidesToDecode(timeline, slides, 0, timeline.slides[2]!.start + 0.01)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   });
 });

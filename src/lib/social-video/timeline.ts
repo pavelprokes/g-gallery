@@ -116,12 +116,23 @@ export function slidesAt(timeline: Timeline, t: number): VisibleSlide[] {
 }
 
 /** The slides on screen at `t` and the one after — what must be decoded
- * (src/lib/social-video/slide-images.ts keeps only those in memory). */
-export function slidesToDecode<T>(timeline: Timeline, slides: readonly T[], t: number): T[] {
+ * (src/lib/social-video/slide-images.ts keeps only those in memory) — and
+ * every slide starting within `ahead` seconds: a reel's half-second slides
+ * need more than one decoded in advance to play in real time. */
+export function slidesToDecode<T>(
+  timeline: Timeline,
+  slides: readonly T[],
+  t: number,
+  ahead = 0,
+): T[] {
   const visible = slidesAt(timeline, t).map((v) => v.index);
   const next = visible.length > 0 ? Math.max(...visible) + 1 : 0;
-  return [...new Set([...visible, next])]
+  const soon = timeline.slides.flatMap((slide, i) =>
+    slide.start > t && slide.start < t + ahead ? [i] : [],
+  );
+  return [...new Set([...visible, next, ...soon])]
     .filter((i) => i >= 0 && i < slides.length)
+    .toSorted((a, b) => a - b)
     .map((i) => slides[i]!);
 }
 

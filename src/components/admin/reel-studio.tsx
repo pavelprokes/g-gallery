@@ -28,9 +28,8 @@ import { formatDuration } from "@/lib/video";
 import { startHint } from "@/lib/reels/start-hint";
 import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame } from "@/lib/social-video/frame";
-import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages } from "@/lib/social-video/slide-images";
-import { slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
+import { slidesAt, slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
 import {
   reelFramePlan,
   reelSlides,
@@ -69,6 +68,8 @@ const PREVIEW_FORMAT: VideoFormat = {
   width: Math.round(FORMAT.width * PREVIEW_SCALE),
   height: Math.round(FORMAT.height * PREVIEW_SCALE),
 };
+/** Seconds of slides the playing preview keeps decoded ahead of the music. */
+const PREVIEW_AHEAD = 2;
 /** A song file larger than this is not a song (or not one a reel needs). */
 const MAX_TRACK_BYTES = 60 * 1024 * 1024;
 
@@ -941,13 +942,14 @@ function VariantCard({
 }) {
   const { plan } = variant;
   const { timeline } = plan;
-  const slides = useMemo(() => reelSlides(variant, photos, PREVIEW_FORMAT), [variant, photos]);
-  const shots = useMemo(
-    () => shotsFor(slides, faces, PREVIEW_FORMAT, timeline, { reel: true }),
-    [slides, faces, timeline],
+  const { slides, shots } = useMemo(
+    () => reelSlides(variant, photos, faces, PREVIEW_FORMAT),
+    [variant, photos, faces],
   );
   const store = useMemo(() => new SlideImages(), []);
   useEffect(() => () => store.close(), [store]);
+  // Fetching the photos before the first play: "3 / 18".
+  const [preparing, setPreparing] = useState<{ done: number; total: number } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -961,6 +963,7 @@ function VariantCard({
     let audio: AudioContext | null = null;
     let source: AudioBufferSourceNode | null = null;
     let startedAt = 0;
+    let cancelled = false;
     const startSound = () => {
       if (!audio || !buffer) return;
       source?.stop();
@@ -972,11 +975,6 @@ function VariantCard({
       source.connect(gain).connect(audio.destination);
       source.start(startedAt, plan.offset, timeline.duration);
     };
-    if (playing) {
-      audio = contextFor();
-      if (buffer) startSound();
-      else startedAt = audio.currentTime;
-    }
 
     let frame = 0;
     let windowKey = "";
@@ -991,26 +989,57 @@ function VariantCard({
           t = 0;
         }
       }
-      const wanted = slidesToDecode(timeline, slides, t);
+      const wanted = slidesToDecode(timeline, slides, t, playing ? PREVIEW_AHEAD : 0);
       const key = wanted.map((p) => p.id).join();
       if (key !== windowKey) {
         windowKey = key;
         void store.keepOnly(wanted).catch(() => {});
       }
-      // Standing still, the first frame is drawn once its photo is in — three
-      // previews redrawing an unchanged frame 60 times a second slowed a
-      // render in the same tab to a third of its speed.
-      const ready = wanted.every((p) => store.imageOf(p.id) !== null);
-      if (playing || !drawnStill) {
+      // Only a frame whose photos are in is drawn: one still decoding keeps
+      // the last frame on screen rather than a black one. Standing still, the
+      // first frame is drawn once — three previews redrawing an unchanged
+      // frame 60 times a second slowed a render in the same tab to a third.
+      const onScreen = slidesAt(timeline, t).every((v) => store.imageOf(slides[v.index]!.id));
+      if (onScreen && (playing || !drawnStill)) {
         drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
-        drawnStill = !playing && ready;
+        drawnStill = !playing;
       }
       frame = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
+
+    if (!playing) {
+      frame = requestAnimationFrame(tick);
+    } else {
+      // Every photo fetched and the first seconds decoded before the music
+      // starts: a reel cuts every half second, faster than a photo arrives.
+      void (async () => {
+        let done = 0;
+        setPreparing({ done, total: slides.length });
+        try {
+          await Promise.all(
+            slides.map((p) =>
+              store.fetch(p).then(() => {
+                if (!cancelled) setPreparing({ done: ++done, total: slides.length });
+              }),
+            ),
+          );
+          await store.keepOnly(slidesToDecode(timeline, slides, 0, PREVIEW_AHEAD));
+        } catch {
+          // A photo that did not come stays black; the rest still plays.
+        }
+        if (cancelled) return;
+        setPreparing(null);
+        audio = contextFor();
+        if (buffer) startSound();
+        else startedAt = audio.currentTime;
+        frame = requestAnimationFrame(tick);
+      })();
+    }
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       source?.stop();
+      setPreparing(null);
     };
   }, [playing, buffer, contextFor, timeline, plan.offset, plan.fadeOut, slides, shots, store]);
 
@@ -1035,6 +1064,11 @@ function VariantCard({
           aria-label={playing ? "Zastavit náhled" : "Přehrát náhled s hudbou"}
           className="absolute inset-0 grid place-items-center text-white"
         >
+          {preparing && (
+            <span className="rounded-full bg-black/60 px-3 py-1 text-sm tabular-nums" role="status">
+              Načítám fotky {preparing.done}/{preparing.total}
+            </span>
+          )}
           {!playing && (
             <span aria-hidden className="grid size-14 place-items-center rounded-full bg-black/55">
               {/* Drawn, not "▶": some systems paint that as a colour emoji. */}
