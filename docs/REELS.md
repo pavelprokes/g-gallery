@@ -197,7 +197,11 @@ in a kiss, seen in profile, scores below the 0.7 the camera aims by, so the tigh
   whole slide stayed black. Chromium never showed it. Fixed in `drawFrame` (shared by the reel, the
   social video and the gift video): the shot is scaled to the bitmap per axis and clipped to it
   (`draw-clipped.ts`). Tried in WebKitGTK 2.52 (WebKitWebDriver + MiniBrowser) on a 30 s reel of 16
-  real photos with prod-like stored sizes: 915 of 915 frames black before, none after.
+  real photos with prod-like stored sizes: 915 of 915 frames black before, none after. Then on 127 photos
+  of Pavel's five galleries, fetched through the real Cloudflare transforms, and his song: the
+  WebKit preview went from 75 of 80 samples black to none; the WebKit and the Chromium export of a
+  30 s reel, 0 of 909 frames black. (Chrome on an iPhone is WebKit too — Apple allows no other
+  engine on iOS.)
 - The face scan's second look drew a window around each face — past the photo's edge for a face
   near it, or one large enough — and in Safari saw nothing there, so those faces were dropped: the
   crop then cut people it never knew of. Drawn clipped too; `FACES_MODEL` gained `+clip`, so the
