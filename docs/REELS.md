@@ -158,6 +158,13 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
   stretches; "Zpět na první návrh" returns to round 0.
 - **×** on a photo takes it out of every variant (and the gap is filled); "Vrátit vyřazené fotky"
   brings them back. Nothing is stored on the server.
+- **Shape first** (2026-10-29, Pavel's 30 s reel — people sliced at the frame's edge): cropped to
+  9:16 (the default), a landscape photo loses two thirds of its width, and with it often someone the
+  face scan did not see — a back, a turned head, a child half in. The suggestion (`fitFor`,
+  `reelCrop`) ranks a landscape 2 lower, 4 more when the reel's crop cuts a face and 3 when it leaves
+  one of the photo's people (a face at least half the largest one's width) beside it: landscapes
+  come in only where a gallery's portraits run out. With "Fotky na šířku: Celé" none of this
+  applies.
 
 ## 5. Framing — the reel's camera
 
@@ -182,6 +189,15 @@ in a kiss, seen in profile, scores below the 0.7 the camera aims by, so the tigh
   whole over its own blurred copy (`fit`, as the slideshow maker does) instead of cut to 9:16.
 - Checked on 16 real photos of one wedding through the same YuNet pass the admin runs (1–17 faces
   each): no face box cut by the still frame or the zoomed one.
+- **No black slide** (2026-10-29 — 348 of 909 frames of Pavel's 30 s reel were black, whole slides
+  at a time): a decoded bitmap that the browser emptied draws nothing. Every frame of a render now
+  checks its photos draw (`SlideImages.ensureDrawn`, a 4×4 probe: opaque and not pure black); one
+  that does not is decoded again from its bytes, then through an `<img>`, and a photo that still
+  draws nothing fails the render instead of leaving its slide black. The preview does the same.
+  Simulated (every third bitmap empty or black): 285 of 915 frames black before, none after. The
+  same check guards the social video and the gift video.
+- A render with "Jemné přiblížení" or "Celé" finished and was then thrown away (the list of current
+  results ignored the framing) — fixed.
 
 - **Photos in time** (2026-10-29 — Pavel saw the preview go black between photos): the preview
   fetches every photo of a variant before the music starts ("Načítám fotky 3/18"), keeps the next

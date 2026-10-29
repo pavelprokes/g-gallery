@@ -12,7 +12,7 @@ import type { PhotoFaces } from "@/lib/social-video/faces";
 import { drawFrame, type FramePlan } from "@/lib/social-video/frame";
 import { shotsFor } from "@/lib/social-video/shots";
 import { SlideImages, type SlidePhoto } from "@/lib/social-video/slide-images";
-import { slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
+import { slidesAt, slidesToDecode, type Timeline } from "@/lib/social-video/timeline";
 import type { Box } from "@/lib/social-video/face-tags";
 import { sourceUrl } from "@/components/admin/face-scan";
 
@@ -151,6 +151,9 @@ export async function renderReel({
           windowKey = key;
           await store.keepOnly(wanted);
         }
+        // Every frame's photos checked to draw: a bitmap the browser emptied
+        // is decoded again, or the render fails — never a black slide.
+        await store.ensureDrawn(slidesAt(timeline, t).map((v) => slides[v.index]!));
         drawFrame(ctx, reelFramePlan(store, slides, shots, format, timeline), t);
       },
     });

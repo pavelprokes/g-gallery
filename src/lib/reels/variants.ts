@@ -28,6 +28,10 @@ export interface PickOptions {
   byGuests?: boolean;
   /** The photos the photographer picked by hand: only these, when there are any. */
   only?: ReadonlySet<string>;
+  /** Landscape photos shown whole over their blur ("Fotky na šířku: Celé"):
+   * otherwise each is cropped to the video's shape, and the ones that crop
+   * cuts people from give way (`SuggestOptions.reelCrop`). */
+  wholeAcross?: boolean;
 }
 
 /** With guests deciding, the suggestion picks from this many times the
@@ -106,7 +110,14 @@ export function pickReelPhotos(
   sources: readonly ReelSource[],
   format: VideoFormat,
   count: number,
-  { avoid = new Set(), exclude = new Set(), mix = false, byGuests = false, only }: PickOptions = {},
+  {
+    avoid = new Set(),
+    exclude = new Set(),
+    mix = false,
+    byGuests = false,
+    only,
+    wholeAcross = false,
+  }: PickOptions = {},
 ): string[] {
   const usable = sources.map((s) => ({
     ...s,
@@ -126,7 +137,7 @@ export function pickReelPhotos(
       byGuests && !only?.size
         ? guestPool(s.candidates, quota * GUEST_POOL + avoid.size)
         : s.candidates;
-    return suggestPhotos(pool, s.chapterStarts, format, quota, { avoid });
+    return suggestPhotos(pool, s.chapterStarts, format, quota, { avoid, reelCrop: !wholeAcross });
   });
   if (!mix) return lists.flat();
   const total = lists.reduce((n, list) => n + list.length, 0);
@@ -186,6 +197,7 @@ export function reelVariants({
   byGuests = false,
   mixGalleries = true,
   only,
+  wholeAcross = false,
 }: {
   sources: readonly ReelSource[];
   format: VideoFormat;
@@ -205,6 +217,8 @@ export function reelVariants({
   mixGalleries?: boolean;
   /** The photos picked by hand; empty or missing — the suggestion picks. */
   only?: ReadonlySet<string>;
+  /** Landscape photos shown whole (`PickOptions.wholeAcross`). */
+  wholeAcross?: boolean;
 }): ReelVariant[] {
   const available = sources.reduce(
     (n, s) => n + s.candidates.filter((c) => usableFor(c, exclude, only)).length,
@@ -240,6 +254,7 @@ export function reelVariants({
       mix: (mixGalleries || recipe.mix) && sources.length > 1,
       byGuests,
       only,
+      wholeAcross,
     });
     if (handPicked && !roomToAvoid && (i > 0 || round > 0)) {
       photoIds = reordered(photoIds, round * RECIPES.length + i);

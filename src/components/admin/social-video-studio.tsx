@@ -434,6 +434,8 @@ export function SocialVideoStudio({
             windowKey = key;
             await images.keepOnly(wanted);
           }
+          // A bitmap the browser emptied is decoded again (SlideImages.ensureDrawn).
+          await images.ensureDrawn(wanted);
           drawFrame(ctx, planWith(images), t);
         },
       });

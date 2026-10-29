@@ -38,6 +38,53 @@ function photo(minutes: number, extra: Partial<VideoCandidate> = {}): VideoCandi
 
 const withFaces = (...faces: Face[]) => ({ v: 1 as const, model: FACES_MODEL, faces });
 
+describe("fitFor for a reel's crop", () => {
+  const reel = { reelCrop: true };
+  const at = (x: number, w = 0.06, score = 0.9): Face => ({
+    x,
+    y: 0.3,
+    w,
+    h: w * 1.4,
+    score,
+    le: [x + w / 4, 0.33],
+    re: [x + (3 * w) / 4, 0.33],
+    blink: null,
+  });
+
+  it("takes a landscape couple the crop holds whole only after the portraits", () => {
+    const close = photo(0, { faces: withFaces(at(0.42), at(0.5)) });
+    // Nobody cut or left out: only the two thirds of the photo a crop loses.
+    expect(fitFor(close, VERTICAL, reel)).toBe(fitFor(close, VERTICAL) - 2);
+    const tall = photo(0, { width: 2000, height: 3000, faces: withFaces(at(0.4, 0.1)) });
+    expect(fitFor(tall, VERTICAL, reel)).toBeGreaterThan(fitFor(close, VERTICAL, reel) + 3);
+  });
+
+  it("steers away from a landscape the crop leaves people beside", () => {
+    const close = photo(0, { faces: withFaces(at(0.42), at(0.5)) });
+    // A row of four across the photo: a 9:16 crop holds one or two.
+    const row = photo(0, { faces: withFaces(at(0.1), at(0.35), at(0.6), at(0.85)) });
+    expect(fitFor(row, VERTICAL, reel)).toBeLessThanOrEqual(fitFor(close, VERTICAL, reel) - 3);
+    // Even someone too unsure to aim by — a profile in a kiss — counts.
+    const profile = photo(0, { faces: withFaces(at(0.3), at(0.7, 0.06, 0.62)) });
+    expect(fitFor(profile, VERTICAL, reel)).toBeLessThan(fitFor(close, VERTICAL, reel));
+  });
+
+  it("does not count a guest far behind", () => {
+    const behind = photo(0, { faces: withFaces(at(0.45, 0.08), at(0.9, 0.02)) });
+    const alone = photo(0, { faces: withFaces(at(0.45, 0.08)) });
+    expect(fitFor(behind, VERTICAL, reel)).toBe(fitFor(alone, VERTICAL, reel));
+  });
+
+  it("leaves a portrait photo's people alone", () => {
+    const tall = photo(0, {
+      width: 2000,
+      height: 3000,
+      faces: withFaces(at(0.2, 0.1), at(0.45, 0.1), at(0.7, 0.1)),
+    });
+    expect(fitFor(tall, VERTICAL, reel)).toBeGreaterThanOrEqual(fitFor(tall, VERTICAL));
+  });
+});
+
 describe("fitFor", () => {
   it("prefers a portrait photo for 9:16 and a landscape one for 16:9", () => {
     const tall = photo(0, { width: 2000, height: 3000 });

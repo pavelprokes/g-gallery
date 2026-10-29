@@ -10,11 +10,13 @@ import {
   eyesInSafeArea,
   FRAMING_MIN_SCORE,
   planShot,
+  type PhotoForShot,
   type VideoFormat,
 } from "@/lib/social-video/camera";
 import { aimFaces } from "@/lib/social-video/aim";
 import { coupleFaces, focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { Face, PhotoFaces } from "@/lib/social-video/faces";
+import { isAcross } from "@/lib/social-video/shots";
 import { FADE_SECONDS, SLIDE_SECONDS } from "@/lib/social-video/timeline";
 
 export interface VideoCandidate extends HighlightCandidate {
@@ -34,6 +36,9 @@ export interface SuggestOptions {
   /** Photos a previous suggestion already showed: "Jiný výběr" reaches past
    * them where the day offers anything else. Pinned photos stay regardless. */
   avoid?: ReadonlySet<string>;
+  /** Framed as a reel crops every photo to the format (docs/REELS.md §5),
+   * never shown whole: the photos that crop cuts people from give way. */
+  reelCrop?: boolean;
 }
 
 /** A guest's heart says the most, a reaction or a print copy a little less, a
@@ -91,7 +96,7 @@ export function suggestPhotos(
   chapterStarts: readonly TimelinePosition[],
   format: VideoFormat,
   count: number,
-  { avoid = new Set() }: SuggestOptions = {},
+  { avoid = new Set(), reelCrop = false }: SuggestOptions = {},
 ): string[] {
   const byId = new Map(candidates.map((c) => [c.id, c]));
   // Any gallery gets a proposal — a small one simply all of its photos. (The
@@ -126,7 +131,9 @@ export function suggestPhotos(
     })),
   ].sort((p, q) => compareTimeline(p.candidate, q.candidate));
 
-  const fitness = new Map(pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format)]));
+  const fitness = new Map(
+    pool.map(({ candidate }) => [candidate.id, fitFor(candidate, format, { reelCrop })]),
+  );
   const likedBonus = likedBonusFor(candidates);
   const rank = (p: (typeof pool)[number]) =>
     fitness.get(p.candidate.id)! +
@@ -192,12 +199,33 @@ function acrossChapters<T extends { part: number }>(ranked: readonly T[], n: num
   return out;
 }
 
+/** A reel's crop that cuts through a face… */
+const REEL_CUT_PENALTY = 4;
+/** …or leaves one of the photo's people beside it: their shoulder, or half a
+ * profile the detector did not see, is then sliced by the frame's edge
+ * (Pavel's 30 s reel, 2026-10-29 — landscape photos cut to 9:16). */
+const REEL_LEFT_OUT_PENALTY = 3;
+/** Cropped to 9:16, a landscape photo loses two thirds of its width — and
+ * with it, often, someone the face scan did not see (a back, a turned head, a
+ * child half in): a reel takes one only where portraits run out. */
+const REEL_ACROSS_PENALTY = 2;
+/** A face at least this share of the largest one's width is one of the
+ * photo's people; a smaller one is a guest further back. */
+const REEL_PEOPLE_SHARE = 0.5;
+
 /** How well a photo suits the format, from its shape and — when known — its faces. */
-export function fitFor(c: VideoCandidate, format: VideoFormat): number {
+export function fitFor(
+  c: VideoCandidate,
+  format: VideoFormat,
+  { reelCrop = false }: { reelCrop?: boolean } = {},
+): number {
   let score = 0;
   const portrait = c.width !== null && c.height !== null && c.height > c.width;
   const wantsPortrait = format.height > format.width;
   if (c.width !== null && c.height !== null && portrait === wantsPortrait) score += 2;
+  if (reelCrop && c.width !== null && c.height !== null) {
+    if (isAcross({ width: c.width, height: c.height }, format)) score -= REEL_ACROSS_PENALTY;
+  }
 
   const faces = c.faces?.faces;
   const people = peopleIn(c);
@@ -221,6 +249,7 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
     faces: aimFaces(focusFaces(faces, coupleTags), c.faces?.focus),
     focus: c.faces?.focus,
   };
+  if (reelCrop) return score - reelCropTrouble({ ...framing, avoid: faces }, format);
   const shot = planShot(framing, format, SLIDE_SECONDS + FADE_SECONDS);
   // A wide group cut to 9:16 can only be shown whole, over its own blur — the
   // suggestion steers away from it; the photographer can still add it.
@@ -228,6 +257,26 @@ export function fitFor(c: VideoCandidate, format: VideoFormat): number {
   // A face at the photo's very edge cannot be brought to the eye line.
   else if (!eyesInSafeArea(framing, shot.to, format)) score -= 1;
   return score;
+}
+
+/** What a reel's crop (still, `{ reel }`) does to the photo's people. */
+function reelCropTrouble(photo: PhotoForShot & { avoid: readonly Face[] }, format: VideoFormat) {
+  const { from: crop } = planShot(photo, format, SLIDE_SECONDS, { reel: { zoom: false } });
+  const largest = Math.max(0, ...photo.avoid.map((f) => f.w));
+  let trouble = 0;
+  for (const f of photo.avoid) {
+    if (f.w < largest * REEL_PEOPLE_SHARE) continue;
+    const x0 = f.x * photo.width;
+    const x1 = (f.x + f.w) * photo.width;
+    const y0 = f.y * photo.height;
+    const y1 = (f.y + f.h) * photo.height;
+    const inX = Math.min(x1, crop.x + crop.w) - Math.max(x0, crop.x);
+    const inY = Math.min(y1, crop.y + crop.h) - Math.max(y0, crop.y);
+    if (inX >= x1 - x0 - 0.5 && inY >= y1 - y0 - 0.5) continue;
+    if (inX > 0 && inY > 0) return REEL_CUT_PENALTY;
+    trouble = REEL_LEFT_OUT_PENALTY;
+  }
+  return trouble;
 }
 
 /** Not three photos without people in a row: the middle one gives way to the

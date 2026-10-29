@@ -451,6 +451,7 @@ export function ReelStudio({
             byGuests,
             mixGalleries,
             only,
+            wholeAcross,
           })
         : [],
     [
@@ -466,6 +467,7 @@ export function ReelStudio({
       byGuests,
       mixGalleries,
       only,
+      wholeAcross,
     ],
   );
   const loudest = useMemo(
@@ -626,7 +628,7 @@ export function ReelStudio({
       return kept.length === prev.length ? prev : kept;
     });
     liveSignatures.current = live;
-  }, [variants, trackId, withSound]);
+  }, [variants, trackId, withSound, framing]);
 
   return (
     <div className="space-y-6">
@@ -1080,7 +1082,12 @@ function VariantCard({
       // the last frame on screen rather than a black one. Standing still, the
       // first frame is drawn once — three previews redrawing an unchanged
       // frame 60 times a second slowed a render in the same tab to a third.
-      const onScreen = slidesAt(timeline, t).every((v) => store.imageOf(slides[v.index]!.id));
+      const visible = slidesAt(timeline, t).map((v) => slides[v.index]!);
+      const onScreen = visible.every((p) => store.draws(p.id));
+      // Decoded but drawing nothing — emptied by the browser: decoded again.
+      if (visible.some((p) => store.imageOf(p.id) && !store.draws(p.id))) {
+        void store.ensureDrawn(visible).catch(() => {});
+      }
       if (onScreen && (playing || !drawnStill)) {
         drawFrame(ctx, reelFramePlan(store, slides, shots, PREVIEW_FORMAT, timeline), t);
         drawnStill = !playing;
