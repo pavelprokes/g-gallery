@@ -47,6 +47,7 @@ import { InstagramMusic, type InstagramState } from "@/components/admin/reel-ins
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 
 // docs/REELS.md is the flow: galleries (the picker above), a song, the
 // length and pace, three variants cut on its beat, one rendered with the
@@ -105,11 +106,14 @@ function writePicked(key: string, ids: string[]) {
 const SECTION_KEY = "section";
 
 const clock = (seconds: number) => formatDuration(seconds * 1000);
+/** "14,0": seconds to a tenth, with the Czech decimal comma. */
+const tenths = (seconds: number) =>
+  seconds.toLocaleString("cs", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** "0,6–1,7 s": the shortest and longest photo, the held last one aside. */
 function lengthRange(timeline: Timeline): string {
   const lengths = timeline.slides.slice(0, -1).map((s) => s.end - s.start);
-  if (lengths.length === 0) return `${timeline.duration.toFixed(1)} s`;
+  if (lengths.length === 0) return `${tenths(timeline.duration)} s`;
   const f = (v: number) => v.toLocaleString("cs", { maximumFractionDigits: 1 });
   const [lo, hi] = [Math.min(...lengths), Math.max(...lengths)];
   return lo.toFixed(1) === hi.toFixed(1) ? `${f(lo)} s` : `${f(lo)}–${f(hi)} s`;
@@ -487,6 +491,37 @@ export function ReelStudio({
 
   // ---- Playback: one variant at a time, with its music ----
   const [playing, setPlaying] = useState<string | null>(null);
+  // ---- The variants on a phone: a strip to swipe through ----
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [shownVariant, setShownVariant] = useState(0);
+  const onStripScroll = () => {
+    const strip = stripRef.current;
+    if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+    const cards = [...strip.children] as HTMLElement[];
+    const middle = strip.scrollLeft + strip.clientWidth / 2;
+    const index = cards.reduce(
+      (best, card, i) =>
+        Math.abs(card.offsetLeft + card.offsetWidth / 2 - middle) <
+        Math.abs(cards[best]!.offsetLeft + cards[best]!.offsetWidth / 2 - middle)
+          ? i
+          : best,
+      0,
+    );
+    if (index === shownVariant) return;
+    setShownVariant(index);
+    // A variant swiped away stops playing.
+    setPlaying((p) => (p === SECTION_KEY ? p : null));
+  };
+  const showVariant = (index: number) => {
+    setShownVariant(index);
+    const card = stripRef.current?.children[index] as HTMLElement | undefined;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    card?.scrollIntoView({
+      behavior: still ? "auto" : "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  };
   const audioContext = useRef<AudioContext | null>(null);
   const contextFor = useCallback(() => {
     audioContext.current ??= new AudioContext();
@@ -634,7 +669,7 @@ export function ReelStudio({
                         onBlur={(e) => updateSource(t.id, e.target.value.trim())}
                         placeholder="Odkud je a jaká licence (pro tebe)"
                         aria-label={`Odkud je skladba ${t.name}`}
-                        className="border-admin-border text-caption mt-1 min-h-11 w-full rounded border px-2 dark:border-neutral-700 dark:bg-neutral-900"
+                        className="border-admin-border mt-1 min-h-11 w-full rounded border px-2 text-base sm:text-xs dark:border-neutral-700 dark:bg-neutral-900"
                       />
                     </li>
                   ))}
@@ -678,32 +713,22 @@ export function ReelStudio({
 
         <Card as="section">
           <CardTitle>Délka a tempo</CardTitle>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Délka">
-            {REEL_LENGTHS.map((l) => (
-              <Button
-                key={l}
-                role="radio"
-                aria-checked={seconds === l}
-                variant={seconds === l ? "primary" : "secondary"}
-                onClick={() => setSeconds(l)}
-              >
-                {l} s
-              </Button>
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Tempo střihů">
-            {(Object.keys(PACES) as Pace[]).map((p) => (
-              <Button
-                key={p}
-                role="radio"
-                aria-checked={pace === p}
-                variant={pace === p ? "primary" : "secondary"}
-                onClick={() => setPace(p)}
-              >
-                {PACE_LABEL[p]}
-              </Button>
-            ))}
-          </div>
+          <ChoiceGroup
+            label="Délka"
+            value={seconds}
+            onChange={setSeconds}
+            choices={REEL_LENGTHS.map((l) => ({ value: l, label: `${l} s` }))}
+          />
+          <ChoiceGroup
+            label="Tempo střihů"
+            className="mt-3"
+            value={pace}
+            onChange={setPace}
+            choices={(Object.keys(PACES) as Pace[]).map((p) => ({
+              value: p,
+              label: PACE_LABEL[p],
+            }))}
+          />
           <p className="text-admin-muted text-caption mt-3 dark:text-neutral-400">
             {pace === "song"
               ? "Střihy jdou s písničkou: v klidné části fotka chvíli vydrží, v refrénu se mění na každou dobu, nová část i výrazný úder dostanou vlastní střih."
@@ -729,24 +754,16 @@ export function ReelStudio({
               </span>
             </span>
           </label>
-          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Zvuk ve videu">
-            {(
-              [
-                [true, "Se zvukem"],
-                [false, "Bez zvuku"],
-              ] as const
-            ).map(([value, label]) => (
-              <Button
-                key={label}
-                role="radio"
-                aria-checked={withSound === value}
-                variant={withSound === value ? "primary" : "secondary"}
-                onClick={() => setWithSound(value)}
-              >
-                {label}
-              </Button>
-            ))}
-          </div>
+          <ChoiceGroup
+            label="Zvuk ve videu"
+            className="mt-3"
+            value={withSound}
+            onChange={setWithSound}
+            choices={[
+              { value: true, label: "Se zvukem" },
+              { value: false, label: "Bez zvuku" },
+            ]}
+          />
           <p className="text-admin-muted text-caption mt-2 dark:text-neutral-400">
             Bez zvuku přidáš písničku až v Instagramu — z jeho knihovny, licencovanou.
           </p>
@@ -819,39 +836,54 @@ export function ReelStudio({
               </Button>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          {/* On a phone the variants sit side by side to swipe through, not
+              three screens tall each; the row above says which one is shown. */}
+          <ChoiceGroup
+            label="Zobrazená varianta"
+            size="sm"
+            className="mb-3 md:hidden"
+            value={Math.min(shownVariant, variants.length - 1)}
+            onChange={showVariant}
+            choices={variants.map((v, i) => ({ value: i, label: v.label }))}
+          />
+          <div
+            ref={stripRef}
+            onScroll={onStripScroll}
+            className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 md:pb-0"
+          >
             {variants.map((variant) => (
-              <VariantCard
-                key={variant.key}
-                variant={variant}
-                photos={photos}
-                faces={faces}
-                buffer={buffer}
-                bpm={analysis.bpm}
-                playing={playing === variant.key}
-                onTogglePlay={() => setPlaying((p) => (p === variant.key ? null : variant.key))}
-                contextFor={contextFor}
-                onShift={(bars) =>
-                  setStartBeats((prev) => ({
-                    ...prev,
-                    [variant.key]: shiftSection(analysis, variant.plan.startBeat, bars),
-                  }))
-                }
-                onExclude={excludePhoto}
-                canRender={codec != null && buffer !== null}
-                silent={silent}
-                trackKind={trackKind}
-                hintStartAt={trackStartAt}
-                hintDurationMs={trackDurationMs}
-                hintDecodedMs={decodedMs}
-                renderState={renderState}
-                result={
-                  results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
-                  null
-                }
-                onRender={() => void render(variant)}
-                onCancel={() => abortRef.current?.abort()}
-              />
+              <div key={variant.key} className="w-[86%] shrink-0 snap-center md:w-auto">
+                <VariantCard
+                  variant={variant}
+                  photos={photos}
+                  faces={faces}
+                  buffer={buffer}
+                  bpm={analysis.bpm}
+                  playing={playing === variant.key}
+                  onTogglePlay={() => setPlaying((p) => (p === variant.key ? null : variant.key))}
+                  contextFor={contextFor}
+                  onShift={(bars) =>
+                    setStartBeats((prev) => ({
+                      ...prev,
+                      [variant.key]: shiftSection(analysis, variant.plan.startBeat, bars),
+                    }))
+                  }
+                  onExclude={excludePhoto}
+                  canRender={codec != null && buffer !== null}
+                  silent={silent}
+                  trackKind={trackKind}
+                  hintStartAt={trackStartAt}
+                  hintDurationMs={trackDurationMs}
+                  hintDecodedMs={decodedMs}
+                  renderState={renderState}
+                  result={
+                    results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
+                    null
+                  }
+                  onRender={() => void render(variant)}
+                  onCancel={() => abortRef.current?.abort()}
+                />
+              </div>
             ))}
           </div>
         </section>
@@ -864,7 +896,7 @@ export function ReelStudio({
 function MusicSources() {
   return (
     <details className="text-caption mt-4">
-      <summary className="cursor-pointer font-semibold">
+      <summary className="cursor-pointer py-3.5 font-semibold">
         Kde vzít hudbu, aby Instagram video neztlumil
       </summary>
       <div className="mt-2 space-y-2 leading-relaxed">
@@ -1057,6 +1089,17 @@ function VariantCard({
           role="img"
           aria-label={`Náhled: ${variant.label}`}
         />
+        {/* Outside the button: a status inside one is read as part of its name. */}
+        <p
+          role="status"
+          className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center"
+        >
+          {preparing && (
+            <span className="rounded-full bg-black/65 px-3 py-1 text-sm text-white tabular-nums">
+              Načítám fotky {preparing.done}/{preparing.total}
+            </span>
+          )}
+        </p>
         <button
           type="button"
           onClick={onTogglePlay}
@@ -1064,11 +1107,6 @@ function VariantCard({
           aria-label={playing ? "Zastavit náhled" : "Přehrát náhled s hudbou"}
           className="absolute inset-0 grid place-items-center text-white"
         >
-          {preparing && (
-            <span className="rounded-full bg-black/60 px-3 py-1 text-sm tabular-nums" role="status">
-              Načítám fotky {preparing.done}/{preparing.total}
-            </span>
-          )}
           {!playing && (
             <span aria-hidden className="grid size-14 place-items-center rounded-full bg-black/55">
               {/* Drawn, not "▶": some systems paint that as a colour emoji. */}
@@ -1080,7 +1118,7 @@ function VariantCard({
         </button>
       </div>
       <p className="text-caption mt-3 tabular-nums">
-        {pluralize(variant.photoIds.length, FORMS.photo)} · {timeline.duration.toFixed(1)} s ·{" "}
+        {pluralize(variant.photoIds.length, FORMS.photo)} · {tenths(timeline.duration)} s ·{" "}
         {plan.adaptive
           ? `střihy podle hudby, ${lengthRange(timeline)}`
           : `střih ${perCut === 1 ? "na každou dobu" : `po ${perCut} dobách`}`}{" "}
@@ -1090,7 +1128,7 @@ function VariantCard({
       <div className="text-caption mt-2 flex flex-wrap items-center gap-2">
         <span>
           {trackKind === "listened"
-            ? `Od ${plan.offset.toFixed(1)} s poslechu`
+            ? `Od ${tenths(plan.offset)} s poslechu`
             : `Hudba od ${clock(plan.offset)}`}
         </span>
         <Button
@@ -1112,7 +1150,7 @@ function VariantCard({
       </div>
 
       <details className="mt-3">
-        <summary className="text-caption cursor-pointer font-semibold">
+        <summary className="cursor-pointer py-3 text-sm font-semibold">
           Fotky ve variantě ({variant.photoIds.length})
         </summary>
         <p className="text-admin-muted text-caption mt-1 dark:text-neutral-400">

@@ -193,7 +193,7 @@ export function ListenPanel({
       open={expanded || state !== null}
       onToggle={(e) => setExpanded(e.currentTarget.open)}
     >
-      <summary className="cursor-pointer text-sm font-semibold">
+      <summary className="cursor-pointer py-3 text-sm font-semibold">
         Nebo písničku poslechnout (YouTube, Instagram, reproduktor)
       </summary>
       <div className="mt-3 space-y-3 text-sm">
@@ -213,7 +213,7 @@ export function ListenPanel({
                   onChange={(e) => setLink(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && showVideo()}
                   placeholder="https://youtu.be/…"
-                  className="border-admin-border min-h-11 min-w-0 flex-1 rounded-lg border px-3 dark:border-neutral-700 dark:bg-neutral-900"
+                  className="border-admin-border min-h-11 min-w-0 flex-1 rounded-lg border px-3 text-base sm:text-sm dark:border-neutral-700 dark:bg-neutral-900"
                 />
                 <Button variant="secondary" onClick={showVideo} disabled={!link.trim()}>
                   Zobrazit
@@ -233,7 +233,7 @@ export function ListenPanel({
                     placeholder="0:00"
                     inputMode="numeric"
                     aria-invalid={from.trim() !== "" && parseClock(from) === null}
-                    className="border-admin-border mt-1 block min-h-11 w-24 rounded-lg border px-3 aria-invalid:border-red-500 dark:border-neutral-700 dark:bg-neutral-900"
+                    className="border-admin-border mt-1 block min-h-11 w-24 rounded-lg border px-3 text-base aria-invalid:border-red-500 sm:text-sm dark:border-neutral-700 dark:bg-neutral-900"
                   />
                 </label>
                 <label className="text-caption">
@@ -243,7 +243,7 @@ export function ListenPanel({
                     onChange={(e) =>
                       setListenFor(Number(e.target.value) as (typeof LISTEN_CHOICES)[number])
                     }
-                    className="border-admin-border mt-1 block min-h-11 rounded-lg border px-3 dark:border-neutral-700 dark:bg-neutral-900"
+                    className="border-admin-border mt-1 block min-h-11 rounded-lg border px-3 text-base sm:text-sm dark:border-neutral-700 dark:bg-neutral-900"
                   >
                     {LISTEN_CHOICES.map((s) => (
                       <option key={s} value={s}>

@@ -184,6 +184,13 @@ shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je
   fetched at the zoom its own shot needs (`shotZoom`), not every one at REEL_ZOOM. `blackframe` on
   two rendered reels: 0 frames.
 
+- **On a phone** (2026-10-29): the three variants are a strip to swipe through (86 % wide, snapping),
+  with "Zobrazená varianta" above it to jump to one; a variant swiped away stops playing. Every
+  choice row (length, pace, sound, photos, Instagram's kind) is a `ChoiceGroup` — one tab stop, the
+  arrow keys move the choice (WAI-ARIA radio group). Fields are 16 px on a phone (smaller, and iOS
+  zooms the page in), every `<summary>` is a 44 px target, numbers take the Czech decimal comma,
+  and the admin's top bar scrolls its current section into view.
+
 ## 6. Sound in the file
 
 `encodeVideo` (`src/lib/social-video/encode.ts`) takes an optional `AudioBuffer`. The reel's sound

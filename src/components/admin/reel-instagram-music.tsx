@@ -7,6 +7,7 @@ import type { AudioKind, InstagramAudio } from "@/lib/instagram/graph";
 import { formatDuration } from "@/lib/video";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 
 export interface InstagramState {
   /** META_APP_ID and META_APP_SECRET are set. */
@@ -139,7 +140,7 @@ export function InstagramMusic({
 
   return (
     <details className="mt-4" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
-      <summary className="cursor-pointer text-sm font-semibold">Hudba z Instagramu</summary>
+      <summary className="cursor-pointer py-3 text-sm font-semibold">Hudba z Instagramu</summary>
       <div className="mt-3 space-y-3 text-sm">
         {outcome && (
           <Alert tone={outcome.tone} compact>
@@ -187,25 +188,17 @@ export function InstagramMusic({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <div className="flex gap-1" role="radiogroup" aria-label="Druh zvuku">
-                {(
-                  [
-                    ["music", "Hudba"],
-                    ["original_sound", "Původní zvuky"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <Button
-                    key={value}
-                    size="sm"
-                    role="radio"
-                    aria-checked={kind === value}
-                    variant={kind === value ? "primary" : "secondary"}
-                    onClick={() => setKind(value)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
+              <ChoiceGroup
+                label="Druh zvuku"
+                size="sm"
+                className="gap-1"
+                value={kind}
+                onChange={setKind}
+                choices={[
+                  { value: "music", label: "Hudba" },
+                  { value: "original_sound", label: "Původní zvuky" },
+                ]}
+              />
               <input
                 type="search"
                 value={query}
@@ -214,7 +207,7 @@ export function InstagramMusic({
                 placeholder="Písnička nebo interpret (prázdné = populární)"
                 maxLength={100}
                 aria-label="Hledat hudbu na Instagramu"
-                className="border-admin-border min-h-11 min-w-0 flex-1 rounded-lg border px-3 dark:border-neutral-700 dark:bg-neutral-900"
+                className="border-admin-border min-h-11 min-w-0 flex-1 rounded-lg border px-3 text-base sm:text-sm dark:border-neutral-700 dark:bg-neutral-900"
               />
               <Button onClick={search} disabled={searching}>
                 {searching ? "Hledám…" : "Hledat"}
