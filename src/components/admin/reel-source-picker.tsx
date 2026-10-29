@@ -83,7 +83,7 @@ export function ReelSourcePicker({
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Hledat svatbu nebo album"
               aria-label="Hledat svatbu nebo album"
-              className="border-admin-border min-h-11 w-full rounded-lg border px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+              className="border-admin-border min-h-11 w-full rounded-lg border px-3 text-base sm:text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
           )}
           {groups.length === 0 ? (

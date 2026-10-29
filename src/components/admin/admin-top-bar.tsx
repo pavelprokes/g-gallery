@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { NAV_ITEMS, badgeLabel, isNavActive } from "@/lib/admin-nav";
 import { Badge } from "@/components/ui/badge";
 import { SignOutButton } from "@/components/admin/sign-out-button";
@@ -17,6 +18,14 @@ import { SignOutButton } from "@/components/admin/sign-out-button";
 export function AdminTopBar({ userName, unread }: { userName: string; unread: number }) {
   const pathname = usePathname();
   const badge = badgeLabel(unread);
+  // On a phone the sections scroll sideways; the one you are on is scrolled
+  // into view, not left half under "Odhlásit".
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current
+      ?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
 
   return (
     <header className="border-admin-border sticky top-0 z-20 border-b bg-white print:hidden">
@@ -31,6 +40,7 @@ export function AdminTopBar({ userName, unread }: { userName: string; unread: nu
         </Link>
 
         <nav
+          ref={navRef}
           aria-label="Hlavní navigace administrace"
           className="-mx-1 flex min-w-0 gap-1 overflow-x-auto px-1"
         >
@@ -42,7 +52,7 @@ export function AdminTopBar({ userName, unread }: { userName: string; unread: nu
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className="hover:text-brand-primary-dark aria-[current=page]:bg-admin-accent-soft aria-[current=page]:text-brand-primary-dark text-admin-muted inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors"
+                className="hover:text-brand-primary-dark aria-[current=page]:bg-admin-accent-soft aria-[current=page]:text-brand-primary-dark text-admin-muted inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold transition-colors sm:px-3"
               >
                 {item.label}
                 {/* No count on the page you are already reading. */}

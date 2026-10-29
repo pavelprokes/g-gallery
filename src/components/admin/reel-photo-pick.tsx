@@ -5,6 +5,7 @@ import type { StudioPhoto } from "@/components/admin/social-video-studio";
 import { AdminPhotoImage } from "@/components/admin/admin-photo-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { ChoiceGroup } from "@/components/ui/choice-group";
 
 // Which photos the reels take (docs/REELS.md §4): the suggestion's pick from
 // every chosen gallery, mixed or album by album — or the photos the
@@ -55,24 +56,15 @@ export function ReelPhotoPick({
   return (
     <Card as="section" aria-label="Fotky do videa">
       <CardTitle>Fotky</CardTitle>
-      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Kdo vybírá fotky">
-        {(
-          [
-            [false, "Vybrat samo"],
-            [true, "Naklikat ručně"],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={label}
-            role="radio"
-            aria-checked={manual === value}
-            variant={manual === value ? "primary" : "secondary"}
-            onClick={() => onManual(value)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <ChoiceGroup
+        label="Kdo vybírá fotky"
+        value={manual}
+        onChange={onManual}
+        choices={[
+          { value: false, label: "Vybrat samo" },
+          { value: true, label: "Naklikat ručně" },
+        ]}
+      />
       {galleries.length > 1 && (
         <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 text-sm">
           <input
@@ -104,7 +96,7 @@ export function ReelPhotoPick({
             const chosen = own.filter((p) => picked.has(p.id)).length;
             return (
               <details key={gallery.id} open={index === 0} className="group">
-                <summary className="cursor-pointer text-sm font-semibold">
+                <summary className="cursor-pointer py-3 text-sm font-semibold">
                   {gallery.title}{" "}
                   <span className="text-admin-muted font-normal dark:text-neutral-400">
                     · vybráno {chosen} z {own.length}
