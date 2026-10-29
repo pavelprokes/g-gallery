@@ -20,6 +20,7 @@ import {
   headRegion,
   type Rect,
 } from "@/lib/photo-check";
+import { drawClipped } from "@/lib/social-video/draw-clipped";
 import { FACES_MODEL, MAX_FACES, type Face, type PhotoFaces } from "@/lib/social-video/faces";
 import { AIM_EDGE, FOCUS_EDGE, FOCUS_VERSION, focusOf } from "@/lib/social-video/focus";
 import {
@@ -98,7 +99,9 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     ctx!.imageSmoothingQuality = "high";
     ctx!.fillStyle = "#000";
     ctx!.fillRect(0, 0, to.width, to.height);
-    ctx!.drawImage(source, from.x, from.y, from.w, from.h, 0, 0, to.drawWidth, to.drawHeight);
+    // The second look's window reaches past the photo's edge for a face
+    // near it: clipped, or WebKit draws nothing (draw-clipped.ts).
+    drawClipped(ctx!, source, from, { x: 0, y: 0, w: to.drawWidth, h: to.drawHeight });
     const pixels = ctx!.getImageData(0, 0, to.width, to.height).data;
     const input = new ort.Tensor("float32", toBgrPlanar(pixels, to.width, to.height), [
       1,
@@ -125,7 +128,7 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
     ctx!.imageSmoothingQuality = "high";
     ctx!.fillStyle = "#000";
     ctx!.fillRect(0, 0, width, height);
-    ctx!.drawImage(source, region.x, region.y, region.w, region.h, 0, 0, width, height);
+    drawClipped(ctx!, source, region, { x: 0, y: 0, w: width, h: height });
     return ctx!.getImageData(0, 0, width, height);
   }
 
@@ -142,7 +145,15 @@ export async function createFaceFinderCore(): Promise<FaceFinderCore> {
       HEAD_SIZE,
       false,
     );
-    const marked = landmarker.detect(head);
+    let marked: ReturnType<NonNullable<typeof landmarker>["detect"]>;
+    try {
+      marked = landmarker.detect(head);
+    } catch (cause) {
+      // The landmarker runs on WebGL; where a browser refuses it mid-scan the
+      // face still counts — the blink is a refinement, not the face.
+      console.warn("[g-gallery/social-video] blink detection failed", cause);
+      return none;
+    }
     // The crop can hold a neighbour's face too (a couple cheek to cheek, a
     // tight row); its blink must not land on this face.
     if (!centredInCrop(marked.faceLandmarks[0] ?? [])) return none;

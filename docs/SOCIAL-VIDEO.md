@@ -255,7 +255,7 @@ every guest's explicit consent.
 ```json
 {
   "v": 1,
-  "model": "yunet-2026may@2048+check+eyes2@ort-web-1.30.0",
+  "model": "yunet-2026may@2048+check+eyes2+clip@ort-web-1.30.0",
   "faces": [
     {
       "x": 0.41,

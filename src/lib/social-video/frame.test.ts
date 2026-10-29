@@ -31,9 +31,9 @@ function recorder() {
   return { ctx: ctx as unknown as FrameContext & { filter: string }, calls };
 }
 
-/** The recorder compares images by name; `width` is the decoded size. */
-const image = (name: string, width = 0) =>
-  ({ name, width, height: 0, toString: () => name }) as unknown as FrameImage;
+/** The recorder compares images by name; `width` × `height` is the decoded size. */
+const image = (name: string, width = 0, height = 0) =>
+  ({ name, width, height, toString: () => name }) as unknown as FrameImage;
 
 const WIDE = FORMATS["16:9"];
 const push: Shot = {
@@ -51,9 +51,9 @@ const plan: FramePlan = {
   format: WIDE,
   timeline: buildTimeline(2, 6),
   slides: [
-    { image: image("first", 3000), width: 3000, height: 2000, shot: push },
+    { image: image("first", 3000, 2000), width: 3000, height: 2000, shot: push },
     {
-      image: image("second", 2000),
+      image: image("second", 2000, 3000),
       width: 2000,
       height: 3000,
       shot: fit,
@@ -73,9 +73,31 @@ describe("drawFrame", () => {
 
   it("scales the shot to a bitmap fetched smaller than the photo", () => {
     const { ctx, calls } = recorder();
-    const half = { ...plan, slides: [{ ...plan.slides[0]!, image: image("first", 1500) }] };
+    const half = { ...plan, slides: [{ ...plan.slides[0]!, image: image("first", 1500, 1000) }] };
     drawFrame(ctx, half, 0);
     expect(calls[0]!.args).toEqual([0, 0, 1500, 843.75, 0, 0, 1920, 1080]);
+  });
+
+  it("keeps the source on the bitmap, which WebKit otherwise leaves black", () => {
+    const { ctx, calls } = recorder();
+    // A full-height frame; the transform rounded the bitmap a pixel short of 1000.
+    const tall: Shot = {
+      kind: "push",
+      from: { x: 0, y: 0, w: 1777.8, h: 2000 },
+      to: { x: 0, y: 0, w: 1777.8, h: 2000 },
+    };
+    const short = {
+      ...plan,
+      slides: [{ ...plan.slides[0]!, shot: tall, image: image("first", 1500, 999) }],
+    };
+    drawFrame(ctx, short, 0);
+    const [sx, sy, sw, sh, , dy, , dh] = calls[0]!.args;
+    expect(sx! >= 0 && sy! >= 0).toBe(true);
+    expect(sx! + sw!).toBeLessThanOrEqual(1500);
+    expect(sy! + sh!).toBeLessThanOrEqual(999);
+    // Scaled per axis: the whole height still fills the frame.
+    expect(dy).toBeCloseTo(0);
+    expect(dh).toBeCloseTo(1080);
   });
 
   it("skips a slide whose photo is not decoded yet", () => {
