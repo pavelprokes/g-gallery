@@ -436,6 +436,17 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), Math.max(min, max));
 }
 
+/** How far a shot goes past its photo's cover frame at its tightest — what
+ * the photo is fetched for (`sourceWidth`'s `zoom`). */
+export function shotZoom(
+  photo: { width: number; height: number },
+  shot: Shot,
+  format: VideoFormat,
+): number {
+  const coverW = Math.min(photo.width, (photo.height * format.width) / format.height);
+  return Math.max(1, coverW / Math.min(shot.from.w, shot.to.w));
+}
+
 /** Widths the transform is asked for are rounded up to this, so renders of
  * the same photo share a cached variant (each one is billed once). */
 const SOURCE_STEP = 256;

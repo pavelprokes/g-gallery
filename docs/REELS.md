@@ -176,6 +176,14 @@ shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je
 - A photo with no face and no sharp part known: the cover frame, a third down — as before. The
   sharp part exists only where the gallery's face scan ran ("Najít tváře").
 
+- **Photos in time** (2026-10-29 — Pavel saw the preview go black between photos): the preview
+  fetches every photo of a variant before the music starts ("Načítám fotky 3/18"), keeps the next
+  2 s decoded (`slidesToDecode(…, ahead)`), and a frame whose photo is still decoding is not drawn
+  — the last frame stays. Measured with photos served 600 ms late: 20 of 181 samples black before,
+  none after. The file waits for each frame's photos anyway and decodes 1 s ahead; each photo is
+  fetched at the zoom its own shot needs (`shotZoom`), not every one at REEL_ZOOM. `blackframe` on
+  two rendered reels: 0 frames.
+
 ## 6. Sound in the file
 
 `encodeVideo` (`src/lib/social-video/encode.ts`) takes an optional `AudioBuffer`. The reel's sound
