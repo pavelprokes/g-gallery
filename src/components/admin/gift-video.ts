@@ -129,6 +129,8 @@ export async function makeGiftVideo({
           windowKey = key;
           await store.keepOnly(wanted);
         }
+        // A bitmap the browser emptied is decoded again (SlideImages.ensureDrawn).
+        await store.ensureDrawn(wanted);
         drawFrame(
           ctx,
           {

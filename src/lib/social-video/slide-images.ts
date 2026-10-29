@@ -16,7 +16,7 @@ export interface SlidePhoto {
 }
 
 interface Decoded {
-  image: ImageBitmap;
+  image: ImageBitmap | HTMLImageElement;
   backdrop: string | null;
   blurred: HTMLCanvasElement | null;
 }
@@ -31,6 +31,8 @@ export async function fetchPhotoBytes(url: string): Promise<Blob> {
 
 /** The side of the square a photo is shrunk to for its backdrop colour. */
 const BACKDROP_SAMPLE = 16;
+/** The side of the square a photo is drawn into to see that it draws (`draws`). */
+const PROBE_SIZE = 4;
 /** The longer side of the copy stretched behind a `fit` slide — small enough
  * that stretching it to the frame is the blur. */
 const BLURRED_EDGE = 36;
@@ -39,6 +41,8 @@ export class SlideImages {
   private readonly blobs = new Map<string, Promise<Blob>>();
   private readonly decoded = new Map<string, Promise<Decoded>>();
   private readonly ready = new Map<string, Decoded>();
+  private readonly repairs = new Map<string, Promise<void>>();
+  private probe: CanvasRenderingContext2D | null = null;
 
   /** The photo's bytes, fetched once. */
   fetch(photo: SlidePhoto): Promise<Blob> {
@@ -53,11 +57,13 @@ export class SlideImages {
   }
 
   /** Decoded and ready to draw; decodes it if needed. */
-  decode(photo: SlidePhoto): Promise<Decoded> {
+  decode(photo: SlidePhoto, asElement = false): Promise<Decoded> {
     let decoded = this.decoded.get(photo.id);
     if (!decoded) {
       decoded = this.fetch(photo)
-        .then((blob) => createImageBitmap(blob))
+        .then((blob): Promise<ImageBitmap | HTMLImageElement> =>
+          asElement ? decodeElement(blob) : createImageBitmap(blob),
+        )
         .then((image) => {
           const entry: Decoded = { image, backdrop: null, blurred: null };
           this.ready.set(photo.id, entry);
@@ -74,11 +80,73 @@ export class SlideImages {
     const keep = new Set(wanted.map((p) => p.id));
     for (const [id, entry] of this.ready) {
       if (keep.has(id)) continue;
-      entry.image.close();
+      release(entry.image);
       this.ready.delete(id);
       this.decoded.delete(id);
     }
     await Promise.all(wanted.map((p) => this.decode(p)));
+  }
+
+  /**
+   * Whether a decoded photo still draws. WebKit can drop a decoded bitmap's
+   * pixels (memory, the page sent to the background) and the bitmap then
+   * draws nothing — a black slide in the file (Pavel's 30 s reel,
+   * 2026-10-29). Drawn small, a photo leaves opaque pixels that are not all
+   * pure black; an emptied bitmap leaves none, or only black ones.
+   */
+  draws(id: string): boolean {
+    return this.look(id) === "drawn";
+  }
+
+  private look(id: string): "drawn" | "empty" | "black" {
+    const entry = this.ready.get(id);
+    if (!entry) return "empty";
+    this.probe ??= probeContext();
+    if (!this.probe) return "drawn";
+    this.probe.clearRect(0, 0, PROBE_SIZE, PROBE_SIZE);
+    this.probe.drawImage(entry.image, 0, 0, PROBE_SIZE, PROBE_SIZE);
+    const pixels = this.probe.getImageData(0, 0, PROBE_SIZE, PROBE_SIZE).data;
+    let opaque = false;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3]! === 0) continue;
+      opaque = true;
+      if (pixels[i]! + pixels[i + 1]! + pixels[i + 2]! > 0) return "drawn";
+    }
+    return opaque ? "black" : "empty";
+  }
+
+  /**
+   * `photos` decoded and drawing: one that lost its pixels is decoded again
+   * from its bytes, then — should a bitmap still draw nothing — through an
+   * `<img>`. Rejects when a photo still draws nothing at all: a render then
+   * fails rather than keeping a black slide.
+   */
+  async ensureDrawn(photos: readonly SlidePhoto[]): Promise<void> {
+    for (const photo of photos) {
+      // One repair at a time per photo: the preview asks every frame.
+      const pending = this.repairs.get(photo.id);
+      if (pending) {
+        await pending;
+        continue;
+      }
+      const repair = this.repair(photo).finally(() => this.repairs.delete(photo.id));
+      this.repairs.set(photo.id, repair);
+      await repair;
+    }
+  }
+
+  private async repair(photo: SlidePhoto): Promise<void> {
+    await this.decode(photo);
+    for (const asElement of [false, true]) {
+      if (this.draws(photo.id)) return;
+      const entry = this.ready.get(photo.id);
+      if (entry) release(entry.image);
+      this.ready.delete(photo.id);
+      this.decoded.delete(photo.id);
+      await this.decode(photo, asElement);
+    }
+    // Still all black, it may be a black photo; drawing nothing, it is lost.
+    if (this.look(photo.id) === "empty") throw new Error(`PHOTO_NOT_DRAWN ${photo.id}`);
   }
 
   /** The decoded photo, or null when it is not decoded right now. */
@@ -125,16 +193,42 @@ export class SlideImages {
 
   /** Forgets one photo entirely — removed from the video. */
   drop(id: string): void {
-    this.ready.get(id)?.image.close();
+    const entry = this.ready.get(id);
+    if (entry) release(entry.image);
     this.ready.delete(id);
     this.decoded.delete(id);
     this.blobs.delete(id);
   }
 
   close(): void {
-    for (const entry of this.ready.values()) entry.image.close();
+    for (const entry of this.ready.values()) release(entry.image);
     this.ready.clear();
     this.decoded.clear();
     this.blobs.clear();
   }
+}
+
+/** A photo decoded by an `<img>` — the second way, for a bitmap that draws nothing. */
+async function decodeElement(blob: Blob): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = URL.createObjectURL(blob);
+  try {
+    await image.decode();
+  } catch (cause) {
+    URL.revokeObjectURL(image.src);
+    throw cause;
+  }
+  return image;
+}
+
+function release(image: ImageBitmap | HTMLImageElement): void {
+  if (image instanceof HTMLImageElement) URL.revokeObjectURL(image.src);
+  else image.close();
+}
+
+function probeContext(): CanvasRenderingContext2D | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = PROBE_SIZE;
+  canvas.height = PROBE_SIZE;
+  return canvas.getContext("2d", { willReadFrequently: true });
 }
