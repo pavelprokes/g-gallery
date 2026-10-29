@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TimelinePosition } from "@/lib/gallery-chapters";
 import { FORMS, pluralize } from "@/lib/czech-plural";
-import { analyzeTrack, applyEnvelope, decodeTrack } from "@/lib/reels/audio";
+import { analyzeTrack, applyEnvelope, clockFor, decodeTrack, unlockAudio } from "@/lib/reels/audio";
 import {
   PACES,
   REEL_LENGTHS,
@@ -529,6 +529,11 @@ export function ReelStudio({
     return audioContext.current;
   }, []);
   useEffect(() => () => void audioContext.current?.close(), []);
+  /** Starts or stops a preview from a tap: the sound is woken inside the tap (iOS). */
+  const togglePlaying = (key: string) => {
+    unlockAudio(contextFor());
+    setPlaying((p) => (p === key ? null : key));
+  };
 
   // ---- Render ----
   const [codec, setCodec] = useState<EncodeCodec | null | undefined>(undefined);
@@ -797,7 +802,7 @@ export function ReelStudio({
           automatic={loudest}
           onChoose={chooseSongStart}
           playing={playing === SECTION_KEY}
-          onTogglePlay={() => setPlaying((p) => (p === SECTION_KEY ? null : SECTION_KEY))}
+          onTogglePlay={() => togglePlaying(SECTION_KEY)}
           contextFor={contextFor}
         />
       )}
@@ -860,7 +865,7 @@ export function ReelStudio({
                   buffer={buffer}
                   bpm={analysis.bpm}
                   playing={playing === variant.key}
-                  onTogglePlay={() => setPlaying((p) => (p === variant.key ? null : variant.key))}
+                  onTogglePlay={() => togglePlaying(variant.key)}
                   contextFor={contextFor}
                   onShift={(bars) =>
                     setStartBeats((prev) => ({
@@ -982,6 +987,8 @@ function VariantCard({
   useEffect(() => () => store.close(), [store]);
   // Fetching the photos before the first play: "3 / 18".
   const [preparing, setPreparing] = useState<{ done: number; total: number } | null>(null);
+  // Playing, but the browser would not start the sound.
+  const [unheard, setUnheard] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -991,8 +998,11 @@ function VariantCard({
     canvas.width = PREVIEW_FORMAT.width;
     canvas.height = PREVIEW_FORMAT.height;
 
-    // The music is the clock: the picture follows the sound, never the other way.
+    // The music is the clock: the picture follows the sound, never the other
+    // way — or the page's clock, when the browser would not start the sound.
     let audio: AudioContext | null = null;
+    let now = () => 0;
+    let audible = false;
     let source: AudioBufferSourceNode | null = null;
     let startedAt = 0;
     let cancelled = false;
@@ -1014,10 +1024,10 @@ function VariantCard({
     const tick = () => {
       let t = 0;
       if (playing && audio) {
-        t = Math.max(0, audio.currentTime - startedAt);
+        t = Math.max(0, now() - startedAt);
         if (t >= timeline.duration) {
-          if (buffer) startSound();
-          else startedAt = audio.currentTime;
+          if (audible && buffer) startSound();
+          else startedAt = now();
           t = 0;
         }
       }
@@ -1060,10 +1070,14 @@ function VariantCard({
           // A photo that did not come stays black; the rest still plays.
         }
         if (cancelled) return;
-        setPreparing(null);
         audio = contextFor();
-        if (buffer) startSound();
-        else startedAt = audio.currentTime;
+        const clock = await clockFor(audio);
+        if (cancelled) return;
+        setPreparing(null);
+        ({ now, audible } = clock);
+        setUnheard(!audible && buffer !== null);
+        if (audible && buffer) startSound();
+        else startedAt = now();
         frame = requestAnimationFrame(tick);
       })();
     }
@@ -1072,6 +1086,7 @@ function VariantCard({
       cancelAnimationFrame(frame);
       source?.stop();
       setPreparing(null);
+      setUnheard(false);
     };
   }, [playing, buffer, contextFor, timeline, plan.offset, plan.fadeOut, slides, shots, store]);
 
@@ -1097,6 +1112,11 @@ function VariantCard({
           {preparing && (
             <span className="rounded-full bg-black/65 px-3 py-1 text-sm text-white tabular-nums">
               Načítám fotky {preparing.done}/{preparing.total}
+            </span>
+          )}
+          {unheard && playing && (
+            <span className="mx-3 rounded-lg bg-black/65 px-3 py-1 text-center text-sm text-white">
+              Prohlížeč nepustil zvuk — zastav a klepni na přehrát znovu
             </span>
           )}
         </p>

@@ -191,6 +191,14 @@ shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je
   zooms the page in), every `<summary>` is a 44 px target, numbers take the Czech decimal comma,
   and the admin's top bar scrolls its current section into view.
 
+- **Sound on iOS** (2026-10-29 — Pavel heard nothing on his iPhone, and the preview stood still):
+  every iOS browser is WebKit, which lets Web Audio sound only when started inside a tap and mutes
+  it with the ring/silent switch. The play buttons now wake the shared `AudioContext` inside the tap
+  (`unlockAudio`: `resume()`, a sample of silence, `navigator.audioSession.type = "playback"` so the
+  switch does not mute it — as it does not mute a video's sound). The preview's clock is the
+  sound's while it plays and the page's when the browser keeps it asleep (`clockFor`): the photos
+  then still move and the card says the sound did not start.
+
 ## 6. Sound in the file
 
 `encodeVideo` (`src/lib/social-video/encode.ts`) takes an optional `AudioBuffer`. The reel's sound

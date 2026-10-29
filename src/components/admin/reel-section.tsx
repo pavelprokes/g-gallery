@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { BeatAnalysis } from "@/lib/reels/beats";
-import { applyEnvelope } from "@/lib/reels/audio";
+import { applyEnvelope, clockFor } from "@/lib/reels/audio";
 import { barAt, loudness, planReel, shiftSection, type Pace } from "@/lib/reels/cuts";
 import { formatDuration } from "@/lib/video";
 import { Button } from "@/components/ui/button";
@@ -67,31 +67,42 @@ export function SongSection({
       return;
     }
     const audio = contextFor();
-    const gain = audio.createGain();
-    const startedAt = audio.currentTime + 0.05;
-    applyEnvelope(gain.gain, startedAt, length, fadeOut);
-    const source = audio.createBufferSource();
-    source.buffer = buffer;
-    source.connect(gain).connect(audio.destination);
-    source.start(startedAt, offset, length);
-    // Played to its end, the button goes back to "listen".
-    source.onended = () => {
-      if (audio.currentTime >= startedAt + length - 0.05) onTogglePlayRef.current();
-    };
+    let source: AudioBufferSourceNode | null = null;
     let frame = 0;
-    const tick = () => {
-      if (head) {
-        head.hidden = false;
-        const t = offset + Math.max(0, audio.currentTime - startedAt);
-        head.style.left = `${Math.min(100, (t / total) * 100)}%`;
+    let cancelled = false;
+    void (async () => {
+      // The sound's clock when it plays; the page's, silently, when the
+      // browser kept it asleep — the playhead still moves (audio.ts).
+      const { now, audible } = await clockFor(audio);
+      if (cancelled) return;
+      const startedAt = now() + 0.05;
+      if (audible) {
+        const gain = audio.createGain();
+        applyEnvelope(gain.gain, startedAt, length, fadeOut);
+        source = audio.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gain).connect(audio.destination);
+        source.start(startedAt, offset, length);
       }
+      const tick = () => {
+        const elapsed = Math.max(0, now() - startedAt);
+        // Played to its end, the button goes back to "listen".
+        if (elapsed >= length) {
+          onTogglePlayRef.current();
+          return;
+        }
+        if (head) {
+          head.hidden = false;
+          head.style.left = `${Math.min(100, ((offset + elapsed) / total) * 100)}%`;
+        }
+        frame = requestAnimationFrame(tick);
+      };
       frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
+    })();
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
-      source.onended = null;
-      source.stop();
+      source?.stop();
       if (head) head.hidden = true;
     };
   }, [playing, buffer, contextFor, offset, length, fadeOut, total]);
