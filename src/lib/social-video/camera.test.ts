@@ -5,6 +5,8 @@ import {
   eyesInSafeArea,
   FORMATS,
   planShot,
+  REEL_ZOOM,
+  shotZoom,
   sourceWidth,
   type PhotoForShot,
   type Rect,
@@ -241,7 +243,10 @@ describe("cameraAt", () => {
 });
 
 describe("planShot for a reel", () => {
-  const reel = (photo: PhotoForShot) => planShot(photo, VERTICAL, 0.6, { reel: true });
+  const still = { reel: { zoom: false } };
+  const gentle = { reel: { zoom: true } };
+  const reel = (photo: PhotoForShot, seconds = 0.6, look = still) =>
+    planShot(photo, VERTICAL, seconds, look);
   /** Head and shoulders as the camera widens a face (camera.ts). */
   const head = (f: Face, p: PhotoForShot): Rect => ({
     x: (f.x - f.w * 0.4) * p.width,
@@ -249,11 +254,26 @@ describe("planShot for a reel", () => {
     w: f.w * 1.8 * p.width,
     h: f.h * 2.8 * p.height,
   });
-  const cut = (r: Rect, h: Rect) => {
-    const left = Math.max(r.x, h.x);
-    const right = Math.min(r.x + r.w, h.x + h.w);
-    return right > left && (left > h.x + 0.5 || right < h.x + h.w - 0.5);
+  const cutAlong = (lo: number, hi: number, a: number, b: number) => {
+    const left = Math.max(lo, a);
+    const right = Math.min(hi, b);
+    return right > left && (left > a + 0.5 || right < b - 0.5);
   };
+  const cut = (r: Rect, h: Rect) =>
+    cutAlong(r.x, r.x + r.w, h.x, h.x + h.w) || cutAlong(r.y, r.y + r.h, h.y, h.y + h.h);
+  const coverW = (p: PhotoForShot) => Math.min(p.width, (p.height * 9) / 16);
+
+  it("holds a still cover frame unless the gentle zoom is asked for", () => {
+    const photo = landscape(face(0.48, 0.45, 0.03, 1.5), face(0.53, 0.46, 0.03, 1.5));
+    for (const seconds of [0.4, 0.6, 2, 4]) {
+      const shot = reel(photo, seconds);
+      expect(shot.kind).toBe("push");
+      expect(shot.to).toEqual(shot.from);
+      expect(shot.from.w).toBeCloseTo(coverW(photo));
+      expect(shot.from.h).toBeCloseTo(photo.height);
+      expect(shotZoom(photo, shot, VERTICAL)).toBe(1);
+    }
+  });
 
   it("never cuts a head in half, however many faces a landscape photo spreads", () => {
     const photo = landscape(
@@ -262,16 +282,17 @@ describe("planShot for a reel", () => {
       face(0.6, 0.32, 0.065, 1.5),
       face(0.86, 0.36, 0.06, 1.5),
     );
-    const shot = reel(photo);
-    expect(shot.kind).not.toBe("fit");
-    for (const r of [shot.from, shot.to]) {
-      inside(r, photo);
-      for (const f of photo.faces) expect(cut(r, head(f, photo))).toBe(false);
+    for (const shot of [reel(photo), reel(photo, 2, gentle)]) {
+      expect(shot.kind).not.toBe("fit");
+      for (const r of [shot.from, shot.to]) {
+        inside(r, photo);
+        for (const f of photo.faces) expect(cut(r, head(f, photo))).toBe(false);
+      }
+      // At least one whole face in the frame.
+      expect(
+        photo.faces.some((f) => !cut(shot.to, head(f, photo)) && head(f, photo).x >= shot.to.x),
+      ).toBe(true);
     }
-    // At least one whole face in the frame.
-    expect(
-      photo.faces.some((f) => !cut(shot.to, head(f, photo)) && head(f, photo).x >= shot.to.x),
-    ).toBe(true);
   });
 
   it("keeps the couple far apart whole by choosing the larger face rather than showing both small", () => {
@@ -282,34 +303,47 @@ describe("planShot for a reel", () => {
     for (const f of photo.faces) expect(cut(shot.to, head(f, photo))).toBe(false);
   });
 
-  it("goes close on small faces in a wide shot, as far as the photo's pixels allow", () => {
-    const faces = [face(0.48, 0.45, 0.03, 1.5), face(0.53, 0.46, 0.03, 1.5)];
-    // 24 MP: the pixels for the full REEL_ZOOM.
-    const large = { width: 6000, height: 4000, faces };
-    const shot = reel(large);
-    expect((4000 * (9 / 16)) / shot.to.w).toBeCloseTo(1.8, 1);
-    // Still a move: the wide end a few per cent out.
-    expect(shot.from.w / shot.to.w).toBeGreaterThan(1.02);
-    expect(eyesInSafeArea(large, shot.to, VERTICAL)).toBe(true);
-    // 6 MP: its cover frame is about the output's width, so it is enlarged
-    // no more than MAX_UPSCALE.
-    const small = reel(landscape(...faces));
-    expect((2000 * (9 / 16)) / small.to.w).toBeCloseTo(1.41, 1);
-    expect(small.from.w / small.to.w).toBeGreaterThan(1.02);
+  it("stays off a face too unsure to aim by — the partner's profile in a kiss", () => {
+    // The bride seen straight on; the groom in profile right beside her, a
+    // score the camera does not aim by but must not cut through either.
+    const bride = face(0.42, 0.3, 0.09, 1.5);
+    const groom = { ...face(0.6, 0.31, 0.08, 1.5), score: 0.62 };
+    const photo = { ...landscape(bride), avoid: [bride, groom] };
+    const shot = reel(photo);
+    expect(cut(shot.to, head(bride, photo))).toBe(false);
+    expect(cut(shot.to, head(groom, photo))).toBe(false);
+    // Without being told about him, the frame centred on her would cut him.
+    const blind = reel(landscape(bride));
+    expect(cut(blind.to, head(groom, photo))).toBe(true);
   });
 
-  it("stays clear of a head it left out, even one right beside the kept face", () => {
-    // A large face, and one close beside it that a crop holding both would have to cut.
-    const photo = landscape(
-      face(0.2, 0.3, 0.1, 1.5),
-      face(0.36, 0.32, 0.07, 1.5),
-      face(0.6, 0.3, 0.06, 1.5),
-      face(0.8, 0.34, 0.06, 1.5),
-    );
-    const shot = reel(photo);
-    for (const r of [shot.from, shot.to]) {
-      for (const f of photo.faces) expect(cut(r, head(f, photo))).toBe(false);
-    }
+  it("moves the frame up or down a tall photo so no head is cut", () => {
+    // Taller than 9:16: the cover frame is the full width and slides vertically.
+    const photo: PhotoForShot = { width: 2000, height: 4400, faces: [] };
+    const aimed = face(0.5, 0.45, 0.12, 2000 / 4400);
+    const above = { ...face(0.3, 0.08, 0.1, 2000 / 4400), score: 0.65 };
+    // At the eye line alone, the frame's top edge goes through the face above.
+    const blind = reel({ ...photo, faces: [aimed] });
+    expect(cut(blind.to, head(above, photo))).toBe(true);
+    const shot = reel({ ...photo, faces: [aimed], avoid: [aimed, above] });
+    expect(shot.to.w).toBeCloseTo(2000);
+    expect(shot.to.h).toBeLessThan(4400);
+    for (const f of [aimed, above]) expect(cut(shot.to, head(f, photo))).toBe(false);
+  });
+
+  it("zooms gently, and only on a slide long enough to show it", () => {
+    const faces = [face(0.48, 0.45, 0.03, 1.5), face(0.53, 0.46, 0.03, 1.5)];
+    const large = { width: 6000, height: 4000, faces };
+    const quick = reel(large, 0.6, gentle);
+    expect(quick.to).toEqual(quick.from);
+    const slow = reel(large, 1.6, gentle);
+    const ratio = slow.from.w / slow.to.w;
+    expect(ratio).toBeGreaterThan(1.05);
+    expect(ratio).toBeLessThanOrEqual(REEL_ZOOM + 1e-9);
+    expect(slow.from.w).toBeCloseTo(coverW(large));
+    expect(shotZoom(large, slow, VERTICAL)).toBeCloseTo(ratio);
+    for (const f of faces) expect(cut(slow.to, head(f, large))).toBe(false);
+    expect(eyesInSafeArea(large, slow.to, VERTICAL)).toBe(true);
   });
 
   it("frames the sharp part of a photo with no face", () => {
@@ -322,7 +356,9 @@ describe("planShot for a reel", () => {
 
   it("fetches the photo large enough for the closer frame", () => {
     const big = { width: 6000, height: 4000 };
-    expect(sourceWidth(big, VERTICAL, 1.8)).toBeGreaterThan(sourceWidth(big, VERTICAL) * 1.7);
-    expect(sourceWidth({ width: 1200, height: 800 }, VERTICAL, 1.8)).toBe(1200);
+    expect(sourceWidth(big, VERTICAL, REEL_ZOOM)).toBeGreaterThan(
+      sourceWidth(big, VERTICAL) * 1.05,
+    );
+    expect(sourceWidth({ width: 1200, height: 800 }, VERTICAL, REEL_ZOOM)).toBe(1200);
   });
 });

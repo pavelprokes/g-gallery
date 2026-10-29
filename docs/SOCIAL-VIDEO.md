@@ -290,8 +290,8 @@ setting behaving inconsistently.
 
 The party projection uses the same camera on the venue's screen (docs/GUEST-GALLERIES.md, F5,
 "Face-aware camera") — `planShot` with the screen as the format.
-The reels (docs/REELS.md §5) frame closer and never show a photo whole over its blur — `planShot`
-with `{ reel: true }`.
+The reels (docs/REELS.md §5) hold a still cover frame that cuts no face, a gentle push only when
+asked — `planShot` with `{ reel: { zoom } }`.
 
 For each photo: its oriented W×H, its faces, the output aspect A (9/16 or 16/9), the slide length.
 

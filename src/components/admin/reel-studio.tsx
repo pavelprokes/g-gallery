@@ -34,6 +34,7 @@ import {
   reelFramePlan,
   reelSlides,
   renderReel,
+  type ReelFraming,
   type ReelPhoto,
   type RenderProgress,
 } from "@/components/admin/reel-render";
@@ -158,8 +159,13 @@ interface Result {
   file: File;
 }
 
-const signatureOf = (v: ReelVariant, trackId: string | null, withSound: boolean) =>
-  `${trackId}|${withSound}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.slides
+const signatureOf = (
+  v: ReelVariant,
+  trackId: string | null,
+  withSound: boolean,
+  framing: ReelFraming,
+) =>
+  `${trackId}|${withSound}|${framing.zoom}|${framing.wholeAcross}|${v.photoIds.join()}|${v.plan.offset}|${v.plan.timeline.slides
     .map((slide) => slide.start)
     .join()}|${v.plan.timeline.duration}`;
 
@@ -409,6 +415,10 @@ export function ReelStudio({
   // The part of the song every variant plays, once the photographer picks one.
   const [songStart, setSongStart] = useState<number | null>(null);
   const [byGuests, setByGuests] = useState(true);
+  // How the photos are framed: still and cut to the video's shape unless asked.
+  const [zoom, setZoom] = useState(false);
+  const [wholeAcross, setWholeAcross] = useState(false);
+  const framing = useMemo(() => ({ zoom, wholeAcross }), [zoom, wholeAcross]);
 
   const analysis = track?.analysis ?? null;
   const trackKind = track ? kindOf(track) : null;
@@ -573,13 +583,14 @@ export function ReelStudio({
         photos,
         faces,
         format: FORMAT,
+        framing,
         track: withSound ? buffer : null,
         codec,
         title,
         signal: controller.signal,
         onProgress: (progress) => setRenderState({ kind: "busy", key: variant.key, progress }),
       });
-      const signature = signatureOf(variant, trackId, withSound);
+      const signature = signatureOf(variant, trackId, withSound, framing);
       setRenderState({ kind: "idle" });
       if (!liveSignatures.current.has(signature)) return;
       const url = URL.createObjectURL(file);
@@ -604,7 +615,7 @@ export function ReelStudio({
   };
   // A changed variant is a different video: its old file goes.
   useEffect(() => {
-    const live = new Set(variants.map((v) => signatureOf(v, trackId, withSound)));
+    const live = new Set(variants.map((v) => signatureOf(v, trackId, withSound, framing)));
     setResults((prev) => {
       const kept = prev.filter((r) => live.has(r.signature));
       for (const r of prev) {
@@ -772,6 +783,30 @@ export function ReelStudio({
           <p className="text-admin-muted text-caption mt-2 dark:text-neutral-400">
             Bez zvuku přidáš písničku až v Instagramu — z jeho knihovny, licencovanou.
           </p>
+          <ChoiceGroup
+            label="Kamera"
+            className="mt-4"
+            value={zoom}
+            onChange={setZoom}
+            choices={[
+              { value: false, label: "Bez přiblížení" },
+              { value: true, label: "Jemné přiblížení" },
+            ]}
+          />
+          <ChoiceGroup
+            label="Fotky na šířku"
+            className="mt-3"
+            value={wholeAcross}
+            onChange={setWholeAcross}
+            choices={[
+              { value: false, label: "Oříznout na výšku" },
+              { value: true, label: "Celé, s rozmazaným okrajem" },
+            ]}
+          />
+          <p className="text-admin-muted text-caption mt-2 dark:text-neutral-400">
+            Ořez se drží obličejů a žádnou hlavu nepřeřízne. Přiblížení jen u fotek, které vydrží
+            aspoň necelou vteřinu — u rychlých střihů by jen škubalo.
+          </p>
           {exclude.size > 0 && (
             <Button
               size="sm"
@@ -867,6 +902,7 @@ export function ReelStudio({
                   playing={playing === variant.key}
                   onTogglePlay={() => togglePlaying(variant.key)}
                   contextFor={contextFor}
+                  framing={framing}
                   onShift={(bars) =>
                     setStartBeats((prev) => ({
                       ...prev,
@@ -882,8 +918,9 @@ export function ReelStudio({
                   hintDecodedMs={decodedMs}
                   renderState={renderState}
                   result={
-                    results.find((r) => r.signature === signatureOf(variant, trackId, withSound)) ??
-                    null
+                    results.find(
+                      (r) => r.signature === signatureOf(variant, trackId, withSound, framing),
+                    ) ?? null
                   }
                   onRender={() => void render(variant)}
                   onCancel={() => abortRef.current?.abort()}
@@ -941,6 +978,7 @@ function VariantCard({
   playing,
   onTogglePlay,
   contextFor,
+  framing,
   onShift,
   onExclude,
   canRender,
@@ -962,6 +1000,7 @@ function VariantCard({
   playing: boolean;
   onTogglePlay(): void;
   contextFor(): AudioContext;
+  framing: ReelFraming;
   onShift(bars: number): void;
   onExclude(id: string): void;
   canRender: boolean;
@@ -980,8 +1019,8 @@ function VariantCard({
   const { plan } = variant;
   const { timeline } = plan;
   const { slides, shots } = useMemo(
-    () => reelSlides(variant, photos, faces, PREVIEW_FORMAT),
-    [variant, photos, faces],
+    () => reelSlides(variant, photos, faces, PREVIEW_FORMAT, framing),
+    [variant, photos, faces, framing],
   );
   const store = useMemo(() => new SlideImages(), []);
   useEffect(() => () => store.close(), [store]);

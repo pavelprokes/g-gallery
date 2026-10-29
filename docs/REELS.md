@@ -161,20 +161,27 @@ attack, swing or a tempo change are still to be checked on Pavel's own music.
 
 ## 5. Framing — the reel's camera
 
-`shotsFor(…, { reel: true })` → `reelShot` (`src/lib/social-video/camera.ts`). A photo is on
-screen for half a second to a second, so a slideshow's slow push is invisible and a landscape photo
-shown whole over its blur is too small (Pavel, 2026-10-28: "fotka na šířku je špatně vidět").
+`shotsFor(…, { reel: { zoom }, fitAcross })` → `reelShot` (`src/lib/social-video/camera.ts`).
 
-- **Close on the subject**: the faces' head-and-shoulders box (or, with no face to frame, the
-  photo's sharp part — `focus`) with 1.25× air, as close as **1.8×** past the cover frame — or as
-  the photo's pixels allow: never enlarged past `MAX_UPSCALE` of what is fetched. The fetch is
-  sized for it (`sourceWidth(…, zoom)`), so a 24 MP photo gets the full 1.8×.
-- **No head cut**: a subject wider than the crop keeps the faces a crop can hold whole
-  (`facesInWindow`): of every place for the crop — each head at either edge — the one keeping the
-  most face area, a head it would cut through costing twice its area; ties to the centre.
-- Eyes on the eye line as everywhere; then a 4 % push in or out (`directShots` alternates).
-- A photo with no face and no sharp part known: the cover frame, a third down — as before. The
-  sharp part exists only where the gallery's face scan ran ("Najít tváře").
+Revised 2026-10-29 after Pavel's 14 s reel ("Stále je to nepoužitelné"): the first version pushed
+up to **1.8×** onto the faces with a 4 % move. On real photos that cut through heads — the partner
+in a kiss, seen in profile, scores below the 0.7 the camera aims by, so the tight frame ignored him
+— and a move on a half-second cut only shakes. Now:
+
+- **Still by default**: the cover frame — the most of the photo the 9:16 shape holds — placed on
+  the faces' head-and-shoulders (eyes on the eye line), or the sharp part (`focus`), or a third
+  down the middle. `from` equals `to`; no move at all.
+- **No head cut, any face**: the frame is then moved (`settle`, along x and, for a photo taller
+  than 9:16, along y) as little as it takes so that every face the scan found — `avoid`, all
+  stored faces (≥ 0.6), not just the ones aimed at — is either wholly in or wholly out, and the
+  aimed faces stay whole. Where nothing does all that, the place cutting the least head. A subject
+  wider than the crop first keeps the faces a crop can hold whole (`facesInWindow`).
+- **"Kamera: Jemné přiblížení"** (off by default): a push to at most **1.15×** (`REEL_ZOOM`), only
+  on a slide of at least 0.9 s; the tight end is settled the same way. Quick cuts stay still.
+- **"Fotky na šířku: Celé, s rozmazaným okrajem"** (off by default): a landscape photo is shown
+  whole over its own blurred copy (`fit`, as the slideshow maker does) instead of cut to 9:16.
+- Checked on 16 real photos of one wedding through the same YuNet pass the admin runs (1–17 faces
+  each): no face box cut by the still frame or the zoomed one.
 
 - **Photos in time** (2026-10-29 — Pavel saw the preview go black between photos): the preview
   fetches every photo of a variant before the music starts ("Načítám fotky 3/18"), keeps the next
