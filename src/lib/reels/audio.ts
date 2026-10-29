@@ -59,3 +59,46 @@ export async function reelAudio(
   source.start(0, offset, duration);
   return context.startRendering();
 }
+
+/**
+ * Called inside the tap that starts playback. iOS (every browser there is
+ * WebKit) lets a page's Web Audio sound only once it was started from a tap,
+ * and mutes it with the ring/silent switch unless the page's audio session
+ * says it is playing media — as a video player's sound does.
+ */
+export function unlockAudio(context: AudioContext): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+  try {
+    if (session) session.type = "playback";
+  } catch {
+    // An older WebKit without the setter: the switch then decides.
+  }
+  void context.resume().catch(() => {});
+  // A sample of silence, started within the tap, is what wakes iOS's output.
+  const source = context.createBufferSource();
+  source.buffer = context.createBuffer(1, 1, context.sampleRate);
+  source.connect(context.destination);
+  source.start(0);
+}
+
+/** How long to wait for a context to start before playing without it. */
+const RESUME_WAIT_MS = 400;
+
+/**
+ * The clock a preview runs on: the sound's own, when the context plays —
+ * the picture then follows the music — or the page's, silently, when the
+ * browser kept the context asleep, so the photos still move.
+ */
+export async function clockFor(
+  context: AudioContext,
+): Promise<{ now(): number; audible: boolean }> {
+  if (context.state !== "running") {
+    await Promise.race([
+      context.resume().catch(() => {}),
+      new Promise((done) => setTimeout(done, RESUME_WAIT_MS)),
+    ]);
+  }
+  return context.state === "running"
+    ? { now: () => context.currentTime, audible: true }
+    : { now: () => performance.now() / 1000, audible: false };
+}
