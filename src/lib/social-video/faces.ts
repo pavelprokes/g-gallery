@@ -9,8 +9,11 @@
 import { z } from "zod";
 
 /** Bumped with any change to the model or the thresholds — a stored result
- * from another `model` is recomputed on demand, never mixed in. */
-export const FACES_MODEL = "yunet-2026may@2048+check+eyes2@ort-web-1.30.0";
+ * from another `model` is recomputed on demand, never mixed in. `clip`: the
+ * second look and the eye samples drawn clipped to the photo — in Safari a
+ * window past its edge drew nothing, and every face near an edge (or large
+ * enough for its window to reach one) was dropped (draw-clipped.ts). */
+export const FACES_MODEL = "yunet-2026may@2048+check+eyes2+clip@ort-web-1.30.0";
 
 /** The most faces stored for a photo — the best-scored ones. A whole wedding
  * on the steps is ~80 (docs/SOCIAL-VIDEO.md §7); the cap keeps a bad run from

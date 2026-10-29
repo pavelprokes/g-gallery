@@ -3,6 +3,7 @@
 // watches is what the file holds.
 
 import { cameraAt, ease, type Shot, type VideoFormat } from "@/lib/social-video/camera";
+import { drawClipped } from "@/lib/social-video/draw-clipped";
 import { slidesAt, type Timeline } from "@/lib/social-video/timeline";
 
 /** The canvas API a frame needs — a 2D context of a canvas or an OffscreenCanvas. */
@@ -73,10 +74,19 @@ function drawSlide(
   H: number,
 ) {
   if (slide.shot.kind !== "fit") {
-    // The shot is in the photo's pixels; the bitmap is whatever size was fetched.
-    const s = image.width / slide.width;
+    // The shot is in the photo's pixels; the bitmap is whatever size was
+    // fetched — scaled per axis, so a transform's rounding of the height does
+    // not push a full-height frame past the bitmap's edge, and clipped to it
+    // all the same: WebKit draws nothing for a source past the edge.
+    const sx = image.width / slide.width;
+    const sy = image.height / slide.height;
     const cam = cameraAt(slide.shot, progress);
-    ctx.drawImage(image, cam.x * s, cam.y * s, cam.w * s, cam.h * s, 0, 0, W, H);
+    drawClipped(
+      ctx,
+      image,
+      { x: cam.x * sx, y: cam.y * sy, w: cam.w * sx, h: cam.h * sy },
+      { x: 0, y: 0, w: W, h: H },
+    );
     return;
   }
   // The frame is already black; the photo's own blurred copy or a colour of

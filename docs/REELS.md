@@ -189,13 +189,27 @@ in a kiss, seen in profile, scores below the 0.7 the camera aims by, so the tigh
   whole over its own blurred copy (`fit`, as the slideshow maker does) instead of cut to 9:16.
 - Checked on 16 real photos of one wedding through the same YuNet pass the admin runs (1–17 faces
   each): no face box cut by the still frame or the zoomed one.
-- **No black slide** (2026-10-29 — 348 of 909 frames of Pavel's 30 s reel were black, whole slides
-  at a time): a decoded bitmap that the browser emptied draws nothing. Every frame of a render now
-  checks its photos draw (`SlideImages.ensureDrawn`, a 4×4 probe: opaque and not pure black); one
-  that does not is decoded again from its bytes, then through an `<img>`, and a photo that still
-  draws nothing fails the render instead of leaving its slide black. The preview does the same.
-  Simulated (every third bitmap empty or black): 285 of 915 frames black before, none after. The
-  same check guards the social video and the gift video.
+- **No black slide — the root cause** (2026-10-29, two of Pavel's 30 s reels: 348 of 909 frames
+  black, the same slides both times). WebKit — Safari, and every browser on iOS — draws _nothing_
+  when `drawImage`'s source rectangle reaches past an ImageBitmap's edge, by a pixel, by 0.3 px, or
+  from −0.5; Chrome clips it. A reel's still frame spans the photo's whole height, and the bitmap
+  is the transform's size, rounded: the frame ran a fraction of a pixel past the bottom and the
+  whole slide stayed black. Chromium never showed it. Fixed in `drawFrame` (shared by the reel, the
+  social video and the gift video): the shot is scaled to the bitmap per axis and clipped to it
+  (`draw-clipped.ts`). Tried in WebKitGTK 2.52 (WebKitWebDriver + MiniBrowser) on a 30 s reel of 16
+  real photos with prod-like stored sizes: 915 of 915 frames black before, none after. Then on 127 photos
+  of Pavel's five galleries, fetched through the real Cloudflare transforms, and his song: the
+  WebKit preview went from 75 of 80 samples black to none; the WebKit and the Chromium export of a
+  30 s reel, 0 of 909 frames black. (Chrome on an iPhone is WebKit too — Apple allows no other
+  engine on iOS.)
+- The face scan's second look drew a window around each face — past the photo's edge for a face
+  near it, or one large enough — and in Safari saw nothing there, so those faces were dropped: the
+  crop then cut people it never knew of. Drawn clipped too; `FACES_MODEL` gained `+clip`, so the
+  galleries' faces are found again (`/admin/prepocet`). A landmarker (blink) that throws no longer
+  loses the photo's faces.
+- `SlideImages.ensureDrawn` (a 4×4 probe each frame: a photo that draws nothing is decoded again,
+  then through an `<img>`, else the render fails) came first, on a wrong guess at the cause; it
+  stays as a guard.
 - A render with "Jemné přiblížení" or "Celé" finished and was then thrown away (the list of current
   results ignored the framing) — fixed.
 
