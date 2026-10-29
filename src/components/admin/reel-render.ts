@@ -39,12 +39,16 @@ export function reelSlides(
   photos: ReadonlyMap<string, ReelPhoto>,
   faces: Readonly<Record<string, PhotoFaces | null>>,
   format: VideoFormat,
+  framing: ReelFraming,
 ): { slides: (SlidePhoto & { coupleTags?: readonly Box[] })[]; shots: Shot[] } {
   const chosen = variant.photoIds.flatMap((id) => {
     const photo = photos.get(id);
     return photo ? [photo] : [];
   });
-  const shots = shotsFor(chosen, faces, format, variant.plan.timeline, { reel: true });
+  const shots = shotsFor(chosen, faces, format, variant.plan.timeline, {
+    reel: { zoom: framing.zoom },
+    fitAcross: framing.wholeAcross,
+  });
   const slides = chosen.map((photo, i) => ({
     id: photo.id,
     width: photo.width,
@@ -71,8 +75,17 @@ export function reelFramePlan(
       height: p.height,
       shot: shots[i]!,
       backdrop: shots[i]!.kind === "fit" ? (store.backdropOf(p.id) ?? undefined) : undefined,
+      blurred: shots[i]!.kind === "fit" ? (store.blurredOf(p.id) ?? undefined) : undefined,
     })),
   };
+}
+
+/** How the photos are framed (docs/REELS.md §5) — the page's "Kamera" and "Fotky na šířku". */
+export interface ReelFraming {
+  /** A gentle push on the longer slides; otherwise every photo still. */
+  zoom: boolean;
+  /** A landscape photo shown whole over its own blur, not cut to the video's shape. */
+  wholeAcross: boolean;
 }
 
 export type RenderProgress =
@@ -83,6 +96,7 @@ export async function renderReel({
   photos,
   faces,
   format,
+  framing,
   track,
   codec,
   title,
@@ -93,6 +107,7 @@ export async function renderReel({
   photos: ReadonlyMap<string, ReelPhoto>;
   faces: Readonly<Record<string, PhotoFaces | null>>;
   format: VideoFormat;
+  framing: ReelFraming;
   /** The song, or null for a reel without sound — its song is added in Instagram. */
   track: AudioBuffer | null;
   codec: EncodeCodec;
@@ -100,7 +115,7 @@ export async function renderReel({
   onProgress(progress: RenderProgress): void;
   signal: AbortSignal;
 }): Promise<File> {
-  const { slides, shots } = reelSlides(variant, photos, faces, format);
+  const { slides, shots } = reelSlides(variant, photos, faces, format, framing);
   const { timeline } = variant.plan;
   const store = new SlideImages();
   try {

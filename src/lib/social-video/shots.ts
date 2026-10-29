@@ -2,7 +2,13 @@
 // pushes and pulls alternate (docs/SOCIAL-VIDEO.md §5). Shared by the studio
 // and the one-click gift, so both draw the same video from the same photos.
 
-import { directShots, planShot, type Shot, type VideoFormat } from "@/lib/social-video/camera";
+import {
+  directShots,
+  planShot,
+  type ReelLook,
+  type Shot,
+  type VideoFormat,
+} from "@/lib/social-video/camera";
 import { aimFaces } from "@/lib/social-video/aim";
 import { focusFaces, type Box } from "@/lib/social-video/face-tags";
 import type { PhotoFaces } from "@/lib/social-video/faces";
@@ -29,9 +35,9 @@ export interface ShotsOptions {
   /** Show a photo turned the other way whole, over a blurred copy of itself,
    * instead of cutting the video's shape out of it (docs/SLIDESHOW-MAKER.md §2). */
   fitAcross?: boolean;
-  /** A reel's framing: close on the faces or the sharp part, no head cut,
-   * never the photo small over its blur (docs/REELS.md §5). */
-  reel?: boolean;
+  /** A reel's framing (docs/REELS.md §5): the cover frame on the faces or the
+   * sharp part, no head cut, still unless a gentle zoom is asked for. */
+  reel?: ReelLook;
 }
 
 export function shotsFor(
@@ -39,7 +45,7 @@ export function shotsFor(
   faces: Readonly<Record<string, PhotoFaces | null | undefined>>,
   format: VideoFormat,
   timeline: Timeline,
-  { fitAcross = false, reel = false }: ShotsOptions = {},
+  { fitAcross = false, reel }: ShotsOptions = {},
 ): Shot[] {
   const seconds = moveSeconds(timeline);
   const aimed = photos.map((p) =>
@@ -50,7 +56,14 @@ export function shotsFor(
       fitAcross && isAcross(p, format)
         ? wholePhoto(p)
         : planShot(
-            { width: p.width, height: p.height, faces: aimed[i]!, focus: faces[p.id]?.focus },
+            {
+              width: p.width,
+              height: p.height,
+              faces: aimed[i]!,
+              focus: faces[p.id]?.focus,
+              // Every face seen, aimed at or not: a frame must not cut through one.
+              avoid: faces[p.id]?.faces,
+            },
             format,
             seconds[i] ?? seconds.at(-1) ?? 3,
             { reel },
