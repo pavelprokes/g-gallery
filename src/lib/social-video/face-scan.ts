@@ -78,3 +78,70 @@ export async function scanFaces<P extends { id: string }>(
   await flush();
   return progress;
 }
+
+/** The query the "Přepočet fotek" page reloads itself with after a failed
+ * save, and starts from on its own. Here, not in the client component: a
+ * server page importing it from there would get a reference, not the string. */
+export const RESCAN_CONTINUE_PARAM = "pokracovat";
+
+/** Waits before each retry of a failed save — a passing network error, a
+ * database connection the pooler dropped. */
+export const SAVE_RETRY_DELAYS = [2_000, 5_000, 15_000] as const;
+
+/**
+ * `work`, tried again after each of `delays` while it throws — unless
+ * `retryable` says the error is one waiting will not cure.
+ */
+export async function withRetry<T>(
+  work: () => Promise<T>,
+  {
+    delays = SAVE_RETRY_DELAYS,
+    retryable = () => true,
+    wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  }: {
+    delays?: readonly number[];
+    retryable?: (error: unknown) => boolean;
+    wait?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await work();
+    } catch (error) {
+      const delay = delays[attempt];
+      if (delay === undefined || !retryable(error)) throw error;
+      await wait(delay);
+    }
+  }
+}
+
+/**
+ * Runs `work` on every item with at most `lanes` at once, each lane taking the
+ * next item as it finishes one — the face scan's workers each searching their
+ * own batch of photos. Stops taking items once `signal` aborts. The first
+ * error aborts `controller` (the other lanes stop at their next photo and save
+ * what they found) and is thrown once every lane has stopped.
+ */
+export async function inLanes<T>(
+  items: readonly T[],
+  lanes: number,
+  work: (item: T, index: number, lane: number) => Promise<void>,
+  controller: AbortController,
+): Promise<void> {
+  let next = 0;
+  let failure: { error: unknown } | null = null;
+  const lane = async (laneIndex: number) => {
+    while (!controller.signal.aborted && next < items.length) {
+      const index = next++;
+      try {
+        await work(items[index]!, index, laneIndex);
+      } catch (error) {
+        failure ??= { error };
+        controller.abort();
+      }
+    }
+  };
+  const count = Math.max(1, Math.min(lanes, items.length));
+  await Promise.all(Array.from({ length: count }, (_, i) => lane(i)));
+  if (failure) throw (failure as { error: unknown }).error;
+}

@@ -173,9 +173,18 @@ its model committed in `public/vendor/mediapipe/models/`.
 **Every gallery at once** (`/admin/prepocet`, "Přepočet fotek" on the overview, 2026-10-26): the
 photos each gallery page would scan on its own when opened — faces never searched, from an older
 build, or the sharp part not yet looked for (`needsFocus`) — listed for all of the owner's galleries
-and scanned one gallery after another in that tab (`BulkFaceScan`), with the same worker, fetch and
-`saveFaces`. Pausing stops at the next photo; what is saved stays saved, and the page lists only the
-rest next time.
+and scanned in that tab (`BulkFaceScan`), with the same fetch and `saveFaces`. Since 2026-10-30
+(Pavel: it was slow, and stopped after a while until the page was reloaded) it runs **up to three
+face workers at once** — each runs its WASM on one thread, so a worker is a core; the count is the
+browser's `hardwareConcurrency` less one, at most three (`inLanes`). The galleries are cut into
+batches of `SCAN_BATCH` photos, one save each, and every worker takes the next batch as it finishes
+one, newest gallery first. **A failed save** is tried again after 2, 5 and 15 s (`withRetry`) —
+except "Server Action not found", which only a reload cures: the tab is from an older deployment,
+and with several merges a day a run of a few hours outlives its deployment. A save that still fails
+reloads the page with `?pokracovat=1`; the reloaded page lists only what is left and starts by
+itself. It reloads only if a save went through since the page loaded, so a save that never works
+stops with the error instead of reloading forever. Pausing stops at the next photo; what is saved
+stays saved, and the page lists only the rest next time.
 
 ### The photo check
 
