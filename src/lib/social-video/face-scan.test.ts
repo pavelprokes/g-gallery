@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { FACES_MODEL, type PhotoFaces } from "@/lib/social-video/faces";
-import { SCAN_BATCH, SCAN_PREFETCH, scanFaces } from "@/lib/social-video/face-scan";
+import {
+  inLanes,
+  SCAN_BATCH,
+  SCAN_PREFETCH,
+  scanFaces,
+  withRetry,
+} from "@/lib/social-video/face-scan";
 
 const none: PhotoFaces = { v: 1, model: FACES_MODEL, faces: [] };
 const photos = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}` }));
@@ -97,5 +103,107 @@ describe("scanFaces", () => {
     expect(result.done).toBe(3);
     expect(saved).toEqual(["p0", "p1", "p2"]);
     expect(progress).toEqual([1, 2, 3]);
+  });
+});
+
+describe("withRetry", () => {
+  it("tries again after each delay until the work succeeds", async () => {
+    const waits: number[] = [];
+    let calls = 0;
+    const result = await withRetry(
+      async () => {
+        calls += 1;
+        if (calls < 3) throw new Error("NETWORK");
+        return "saved";
+      },
+      { delays: [10, 20, 30], wait: async (ms) => void waits.push(ms) },
+    );
+    expect(result).toBe("saved");
+    expect(waits).toEqual([10, 20]);
+  });
+
+  it("throws the last error once the delays run out", async () => {
+    let calls = 0;
+    const work = withRetry(
+      async () => {
+        calls += 1;
+        throw new Error(`FAIL_${calls}`);
+      },
+      { delays: [1, 1], wait: async () => {} },
+    );
+    await expect(work).rejects.toThrow("FAIL_3");
+  });
+
+  it("does not wait on an error that waiting will not cure", async () => {
+    const wait = vi.fn(async () => {});
+    let calls = 0;
+    const work = withRetry(
+      async () => {
+        calls += 1;
+        throw new Error("STALE_DEPLOYMENT");
+      },
+      { delays: [1, 1], retryable: () => false, wait },
+    );
+    await expect(work).rejects.toThrow("STALE_DEPLOYMENT");
+    expect(calls).toBe(1);
+    expect(wait).not.toHaveBeenCalled();
+  });
+});
+
+describe("inLanes", () => {
+  it("does every item, never more than `lanes` at once", async () => {
+    let running = 0;
+    let most = 0;
+    const done: number[] = [];
+    await inLanes(
+      [0, 1, 2, 3, 4, 5, 6],
+      3,
+      async (item) => {
+        running += 1;
+        most = Math.max(most, running);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        done.push(item);
+        running -= 1;
+      },
+      new AbortController(),
+    );
+    expect(done.sort()).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(most).toBe(3);
+  });
+
+  it("stops taking items after a failure, lets the others finish, then throws", async () => {
+    const controller = new AbortController();
+    const started: number[] = [];
+    let finishedOther = false;
+    const run = inLanes(
+      [0, 1, 2, 3, 4, 5],
+      2,
+      async (item) => {
+        started.push(item);
+        if (item === 0) throw new Error("SAVE");
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        if (item === 1) finishedOther = true;
+      },
+      controller,
+    );
+    await expect(run).rejects.toThrow("SAVE");
+    expect(controller.signal.aborted).toBe(true);
+    expect(finishedOther).toBe(true);
+    expect(started).toEqual([0, 1]);
+  });
+
+  it("takes no more items once aborted", async () => {
+    const controller = new AbortController();
+    const started: number[] = [];
+    await inLanes(
+      [0, 1, 2, 3],
+      1,
+      async (item) => {
+        started.push(item);
+        if (item === 1) controller.abort();
+      },
+      controller,
+    );
+    expect(started).toEqual([0, 1]);
   });
 });

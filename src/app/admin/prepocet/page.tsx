@@ -5,6 +5,7 @@ import { rescanCrumbs } from "@/lib/admin-breadcrumbs";
 import { needsFocus } from "@/lib/social-video/aim";
 import { currentFaces, FACES_MODEL } from "@/lib/social-video/faces";
 import { FOCUS_VERSION } from "@/lib/social-video/focus";
+import { RESCAN_CONTINUE_PARAM } from "@/lib/social-video/face-scan";
 import { BulkFaceScan, type RescanGallery } from "@/components/admin/bulk-face-scan";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -17,9 +18,13 @@ export const dynamic = "force-dynamic";
  * for — listed here so one open tab does them all. Its own page rather than a
  * card on the overview, which would otherwise read photos' faces on every visit.
  */
-export default async function RescanPage() {
+export default async function RescanPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await getAdminSession();
   if (!session) redirect("/sign-in?next=/admin/prepocet");
+  // Back from the reload a failed save asks for (BulkFaceScan): go on by itself.
+  const autoStart = (await props.searchParams)[RESCAN_CONTINUE_PARAM] === "1";
 
   // The database narrows to the candidates — no faces, another build, no
   // focus key yet, or a focus aimed by an older version — so a library that is
@@ -83,7 +88,7 @@ export default async function RescanPage() {
         crumbs={rescanCrumbs()}
         subtitle="Obličeje a ostrá místa pro video, promítání, kontrolu fotek a filtr Detaily — u všech galerií najednou."
       />
-      <BulkFaceScan galleries={pending} />
+      <BulkFaceScan galleries={pending} autoStart={autoStart} />
     </div>
   );
 }
