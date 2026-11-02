@@ -18,6 +18,13 @@ import { isPhotoOrder, isValidOrderKey, type PhotoOrder } from "@/lib/photo-orde
 export const PHOTOS_PAGE_SIZE = 60;
 
 /**
+ * How many pages one response may bring ahead of the viewer — a photo's link
+ * (src/lib/shared-gallery.ts) or a chapter's / highlight's jump (the photos
+ * route): 600 photos, ~120 kB compressed. Past it the client pulls the rest.
+ */
+export const PAGES_AHEAD_MAX = 10;
+
+/**
  * A place in the gallery's order (src/lib/photo-order.ts), plus the order it
  * was taken in. A gallery can be switched between orders while a guest is
  * scrolling it; a cursor from the other order would name a key of the wrong

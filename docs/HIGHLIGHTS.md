@@ -107,8 +107,9 @@ the highlights' rows re-flow when the width changes.
 lightbox, arrow keys, selection, favourites, print marks and the ZIP never see it (same rule as
 promos and chapter headers). Tapping it does not open a lightbox; it **jumps**:
 
-- the same mechanics as a chapter jump — pages of metadata are pulled until the photo is in the
-  grid, then one **instant** `scrollToIndex` (a smooth scroll would download every row it passes);
+- the same mechanics as a chapter jump — the pages of metadata up to the photo, in one request
+  (its `orderKey` is the position, docs/GALLERY-LOADING.md), then one **instant** `scrollToIndex`
+  (a smooth scroll would download every row it passes);
 - the tile then takes focus (it becomes the roving tab stop) and flashes a brand-coloured outline
   for two seconds, so the eye finds it among its neighbours;
 - a photo deleted since the page loaded is simply not found; nothing happens;

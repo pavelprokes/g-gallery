@@ -91,10 +91,10 @@ depends on it.
 The grid is virtualized by row (`useWindowVirtualizer`): only rows around the viewport mount, and an
 image is only requested by a mounted tile. So a jump costs:
 
-1. **Metadata up to the chapter's start** — row positions depend on every photo above, so pages are
-   pulled until the header exists (the same loop the favourites filter uses). 60 photos per small
-   JSON page; a 500-photo wedding is ~8 requests to reach its last chapter. The upgrade, if a
-   2000-photo gallery ever makes that feel slow, is a `take` parameter on the photos route.
+1. **Metadata up to the chapter's start** — row positions depend on every photo above, so the pages
+   up to the header are needed. Since 2026-11-02 they come in **one** request
+   (`throughKey`/`throughId` on the photos route, docs/GALLERY-LOADING.md), not one round trip per
+   60-photo page — a chapter link on a slow phone waited ~6 s for five pages before it could move.
 2. **An instant `scrollToIndex`, never a smooth one.** A smooth scroll would mount — and
    download — every row it passes. This is the load-bearing detail; `e2e/chapters.spec.ts` asserts
    that no photo from the middle of the gallery is requested on the way down.

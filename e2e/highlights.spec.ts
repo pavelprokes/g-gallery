@@ -40,12 +40,21 @@ test.describe("gallery highlights", () => {
   test("a tile takes the viewer to the photo's place in the grid", async ({ page }) => {
     await page.goto(`/g/${token}/${slug}`);
     const strip = page.getByRole("region", { name: STRIP });
+    const pages: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/g\/[^/]+\/photos/.test(request.url())) pages.push(request.url());
+    });
     // The pinned photo is the last of 130 — past the first two 60-photo pages.
     await strip.getByRole("button", { name: tileName(pinnedFile) }).click();
 
     const tile = page.getByRole("button", { name: gridName(pinnedFile) });
     await expect(tile).toBeInViewport();
+    // Both pages up to it came in one request (docs/GALLERY-LOADING.md),
+    // counted up to the landing.
+    const jump = [...pages];
     await expect(tile).toBeFocused();
+    expect(jump).toHaveLength(1);
+    expect(new URL(jump[0]!).searchParams.has("throughKey")).toBe(true);
   });
 
   test("the wheel over the strip scrolls the page, not the strip", async ({ page, isMobile }) => {
