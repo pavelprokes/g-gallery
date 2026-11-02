@@ -1571,6 +1571,32 @@ function GalleryViewInner({
   const [awaitingLinkedPhoto, setAwaitingLinkedPhoto] = useState(linkedPhoto !== null);
   const [imagesHeld, setImagesHeld] = useState(linkedPhoto !== null);
 
+  /**
+   * A chapter's link (docs/GALLERY-LOADING.md): the grid jumps as soon as the
+   * pages up to the chapter arrive, so the rows it first lays out are about to
+   * be left. Their images wait until the jump has landed — fetched, they would
+   * share a slow connection with the chapter's own for seconds, and an image
+   * whose row is unmounted keeps downloading. Read from the address before the
+   * grid's first rows exist; the grid is not server-rendered, so the hydrated
+   * markup is the server's either way.
+   */
+  const [landingHeld, setLandingHeld] = useState(() => {
+    if (typeof window === "undefined" || linkedPhoto) return false;
+    try {
+      const anchor = decodeURIComponent(window.location.hash.slice(1));
+      return anchor !== "" && chapters.some((chapter) => chapter.anchor === anchor);
+    } catch {
+      return false;
+    }
+  });
+  // ponytail: a failsafe, not a rule — a jump that cannot finish (the pages
+  // never arrive) shows what the grid has after 15 s rather than nothing.
+  useEffect(() => {
+    if (!landingHeld) return;
+    const timer = setTimeout(() => setLandingHeld(false), 15_000);
+    return () => clearTimeout(timer);
+  }, [landingHeld]);
+
   useEffect(() => {
     if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
     void fetchNextPage();
@@ -2143,7 +2169,10 @@ function GalleryViewInner({
     // Favourites switched on mid-jump: there are no headers to land on now.
     // Drop the jump quietly — the link in the URL is still a good one.
     if (!showChapters) {
-      const frame = requestAnimationFrame(() => setJumpingTo(null));
+      const frame = requestAnimationFrame(() => {
+        setJumpingTo(null);
+        setLandingHeld(false);
+      });
       return () => cancelAnimationFrame(frame);
     }
     const target = chapterRows.find((c) => c.id === jumpingTo);
@@ -2163,8 +2192,12 @@ function GalleryViewInner({
       replaceHash("");
       window.scrollTo({ top: 0 });
     }
-    // Cleared on the next frame, once the scroll has landed.
-    const frame = requestAnimationFrame(() => setJumpingTo(null));
+    // Cleared on the next frame, once the scroll has landed — and the rows it
+    // landed on may fetch their images now.
+    const frame = requestAnimationFrame(() => {
+      setJumpingTo(null);
+      setLandingHeld(false);
+    });
     return () => cancelAnimationFrame(frame);
   }, [
     jumpingTo,
@@ -2212,6 +2245,7 @@ function GalleryViewInner({
     } else {
       replaceHash("");
       window.scrollTo({ top: 0 });
+      setLandingHeld(false);
     }
   });
 
@@ -3422,7 +3456,7 @@ function GalleryViewInner({
                     height={entry.height}
                     index={index}
                     priority={virtualRow.index === firstPhotoRow}
-                    imageHeld={imagesHeld}
+                    imageHeld={imagesHeld || landingHeld}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}
