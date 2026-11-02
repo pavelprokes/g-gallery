@@ -1116,6 +1116,17 @@ async function fetchMyPhotoIds(
 /** One `QueryClient` per gallery view, created once — this is the only
  * surface in the app using TanStack Query, so there is no reason for a
  * layout-level provider every other route would carry for nothing. */
+/** The chapter the address's hash names, if any — a malformed hash names none. */
+function chapterInHash(chapters: readonly GalleryChapter[]): GalleryChapter | undefined {
+  let anchor: string;
+  try {
+    anchor = decodeURIComponent(window.location.hash.slice(1));
+  } catch {
+    return undefined;
+  }
+  return anchor ? chapters.find((chapter) => chapter.anchor === anchor) : undefined;
+}
+
 export function GalleryView(props: GalleryViewProps) {
   const [queryClient] = useState(() => new QueryClient());
   return (
@@ -1410,6 +1421,7 @@ function GalleryViewInner({
     fetchNextPage: fetchNextPageCancelling,
     hasNextPage,
     isFetchingNextPage,
+    isFetchNextPageError,
   } = useInfiniteQuery({
     queryKey: ["gallery-photos", token],
     queryFn: ({ pageParam, signal }) => fetchPhotosPage(token, pageParam, signal, photoOrder),
@@ -2136,6 +2148,25 @@ function GalleryViewInner({
   const [jumpingTo, setJumpingTo] = useState<string | null>(null);
   const focusChapterRef = useRef<string | null>(null);
 
+  /**
+   * A chapter's link (docs/GALLERY-LOADING.md): the grid jumps as soon as the
+   * pages up to the chapter arrive, so the rows it first lays out are about to
+   * be left. Their images wait while that jump is pending — fetched, they would
+   * share a slow connection with the chapter's own for seconds, and an image
+   * whose row unmounts keeps downloading. The hold is the arrival jump itself:
+   * it starts with the page and ends when that jump does (landed, dropped, or
+   * the pages failing to arrive). `arrivalChapter` is read from the address in
+   * the state initializer and never rendered — the grid is not server-rendered,
+   * so its first render has no rows to differ — while `jumpingTo`, which the
+   * chapter bar does render, starts on the next frame as before.
+   */
+  const [arrivalChapter] = useState(() =>
+    typeof window === "undefined" || linkedPhoto ? null : (chapterInHash(chapters)?.id ?? null),
+  );
+  const [arrivalRead, setArrivalRead] = useState(false);
+  const landingHeld =
+    arrivalChapter !== null && (!arrivalRead || jumpingTo !== null) && !isFetchNextPageError;
+
   useEffect(() => {
     // Wait for the first layout: before it there are no rows to find a
     // header in, and fetching pages to look for one would be wasted.
@@ -2198,15 +2229,11 @@ function GalleryViewInner({
     // The viewer's own shortlist has no chapters to land on: the link is
     // ignored there (not wiped), and the reader's own chapter replaces it
     // once the filter is off and they scroll.
+    setArrivalRead(true);
     if (favoritesOnly) return;
-    let anchor: string;
-    try {
-      anchor = decodeURIComponent(window.location.hash.slice(1));
-    } catch {
-      anchor = "\u0000"; // a malformed hash (`#100%`) names no chapter either
-    }
-    if (!anchor) return;
-    const chapter = chapters.find((c) => c.anchor === anchor);
+    if (!window.location.hash.slice(1)) return;
+    // A hash naming no chapter — malformed (`#100%`) included — is dropped.
+    const chapter = chapterInHash(chapters);
     if (chapter) {
       setJumpingTo(chapter.id);
     } else {
@@ -3422,7 +3449,7 @@ function GalleryViewInner({
                     height={entry.height}
                     index={index}
                     priority={virtualRow.index === firstPhotoRow}
-                    imageHeld={imagesHeld}
+                    imageHeld={imagesHeld || landingHeld}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}

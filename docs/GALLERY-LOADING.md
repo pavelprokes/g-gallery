@@ -80,6 +80,16 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   would have been fetched with. A failure falls back to one ordinary page and the jump's loop asks
   again. A chapter link on Slow 4G used to wait for five pages one after another (~6 s).
 
+- **A chapter's link holds the rows it is about to leave.** With the jump down to one request, the
+  grid moved to the chapter while the photos of the rows it first laid out (the top of the gallery)
+  were still downloading — an image keeps downloading after its row unmounts — and the chapter's own
+  tiles shared the link with them: on Slow 4G the first chapter tile appeared at 18 s. When the
+  address names a chapter on arrival (and no photo), the grid's tiles show their colour only while
+  that arrival jump is pending; it ends when the jump does — landed, dropped, or the pages failing
+  to arrive. The chapter is read from the address in a state initializer that is never rendered
+  (the grid is not server-rendered, so its first render has no rows either way). Ceiling: a featured
+  film or the highlights above the grid are server-rendered and their images are already requested
+  by the HTML, which cannot know the hash.
 - **Slow mode.** On a slow connection the lightbox asks for the 1080 px variant instead of 1920/2560
   and warms only the neighbour the viewer is heading to (`src/lib/slow-connection.ts`). Slow means:
   Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
