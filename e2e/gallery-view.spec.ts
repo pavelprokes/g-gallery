@@ -246,6 +246,44 @@ test.describe("share gallery viewer", () => {
   });
 });
 
+test.describe("slow mode", () => {
+  // docs/GALLERY-LOADING.md. Chromium reports its connection; the others are
+  // judged by their first images. Here the browser is told it is on 3G.
+  for (const [what, effectiveType, width, warmed] of [
+    ["on a slow connection the lightbox asks for 1080 px and warms one neighbour", "3g", "1080", 1],
+    ["on a good connection it asks for the screen and warms every neighbour", "4g", null, 2],
+  ] as const) {
+    test(what, async ({ page }) => {
+      await page.addInitScript((type) => {
+        Object.defineProperty(navigator, "connection", {
+          value: { effectiveType: type, saveData: false },
+          configurable: true,
+        });
+      }, effectiveType);
+      await page.goto(`/g/${seed.token}/${seed.slug}`);
+      await page
+        .getByRole("list", { name: "Fotky v galerii" })
+        .locator('button[aria-label^="Otevřít"]')
+        .first()
+        .click();
+
+      const full = page.getByRole("dialog").locator("img").last();
+      await expect
+        .poll(() => full.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+        .toBe(true);
+      const src = await full.evaluate((img: HTMLImageElement) => img.currentSrc);
+      if (width) expect(src).toMatch(new RegExp(`(fit:|width=)${width}\\b`));
+      else expect(src).not.toMatch(/(fit:|width=)1080\b/);
+
+      // The first photo has no previous one: next and the one after it
+      // normally, only the next on a slow link.
+      await expect
+        .poll(() => page.locator('head link[rel="preload"][as="image"][imagesrcset]').count())
+        .toBe(warmed);
+    });
+  }
+});
+
 test.describe("image retry", () => {
   // src/lib/image-retry.ts is serialized into an inline script, so only a
   // production build proves it survives bundling — and that a tile which

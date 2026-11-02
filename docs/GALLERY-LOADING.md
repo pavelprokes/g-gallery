@@ -80,6 +80,16 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   would have been fetched with. A failure falls back to one ordinary page and the jump's loop asks
   again. A chapter link on Slow 4G used to wait for five pages one after another (~6 s).
 
+- **Slow mode.** On a slow connection the lightbox asks for the 1080 px variant instead of 1920/2560
+  and warms only the neighbour the viewer is heading to (`src/lib/slow-connection.ts`). Slow means:
+  Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
+  Firefox — most guests are on an iPhone) the median time of the first images from the photo host
+  over 1.5 s. The `sizes` is `1080 / devicePixelRatio` px, which lands on the 1080 candidate on any
+  screen — a width already in the variant list, so no new billed transformation; the neighbour's
+  preload gets the same `sizes`, or it would warm a variant the image does not use. Read on every
+  open and move (events), so a photo's first render already asks for the right width. The linked
+  photo keeps `100vw`: the page's placeholder already fetched it at that.
+
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
 cover) rely on. Revisit only with a measurement that shows the extra rows costing on-screen time
@@ -116,11 +126,8 @@ One deliberate change: `/s/{t}?foto=` (no slug) redirected to the canonical addr
 the query, so on a one-gallery wedding the photo did not open. That was a bug, not a contract — the
 redirect carries the query now.
 
-## Next steps (planned, in this order)
+## Later, only if measurements call for it
 
-1. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
-   (an existing width — no new billed transformation) and warms one neighbour instead of three.
-
-Later, only if measurements still call for it: a 768 px phone thumbnail (−40 % per tile; 512 px
+A 768 px phone thumbnail (−40 % per tile; 512 px
 would blur portraits on a 3× iPhone), ThumbHash placeholders, leaner page payloads (`faces`/`focus`
 are ~38 % of each item and only the projection uses them).
