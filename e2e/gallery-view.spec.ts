@@ -267,10 +267,10 @@ test.describe("slow mode", () => {
         .first()
         .click();
 
+      // The full size is the dialog's last image. Done, not drawn: the local
+      // stack has no files behind these rows, and the request is what counts.
       const full = page.getByRole("dialog").locator("img").last();
-      await expect
-        .poll(() => full.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
-        .toBe(true);
+      await expect.poll(() => full.evaluate((img: HTMLImageElement) => img.complete)).toBe(true);
       // 1080 device pixels on any screen when slow; which candidate the screen
       // alone picks is the browser's business (a 2.6× Pixel takes 1080 too).
       const dpr = await page.evaluate(() => window.devicePixelRatio);
