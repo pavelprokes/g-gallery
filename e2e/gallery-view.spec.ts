@@ -48,6 +48,26 @@ test.describe("share gallery viewer", () => {
     expect(box!.height).toBeGreaterThan(0);
   });
 
+  test("the first row is fetched first, and page one is not asked for again", async ({ page }) => {
+    // docs/GALLERY-LOADING.md. This gallery has no film and no highlights,
+    // so the page opens on the grid's first row: it alone is eager and high.
+    const photoPages: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/g\/[^/]+\/photos/.test(request.url())) photoPages.push(request.url());
+    });
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+
+    const images = page.getByRole("list", { name: "Fotky v galerii" }).locator("img");
+    await expect(images.first()).toHaveAttribute("fetchpriority", "high");
+    await expect(images.first()).toHaveAttribute("loading", "eager");
+    await expect(images.last()).toHaveAttribute("loading", "lazy");
+    await expect(images.last()).not.toHaveAttribute("fetchpriority", "high");
+
+    // The seed is the server's own first page: hydrating must not refetch it.
+    await page.waitForLoadState("networkidle");
+    expect(photoPages).toEqual([]);
+  });
+
   test("previews in a chat with a resized cover, not the original", async ({ page }) => {
     await page.goto(`/g/${seed.token}/${seed.slug}`);
 

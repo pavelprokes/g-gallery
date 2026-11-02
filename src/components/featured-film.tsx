@@ -50,7 +50,11 @@ export function FeaturedFilmCard({
           src={posterSrc}
           fill
           sizes="(min-width: 1280px) 1280px, 100vw"
-          priority
+          // The page opens on this poster. `priority` would only add a preload
+          // link, which Chrome fetches at Low; the fetch priority is what puts
+          // it ahead of everything below it.
+          loading="eager"
+          fetchPriority="high"
           className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
           style={{ backgroundColor: placeholderStyle(placeholder) }}
         />

@@ -70,7 +70,8 @@ one. A header is a **row** in the virtualized grid, not a tile:
   so a credit card never dangles alone at the end of the previous chapter.
 
 The eager-priority image load goes to the first row of **photos**, not to row 0 — with a chapter
-starting at the first photo, row 0 is a header.
+starting at the first photo, row 0 is a header — and only when nothing (film, highlights) sits above
+the grid (docs/GALLERY-LOADING.md).
 
 ## Placement happens in the browser
 

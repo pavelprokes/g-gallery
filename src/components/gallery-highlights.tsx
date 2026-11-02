@@ -43,12 +43,16 @@ export function GalleryHighlights({
   highlights,
   imageGrant,
   jumpingTo,
+  leading,
   onJump,
 }: {
   highlights: GalleryHighlight[];
   imageGrant: SignedImageGrant | null;
   /** The photo a jump is on its way to, while its page is still loading. */
   jumpingTo: string | null;
+  /** Nothing above the strip (no featured film): its first tiles are what the
+   * page opens on, and get the high fetch priority. */
+  leading: boolean;
   onJump: (photoId: string) => void;
 }) {
   const t = useTranslations("gallery");
@@ -72,7 +76,8 @@ export function GalleryHighlights({
             busy={jumpingTo === photo.id}
             // The highlights open the page; the first few are what the viewer
             // sees before anything else loads.
-            priority={i < 3}
+            eager={i < 3}
+            highPriority={leading && i < 3}
             label={t("highlightOpen", { fileName: photo.fileName })}
             onJump={onJump}
           />
@@ -89,7 +94,8 @@ function HighlightTile({
   aspect,
   imageGrant,
   busy,
-  priority,
+  eager,
+  highPriority,
   label,
   onJump,
 }: {
@@ -97,7 +103,8 @@ function HighlightTile({
   aspect: number;
   imageGrant: SignedImageGrant | null;
   busy: boolean;
-  priority: boolean;
+  eager: boolean;
+  highPriority: boolean;
   label: string;
   onJump: (photoId: string) => void;
 }) {
@@ -145,7 +152,10 @@ function HighlightTile({
           sizes={`(max-width: 799px) ${aspect < 1 ? 50 : 100}vw, ${Math.ceil(
             aspect * 260 * MAX_GROWTH,
           )}px`}
-          priority={priority}
+          // Not next/image's `priority`: since Next 16 that is only a preload
+          // link, fetched at Low like every lazy image.
+          loading={eager ? "eager" : undefined}
+          fetchPriority={highPriority ? "high" : undefined}
           className="duration-toggle object-cover transition-transform hover:scale-105"
         />
         {busy && (
