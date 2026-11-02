@@ -5,7 +5,7 @@ import { resolveShareLink } from "@/lib/share-access";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { ShareLinkDead } from "@/components/share-link-dead";
-import { PHOTO_PARAM, isPhotoId, linkedPhotoParam } from "@/lib/photo-link";
+import { linkedPhotoParam } from "@/lib/photo-link";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { galleryShareMetadata, unavailableShareMetadata } from "@/lib/share-metadata";
 import { gallerySignPath, requestedSharePath } from "@/lib/sign-url";
@@ -28,7 +28,8 @@ export async function generateMetadata(
   props: PageProps<"/g/[token]/[[...slug]]">,
 ): Promise<Metadata> {
   const { token, slug } = await props.params;
-  const linked = (await props.searchParams)[PHOTO_PARAM];
+  // Read as the page reads it, so a link previews with the photo it opens.
+  const linked = linkedPhotoParam(await props.searchParams);
   const t = await getTranslations("gallery");
   const locale = await getLocale();
 
@@ -44,7 +45,7 @@ export async function generateMetadata(
     t,
     locale,
     gallerySignPath(token, access.shareLink.slug),
-    isPhotoId(linked) ? linked : null,
+    linked,
   );
 }
 

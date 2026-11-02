@@ -85,13 +85,21 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("photo links", () => {
   test("a photo past the first pages opens before anything else loads", async ({ page }) => {
+    // Every photo image request, in the order sent, and when it settled.
+    let clock = 0;
+    const log: { url: string; file: string; start: number; end?: number }[] = [];
     const pages: string[] = [];
-    const files: string[] = [];
     page.on("request", (request) => {
       if (PHOTOS_API.test(request.url())) pages.push(request.url());
       const file = request.resourceType() === "image" ? photoFile(request.url()) : null;
-      if (file) files.push(file);
+      if (file) log.push({ url: request.url(), file, start: ++clock });
     });
+    const settle = (request: { url: () => string }) => {
+      const entry = log.find((e) => e.url === request.url() && e.end === undefined);
+      if (entry) entry.end = ++clock;
+    };
+    page.on("requestfinished", settle);
+    page.on("requestfailed", settle);
 
     await page.goto(`${gallery}?foto=${far.id}`);
     const dialog = page.getByRole("dialog");
@@ -102,18 +110,24 @@ test.describe("photo links", () => {
 
     // The pages up to the photo came with the page: none was fetched.
     expect(pages).toEqual([]);
-    // Until the photo's own request is done, it is the only photo asked for.
-    // (`complete`, not drawn: this seed's rows have no files behind them.)
-    const full = dialog.locator('img[sizes="100vw"]');
-    await expect.poll(() => full.evaluate((img: HTMLImageElement) => img.complete)).toBe(true);
-    expect(new Set(files)).toEqual(new Set([fileOf(far)]));
+
+    // The photo's full size (asked for at 100vw, so 1080 px or wider) is
+    // requested, and no other photo is asked for before that request is done.
+    // (Done, not drawn: this seed's rows have no files behind them.)
+    const width = (url: string) =>
+      Number(/fit:(\d+)|width=(\d+)/.exec(url)?.slice(1).find(Boolean));
+    const fullDone = () =>
+      log.find((e) => e.file === fileOf(far) && width(e.url) >= 1080 && e.end !== undefined)?.end;
+    await expect.poll(fullDone).toBeDefined();
+    const others = log.filter((e) => e.file !== fileOf(far));
+    expect(others.filter((e) => e.start < fullDone()!)).toEqual([]);
 
     // Back is the gallery, on the photo's own tile — whose image now loads.
     await page.goBack();
     await expect(dialog).not.toBeVisible();
     await expect(page).not.toHaveURL(/foto=/);
     await expect(tileOf(page, far)).toBeInViewport();
-    await expect.poll(() => files.length).toBeGreaterThan(1);
+    await expect.poll(() => log.filter((e) => e.file !== fileOf(far)).length).toBeGreaterThan(0);
   });
 
   test("with another chapter's anchor, the photo wins and Back lands on it", async ({ page }) => {

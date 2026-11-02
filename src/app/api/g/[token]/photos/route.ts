@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { VIDEO_SELECT, videoOf } from "@/lib/video";
 import { resolveShareLink } from "@/lib/share-access";
-import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor } from "@/lib/photo-cursor";
+import { PHOTOS_PAGE_SIZE, decodeCursor, toPages } from "@/lib/photo-cursor";
 import {
   ORDER_KEY_SELECT,
   PHOTO_ORDERS,
@@ -90,12 +90,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
 
   const hasMore = photos.length > PHOTOS_PAGE_SIZE;
   const page = hasMore ? photos.slice(0, PHOTOS_PAGE_SIZE) : photos;
-  const last = page.at(-1);
-
-  return NextResponse.json({
-    // Which order `orderKey` is in — a page open across a switch notices here.
+  // Cut by the same function as the pages a photo's link brings with the page
+  // (src/lib/shared-gallery.ts), so a refetch lands on the same boundaries.
+  // A page this size is always exactly one page.
+  const { items, nextCursor } = toPages(
     order,
-    items: page.map((photo) => ({
+    page.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
       thumbObjectKey: photo.thumbObjectKey,
@@ -110,8 +110,14 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       // For the projection's camera (src/lib/projection-camera.ts).
       ...projectionAim(photo.faces, photo.faceTags),
     })),
+    hasMore,
+  )[0]!;
+
+  return NextResponse.json({
+    // Which order `orderKey` is in — a page open across a switch notices here.
+    order,
+    items,
     ...(total !== undefined ? { total } : {}),
-    nextCursor:
-      hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
+    nextCursor,
   });
 }

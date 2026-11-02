@@ -55,17 +55,6 @@ import {
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
 
-/**
- * Everything the shared `GalleryView` needs, loaded from one resolved share
- * link. Shared by the two surfaces that can render a gallery to a viewer:
- * `/g/{token}` and a wedding page that lists exactly one gallery
- * (docs/GUEST-GALLERIES.md §2), so the two cannot drift on ordering, page
- * size, or which photos count as visible.
- *
- * `token` is passed straight through to the client, which only ever
- * interpolates it into API URLs — so it works identically for a plain share
- * token and for the `{eventToken}~{eventKey}` composite.
- */
 /** One photo as the guest's grid receives it, from the page or the photos route. */
 export interface GalleryViewPhoto {
   id: string;
@@ -99,11 +88,24 @@ export interface LinkedPhoto {
 }
 
 /**
- * How many pages a link may pull in with the page itself. Past this — photo
- * 1 200 of a bigger gallery — the client pulls the rest as it always did.
+ * How many pages a link may pull in with the page itself: 600 photos, most of
+ * a wedding, at ~12 kB compressed a page in the HTML. Past this the photo is
+ * not linked at all and the client pulls the pages as it always did — a
+ * bigger page would make the very phone this is for parse and hydrate it.
  */
-const LINKED_PAGES_MAX = 20;
+const LINKED_PAGES_MAX = 10;
 
+/**
+ * Everything the shared `GalleryView` needs, loaded from one resolved share
+ * link. Shared by the two surfaces that can render a gallery to a viewer:
+ * `/g/{token}` and a wedding page that lists exactly one gallery
+ * (docs/GUEST-GALLERIES.md §2), so the two cannot drift on ordering, page
+ * size, or which photos count as visible.
+ *
+ * `token` is passed straight through to the client, which only ever
+ * interpolates it into API URLs — so it works identically for a plain share
+ * token and for the `{eventToken}~{eventKey}` composite.
+ */
 export interface GalleryViewData {
   title: string;
   eventDate: string | null;
@@ -168,13 +170,14 @@ export async function loadGalleryViewData(
   linkedPhotoId: string | null = null,
 ): Promise<GalleryViewData | null> {
   const order = access.photoOrder;
-  const linked = linkedPhotoId ? await findLinkedPhoto(access, linkedPhotoId) : null;
+  const found = linkedPhotoId ? await findLinkedPhoto(access, linkedPhotoId) : null;
   // The page carries every page of photos up to the linked one, so the
   // lightbox can open on it as soon as the page hydrates instead of after a
-  // round trip per page (docs/GALLERY-LOADING.md).
-  const pageCount = linked
-    ? Math.min(Math.floor(linked.index / PHOTOS_PAGE_SIZE) + 1, LINKED_PAGES_MAX)
-    : 1;
+  // round trip per page (docs/GALLERY-LOADING.md). A photo past the cap is
+  // left to the client's own pulling, as before — with no placeholder and no
+  // held images, which only make sense while the photo is a frame away.
+  const linked = found && found.index < LINKED_PAGES_MAX * PHOTOS_PAGE_SIZE ? found : null;
+  const pageCount = linked ? Math.floor(linked.index / PHOTOS_PAGE_SIZE) + 1 : 1;
   const take = pageCount * PHOTOS_PAGE_SIZE;
   const gallery = await prisma.gallery.findUnique({
     where: { id: access.galleryId },
@@ -348,7 +351,11 @@ export async function loadGalleryViewData(
       })),
       hasMore,
     ),
-    linkedPhoto: linked?.photo ?? null,
+    // Only when the photo really is in those pages: the count above reads the
+    // order's key with its fallbacks, the database sorts the raw column, and a
+    // row caught between two writes of it can land elsewhere. Then the client
+    // pulls on as it always did, rather than wait behind a placeholder.
+    linkedPhoto: linked && rows.some((row) => row.id === linked.photo.id) ? linked.photo : null,
     photoOrder: order,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),

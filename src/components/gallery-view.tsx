@@ -722,6 +722,8 @@ interface LightboxPhotoProps {
   loaded: boolean;
   selected: boolean;
   onLoad: () => void;
+  /** The full size failed (the retry script may still bring it back). */
+  onError: () => void;
   onSwipe: (delta: 1 | -1) => void;
   onDismiss: () => void;
   onTap: () => void;
@@ -749,6 +751,7 @@ function LightboxPhoto({
   loaded,
   selected,
   onLoad,
+  onError,
   onSwipe,
   onDismiss,
   onTap,
@@ -825,6 +828,7 @@ function LightboxPhoto({
           fill
           sizes="100vw"
           onLoad={onLoad}
+          onError={onError}
           // No fade, and never hidden: an image that is transparent until it
           // loads guarantees a black gap, and one that fades in over 200 ms
           // guarantees a visible one. An `<img>` shows nothing until it has
@@ -1169,6 +1173,9 @@ function GalleryViewInner({
   // lightbox fade-in below. Starts at null so even the very first photo
   // fades in rather than popping straight onto the black background.
   const [loadedPhotoId, setLoadedPhotoId] = useState<string | null>(null);
+  // One that failed to load counts as done for warming the neighbours: they
+  // must not wait for an image that is not coming.
+  const [failedPhotoId, setFailedPhotoId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState<Map<string, number>>(
     () => new Map(initialPages.flatMap((page) => page.items).map((p) => [p.id, p.favoriteCount])),
@@ -2775,7 +2782,9 @@ function GalleryViewInner({
   // The photo on screen first: until it has loaded, warming three more would
   // split a slow connection four ways while the viewer waits on the one
   // (docs/GALLERY-LOADING.md). A film has no full-size image to wait for.
-  const activeShown = !!active && (active.video !== null || loadedPhotoId === active.id);
+  const activeShown =
+    !!active &&
+    (active.video !== null || loadedPhotoId === active.id || failedPhotoId === active.id);
   useEffect(() => {
     if (lightboxIndex === null || photos.length < 2 || !activeShown) return;
 
@@ -3355,6 +3364,7 @@ function GalleryViewInner({
               loaded={loadedPhotoId === active.id}
               selected={activeSelected}
               onLoad={() => setLoadedPhotoId(active.id)}
+              onError={() => setFailedPhotoId(active.id)}
               onSwipe={move}
               onDismiss={closeLightbox}
               onTap={toggleChrome}

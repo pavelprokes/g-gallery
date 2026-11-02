@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { resolveEvent } from "@/lib/event-access";
 import { resolveShareLink } from "@/lib/share-access";
 import { compositeToken } from "@/lib/event-token";
-import { PHOTO_PARAM, isPhotoId, linkedPhotoParam } from "@/lib/photo-link";
+import { linkedPhotoParam } from "@/lib/photo-link";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { splitEventCards } from "@/lib/event-cards";
 import {
@@ -68,14 +68,8 @@ export async function generateMetadata(
     const galleryToken = compositeToken(token, card.eventKey);
     const access = await resolveShareLink(galleryToken);
     if (access.ok) {
-      const linked = (await props.searchParams)[PHOTO_PARAM];
-      return galleryShareMetadata(
-        access.shareLink.galleryId,
-        t,
-        locale,
-        url,
-        isPhotoId(linked) ? linked : null,
-      );
+      const linked = linkedPhotoParam(await props.searchParams);
+      return galleryShareMetadata(access.shareLink.galleryId, t, locale, url, linked);
     }
   }
 
