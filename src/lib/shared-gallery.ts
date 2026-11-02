@@ -500,9 +500,18 @@ async function loadHighlights(
       width: true,
       height: true,
       placeholder: true,
+      ...ORDER_KEY_SELECT,
     },
   });
-  const byId = new Map(photos.map((photo) => [photo.id, photo]));
+  const byId = new Map(
+    photos.map(({ takenAt, createdAt, fileOrderKey, wovenAt, manualOrderKey, ...photo }) => [
+      photo.id,
+      {
+        ...photo,
+        orderKey: orderKeyOf(order, { takenAt, createdAt, fileOrderKey, wovenAt, manualOrderKey }),
+      },
+    ]),
+  );
   return picks.flatMap((pick) => byId.get(pick.id) ?? []);
 }
 

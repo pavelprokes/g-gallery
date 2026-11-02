@@ -25,6 +25,7 @@ import {
   QueryClientProvider,
   useInfiniteQuery,
   useQueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -63,7 +64,7 @@ import {
 } from "@/lib/gallery-grid";
 import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
 import type { PhotoOrder } from "@/lib/photo-order";
-import type { GalleryChapter } from "@/lib/gallery-chapters";
+import type { GalleryChapter, TimelinePosition } from "@/lib/gallery-chapters";
 import { PromoTile } from "@/components/promo-tile";
 import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
 import { GalleryHighlights } from "@/components/gallery-highlights";
@@ -1011,6 +1012,31 @@ async function fetchPhotosPage(
   return page;
 }
 
+/**
+ * Every page from `cursor` up to the one holding `through` (a chapter's start,
+ * a highlight), in one request — cut exactly as the pages would have come one
+ * at a time (docs/GALLERY-LOADING.md).
+ */
+async function fetchPhotosThrough(
+  token: string,
+  cursor: string,
+  through: TimelinePosition,
+  photoOrder: PhotoOrder,
+): Promise<PhotosPage[]> {
+  const query = new URLSearchParams({ cursor, throughKey: through.key, throughId: through.id });
+  const response = await fetch(`/api/g/${encodeURIComponent(token)}/photos?${query}`);
+  const body = response.ok
+    ? ((await response.json()) as { order?: PhotoOrder; pages?: PhotosPage[] })
+    : null;
+  // The order changed under the open page: start over, as fetchPhotosPage does.
+  if (response.status === 409 || (body?.order && body.order !== photoOrder)) {
+    window.location.reload();
+    return new Promise<never>(() => {});
+  }
+  if (!body?.pages?.length) throw new Error(`failed to fetch photos (${response.status})`);
+  return body.pages;
+}
+
 /** One print-mark write, sorted into what the queue should do next with it. */
 async function postPrintQuantity(
   token: string,
@@ -1414,6 +1440,51 @@ function GalleryViewInner({
     });
     return nextPageInFlight.current;
   }, [fetchNextPageCancelling]);
+
+  /**
+   * A jump's pages in one request instead of one round trip each: a chapter
+   * link on a slow phone pulled five pages one after another before it could
+   * move (docs/GALLERY-LOADING.md). The pages are appended with the cursors
+   * they would have been fetched with, so a later refetch walks the same
+   * pages. A failure falls back to one ordinary page; the jump's loop asks
+   * again from there. Joins, and is joined by, the call in flight.
+   */
+  const fetchThrough = useCallback(
+    (through: TimelinePosition) => {
+      nextPageInFlight.current ??= (async () => {
+        const key = ["gallery-photos", token];
+        const cursor = queryClient
+          .getQueryData<InfiniteData<PhotosPage, string | null>>(key)
+          ?.pages.at(-1)?.nextCursor;
+        if (!cursor) return;
+        let pages: PhotosPage[];
+        try {
+          pages = await fetchPhotosThrough(token, cursor, through, photoOrder);
+        } catch {
+          await fetchNextPageCancelling();
+          return;
+        }
+        queryClient.setQueryData<InfiniteData<PhotosPage, string | null>>(key, (old) =>
+          // Only onto the pages it was asked from: a refetch that landed in
+          // the meantime has its own last page, and the loop asks again.
+          old && old.pages.at(-1)?.nextCursor === cursor
+            ? {
+                pages: [...old.pages, ...pages],
+                pageParams: [
+                  ...old.pageParams,
+                  cursor,
+                  ...pages.slice(0, -1).map((page) => page.nextCursor),
+                ],
+              }
+            : old,
+        );
+      })().finally(() => {
+        nextPageInFlight.current = null;
+      });
+      return nextPageInFlight.current;
+    },
+    [fetchNextPageCancelling, photoOrder, queryClient, token],
+  );
 
   /**
    * The gallery's real total, kept current. The `photoCount` prop is fixed at
@@ -2039,13 +2110,10 @@ function GalleryViewInner({
    * Jumping to a chapter (docs/CHAPTERS.md). The grid is virtualized, so only
    * the rows around the target ever mount — nothing between here and there
    * is downloaded. What the jump does need is the photo *metadata* up to the
-   * chapter's start, since row positions depend on every photo above; pages
-   * are pulled until the header exists, the same way the favourites filter
-   * pulls the whole gallery.
-   *
-   * ponytail: sequential 60-photo pages — a 500-photo wedding is ~8 small JSON
-   * requests to reach its last chapter. A `take` parameter on the photos
-   * route is the upgrade if a 2000-photo gallery ever makes that feel slow.
+   * chapter's start, since row positions depend on every photo above. Those
+   * pages come in one request (`fetchThrough`, docs/GALLERY-LOADING.md) —
+   * one round trip per page made a chapter link on a slow phone wait seconds
+   * before it could move.
    */
   const [jumpingTo, setJumpingTo] = useState<string | null>(null);
   const focusChapterRef = useRef<string | null>(null);
@@ -2067,7 +2135,8 @@ function GalleryViewInner({
       rowVirtualizer.scrollToIndex(target.rowIndex, { align: "start" });
       focusChapterRef.current = jumpingTo;
     } else if (hasNextPage) {
-      if (!isFetchingNextPage) void fetchNextPage();
+      const start = chapters.find((c) => c.id === jumpingTo)?.start;
+      if (!isFetchingNextPage) void (start ? fetchThrough(start) : fetchNextPage());
       return;
     }
     // Done — or the chapter emptied since the page loaded and there is nothing
@@ -2084,9 +2153,11 @@ function GalleryViewInner({
     rows.length,
     showChapters,
     chapterRows,
+    chapters,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
+    fetchThrough,
     rowVirtualizer,
   ]);
 
@@ -2236,7 +2307,12 @@ function GalleryViewInner({
     const index = photos.findIndex((photo) => photo.id === jumpingToPhoto);
     const rowIndex = index >= 0 ? nav.rowIndexForPhoto.get(index) : undefined;
     if (rowIndex === undefined && hasNextPage) {
-      if (!isFetchingNextPage) void fetchNextPage();
+      const highlight = highlights.find((h) => h.id === jumpingToPhoto);
+      if (!isFetchingNextPage) {
+        void (highlight
+          ? fetchThrough({ key: highlight.orderKey, id: highlight.id })
+          : fetchNextPage());
+      }
       return;
     }
     // Not found with nothing left to fetch: deleted since the page loaded, so
@@ -2261,9 +2337,11 @@ function GalleryViewInner({
     rows.length,
     photos,
     nav,
+    highlights,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
+    fetchThrough,
     rowVirtualizer,
   ]);
 

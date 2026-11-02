@@ -8,6 +8,8 @@ import {
   ORDER_KEY_SELECT,
   PHOTO_ORDERS,
   afterPosition,
+  beforePosition,
+  isValidOrderKey,
   orderKeyOf,
   photoOrderBy,
 } from "@/lib/photo-order";
@@ -17,9 +19,21 @@ import { PROJECTION_FACES_SELECT, projectionAim } from "@/lib/projection-camera"
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
 
-const querySchema = z.object({
-  cursor: z.string().optional(),
-});
+const querySchema = z
+  .object({
+    cursor: z.string().optional(),
+    // A place in the gallery's order — a chapter's start, a highlight — to
+    // bring every page up to in one response (docs/GALLERY-LOADING.md).
+    throughKey: z.string().max(200).optional(),
+    throughId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .optional(),
+  })
+  .refine((query) => (query.throughKey === undefined) === (query.throughId === undefined));
+
+/** How many pages one `through` request may bring: 600 photos. */
+const THROUGH_PAGES_MAX = 10;
 
 /**
  * Keyset (cursor) pagination over a gallery's confirmed photos, in the
@@ -52,6 +66,29 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       : NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
 
+  const through =
+    parsed.data.throughKey !== undefined && parsed.data.throughId !== undefined
+      ? { key: parsed.data.throughKey, id: parsed.data.throughId }
+      : null;
+  if (through && !isValidOrderKey(order, through.key)) {
+    return NextResponse.json({ error: "invalid_query" }, { status: 400 });
+  }
+  const after = cursor ? afterPosition(order, cursor) : {};
+  // Every page up to the one that holds `through` — the pages the client
+  // would otherwise ask for one round trip at a time, cut the same way.
+  // ponytail: a jump past THROUGH_PAGES_MAX pages takes another request.
+  const before = through
+    ? await prisma.photo.count({
+        where: {
+          galleryId: access.shareLink.galleryId,
+          status: "CONFIRMED",
+          AND: [after, beforePosition(order, through)],
+        },
+      })
+    : 0;
+  const take =
+    Math.min(Math.floor(before / PHOTOS_PAGE_SIZE) + 1, THROUGH_PAGES_MAX) * PHOTOS_PAGE_SIZE;
+
   // The gallery's total rides along with the first page. The page's own
   // server-rendered count is fixed at load, so after a guest adds or takes
   // back a photo the header and the lightbox read "3 / 2" until a reload.
@@ -62,10 +99,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       where: {
         galleryId: access.shareLink.galleryId,
         status: "CONFIRMED",
-        ...(cursor ? afterPosition(order, cursor) : {}),
+        ...after,
       },
       orderBy: photoOrderBy(order),
-      take: PHOTOS_PAGE_SIZE + 1,
+      take: take + 1,
       select: {
         id: true,
         objectKey: true,
@@ -88,14 +125,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
         }),
   ]);
 
-  const hasMore = photos.length > PHOTOS_PAGE_SIZE;
-  const page = hasMore ? photos.slice(0, PHOTOS_PAGE_SIZE) : photos;
+  const hasMore = photos.length > take;
+  const rows = hasMore ? photos.slice(0, take) : photos;
   // Cut by the same function as the pages a photo's link brings with the page
   // (src/lib/shared-gallery.ts), so a refetch lands on the same boundaries.
-  // A page this size is always exactly one page.
-  const { items, nextCursor } = toPages(
+  const pages = toPages(
     order,
-    page.map((photo) => ({
+    rows.map((photo) => ({
       id: photo.id,
       objectKey: photo.objectKey,
       thumbObjectKey: photo.thumbObjectKey,
@@ -111,13 +147,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       ...projectionAim(photo.faces, photo.faceTags),
     })),
     hasMore,
-  )[0]!;
+  );
 
   return NextResponse.json({
     // Which order `orderKey` is in — a page open across a switch notices here.
     order,
-    items,
+    ...(through ? { pages } : { items: pages[0]!.items, nextCursor: pages[0]!.nextCursor }),
     ...(total !== undefined ? { total } : {}),
-    nextCursor,
   });
 }

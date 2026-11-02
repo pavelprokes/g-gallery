@@ -89,9 +89,17 @@ test.describe("gallery chapters", () => {
   });
 
   test("a link with a chapter opens the gallery on it", async ({ page }) => {
+    const pages: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/g\/[^/]+\/photos/.test(request.url())) pages.push(request.url());
+    });
     await page.goto(`/g/${token}/${slug}#${anchors.at(-1)}`);
     await expect(page.getByRole("heading", { level: 2, name: titles.at(-1) })).toBeInViewport();
     await expect(page).toHaveURL(new RegExp(`#${anchors.at(-1)}$`));
+    // Its start is two pages past the first: both came in one request
+    // (docs/GALLERY-LOADING.md).
+    expect(pages).toHaveLength(1);
+    expect(new URL(pages[0]!).searchParams.has("throughKey")).toBe(true);
   });
 
   for (const [what, hash] of [

@@ -73,6 +73,13 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   the viewer waited for the one. A film has nothing to wait for and warms them at once, and a full
   size that fails to load counts as done.
 
+- **A jump's pages in one request.** A chapter link, a chapter chip and a highlight need the photo
+  metadata up to their target (row positions depend on every photo above). `throughKey`/`throughId`
+  on `/api/g/[token]/photos` returns every page from the cursor up to the one holding that position
+  (at most 10), cut by `toPages` like any other; the client appends them with the cursors they
+  would have been fetched with. A failure falls back to one ordinary page and the jump's loop asks
+  again. A chapter link on Slow 4G used to wait for five pages one after another (~6 s).
+
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
 cover) rely on. Revisit only with a measurement that shows the extra rows costing on-screen time
@@ -111,10 +118,7 @@ redirect carries the query now.
 
 ## Next steps (planned, in this order)
 
-1. **Chapter link and highlight jump: one request.** `throughKey`/`throughId` on
-   `/api/g/[token]/photos` returns every page up to that position at once (docs/CHAPTERS.md names
-   this as the upgrade); a failure falls back to today's page-by-page pull.
-2. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
+1. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
    (an existing width — no new billed transformation) and warms one neighbour instead of three.
 
 Later, only if measurements still call for it: a 768 px phone thumbnail (−40 % per tile; 512 px

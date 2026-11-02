@@ -399,6 +399,9 @@ export interface GalleryHighlight {
   width: number | null;
   height: number | null;
   placeholder: string | null;
+  /** Its place in the gallery's order: a jump brings every page up to it in
+   * one request (docs/GALLERY-LOADING.md). */
+  orderKey: string;
 }
 
 /** The columns `toHighlightCandidate` reads — for a Prisma `select`. */
