@@ -41,10 +41,15 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
 - **No second fetch of page one.** The photos query is seeded with the server's first page and has
   `refetchOnMount: false`; with the default `staleTime: 0` the seed counted as stale on arrival and
   every visit asked for page one again right after hydrating. Uploads and deletions invalidate the
-  query explicitly, so they still refresh it.
-- **Joined page fetches.** Every "next page" goes through one `fetchNextPage` with
-  `cancelRefetch: false`. TanStack's default aborts a page in flight and asks again; a photo link
-  carrying a chapter anchor ran two pulling loops in one commit and requested every page twice.
+  query explicitly, so they still refresh it, and the refetch on regaining focus stays — it is how a
+  gallery left open picks up photos added since.
+- **One next page at a time.** Every "next page" goes through one `fetchNextPage` that joins a call
+  of ours already in flight. With TanStack's default (`cancelRefetch: true`) the second of two loops
+  firing in one commit — a photo link carrying a chapter anchor — aborted the first one's request
+  and asked again: every page went out twice. The default still applies to a _background_ refetch,
+  on purpose: it is cancelled in favour of the next page, so scrolling, the favourites filter and the
+  lightbox's next button never wait for every loaded page to be fetched again (`cancelRefetch:
+false` on every call would make them).
 
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they

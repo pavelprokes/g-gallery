@@ -17,10 +17,10 @@ const args = Object.fromEntries(
     return [key, value ?? "1"];
   }),
 );
-const galleryUrl = new URL(process.argv[2] ?? "");
-const token = galleryUrl.pathname.split("/")[2];
+const galleryUrl = URL.canParse(process.argv[2] ?? "") ? new URL(process.argv[2]) : null;
+const token = galleryUrl?.pathname.split("/")[2];
 // A /g/ link only: its token is the one the photos API takes.
-if (!galleryUrl.pathname.startsWith("/g/") || !token) {
+if (!galleryUrl?.pathname.startsWith("/g/") || !token) {
   console.error(
     "usage: node scripts/perf-gallery.mjs <https://…/g/{token}/{slug}> [--hash=] [--photo=] [--runs=]",
   );
@@ -80,6 +80,12 @@ async function measure(url, isPhoto) {
   cdp.on("Network.loadingFinished", (event) => {
     const record = images.get(event.requestId);
     if (record) Object.assign(record, { end: Date.now() - t0, bytes: event.encodedDataLength });
+  });
+  // A tile the grid unmounted mid-flight, or an image that failed, is done
+  // too — otherwise a grid run waits out the whole cap for it.
+  cdp.on("Network.loadingFailed", (event) => {
+    const record = images.get(event.requestId);
+    if (record) record.end = Date.now() - t0;
   });
 
   page.goto(url, { timeout: CAP_MS }).catch(() => {});
