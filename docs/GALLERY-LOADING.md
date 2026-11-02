@@ -68,11 +68,32 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     turns out to be gone), so nothing shares the connection with the one photo being waited for;
   - the browser still opens the link with its own logic, unchanged: the same history entries, the
     same instant scroll under the dialog, the same Back. That is what keeps the contract below.
-- **Neighbours after the photo.** The lightbox warms its neighbours (next, previous, one further
-  ahead) once the photo on screen has loaded — before, a slow connection was split four ways while
-  the viewer waited for the one. A film has nothing to wait for and warms them at once, and a full
-  size that fails to load counts as done.
-
+- **Clicks are never ignored; loading waits for a pause.** Browsing a click a second or faster —
+  looking for one photo, or trying to break it — every click moves the counter and the photo on
+  screen at once; nothing is throttled. What waits is the expensive part: a photo's full size, and
+  its neighbours' full sizes, are fetched only once a hurrying viewer has stayed on it for 250 ms
+  (`LIGHTBOX_SETTLE_MS`); an ordinary step (the photo left had loaded) shows the next full size at
+  once, usually from the warmed cache. Racing past ten photos fetches their thumbnails, not ten
+  0.5–1.5 MB full sizes that would all share the connection with the one finally stopped on. A load
+  is credited to the photo whose pixels the element actually drew (next/image reports after
+  decoding, by which time a fast click may have moved the element on).
+- **The right photo on screen at every step.** The lightbox keeps the previous photo's pixels until
+  the next one can be drawn (never a black gap). Once the next photo's thumbnail has drawn it goes on
+  top, on black, so the old photo cannot show around a different shape (portrait after landscape);
+  the full size replaces it. The thumbnails of the next two photos in the viewer's direction and the
+  previous one are preloaded at once (a few dozen kB each, only those served straight from the bucket,
+  whose URL does not depend on the width), so that thumbnail is there at the next click. The photo
+  layer is its own stacking context (`isolate`): the raised thumbnail never covers the arrows or bars.
+- **Neighbours after the first photo, at once while hurrying.** An opening's first photo is loaded
+  before its neighbours' full sizes are warmed — on a slow link the four would otherwise share it
+  while the viewer waits for the one. A viewer who moves on before the photo they left has loaded is
+  hurrying: then only the next photo in their direction is warmed, without waiting for the current
+  one but later than it (twice the pause), so the photo they stop on is not split four ways either. Measured on production before this: Chrome, Fast 4G, a click a second —
+  in 22 of 40 steps the photo drawn was not the one the counter showed. A film has nothing to wait
+  for, and a full size that fails to load counts as done.
+- **The next page before the end.** When the photo on screen is among the last five loaded, the
+  lightbox fetches the next page of photos, so "next" never holds in place waiting for it — but not
+  again after a failed page (a revoked link would otherwise be asked forever).
 - **A jump's pages in one request.** A chapter link, a chapter chip and a highlight need the photo
   metadata up to their target (row positions depend on every photo above). `throughKey`/`throughId`
   on `/api/g/[token]/photos` returns every page from the cursor up to the one holding that position
