@@ -310,6 +310,13 @@ function replaceUrl(url: string) {
  * so a jump lands a header just under the bar instead of behind it. */
 const CHAPTER_BAR_HEIGHT = 56;
 
+/**
+ * How long the viewer stays on a lightbox photo before its full size, and its
+ * neighbours', are fetched (docs/GALLERY-LOADING.md). Under a pause a person
+ * notices; long enough that racing through photos fetches only thumbnails.
+ */
+const LIGHTBOX_SETTLE_MS = 250;
+
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
@@ -725,9 +732,12 @@ interface LightboxPhotoProps {
   sizes: string;
   loaded: boolean;
   selected: boolean;
-  onLoad: () => void;
-  /** The full size failed (the retry script may still bring it back). */
-  onError: () => void;
+  /** The full size of `photoId` has drawn — not always the photo on screen:
+   * while the viewer races past photos, the full size follows only once they
+   * pause. */
+  onLoad: (photoId: string) => void;
+  /** The full size of `photoId` failed (the retry script may still bring it back). */
+  onError: (photoId: string) => void;
   onSwipe: (delta: 1 | -1) => void;
   onDismiss: () => void;
   onTap: () => void;
@@ -804,12 +814,30 @@ function LightboxPhoto({
   const [previewShown, setPreviewShown] = useState<string | null>(null);
   const previewOnTop = previewShown === photo.id;
 
+  // The full size follows the viewer only once they pause on a photo. Clicked
+  // through ten in a second — on purpose or not — the counter and the
+  // thumbnail move with every click, but only the photo they stop on is
+  // downloaded at full size (docs/GALLERY-LOADING.md): ten 0.5–1.5 MB images
+  // in flight at once is what made each step slower than the last. A change
+  // of width for the same photo (zoom, slow mode) applies at once.
+  const [shown, setShown] = useState({ id: photo.id, src, sizes });
+  useEffect(() => {
+    if (shown.id === photo.id && shown.src === src && shown.sizes === sizes) return;
+    const timer = setTimeout(
+      () => setShown({ id: photo.id, src, sizes }),
+      shown.id === photo.id ? 0 : LIGHTBOX_SETTLE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [photo.id, src, sizes, shown]);
+
   return (
     <div
       // `touch-none` hands every gesture in here to the handlers above: the
       // browser's own pan and zoom would otherwise fight them for the same
       // fingers.
-      className="relative h-full w-full touch-none bg-black select-none"
+      // `isolate`: the thumbnail raised over the previous photo (z-10) stays
+      // inside the photo's own layer, under the dialog's arrows and bars.
+      className="relative isolate h-full w-full touch-none bg-black select-none"
       onClick={(event) => event.stopPropagation()}
       {...handlers}
     >
@@ -841,11 +869,11 @@ function LightboxPhoto({
           // The dialog itself is labelled with the photo's position; repeating
           // a file name here would only make a screen reader say "DSC_1234.jpg".
           alt=""
-          src={src}
+          src={shown.src}
           fill
-          sizes={sizes}
-          onLoad={onLoad}
-          onError={onError}
+          sizes={shown.sizes}
+          onLoad={() => onLoad(shown.id)}
+          onError={() => onError(shown.id)}
           // No fade, and never hidden: an image that is transparent until it
           // loads guarantees a black gap, and one that fades in over 200 ms
           // guarantees a visible one. An `<img>` shows nothing until it has
@@ -865,13 +893,13 @@ function LightboxPhoto({
         {overlay && (
           // Scaled with the photo when it is picked, so a spot lands — and is
           // drawn — where the finger is.
-          <div className={`absolute inset-0 ${selected ? "scale-[0.93]" : ""}`}>{overlay}</div>
+          <div className={`absolute inset-0 z-20 ${selected ? "scale-[0.93]" : ""}`}>{overlay}</div>
         )}
       </div>
       {showStale && (
         <span
           aria-hidden
-          className="pointer-events-none absolute right-4 bottom-4 flex size-8 items-center justify-center rounded-full bg-black/60"
+          className="pointer-events-none absolute right-4 bottom-4 z-20 flex size-8 items-center justify-center rounded-full bg-black/60"
         >
           <span className="motion-loop size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
         </span>
@@ -882,7 +910,7 @@ function LightboxPhoto({
         // photo.
         <span
           aria-hidden
-          className="ring-brand-border/80 pointer-events-none absolute inset-4 ring-4 ring-inset"
+          className="ring-brand-border/80 pointer-events-none absolute inset-4 z-20 ring-4 ring-inset"
         />
       )}
     </div>
@@ -2504,8 +2532,11 @@ function GalleryViewInner({
    * on screen never changes width under the viewer.
    */
   const [slowSizes, setSlowSizes] = useState<string | null>(null);
-  /** The viewer has moved since this opening: they are browsing, not waiting. */
-  const [browsing, setBrowsing] = useState(false);
+  /**
+   * The viewer moved on before the photo they left had loaded: they are
+   * browsing faster than the photos arrive, not waiting for each one.
+   */
+  const [hurried, setHurried] = useState(false);
   const readConnection = useCallback(() => {
     const signals = connectionSignals([
       process.env.NEXT_PUBLIC_PHOTOS_BASE_URL,
@@ -2533,7 +2564,7 @@ function GalleryViewInner({
       // A fresh opening heads forward, whatever the last one did: slow mode
       // warms only the photo in that direction.
       lastDirection.current = 1;
-      setBrowsing(false);
+      setHurried(false);
       setLightboxIndex(index);
       // A freshly opened photo shows its controls, however the last one was
       // left. Done here rather than in an effect: opening is an event, and an
@@ -2576,7 +2607,17 @@ function GalleryViewInner({
   const move = useCallback(
     (delta: number) => {
       lastDirection.current = delta > 0 ? 1 : -1;
-      setBrowsing(true);
+      // Hurried when this moves to another photo before the one being left
+      // has loaded. A move held in place (at either end) leaves nothing.
+      if (lightboxIndex !== null) {
+        const from = Math.min(lightboxIndex, photos.length - 1);
+        const leaving = photos[from];
+        if (leaving && from + delta >= 0 && from + delta < photos.length) {
+          setHurried(
+            !leaving.video && loadedPhotoId !== leaving.id && failedPhotoId !== leaving.id,
+          );
+        }
+      }
       setZoomed(false);
       setLightboxIndex((current) => {
         if (current === null) return current;
@@ -2603,7 +2644,16 @@ function GalleryViewInner({
         return next;
       });
     },
-    [photos, report, hasNextPage, isFetchingNextPage, fetchNextPage],
+    [
+      photos,
+      report,
+      hasNextPage,
+      isFetchingNextPage,
+      fetchNextPage,
+      lightboxIndex,
+      loadedPhotoId,
+      failedPhotoId,
+    ],
   );
 
   /**
@@ -2953,15 +3003,16 @@ function GalleryViewInner({
    * Guessing the width would risk warming a variant the browser ignores — the
    * swipe would still stall AND the transformation would be billed twice.
    */
-  // The photo an opening shows first: until it has loaded, warming three more
-  // would split a slow connection four ways while the viewer waits on the one
-  // (docs/GALLERY-LOADING.md). Not once they browse: then every step must
-  // already have its next photo on the way, or a click a second outruns the
-  // loading and each photo starts cold. A film has no full size to wait for.
+  // The photo on screen first: until it has loaded, warming three more would
+  // split a slow connection four ways while the viewer waits on the one
+  // (docs/GALLERY-LOADING.md). Not when they are hurrying past photos that
+  // have not loaded (a click a second, looking for one): then every step must
+  // already have its next photo on the way, or each starts cold and the
+  // lightbox keeps showing an old one. A film has no full size to wait for.
   const activeShown =
     !!active &&
     (active.video !== null ||
-      browsing ||
+      hurried ||
       loadedPhotoId === active.id ||
       failedPhotoId === active.id);
   useEffect(() => {
@@ -2972,48 +3023,70 @@ function GalleryViewInner({
     // isn't the last loaded photo — wrapping would warm the wrong photo in
     // both directions.
     const inRange = (index: number) => index >= 0 && index < photos.length;
-    const ahead = lightboxIndex + 2 * lastDirection.current;
-    const next = lightboxIndex + lastDirection.current;
-    // Slow mode warms only the one the viewer is heading to.
-    const neighbours = slowSizes
-      ? [inRange(next) ? photos[next] : undefined]
-      : [
-          inRange(lightboxIndex + 1) ? photos[lightboxIndex + 1] : undefined,
-          inRange(lightboxIndex - 1) ? photos[lightboxIndex - 1] : undefined,
-          inRange(ahead) ? photos[ahead] : undefined,
-        ];
-
-    const links = neighbours
+    const step = lastDirection.current;
+    const at = (index: number) => (inRange(index) ? photos[index] : undefined);
+    const warmable = (photo: GalleryPhoto | undefined): photo is GalleryPhoto =>
       // A video neighbour's poster is requested at one fixed width, not from
       // this srcset — warming it would be a second billed variant for nothing.
-      .filter(
-        (photo): photo is GalleryPhoto =>
-          photo !== undefined && photo.id !== active?.id && !photo.video,
-      )
-      .map((photo) => {
-        const link = document.createElement("link");
-        link.rel = "preload";
-        link.as = "image";
-        link.imageSrcset = fullWidthSrcSet(srcFor(photo.objectKey, imageGrant), imageLoader);
-        // The same `sizes` the lightbox will give it, or the preload warms a
-        // variant the browser then does not use.
-        link.imageSizes = lightboxSizesFor(photo.id);
-        // Deliberately NO crossOrigin. next/image renders a plain <img> with no
-        // crossorigin attribute, and a preload whose CORS mode differs from the
-        // eventual request is a cache MISS — the browser would fetch the photo
-        // twice, making the swipe no faster and doubling the billed transforms.
-        // Verified in a real browser: with crossOrigin="anonymous" set, the
-        // preload and the <img> disagreed.
-        //
-        // Chrome logs "preloaded but not used within a few seconds" when the
-        // viewer lingers on a photo. That is inherent to speculative prefetch
-        // and not a bug — the warning is the cost of the swipe being instant
-        // when they do move.
-        document.head.append(link);
-        return link;
+      photo !== undefined && photo.id !== active?.id && !photo.video;
+    const links: HTMLLinkElement[] = [];
+    const preload = (fill: (link: HTMLLinkElement) => void) => {
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      // Deliberately NO crossOrigin. next/image renders a plain <img> with no
+      // crossorigin attribute, and a preload whose CORS mode differs from the
+      // eventual request is a cache MISS — the browser would fetch the photo
+      // twice, making the swipe no faster and doubling the billed transforms.
+      // Verified in a real browser: with crossOrigin="anonymous" set, the
+      // preload and the <img> disagreed.
+      //
+      // Chrome logs "preloaded but not used within a few seconds" when the
+      // viewer lingers on a photo. That is inherent to speculative prefetch
+      // and not a bug — the warning is the cost of the swipe being instant
+      // when they do move.
+      fill(link);
+      document.head.append(link);
+      links.push(link);
+    };
+
+    // The thumbnails first and at once: a few dozen kB each, and what the
+    // next step draws over the old photo. Only one served straight from the
+    // bucket — its URL is the same whatever width the tile asks for, so the
+    // preload is exactly the request the lightbox will make.
+    for (const photo of [
+      at(lightboxIndex + step),
+      at(lightboxIndex + 2 * step),
+      at(lightboxIndex - step),
+    ]) {
+      if (!warmable(photo) || !photo.thumbObjectKey) continue;
+      const thumb = srcFor(photo.thumbObjectKey, imageGrant);
+      const href = imageLoader({ src: thumb, width: DEVICE_SIZES[0] });
+      if (href !== imageLoader({ src: thumb, width: DEVICE_SIZES.at(-1)! })) continue;
+      preload((link) => {
+        link.href = href;
       });
+    }
+
+    // The full sizes once the viewer pauses: racing past photos must not leave
+    // a full-size download behind for every one (docs/GALLERY-LOADING.md).
+    // Slow mode warms only the one the viewer is heading to.
+    const neighbours = slowSizes
+      ? [at(lightboxIndex + step)]
+      : [at(lightboxIndex + 1), at(lightboxIndex - 1), at(lightboxIndex + 2 * step)];
+    const timer = setTimeout(() => {
+      for (const photo of neighbours.filter(warmable)) {
+        preload((link) => {
+          link.imageSrcset = fullWidthSrcSet(srcFor(photo.objectKey, imageGrant), imageLoader);
+          // The same `sizes` the lightbox will give it, or the preload warms a
+          // variant the browser then does not use.
+          link.imageSizes = lightboxSizesFor(photo.id);
+        });
+      }
+    }, LIGHTBOX_SETTLE_MS);
 
     return () => {
+      clearTimeout(timer);
       for (const link of links) link.remove();
     };
   }, [active?.id, activeShown, lightboxIndex, photos, imageGrant, slowSizes, lightboxSizesFor]);
@@ -3023,9 +3096,21 @@ function GalleryViewInner({
   // page is fetched, which reads as the lightbox being stuck. The grid's own
   // scroll trigger never fires while the lightbox covers it.
   useEffect(() => {
-    if (lightboxIndex === null || !hasNextPage || isFetchingNextPage) return;
+    // Not after a failed page: retried as the effect re-runs, it would ask
+    // forever while the lightbox stays open (a revoked link, the API down).
+    if (lightboxIndex === null || !hasNextPage || isFetchingNextPage || isFetchNextPageError) {
+      return;
+    }
+    // On screen among the last five loaded.
     if (lightboxIndex >= photos.length - 5) void fetchNextPage();
-  }, [lightboxIndex, photos.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [
+    lightboxIndex,
+    photos.length,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
+  ]);
 
   // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
   // an outer margin — the page edge matches the seam between two photos
@@ -3559,8 +3644,8 @@ function GalleryViewInner({
               sizes={zoomed ? "100vw" : lightboxSizesFor(active.id)}
               loaded={loadedPhotoId === active.id}
               selected={activeSelected}
-              onLoad={() => setLoadedPhotoId(active.id)}
-              onError={() => setFailedPhotoId(active.id)}
+              onLoad={setLoadedPhotoId}
+              onError={setFailedPhotoId}
               onSwipe={move}
               onDismiss={closeLightbox}
               onTap={toggleChrome}

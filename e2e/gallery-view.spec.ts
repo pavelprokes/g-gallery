@@ -310,7 +310,8 @@ test.describe("fast browsing", () => {
     const body = (await (await page.request.get(`/api/g/${seed.token}/photos`)).json()) as {
       items: { id: string; objectKey: string }[];
     };
-    const fileOf = new Map(body.items.map((p) => [p.id, p.objectKey.split("/").pop()!]));
+    const files = body.items.map((p) => p.objectKey.split("/").pop()!);
+    const indexOf = new Map(body.items.map((p, i) => [p.id, i]));
 
     await page.goto(`/g/${seed.token}/${seed.slug}`);
     await page
@@ -322,10 +323,14 @@ test.describe("fast browsing", () => {
     await expect(dialog).toBeVisible();
 
     for (let step = 0; step < 3; step++) {
-      await page.getByRole("button", { name: "Další" }).click();
-      const file = fileOf.get(
+      // A short timeout on purpose: if anything in the photo layer covered the
+      // arrows, the click would wait for it to go — and a person's click would
+      // land on the photo instead.
+      await page.getByRole("button", { name: "Další" }).click({ timeout: 500 });
+      const index = indexOf.get(
         new URLSearchParams(await page.evaluate(() => location.search)).get("foto")!,
       )!;
+      const file = files[index]!;
       // Well before a cold full size could arrive (2.5 s), the image drawn on
       // top is this photo: its thumbnail over the previous photo's pixels, or
       // its full size when the warming got there first.
@@ -342,11 +347,79 @@ test.describe("fast browsing", () => {
         .toContain(file);
       // And the next photo is already on its way, without waiting for this one.
       await expect
-        .poll(() => page.locator('head link[rel="preload"][as="image"][imagesrcset]').count(), {
-          timeout: 1000,
-        })
-        .toBeGreaterThan(0);
+        .poll(
+          () =>
+            page
+              .locator('head link[rel="preload"][as="image"][imagesrcset]')
+              .evaluateAll((links) => links.map((link) => link.getAttribute("imagesrcset") ?? "")),
+          { timeout: 1000 },
+        )
+        .toContainEqual(expect.stringContaining(files[index + 1]!));
     }
+  });
+
+  test("ten clicks in a second land on the right photo and fetch one full size, not ten", async ({
+    page,
+  }) => {
+    const fullSizes: string[] = [];
+    await page.route(/photo-\d+\.jpg/, async (route) => {
+      const width = Number(/(?:fit:|width=)(\d+)/.exec(route.request().url())?.[1] ?? 0);
+      if (width >= 1080) {
+        fullSizes.push(route.request().url());
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+      }
+      await route.fulfill({ contentType: "image/webp", body: IMAGE }).catch(() => {});
+    });
+    const body = (await (await page.request.get(`/api/g/${seed.token}/photos`)).json()) as {
+      items: { id: string; objectKey: string }[];
+    };
+
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    await page
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]')
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const before = fullSizes.length;
+
+    const next = page.getByRole("button", { name: "Další" });
+    for (let click = 0; click < 10; click++) {
+      await next.click({ timeout: 500 });
+      await page.waitForTimeout(100);
+    }
+
+    // Every click counted: photo 11 of the gallery is open…
+    const target = body.items[10]!;
+    await expect.poll(() => page.evaluate(() => location.search)).toBe(`?foto=${target.id}`);
+    // …and it is what is drawn on top, its thumbnail at once.
+    const file = target.objectKey.split("/").pop()!;
+    await expect
+      .poll(
+        () =>
+          dialog.evaluate((element) => {
+            const images = [...element.querySelectorAll("img")];
+            const top = images.find((img) => img.classList.contains("z-10")) ?? images.at(-1);
+            return top && top.complete && top.naturalWidth > 0 ? top.currentSrc : "";
+          }),
+        { timeout: 1500 },
+      )
+      .toContain(file);
+    // The photos raced past were never fetched at full size: the one stopped
+    // on, and the neighbours warmed once the viewer paused there. "Full size"
+    // is the width the lightbox asks for on this screen — read off the photo
+    // it lands on (a tile-sized thumbnail can be 1080 px on a 3× phone).
+    await page.waitForTimeout(600);
+    const width = (url: string) => /(?:fit:|width=)(\d+)/.exec(url)?.[1];
+    const landed = fullSizes.find((url) => url.includes(file));
+    expect(landed).toBeDefined();
+    const raced = fullSizes
+      .slice(before)
+      .filter((url) => width(url) === width(landed!))
+      .map((url) => /photo-\d+\.jpg/.exec(url)![0]);
+    expect(raced).toContain(file);
+    expect(raced.length).toBeLessThanOrEqual(4);
   });
 });
 
