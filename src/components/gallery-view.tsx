@@ -989,27 +989,41 @@ interface PhotosPage {
   total?: number;
 }
 
-async function fetchPhotosPage(
+/**
+ * One request to the photos route, `query` being a cursor and, for a jump, the
+ * position to bring every page up to (docs/GALLERY-LOADING.md).
+ */
+async function fetchPhotos<T extends { order?: PhotoOrder }>(
   token: string,
-  cursor: string | null,
-  signal: AbortSignal,
+  query: URLSearchParams,
+  signal: AbortSignal | undefined,
   photoOrder: PhotoOrder,
-): Promise<PhotosPage> {
-  const url = `/api/g/${encodeURIComponent(token)}/photos${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`;
-  const response = await fetch(url, { signal });
-  const page = response.ok ? ((await response.json()) as PhotosPage) : null;
+): Promise<T> {
+  const search = query.size > 0 ? `?${query}` : "";
+  const response = await fetch(`/api/g/${encodeURIComponent(token)}/photos${search}`, { signal });
+  const body = response.ok ? ((await response.json()) as T) : null;
   // The photographer switched the gallery's order while this page was open
   // (docs/PHOTO-ORDER.md): the loaded pages, the chapter starts and the
   // highlights all came in the old order, and splicing the new one onto them
   // misplaces every chapter header. Rare enough that starting over is right.
-  if (response.status === 409 || (page?.order && page.order !== photoOrder)) {
+  if (response.status === 409 || (body?.order && body.order !== photoOrder)) {
     window.location.reload();
     // Pending until the reload lands: an error would be retried (another
     // request, another reload) and could flash an error state first.
     return new Promise<never>(() => {});
   }
-  if (!page) throw new Error(`failed to fetch photos page (${response.status})`);
-  return page;
+  if (!body) throw new Error(`failed to fetch photos (${response.status})`);
+  return body;
+}
+
+function fetchPhotosPage(
+  token: string,
+  cursor: string | null,
+  signal: AbortSignal,
+  photoOrder: PhotoOrder,
+): Promise<PhotosPage> {
+  const query = new URLSearchParams(cursor ? { cursor } : {});
+  return fetchPhotos<PhotosPage>(token, query, signal, photoOrder);
 }
 
 /**
@@ -1024,16 +1038,13 @@ async function fetchPhotosThrough(
   photoOrder: PhotoOrder,
 ): Promise<PhotosPage[]> {
   const query = new URLSearchParams({ cursor, throughKey: through.key, throughId: through.id });
-  const response = await fetch(`/api/g/${encodeURIComponent(token)}/photos?${query}`);
-  const body = response.ok
-    ? ((await response.json()) as { order?: PhotoOrder; pages?: PhotosPage[] })
-    : null;
-  // The order changed under the open page: start over, as fetchPhotosPage does.
-  if (response.status === 409 || (body?.order && body.order !== photoOrder)) {
-    window.location.reload();
-    return new Promise<never>(() => {});
-  }
-  if (!body?.pages?.length) throw new Error(`failed to fetch photos (${response.status})`);
+  const body = await fetchPhotos<{ order?: PhotoOrder; pages?: PhotosPage[] }>(
+    token,
+    query,
+    undefined,
+    photoOrder,
+  );
+  if (!body.pages?.length) throw new Error("no pages in a through response");
   return body.pages;
 }
 
@@ -1464,20 +1475,23 @@ function GalleryViewInner({
           await fetchNextPageCancelling();
           return;
         }
-        queryClient.setQueryData<InfiniteData<PhotosPage, string | null>>(key, (old) =>
-          // Only onto the pages it was asked from: a refetch that landed in
-          // the meantime has its own last page, and the loop asks again.
-          old && old.pages.at(-1)?.nextCursor === cursor
-            ? {
-                pages: [...old.pages, ...pages],
-                pageParams: [
-                  ...old.pageParams,
-                  cursor,
-                  ...pages.slice(0, -1).map((page) => page.nextCursor),
-                ],
-              }
-            : old,
-        );
+        // Only onto the pages it was asked from. A refetch that landed in the
+        // meantime ends on a page of its own: the result is dropped and one
+        // ordinary page is fetched instead, so the data still changes and the
+        // jump's loop runs again (unchanged data would leave it waiting).
+        const current = queryClient.getQueryData<InfiniteData<PhotosPage, string | null>>(key);
+        if (current?.pages.at(-1)?.nextCursor !== cursor) {
+          await fetchNextPageCancelling();
+          return;
+        }
+        queryClient.setQueryData<InfiniteData<PhotosPage, string | null>>(key, {
+          pages: [...current.pages, ...pages],
+          pageParams: [
+            ...current.pageParams,
+            cursor,
+            ...pages.slice(0, -1).map((page) => page.nextCursor),
+          ],
+        });
       })().finally(() => {
         nextPageInFlight.current = null;
       });

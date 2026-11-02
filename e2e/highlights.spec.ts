@@ -49,10 +49,12 @@ test.describe("gallery highlights", () => {
 
     const tile = page.getByRole("button", { name: gridName(pinnedFile) });
     await expect(tile).toBeInViewport();
+    // Both pages up to it came in one request (docs/GALLERY-LOADING.md),
+    // counted up to the landing.
+    const jump = [...pages];
     await expect(tile).toBeFocused();
-    // Both pages up to it came in one request (docs/GALLERY-LOADING.md).
-    expect(pages).toHaveLength(1);
-    expect(new URL(pages[0]!).searchParams.has("throughKey")).toBe(true);
+    expect(jump).toHaveLength(1);
+    expect(new URL(jump[0]!).searchParams.has("throughKey")).toBe(true);
   });
 
   test("the wheel over the strip scrolls the page, not the strip", async ({ page, isMobile }) => {

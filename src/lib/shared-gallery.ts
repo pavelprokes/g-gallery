@@ -18,7 +18,7 @@ import {
   PROMO_TRANSLATED_FIELDS,
 } from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
-import { PHOTOS_PAGE_SIZE, toPages } from "@/lib/photo-cursor";
+import { PAGES_AHEAD_MAX, PHOTOS_PAGE_SIZE, toPages } from "@/lib/photo-cursor";
 import {
   CHAPTER_START_SELECT,
   ORDER_KEY_SELECT,
@@ -86,14 +86,6 @@ export interface LinkedPhoto {
   /** A film opens on its poster in the lightbox, at a width of its own. */
   isVideo: boolean;
 }
-
-/**
- * How many pages a link may pull in with the page itself: 600 photos, most of
- * a wedding, at ~12 kB compressed a page in the HTML. Past this the photo is
- * not linked at all and the client pulls the pages as it always did — a
- * bigger page would make the very phone this is for parse and hydrate it.
- */
-const LINKED_PAGES_MAX = 10;
 
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
@@ -176,7 +168,7 @@ export async function loadGalleryViewData(
   // round trip per page (docs/GALLERY-LOADING.md). A photo past the cap is
   // left to the client's own pulling, as before — with no placeholder and no
   // held images, which only make sense while the photo is a frame away.
-  const linked = found && found.index < LINKED_PAGES_MAX * PHOTOS_PAGE_SIZE ? found : null;
+  const linked = found && found.index < PAGES_AHEAD_MAX * PHOTOS_PAGE_SIZE ? found : null;
   const pageCount = linked ? Math.floor(linked.index / PHOTOS_PAGE_SIZE) + 1 : 1;
   const take = pageCount * PHOTOS_PAGE_SIZE;
   const gallery = await prisma.gallery.findUnique({
@@ -484,11 +476,12 @@ async function loadHighlights(
     where: { galleryId, status: "CONFIRMED", videoObjectKey: null },
     select: HIGHLIGHT_CANDIDATE_SELECT,
   });
-  const picks = pickHighlights(
-    candidates.map((candidate) => toHighlightCandidate(order, candidate)),
-    chapterStarts,
-  );
+  const timeline = candidates.map((candidate) => toHighlightCandidate(order, candidate));
+  const picks = pickHighlights(timeline, chapterStarts);
   if (picks.length === 0) return [];
+  // Each candidate already carries its key in the gallery's order — the
+  // position a highlight's jump brings the pages up to (docs/GALLERY-LOADING.md).
+  const keyOf = new Map(timeline.map((candidate) => [candidate.id, candidate.key]));
 
   const photos = await prisma.photo.findMany({
     where: { id: { in: picks.map((pick) => pick.id) } },
@@ -500,19 +493,13 @@ async function loadHighlights(
       width: true,
       height: true,
       placeholder: true,
-      ...ORDER_KEY_SELECT,
     },
   });
-  const byId = new Map(
-    photos.map(({ takenAt, createdAt, fileOrderKey, wovenAt, manualOrderKey, ...photo }) => [
-      photo.id,
-      {
-        ...photo,
-        orderKey: orderKeyOf(order, { takenAt, createdAt, fileOrderKey, wovenAt, manualOrderKey }),
-      },
-    ]),
-  );
-  return picks.flatMap((pick) => byId.get(pick.id) ?? []);
+  const byId = new Map(photos.map((photo) => [photo.id, photo]));
+  return picks.flatMap((pick) => {
+    const photo = byId.get(pick.id);
+    return photo ? [{ ...photo, orderKey: keyOf.get(pick.id)! }] : [];
+  });
 }
 
 /**

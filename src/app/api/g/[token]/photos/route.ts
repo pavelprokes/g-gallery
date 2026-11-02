@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { VIDEO_SELECT, videoOf } from "@/lib/video";
 import { resolveShareLink } from "@/lib/share-access";
-import { PHOTOS_PAGE_SIZE, decodeCursor, toPages } from "@/lib/photo-cursor";
+import { PAGES_AHEAD_MAX, PHOTOS_PAGE_SIZE, decodeCursor, toPages } from "@/lib/photo-cursor";
 import {
   ORDER_KEY_SELECT,
   PHOTO_ORDERS,
@@ -24,16 +24,14 @@ const querySchema = z
     cursor: z.string().optional(),
     // A place in the gallery's order — a chapter's start, a highlight — to
     // bring every page up to in one response (docs/GALLERY-LOADING.md).
-    throughKey: z.string().max(200).optional(),
+    // As long as an order key may be (isValidOrderKey checks it below).
+    throughKey: z.string().max(4096).optional(),
     throughId: z
       .string()
       .regex(/^[A-Za-z0-9_-]{1,64}$/)
       .optional(),
   })
   .refine((query) => (query.throughKey === undefined) === (query.throughId === undefined));
-
-/** How many pages one `through` request may bring: 600 photos. */
-const THROUGH_PAGES_MAX = 10;
 
 /**
  * Keyset (cursor) pagination over a gallery's confirmed photos, in the
@@ -76,7 +74,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const after = cursor ? afterPosition(order, cursor) : {};
   // Every page up to the one that holds `through` — the pages the client
   // would otherwise ask for one round trip at a time, cut the same way.
-  // ponytail: a jump past THROUGH_PAGES_MAX pages takes another request.
+  // ponytail: a jump past PAGES_AHEAD_MAX pages takes another request.
   const before = through
     ? await prisma.photo.count({
         where: {
@@ -87,7 +85,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
       })
     : 0;
   const take =
-    Math.min(Math.floor(before / PHOTOS_PAGE_SIZE) + 1, THROUGH_PAGES_MAX) * PHOTOS_PAGE_SIZE;
+    Math.min(Math.floor(before / PHOTOS_PAGE_SIZE) + 1, PAGES_AHEAD_MAX) * PHOTOS_PAGE_SIZE;
 
   // The gallery's total rides along with the first page. The page's own
   // server-rendered count is fixed at load, so after a guest adds or takes
