@@ -795,6 +795,15 @@ function LightboxPhoto({
   }, [photo.id, loaded]);
   const showStale = staleFor === photo.id && !loaded;
 
+  // Which photo's thumbnail has drawn. Browsing faster than full sizes arrive
+  // (a click a second, looking for one photo) used to leave the previous
+  // photo's pixels on screen while the counter moved on — photo after photo
+  // that seemed not to change. Once the new photo's thumbnail has pixels it
+  // goes on top of those, on black so the old photo cannot show around a
+  // different shape; until then the old pixels stay, never a black gap.
+  const [previewShown, setPreviewShown] = useState<string | null>(null);
+  const previewOnTop = previewShown === photo.id;
+
   return (
     <div
       // `touch-none` hands every gesture in here to the handlers above: the
@@ -822,7 +831,10 @@ function LightboxPhoto({
             // be on screen in the frame the lightbox opens in.
             loading="eager"
             fetchPriority="high"
-            className={`object-contain ${selected ? "scale-[0.93]" : ""}`}
+            onLoad={() => setPreviewShown(photo.id)}
+            className={`object-contain ${selected ? "scale-[0.93]" : ""} ${
+              previewOnTop ? "z-10 bg-black" : ""
+            }`}
           />
         )}
         <Image
@@ -2492,6 +2504,8 @@ function GalleryViewInner({
    * on screen never changes width under the viewer.
    */
   const [slowSizes, setSlowSizes] = useState<string | null>(null);
+  /** The viewer has moved since this opening: they are browsing, not waiting. */
+  const [browsing, setBrowsing] = useState(false);
   const readConnection = useCallback(() => {
     const signals = connectionSignals([
       process.env.NEXT_PUBLIC_PHOTOS_BASE_URL,
@@ -2519,6 +2533,7 @@ function GalleryViewInner({
       // A fresh opening heads forward, whatever the last one did: slow mode
       // warms only the photo in that direction.
       lastDirection.current = 1;
+      setBrowsing(false);
       setLightboxIndex(index);
       // A freshly opened photo shows its controls, however the last one was
       // left. Done here rather than in an effect: opening is an event, and an
@@ -2561,6 +2576,7 @@ function GalleryViewInner({
   const move = useCallback(
     (delta: number) => {
       lastDirection.current = delta > 0 ? 1 : -1;
+      setBrowsing(true);
       setZoomed(false);
       setLightboxIndex((current) => {
         if (current === null) return current;
@@ -2937,12 +2953,17 @@ function GalleryViewInner({
    * Guessing the width would risk warming a variant the browser ignores — the
    * swipe would still stall AND the transformation would be billed twice.
    */
-  // The photo on screen first: until it has loaded, warming three more would
-  // split a slow connection four ways while the viewer waits on the one
-  // (docs/GALLERY-LOADING.md). A film has no full-size image to wait for.
+  // The photo an opening shows first: until it has loaded, warming three more
+  // would split a slow connection four ways while the viewer waits on the one
+  // (docs/GALLERY-LOADING.md). Not once they browse: then every step must
+  // already have its next photo on the way, or a click a second outruns the
+  // loading and each photo starts cold. A film has no full size to wait for.
   const activeShown =
     !!active &&
-    (active.video !== null || loadedPhotoId === active.id || failedPhotoId === active.id);
+    (active.video !== null ||
+      browsing ||
+      loadedPhotoId === active.id ||
+      failedPhotoId === active.id);
   useEffect(() => {
     if (lightboxIndex === null || photos.length < 2 || !activeShown) return;
 
@@ -2996,6 +3017,15 @@ function GalleryViewInner({
       for (const link of links) link.remove();
     };
   }, [active?.id, activeShown, lightboxIndex, photos, imageGrant, slowSizes, lightboxSizesFor]);
+
+  // The next page of photos before the lightbox reaches the end of the loaded
+  // ones: otherwise "next" on the last loaded photo holds in place while the
+  // page is fetched, which reads as the lightbox being stuck. The grid's own
+  // scroll trigger never fires while the lightbox covers it.
+  useEffect(() => {
+    if (lightboxIndex === null || !hasNextPage || isFetchingNextPage) return;
+    if (lightboxIndex >= photos.length - 5) void fetchNextPage();
+  }, [lightboxIndex, photos.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
   // an outer margin — the page edge matches the seam between two photos

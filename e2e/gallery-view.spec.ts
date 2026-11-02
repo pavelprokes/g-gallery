@@ -293,6 +293,63 @@ test.describe("slow mode", () => {
   }
 });
 
+test.describe("fast browsing", () => {
+  // A click a second while looking for one photo, on a link where full sizes
+  // take longer than that to arrive (docs/GALLERY-LOADING.md). The images are
+  // answered here: thumbnails at once, full sizes (1080 px and up) after 2.5 s.
+  const IMAGE = fs.readFileSync(path.join(__dirname, "..", "public", "qr-sign-table.webp"));
+
+  test("each step shows its own photo and warms the next, before full sizes arrive", async ({
+    page,
+  }) => {
+    await page.route(/photo-\d+\.jpg/, async (route) => {
+      const width = Number(/(?:fit:|width=)(\d+)/.exec(route.request().url())?.[1] ?? 0);
+      if (width >= 1080) await new Promise((resolve) => setTimeout(resolve, 2500));
+      await route.fulfill({ contentType: "image/webp", body: IMAGE }).catch(() => {});
+    });
+    const body = (await (await page.request.get(`/api/g/${seed.token}/photos`)).json()) as {
+      items: { id: string; objectKey: string }[];
+    };
+    const fileOf = new Map(body.items.map((p) => [p.id, p.objectKey.split("/").pop()!]));
+
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    await page
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]')
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    for (let step = 0; step < 3; step++) {
+      await page.getByRole("button", { name: "Další" }).click();
+      const file = fileOf.get(
+        new URLSearchParams(await page.evaluate(() => location.search)).get("foto")!,
+      )!;
+      // Well before a cold full size could arrive (2.5 s), the image drawn on
+      // top is this photo: its thumbnail over the previous photo's pixels, or
+      // its full size when the warming got there first.
+      await expect
+        .poll(
+          () =>
+            dialog.evaluate((element) => {
+              const images = [...element.querySelectorAll("img")];
+              const top = images.find((img) => img.classList.contains("z-10")) ?? images.at(-1);
+              return top && top.complete && top.naturalWidth > 0 ? top.currentSrc : "";
+            }),
+          { timeout: 1500 },
+        )
+        .toContain(file);
+      // And the next photo is already on its way, without waiting for this one.
+      await expect
+        .poll(() => page.locator('head link[rel="preload"][as="image"][imagesrcset]').count(), {
+          timeout: 1000,
+        })
+        .toBeGreaterThan(0);
+    }
+  });
+});
+
 test.describe("image retry", () => {
   // src/lib/image-retry.ts is serialized into an inline script, so only a
   // production build proves it survives bundling — and that a tile which

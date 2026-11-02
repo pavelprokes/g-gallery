@@ -68,11 +68,19 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     turns out to be gone), so nothing shares the connection with the one photo being waited for;
   - the browser still opens the link with its own logic, unchanged: the same history entries, the
     same instant scroll under the dialog, the same Back. That is what keeps the contract below.
-- **Neighbours after the photo.** The lightbox warms its neighbours (next, previous, one further
-  ahead) once the photo on screen has loaded — before, a slow connection was split four ways while
-  the viewer waited for the one. A film has nothing to wait for and warms them at once, and a full
-  size that fails to load counts as done.
-
+- **Neighbours after the first photo, at once while browsing.** An opening's first photo is loaded
+  before its neighbours (next, previous, one further ahead) are warmed — on a slow link the four
+  would otherwise share it while the viewer waits for the one. From the first move on they are
+  warmed at once: browsing a click a second (looking for one photo) outran the loading when each
+  step waited for its own photo first, and the lightbox kept showing the previous photo while the
+  counter moved on (measured on production: 22 of 40 steps on Fast 4G). A film has nothing to wait
+  for, and a full size that fails to load counts as done.
+- **The right photo on screen while browsing.** The lightbox keeps the previous photo's pixels until
+  the next full size arrives (no black gap). Once the next photo's thumbnail has drawn, it goes on top
+  of those pixels, on black so the old photo cannot show around a different shape; the full size then
+  replaces it.
+- **The next page before the end.** Within five photos of the last loaded one, the lightbox fetches
+  the next page of photos, so "next" never holds in place waiting for it.
 - **A jump's pages in one request.** A chapter link, a chapter chip and a highlight need the photo
   metadata up to their target (row positions depend on every photo above). `throughKey`/`throughId`
   on `/api/g/[token]/photos` returns every page from the cursor up to the one holding that position
