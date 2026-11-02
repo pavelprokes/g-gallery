@@ -5,7 +5,7 @@ import { resolveShareLink } from "@/lib/share-access";
 import { GalleryView } from "@/components/gallery-view";
 import { SharePasswordForm } from "@/components/share-password-form";
 import { ShareLinkDead } from "@/components/share-link-dead";
-import { PHOTO_PARAM, isPhotoId } from "@/lib/photo-link";
+import { linkedPhotoParam } from "@/lib/photo-link";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { galleryShareMetadata, unavailableShareMetadata } from "@/lib/share-metadata";
 import { gallerySignPath, requestedSharePath } from "@/lib/sign-url";
@@ -28,7 +28,8 @@ export async function generateMetadata(
   props: PageProps<"/g/[token]/[[...slug]]">,
 ): Promise<Metadata> {
   const { token, slug } = await props.params;
-  const linked = (await props.searchParams)[PHOTO_PARAM];
+  // Read as the page reads it, so a link previews with the photo it opens.
+  const linked = linkedPhotoParam(await props.searchParams);
   const t = await getTranslations("gallery");
   const locale = await getLocale();
 
@@ -44,7 +45,7 @@ export async function generateMetadata(
     t,
     locale,
     gallerySignPath(token, access.shareLink.slug),
-    isPhotoId(linked) ? linked : null,
+    linked,
   );
 }
 
@@ -60,7 +61,10 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
   }
 
   const locale = await getLocale();
-  const data = await loadGalleryViewData(access.shareLink, locale);
+  // A photo's link brings the pages up to that photo with the page itself
+  // (docs/GALLERY-LOADING.md); the browser still opens it as it always did.
+  const linked = linkedPhotoParam(await props.searchParams);
+  const data = await loadGalleryViewData(access.shareLink, locale, linked);
   if (!data) notFound();
 
   return (
@@ -73,8 +77,8 @@ export default async function SharedGalleryPage(props: PageProps<"/g/[token]/[[.
       photoCount={data.photoCount}
       videoCount={data.videoCount}
       archive={data.archive}
-      initialPhotos={data.initialPhotos}
-      initialCursor={data.initialCursor}
+      initialPages={data.initialPages}
+      linkedPhoto={data.linkedPhoto}
       photoOrder={data.photoOrder}
       imageGrant={data.imageGrant}
       viewers={data.viewers}

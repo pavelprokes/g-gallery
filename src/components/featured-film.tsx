@@ -21,6 +21,8 @@ export function FeaturedFilmCard({
   width,
   height,
   durationMs,
+  lead,
+  imageHeld,
   onOpen,
 }: {
   /** The image loader's input (object key + any signed grant), as for a tile. */
@@ -29,6 +31,11 @@ export function FeaturedFilmCard({
   width: number | null;
   height: number | null;
   durationMs: number | null;
+  /** The page opens on this poster: it gets the high fetch priority. */
+  lead: boolean;
+  /** A photo's link is loading or open: the card shows its colour only
+   * (docs/GALLERY-LOADING.md). */
+  imageHeld: boolean;
   onOpen: () => void;
 }) {
   const t = useTranslations("gallery");
@@ -43,21 +50,26 @@ export function FeaturedFilmCard({
         onClick={onOpen}
         aria-label={t("playFeaturedFilm", { duration: duration ?? "none" })}
         className="group on-media relative block max-h-[70vh] w-full overflow-hidden rounded-2xl bg-black"
-        style={{ aspectRatio: aspect }}
+        style={{
+          aspectRatio: aspect,
+          backgroundColor: imageHeld ? placeholderStyle(placeholder) : undefined,
+        }}
       >
-        <Image
-          alt=""
-          src={posterSrc}
-          fill
-          sizes="(min-width: 1280px) 1280px, 100vw"
-          // The page opens on this poster. `priority` would only add a preload
-          // link, which Chrome fetches at Low; the fetch priority is what puts
-          // it ahead of everything below it.
-          loading="eager"
-          fetchPriority="high"
-          className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-          style={{ backgroundColor: placeholderStyle(placeholder) }}
-        />
+        {!imageHeld && (
+          <Image
+            alt=""
+            src={posterSrc}
+            fill
+            sizes="(min-width: 1280px) 1280px, 100vw"
+            // When the page opens on this poster. `priority` would only add a
+            // preload link, which Chrome fetches at Low; the fetch priority is
+            // what puts it ahead of everything below it.
+            loading={lead ? "eager" : undefined}
+            fetchPriority={lead ? "high" : undefined}
+            className="object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+            style={{ backgroundColor: placeholderStyle(placeholder) }}
+          />
+        )}
         <span
           aria-hidden
           className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"

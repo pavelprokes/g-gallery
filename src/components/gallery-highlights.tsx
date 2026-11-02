@@ -44,6 +44,7 @@ export function GalleryHighlights({
   imageGrant,
   jumpingTo,
   leading,
+  imagesHeld,
   onJump,
 }: {
   highlights: GalleryHighlight[];
@@ -53,6 +54,9 @@ export function GalleryHighlights({
   /** Nothing above the strip (no featured film): its first tiles are what the
    * page opens on, and get the high fetch priority. */
   leading: boolean;
+  /** A photo's link is loading or open: the tiles show their colour only
+   * (docs/GALLERY-LOADING.md). */
+  imagesHeld: boolean;
   onJump: (photoId: string) => void;
 }) {
   const t = useTranslations("gallery");
@@ -78,6 +82,7 @@ export function GalleryHighlights({
             // sees before anything else loads.
             eager={i < 3}
             highPriority={leading && i < 3}
+            imageHeld={imagesHeld}
             label={t("highlightOpen", { fileName: photo.fileName })}
             onJump={onJump}
           />
@@ -96,6 +101,7 @@ function HighlightTile({
   busy,
   eager,
   highPriority,
+  imageHeld,
   label,
   onJump,
 }: {
@@ -105,6 +111,7 @@ function HighlightTile({
   busy: boolean;
   eager: boolean;
   highPriority: boolean;
+  imageHeld: boolean;
   label: string;
   onJump: (photoId: string) => void;
 }) {
@@ -138,26 +145,28 @@ function HighlightTile({
         }`}
         style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
       >
-        <Image
-          // The button is what a screen reader announces; see its label.
-          alt=""
-          src={srcFor(
-            thumbnailFailed ? photo.objectKey : (photo.thumbObjectKey ?? photo.objectKey),
-            imageGrant,
-          )}
-          onError={() => setThumbnailFailed(true)}
-          fill
-          // Up to a small tablet a landscape can take the whole width and a
-          // portrait about half; wider up a tile is at most its capped growth.
-          sizes={`(max-width: 799px) ${aspect < 1 ? 50 : 100}vw, ${Math.ceil(
-            aspect * 260 * MAX_GROWTH,
-          )}px`}
-          // Not next/image's `priority`: since Next 16 that is only a preload
-          // link, fetched at Low like every lazy image.
-          loading={eager ? "eager" : undefined}
-          fetchPriority={highPriority ? "high" : undefined}
-          className="duration-toggle object-cover transition-transform hover:scale-105"
-        />
+        {!imageHeld && (
+          <Image
+            // The button is what a screen reader announces; see its label.
+            alt=""
+            src={srcFor(
+              thumbnailFailed ? photo.objectKey : (photo.thumbObjectKey ?? photo.objectKey),
+              imageGrant,
+            )}
+            onError={() => setThumbnailFailed(true)}
+            fill
+            // Up to a small tablet a landscape can take the whole width and a
+            // portrait about half; wider up a tile is at most its capped growth.
+            sizes={`(max-width: 799px) ${aspect < 1 ? 50 : 100}vw, ${Math.ceil(
+              aspect * 260 * MAX_GROWTH,
+            )}px`}
+            // Not next/image's `priority`: since Next 16 that is only a preload
+            // link, fetched at Low like every lazy image.
+            loading={eager ? "eager" : undefined}
+            fetchPriority={highPriority ? "high" : undefined}
+            className="duration-toggle object-cover transition-transform hover:scale-105"
+          />
+        )}
         {busy && (
           <span className="absolute inset-0 flex items-center justify-center bg-black/30">
             <span

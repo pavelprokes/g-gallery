@@ -20,6 +20,20 @@ export function photoParam(search: string): string | null {
 }
 
 /**
+ * The photo a page's `searchParams` names — the server's reading of the same
+ * address `photoParam` reads in the browser, and it has to agree with it: a
+ * repeated parameter arrives here as an array, and `URLSearchParams.get`
+ * takes the first, so this does too.
+ */
+export function linkedPhotoParam(
+  searchParams: Record<string, string | string[] | undefined>,
+): string | null {
+  const value = searchParams[PHOTO_PARAM];
+  const first = Array.isArray(value) ? value[0] : value;
+  return isPhotoId(first) ? first : null;
+}
+
+/**
  * The same address pointing at `photoId`, or at no photo for null. Every other
  * query parameter and the hash (a chapter anchor) are kept as they were.
  */

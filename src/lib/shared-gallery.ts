@@ -18,7 +18,7 @@ import {
   PROMO_TRANSLATED_FIELDS,
 } from "@/lib/content-translations";
 import type { ResolvedShareLink } from "@/lib/share-access";
-import { PHOTOS_PAGE_SIZE, encodeCursor } from "@/lib/photo-cursor";
+import { PHOTOS_PAGE_SIZE, toPages } from "@/lib/photo-cursor";
 import {
   CHAPTER_START_SELECT,
   ORDER_KEY_SELECT,
@@ -27,6 +27,7 @@ import {
   compareChapterStarts,
   orderKeyOf,
   photoOrderBy,
+  positionOf,
   type PhotoOrder,
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
@@ -54,6 +55,46 @@ import {
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
 
+/** One photo as the guest's grid receives it, from the page or the photos route. */
+export interface GalleryViewPhoto {
+  id: string;
+  objectKey: string;
+  thumbObjectKey: string | null;
+  video: GalleryVideo | null;
+  fileName: string;
+  width: number | null;
+  height: number | null;
+  placeholder: string | null;
+  favoriteCount: number;
+  /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
+  uploaderName: string | null;
+  /** Key in the gallery's order — places chapter headers (docs/CHAPTERS.md). */
+  orderKey: string;
+  /** For the projection's camera (src/lib/projection-camera.ts). */
+  faces: Face[] | null;
+  focus: Focus | null;
+}
+
+/** What the page draws of a linked photo before the lightbox can open on it. */
+export interface LinkedPhoto {
+  id: string;
+  objectKey: string;
+  thumbObjectKey: string | null;
+  placeholder: string | null;
+  width: number | null;
+  height: number | null;
+  /** A film opens on its poster in the lightbox, at a width of its own. */
+  isVideo: boolean;
+}
+
+/**
+ * How many pages a link may pull in with the page itself: 600 photos, most of
+ * a wedding, at ~12 kB compressed a page in the HTML. Past this the photo is
+ * not linked at all and the client pulls the pages as it always did — a
+ * bigger page would make the very phone this is for parse and hydrate it.
+ */
+const LINKED_PAGES_MAX = 10;
+
 /**
  * Everything the shared `GalleryView` needs, loaded from one resolved share
  * link. Shared by the two surfaces that can render a gallery to a viewer:
@@ -75,26 +116,14 @@ export interface GalleryViewData {
   photoCount: number;
   /** How many of `photoCount` are videos (docs/VIDEO.md) — the header counts them apart. */
   videoCount: number;
-  initialPhotos: {
-    id: string;
-    objectKey: string;
-    thumbObjectKey: string | null;
-    video: GalleryVideo | null;
-    fileName: string;
-    width: number | null;
-    height: number | null;
-    placeholder: string | null;
-    favoriteCount: number;
-    /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
-    uploaderName: string | null;
-    /** Key in the gallery's order — places chapter headers (docs/CHAPTERS.md). */
-    orderKey: string;
-    /** For the projection's camera (src/lib/projection-camera.ts). */
-    faces: Face[] | null;
-    focus: Focus | null;
-  }[];
-  initialCursor: string | null;
-  /** The order `initialPhotos` and every `orderKey` are in (src/lib/photo-order.ts). */
+  /** The first pages of photos, cut exactly as the photos route pages them —
+   * one page, or every page up to a linked photo (`linkedPhoto`). */
+  initialPages: { items: GalleryViewPhoto[]; nextCursor: string | null }[];
+  /** The photo a `?foto=` link names, when it is a confirmed photo of this
+   * gallery — drawn before hydration while the grid waits
+   * (docs/GALLERY-LOADING.md). */
+  linkedPhoto: LinkedPhoto | null;
+  /** The order `initialPages` and every `orderKey` are in (src/lib/photo-order.ts). */
   photoOrder: PhotoOrder;
   imageGrant: SignedImageGrant | null;
   viewers: { id: string; displayName: string }[];
@@ -137,8 +166,19 @@ export interface GalleryArchive {
 export async function loadGalleryViewData(
   access: ResolvedShareLink,
   locale: Locale,
+  /** A `?foto=` link's photo id, already shaped like one (src/lib/photo-link.ts). */
+  linkedPhotoId: string | null = null,
 ): Promise<GalleryViewData | null> {
   const order = access.photoOrder;
+  const found = linkedPhotoId ? await findLinkedPhoto(access, linkedPhotoId) : null;
+  // The page carries every page of photos up to the linked one, so the
+  // lightbox can open on it as soon as the page hydrates instead of after a
+  // round trip per page (docs/GALLERY-LOADING.md). A photo past the cap is
+  // left to the client's own pulling, as before — with no placeholder and no
+  // held images, which only make sense while the photo is a frame away.
+  const linked = found && found.index < LINKED_PAGES_MAX * PHOTOS_PAGE_SIZE ? found : null;
+  const pageCount = linked ? Math.floor(linked.index / PHOTOS_PAGE_SIZE) + 1 : 1;
+  const take = pageCount * PHOTOS_PAGE_SIZE;
   const gallery = await prisma.gallery.findUnique({
     where: { id: access.galleryId },
     select: {
@@ -180,7 +220,7 @@ export async function loadGalleryViewData(
         // exactly, or scrolling past the first page would reshuffle what the
         // viewer already saw.
         orderBy: photoOrderBy(order),
-        take: PHOTOS_PAGE_SIZE + 1,
+        take: take + 1,
         select: {
           id: true,
           objectKey: true,
@@ -238,9 +278,8 @@ export async function loadGalleryViewData(
   });
   if (!gallery) return null;
 
-  const hasMore = gallery.photos.length > PHOTOS_PAGE_SIZE;
-  const page = hasMore ? gallery.photos.slice(0, PHOTOS_PAGE_SIZE) : gallery.photos;
-  const last = page.at(-1);
+  const hasMore = gallery.photos.length > take;
+  const rows = hasMore ? gallery.photos.slice(0, take) : gallery.photos;
 
   const titleTranslations = parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS);
   // In the gallery's order — `chaptersWithCounts` counts each one up to the next.
@@ -294,22 +333,29 @@ export async function loadGalleryViewData(
         : null,
     photoCount: gallery._count.photos,
     videoCount,
-    initialPhotos: page.map((photo) => ({
-      id: photo.id,
-      objectKey: photo.objectKey,
-      thumbObjectKey: photo.thumbObjectKey,
-      video: videoOf(photo),
-      fileName: photo.fileName,
-      width: photo.width,
-      height: photo.height,
-      placeholder: photo.placeholder,
-      favoriteCount: photo._count.favorites,
-      uploaderName: uploaderNameOf(photo),
-      orderKey: orderKeyOf(order, photo),
-      ...projectionAim(photo.faces, photo.faceTags),
-    })),
-    initialCursor:
-      hasMore && last ? encodeCursor({ order, key: orderKeyOf(order, last), id: last.id }) : null,
+    initialPages: toPages(
+      order,
+      rows.map((photo) => ({
+        id: photo.id,
+        objectKey: photo.objectKey,
+        thumbObjectKey: photo.thumbObjectKey,
+        video: videoOf(photo),
+        fileName: photo.fileName,
+        width: photo.width,
+        height: photo.height,
+        placeholder: photo.placeholder,
+        favoriteCount: photo._count.favorites,
+        uploaderName: uploaderNameOf(photo),
+        orderKey: orderKeyOf(order, photo),
+        ...projectionAim(photo.faces, photo.faceTags),
+      })),
+      hasMore,
+    ),
+    // Only when the photo really is in those pages: the count above reads the
+    // order's key with its fallbacks, the database sorts the raw column, and a
+    // row caught between two writes of it can land elsewhere. Then the client
+    // pulls on as it always did, rather than wait behind a placeholder.
+    linkedPhoto: linked && rows.some((row) => row.id === linked.photo.id) ? linked.photo : null,
     photoOrder: order,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
@@ -372,6 +418,51 @@ async function chaptersWithCounts(
   return chapters
     .map((chapter, i) => ({ ...chapter, count: (before[i + 1] ?? total) - before[i]! }))
     .filter((chapter) => chapter.count > 0);
+}
+
+/**
+ * The photo a `?foto=` link names, and how many photos come before it in the
+ * gallery's order — or null when it is not a confirmed photo of this gallery
+ * (deleted, still uploading, another gallery's), which the client then treats
+ * as the dead link it always did (docs/PHOTO-LINKS.md).
+ */
+async function findLinkedPhoto(
+  access: ResolvedShareLink,
+  photoId: string,
+): Promise<{ photo: LinkedPhoto; index: number } | null> {
+  const photo = await prisma.photo.findFirst({
+    where: { id: photoId, galleryId: access.galleryId, status: "CONFIRMED" },
+    select: {
+      id: true,
+      objectKey: true,
+      thumbObjectKey: true,
+      placeholder: true,
+      width: true,
+      height: true,
+      videoObjectKey: true,
+      ...ORDER_KEY_SELECT,
+    },
+  });
+  if (!photo) return null;
+  const index = await prisma.photo.count({
+    where: {
+      galleryId: access.galleryId,
+      status: "CONFIRMED",
+      ...beforePosition(access.photoOrder, positionOf(access.photoOrder, photo)),
+    },
+  });
+  return {
+    photo: {
+      id: photo.id,
+      objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
+      placeholder: photo.placeholder,
+      width: photo.width,
+      height: photo.height,
+      isVideo: photo.videoObjectKey !== null,
+    },
+    index,
+  };
 }
 
 /**

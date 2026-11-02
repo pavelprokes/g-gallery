@@ -48,8 +48,30 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   firing in one commit — a photo link carrying a chapter anchor — aborted the first one's request
   and asked again: every page went out twice. The default still applies to a _background_ refetch,
   on purpose: it is cancelled in favour of the next page, so scrolling, the favourites filter and the
-  lightbox's next button never wait for every loaded page to be fetched again (`cancelRefetch:
-false` on every call would make them).
+  lightbox's next button never wait for every loaded page to be fetched again, as
+  `cancelRefetch: false` on every call would make them.
+- **A photo's link: the photo first.** For `?foto={id}` naming a confirmed photo of the gallery
+  (`linkedPhotoParam` reads it exactly as `photoParam` does in the browser — the first of a
+  repeated parameter):
+  - the page carries every page of photos up to that photo, cut by `toPages` into the
+    very 60-photo pages, with the very cursors, that pulling them one by one would produce. One big
+    page would not do: an infinite query refetches as many pages as it holds from the first page's
+    param on, so a 343-photo first page would come back as 60 and move an open lightbox onto another
+    photo. At most 10 pages (600 photos, ~120 kB compressed in the HTML): a photo past that, or one
+    the count misplaced, is linked as before — the client pulls the pages, with no placeholder and
+    nothing held, because both only make sense while the photo is a frame away;
+  - the server draws a placeholder layer — the lightbox's black frame, the photo's colour, and the
+    images the lightbox is about to ask for (the full size at its `sizes="100vw"`, and the grid
+    thumbnail when its URL does not depend on the width) — so they download, at high priority,
+    while the page's script does. It is inert and goes once the lightbox has opened;
+  - every other image — grid, highlights, film — waits until that lightbox is closed (or the photo
+    turns out to be gone), so nothing shares the connection with the one photo being waited for;
+  - the browser still opens the link with its own logic, unchanged: the same history entries, the
+    same instant scroll under the dialog, the same Back. That is what keeps the contract below.
+- **Neighbours after the photo.** The lightbox warms its neighbours (next, previous, one further
+  ahead) once the photo on screen has loaded — before, a slow connection was split four ways while
+  the viewer waited for the one. A film has nothing to wait for and warms them at once, and a full
+  size that fails to load counts as done.
 
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
@@ -60,7 +82,9 @@ now that the on-screen images are fetched first.
 
 Every shape of guest link that exists today keeps doing exactly what it does today. Measured on
 production before any loading change (Chromium desktop, WebKit iPhone 14, Firefox), and it is the
-oracle every step below is checked against (`e2e/gallery-view.spec.ts`, `e2e/chapters.spec.ts`):
+oracle every step below is checked against (`e2e/photo-links.spec.ts`, `e2e/gallery-view.spec.ts`,
+`e2e/chapters.spec.ts` — the photo-link spec passes on the code from before the change, except for
+its two tests of what is new):
 
 | Link                                                      | Behaviour to keep                                                                       |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -81,23 +105,16 @@ oracle every step below is checked against (`e2e/gallery-view.spec.ts`, `e2e/cha
 | `/s/{t}/{slug}/{unknown key}?foto=`                       | "this part is gone" with the way back                                                   |
 | reload on an open photo                                   | the same photo opens again; one Back closes it                                          |
 
-One deliberate exception: `/s/{t}?foto=` (no slug) redirects to the canonical address and **drops**
-the parameter today, so on a one-gallery wedding the photo does not open. That is a bug, not a
-contract — the redirect should carry the query (planned with the photo-link work below).
+One deliberate change: `/s/{t}?foto=` (no slug) redirected to the canonical address and **dropped**
+the query, so on a one-gallery wedding the photo did not open. That was a bug, not a contract — the
+redirect carries the query now.
 
 ## Next steps (planned, in this order)
 
-1. **Photo link: the photo first.** The page server-renders the pages of metadata up to the linked
-   photo (chunked into the same 60-photo pages, with the same cursors, that pulling them one by one
-   would have produced — a single big page would come back as 60 on the next refetch and shift an
-   open lightbox onto another photo). It also renders a static, non-interactive layer showing that
-   photo's thumbnail and full image (the very URLs the lightbox will ask for), and holds every
-   other image — grid, highlights, film — until the lightbox is closed. The client-side opening,
-   history and scroll logic stays exactly as it is, so the contract above holds by construction.
-2. **Chapter link and highlight jump: one request.** `throughKey`/`throughId` on
+1. **Chapter link and highlight jump: one request.** `throughKey`/`throughId` on
    `/api/g/[token]/photos` returns every page up to that position at once (docs/CHAPTERS.md names
    this as the upgrade); a failure falls back to today's page-by-page pull.
-3. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
+2. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
    (an existing width — no new billed transformation) and warms one neighbour instead of three.
 
 Later, only if measurements still call for it: a 768 px phone thumbnail (−40 % per tile; 512 px

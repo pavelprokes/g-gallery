@@ -107,11 +107,12 @@ test.describe("gallery chapters", () => {
     });
   }
 
-  test("a photo link with a chapter anchor opens the photo, asking for each page once", async ({
+  test("a photo link with a chapter anchor opens the photo, asking for no page", async ({
     page,
   }) => {
-    // Two loops pull pages here — the photo's and the chapter's — and each
-    // used to abort the other's request and ask for the same page again
+    // Two loops could pull pages here — the photo's and the chapter's — and
+    // each used to abort the other's request and ask for the same page again.
+    // The pages up to the photo now come with the page itself
     // (docs/GALLERY-LOADING.md).
     const ids: string[] = [];
     let cursor: string | null = null;
@@ -136,8 +137,7 @@ test.describe("gallery chapters", () => {
 
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`foto=${target}`));
-    expect(pages.length).toBeGreaterThan(0);
-    expect(new Set(pages).size).toBe(pages.length);
+    expect(pages).toEqual([]);
 
     await page.goBack();
     await expect(page.getByRole("dialog")).not.toBeVisible();
