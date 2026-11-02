@@ -52,6 +52,7 @@ import {
 } from "@/lib/selection";
 import imageLoader from "@/lib/image-loader";
 import { DEVICE_SIZES, QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
+import { connectionSignals, isSlowConnection, slowLightboxSizes } from "@/lib/slow-connection";
 import { placeholderStyle } from "@/lib/placeholder";
 import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
@@ -720,6 +721,8 @@ interface LightboxPhotoProps {
   src: string;
   /** The grid thumbnail to hold the frame until the full size arrives. */
   preview: { src: string; sizes: string } | null;
+  /** The full size's `sizes`: the screen, or less on a slow connection. */
+  sizes: string;
   loaded: boolean;
   selected: boolean;
   onLoad: () => void;
@@ -749,6 +752,7 @@ function LightboxPhoto({
   photo,
   src,
   preview,
+  sizes,
   loaded,
   selected,
   onLoad,
@@ -827,7 +831,7 @@ function LightboxPhoto({
           alt=""
           src={src}
           fill
-          sizes="100vw"
+          sizes={sizes}
           onLoad={onLoad}
           onError={onError}
           // No fade, and never hidden: an image that is transparent until it
@@ -2451,8 +2455,43 @@ function GalleryViewInner({
     [token],
   );
 
+  /**
+   * Slow mode (docs/GALLERY-LOADING.md): on a slow connection the lightbox asks
+   * for the 1080 px variant instead of 1920/2560 and warms one neighbour
+   * instead of three. Null when the connection is not slow. Read once per
+   * opening — an event, so the photo's first render already has it (read in an
+   * effect, the full size would start at the screen's width and be asked for
+   * again a render later) — and kept while the lightbox stays open, so a photo
+   * on screen never changes width under the viewer.
+   */
+  const [slowSizes, setSlowSizes] = useState<string | null>(null);
+  const readConnection = useCallback(() => {
+    const signals = connectionSignals([
+      process.env.NEXT_PUBLIC_PHOTOS_BASE_URL,
+      process.env.NEXT_PUBLIC_SIGNED_IMAGES_URL,
+    ]);
+    setSlowSizes(isSlowConnection(signals) ? slowLightboxSizes(window.devicePixelRatio) : null);
+  }, []);
+
+  /**
+   * A photo's full-size `sizes` — one rule for the photo on screen and the
+   * neighbours warmed for it, or a preload warms a variant the image then does
+   * not use. The screen's width for the linked photo (the page's placeholder
+   * already fetched it at that) and while corrections are on (spots are marked
+   * on detail).
+   */
+  const lightboxSizesFor = useCallback(
+    (photoId: string) =>
+      slowSizes && photoId !== linkedPhoto?.id && !corrections.active ? slowSizes : "100vw",
+    [slowSizes, linkedPhoto?.id, corrections.active],
+  );
+
   const openPhoto = useCallback(
     (index: number) => {
+      readConnection();
+      // A fresh opening heads forward, whatever the last one did: slow mode
+      // warms only the photo in that direction.
+      lastDirection.current = 1;
       setLightboxIndex(index);
       // A freshly opened photo shows its controls, however the last one was
       // left. Done here rather than in an effect: opening is an event, and an
@@ -2467,7 +2506,7 @@ function GalleryViewInner({
         report("PHOTO_VIEW", photo.id);
       }
     },
-    [photos, report],
+    [photos, report, readConnection],
   );
 
   /**
@@ -2886,11 +2925,15 @@ function GalleryViewInner({
     // both directions.
     const inRange = (index: number) => index >= 0 && index < photos.length;
     const ahead = lightboxIndex + 2 * lastDirection.current;
-    const neighbours = [
-      inRange(lightboxIndex + 1) ? photos[lightboxIndex + 1] : undefined,
-      inRange(lightboxIndex - 1) ? photos[lightboxIndex - 1] : undefined,
-      inRange(ahead) ? photos[ahead] : undefined,
-    ];
+    const next = lightboxIndex + lastDirection.current;
+    // Slow mode warms only the one the viewer is heading to.
+    const neighbours = slowSizes
+      ? [inRange(next) ? photos[next] : undefined]
+      : [
+          inRange(lightboxIndex + 1) ? photos[lightboxIndex + 1] : undefined,
+          inRange(lightboxIndex - 1) ? photos[lightboxIndex - 1] : undefined,
+          inRange(ahead) ? photos[ahead] : undefined,
+        ];
 
     const links = neighbours
       // A video neighbour's poster is requested at one fixed width, not from
@@ -2904,7 +2947,9 @@ function GalleryViewInner({
         link.rel = "preload";
         link.as = "image";
         link.imageSrcset = fullWidthSrcSet(srcFor(photo.objectKey, imageGrant), imageLoader);
-        link.imageSizes = "100vw";
+        // The same `sizes` the lightbox will give it, or the preload warms a
+        // variant the browser then does not use.
+        link.imageSizes = lightboxSizesFor(photo.id);
         // Deliberately NO crossOrigin. next/image renders a plain <img> with no
         // crossorigin attribute, and a preload whose CORS mode differs from the
         // eventual request is a cache MISS — the browser would fetch the photo
@@ -2923,7 +2968,7 @@ function GalleryViewInner({
     return () => {
       for (const link of links) link.remove();
     };
-  }, [active?.id, activeShown, lightboxIndex, photos, imageGrant]);
+  }, [active?.id, activeShown, lightboxIndex, photos, imageGrant, slowSizes, lightboxSizesFor]);
 
   // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
   // an outer margin — the page edge matches the seam between two photos
@@ -3453,6 +3498,8 @@ function GalleryViewInner({
               photo={active}
               src={srcFor(active.objectKey, imageGrant)}
               preview={preview}
+              // Zoomed in, the viewer is asking for detail: the screen's width.
+              sizes={zoomed ? "100vw" : lightboxSizesFor(active.id)}
               loaded={loadedPhotoId === active.id}
               selected={activeSelected}
               onLoad={() => setLoadedPhotoId(active.id)}

@@ -246,6 +246,53 @@ test.describe("share gallery viewer", () => {
   });
 });
 
+test.describe("slow mode", () => {
+  // docs/GALLERY-LOADING.md. Chromium reports its connection; the others are
+  // judged by their first images. Here the browser is told what it is on.
+  for (const [what, effectiveType, slow, warmed] of [
+    ["on a slow connection the lightbox asks for 1080 px and warms one neighbour", "3g", true, 1],
+    ["on a good connection it asks for the screen and warms every neighbour", "4g", false, 2],
+  ] as const) {
+    test(what, async ({ page }) => {
+      await page.addInitScript((type) => {
+        Object.defineProperty(navigator, "connection", {
+          value: { effectiveType: type, saveData: false },
+          configurable: true,
+        });
+      }, effectiveType);
+      await page.goto(`/g/${seed.token}/${seed.slug}`);
+      await page
+        .getByRole("list", { name: "Fotky v galerii" })
+        .locator('button[aria-label^="Otevřít"]')
+        .first()
+        .click();
+
+      // The full size is the dialog's last image. Done, not drawn: the local
+      // stack has no files behind these rows, and the request is what counts.
+      const full = page.getByRole("dialog").locator("img").last();
+      await expect.poll(() => full.evaluate((img: HTMLImageElement) => img.complete)).toBe(true);
+      // 1080 device pixels on any screen when slow; which candidate the screen
+      // alone picks is the browser's business (a 2.6× Pixel takes 1080 too).
+      const dpr = await page.evaluate(() => window.devicePixelRatio);
+      await expect(full).toHaveAttribute(
+        "sizes",
+        slow ? `${Math.floor(1080 / Math.max(dpr, 1))}px` : "100vw",
+      );
+      if (slow) {
+        expect(await full.evaluate((img: HTMLImageElement) => img.currentSrc)).toMatch(
+          /(fit:|width=)1080\b/,
+        );
+      }
+
+      // The first photo has no previous one: next and the one after it
+      // normally, only the next on a slow link.
+      await expect
+        .poll(() => page.locator('head link[rel="preload"][as="image"][imagesrcset]').count())
+        .toBe(warmed);
+    });
+  }
+});
+
 test.describe("image retry", () => {
   // src/lib/image-retry.ts is serialized into an inline script, so only a
   // production build proves it survives bundling — and that a tile which

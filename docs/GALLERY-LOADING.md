@@ -80,6 +80,22 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   would have been fetched with. A failure falls back to one ordinary page and the jump's loop asks
   again. A chapter link on Slow 4G used to wait for five pages one after another (~6 s).
 
+- **Slow mode.** On a slow connection the lightbox asks for the 1080 px variant instead of 1920/2560
+  and warms only the neighbour the viewer is heading to (`src/lib/slow-connection.ts`). Slow means:
+  Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
+  Firefox — most guests are on an iPhone) the median time of the first grid-sized images (the
+  thumbnails, never a lightbox photo) from the photo hosts over 1.5 s.
+  - `sizes` is `1080 / devicePixelRatio` px: exactly 1080 device pixels, which every selection rule
+    lands on 1080 for — a width already in the variant list, so no new billed transformation. It
+    saves where the screen alone asks for more (a 3× iPhone: 1920; a retina desktop: 2560); a 2.6×
+    Pixel already gets 1080 at `100vw` by Chromium's geometric-mean rule.
+  - One rule (`lightboxSizesFor`) for the photo on screen and the neighbour's preload, or the
+    preload warms a variant the image does not use. The screen's width for the linked photo (the
+    page's placeholder already fetched it at that), while corrections are on, and when zoomed in.
+  - Read once per opening (an event, so the photo's first render has it) and kept while the
+    lightbox stays open, so a photo on screen never changes width under the viewer. An opening
+    always heads forward, whatever the last session's direction was.
+
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
 cover) rely on. Revisit only with a measurement that shows the extra rows costing on-screen time
@@ -116,11 +132,8 @@ One deliberate change: `/s/{t}?foto=` (no slug) redirected to the canonical addr
 the query, so on a one-gallery wedding the photo did not open. That was a bug, not a contract — the
 redirect carries the query now.
 
-## Next steps (planned, in this order)
+## Later, only if measurements call for it
 
-1. **Slow mode.** On a detected slow connection the lightbox asks for 1080w instead of 1920/2560
-   (an existing width — no new billed transformation) and warms one neighbour instead of three.
-
-Later, only if measurements still call for it: a 768 px phone thumbnail (−40 % per tile; 512 px
+A 768 px phone thumbnail (−40 % per tile; 512 px
 would blur portraits on a 3× iPhone), ThumbHash placeholders, leaner page payloads (`faces`/`focus`
 are ~38 % of each item and only the projection uses them).
