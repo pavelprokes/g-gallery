@@ -53,11 +53,13 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
 - **A photo's link: the photo first.** For `?foto={id}` naming a confirmed photo of the gallery
   (`linkedPhotoParam` reads it exactly as `photoParam` does in the browser — the first of a
   repeated parameter):
-  - the page carries every page of photos up to that photo (at most 20), cut by `toPages` into the
+  - the page carries every page of photos up to that photo, cut by `toPages` into the
     very 60-photo pages, with the very cursors, that pulling them one by one would produce. One big
     page would not do: an infinite query refetches as many pages as it holds from the first page's
     param on, so a 343-photo first page would come back as 60 and move an open lightbox onto another
-    photo;
+    photo. At most 10 pages (600 photos, ~120 kB compressed in the HTML): a photo past that, or one
+    the count misplaced, is linked as before — the client pulls the pages, with no placeholder and
+    nothing held, because both only make sense while the photo is a frame away;
   - the server draws a placeholder layer — the lightbox's black frame, the photo's colour, and the
     images the lightbox is about to ask for (the full size at its `sizes="100vw"`, and the grid
     thumbnail when its URL does not depend on the width) — so they download, at high priority,
@@ -68,7 +70,8 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     same instant scroll under the dialog, the same Back. That is what keeps the contract below.
 - **Neighbours after the photo.** The lightbox warms its neighbours (next, previous, one further
   ahead) once the photo on screen has loaded — before, a slow connection was split four ways while
-  the viewer waited for the one. A film has nothing to wait for and warms them at once.
+  the viewer waited for the one. A film has nothing to wait for and warms them at once, and a full
+  size that fails to load counts as done.
 
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
