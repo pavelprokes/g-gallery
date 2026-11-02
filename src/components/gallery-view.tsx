@@ -50,7 +50,7 @@ import {
   toggleOne,
 } from "@/lib/selection";
 import imageLoader from "@/lib/image-loader";
-import { QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
+import { DEVICE_SIZES, QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
 import { placeholderStyle } from "@/lib/placeholder";
 import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
@@ -126,7 +126,7 @@ import {
   CorrectionsPinSheet,
 } from "@/components/corrections/corrections-ui";
 import type { SignedImageGrant } from "@/lib/image-signing";
-import type { GalleryArchive } from "@/lib/shared-gallery";
+import type { GalleryArchive, LinkedPhoto } from "@/lib/shared-gallery";
 import {
   formatDuration,
   mediaCounts,
@@ -649,6 +649,71 @@ function useLightboxGestures(
   return { reset, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel } };
 }
 
+/**
+ * A photo's link, drawn by the server before the page can open its lightbox
+ * (docs/GALLERY-LOADING.md): the lightbox's black frame with the photo's
+ * colour where it will be, and the very images the lightbox is about to ask
+ * for — the full size at the lightbox's own `sizes` and, when it is served
+ * untransformed, the grid thumbnail — so both are already downloading, at high
+ * priority, while the page's script is. Nothing here can be used; the real
+ * lightbox replaces it a frame after hydrating, over the same pixels.
+ *
+ * A film draws only the frame: its lightbox poster is fetched at a width of
+ * its own, and guessing it here would be a second billed variant.
+ */
+function LinkedPhotoPlaceholder({
+  photo,
+  imageGrant,
+}: {
+  photo: LinkedPhoto;
+  imageGrant: SignedImageGrant | null;
+}) {
+  const aspect = photo.width && photo.height ? photo.width / photo.height : 1.5;
+  const thumb = photo.thumbObjectKey ? srcFor(photo.thumbObjectKey, imageGrant) : null;
+  // The lightbox draws the thumbnail at the tile's width, which the server
+  // cannot know. Only a thumbnail whose URL ignores the width (served straight
+  // from the bucket) is the same request whatever `sizes` says.
+  const thumbAnyWidth =
+    thumb !== null &&
+    imageLoader({ src: thumb, width: DEVICE_SIZES[0] }) ===
+      imageLoader({ src: thumb, width: DEVICE_SIZES.at(-1)! });
+  return (
+    <div aria-hidden className="fixed inset-0 z-50 bg-black">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          style={{
+            width: `min(100%, calc(100dvh * ${aspect}))`,
+            aspectRatio: aspect,
+            backgroundColor: placeholderStyle(photo.placeholder),
+          }}
+        />
+      </div>
+      {thumbAnyWidth && (
+        <Image
+          alt=""
+          src={thumb}
+          fill
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+          className="object-contain"
+        />
+      )}
+      {!photo.isVideo && (
+        <Image
+          alt=""
+          src={srcFor(photo.objectKey, imageGrant)}
+          fill
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+          className="object-contain"
+        />
+      )}
+    </div>
+  );
+}
+
 interface LightboxPhotoProps {
   photo: GalleryPhoto;
   src: string;
@@ -1029,9 +1094,13 @@ interface GalleryViewProps {
    * a still can use (print, projection, offline) stays away from a films-only
    * gallery (docs/VIDEO.md). */
   videoCount: number;
-  initialPhotos: GalleryPhoto[];
-  initialCursor: string | null;
-  /** The order `initialPhotos` came in; a page fetched in another one reloads. */
+  /** The first pages of photos — one, or every page up to a linked photo —
+   * cut exactly as the photos route pages them (`toPages`,
+   * src/lib/photo-cursor.ts). */
+  initialPages: { items: GalleryPhoto[]; nextCursor: string | null }[];
+  /** The confirmed photo a `?foto=` link names, or null (docs/GALLERY-LOADING.md). */
+  linkedPhoto: LinkedPhoto | null;
+  /** The order `initialPages` came in; a page fetched in another one reloads. */
   photoOrder: PhotoOrder;
   imageGrant: SignedImageGrant | null;
   viewers: GalleryViewer[];
@@ -1074,8 +1143,8 @@ function GalleryViewInner({
   venue,
   photoCount,
   videoCount,
-  initialPhotos,
-  initialCursor,
+  initialPages,
+  linkedPhoto,
   photoOrder,
   imageGrant,
   viewers,
@@ -1102,7 +1171,7 @@ function GalleryViewInner({
   const [loadedPhotoId, setLoadedPhotoId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [counts, setCounts] = useState<Map<string, number>>(
-    () => new Map(initialPhotos.map((p) => [p.id, p.favoriteCount])),
+    () => new Map(initialPages.flatMap((page) => page.items).map((p) => [p.id, p.favoriteCount])),
   );
   const [namePromptFor, setNamePromptFor] = useState<string | null>(null);
   /**
@@ -1299,10 +1368,12 @@ function GalleryViewInner({
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialData: {
-      pages: [
-        { items: initialPhotos, nextCursor: initialCursor, total: photoCount },
-      ] as PhotosPage[],
-      pageParams: [null],
+      pages: initialPages.map((page, i) =>
+        i === 0 ? { ...page, total: photoCount } : page,
+      ) as PhotosPage[],
+      // Each page's param is the cursor it would have been fetched with — the
+      // page before it's own — so a refetch walks the very same pages.
+      pageParams: [null, ...initialPages.slice(0, -1).map((page) => page.nextCursor)],
     },
     // The server rendered that first page for this very request. With the
     // default `staleTime: 0` the seed counts as stale on arrival, so every
@@ -1380,11 +1451,29 @@ function GalleryViewInner({
   const showHighlights = !favoritesOnly && highlights.length > 0;
   /**
    * What the page opens on, and so the one image that gets the high fetch
-   * priority (docs/GALLERY-LOADING.md): the featured film's poster, else the
-   * first highlights, else the grid's first row of photos. Decided once here so
-   * the three cannot disagree.
+   * priority (docs/GALLERY-LOADING.md): a linked photo, else the featured
+   * film's poster, else the first highlights, else the grid's first row of
+   * photos. Decided once here so they cannot disagree.
    */
-  const opensOn = featuredFilm ? "film" : showHighlights ? "highlights" : "grid";
+  const opensOn = linkedPhoto
+    ? "photo"
+    : featuredFilm
+      ? "film"
+      : showHighlights
+        ? "highlights"
+        : "grid";
+
+  /**
+   * A photo's link (docs/GALLERY-LOADING.md). The server sent every page up to
+   * the photo and drew it in a placeholder layer, so the lightbox opens on it as
+   * soon as the page hydrates. Until then — and from then until that lightbox
+   * is closed — no other image is requested: the grid, the highlights and the
+   * film behind the dialog would share a slow connection with the one photo the
+   * viewer is waiting for. A linked photo that cannot be opened after all
+   * (deleted since) releases them at once.
+   */
+  const [awaitingLinkedPhoto, setAwaitingLinkedPhoto] = useState(linkedPhoto !== null);
+  const [imagesHeld, setImagesHeld] = useState(linkedPhoto !== null);
 
   useEffect(() => {
     if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
@@ -2397,6 +2486,7 @@ function GalleryViewInner({
   useEffect(() => {
     function onPopState() {
       setLightboxIndex(null);
+      setImagesHeld(false);
       // Forward onto a closed lightbox's entry: the photo it named is not
       // on screen, so the address must not say it is.
       if (photoParam(window.location.search))
@@ -2484,7 +2574,10 @@ function GalleryViewInner({
       if (index >= 0) {
         setRovingIndex(index);
         openPhoto(index);
+      } else {
+        setImagesHeld(false);
       }
+      setAwaitingLinkedPhoto(false);
       setOpeningPhoto(null);
     });
     return () => cancelAnimationFrame(frame);
@@ -2679,8 +2772,12 @@ function GalleryViewInner({
    * Guessing the width would risk warming a variant the browser ignores — the
    * swipe would still stall AND the transformation would be billed twice.
    */
+  // The photo on screen first: until it has loaded, warming three more would
+  // split a slow connection four ways while the viewer waits on the one
+  // (docs/GALLERY-LOADING.md). A film has no full-size image to wait for.
+  const activeShown = !!active && (active.video !== null || loadedPhotoId === active.id);
   useEffect(() => {
-    if (lightboxIndex === null || photos.length < 2) return;
+    if (lightboxIndex === null || photos.length < 2 || !activeShown) return;
 
     // No wrapping past either loaded end: the next page may not have landed
     // yet (see `move`, above) and, symmetrically, the "previous" of index 0
@@ -2725,7 +2822,7 @@ function GalleryViewInner({
     return () => {
       for (const link of links) link.remove();
     };
-  }, [active?.id, lightboxIndex, photos, imageGrant]);
+  }, [active?.id, activeShown, lightboxIndex, photos, imageGrant]);
 
   // Edge to edge on a phone, and above `sm` only the grid's own 4 px gap as
   // an outer margin — the page edge matches the seam between two photos
@@ -2945,6 +3042,8 @@ function GalleryViewInner({
           width={featuredFilm.width}
           height={featuredFilm.height}
           durationMs={featuredFilm.video.durationMs}
+          lead={opensOn === "film"}
+          imageHeld={imagesHeld}
           onOpen={openFeaturedFilm}
         />
       )}
@@ -2955,6 +3054,7 @@ function GalleryViewInner({
           imageGrant={imageGrant}
           jumpingTo={jumpingToPhoto}
           leading={opensOn === "highlights"}
+          imagesHeld={imagesHeld}
           onJump={setJumpingToPhoto}
         />
       )}
@@ -3176,6 +3276,7 @@ function GalleryViewInner({
                     height={entry.height}
                     index={index}
                     priority={virtualRow.index === firstPhotoRow}
+                    imageHeld={imagesHeld}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}
@@ -3216,6 +3317,10 @@ function GalleryViewInner({
               ? t("searchingFavorites")
               : t("noFavoritesYet")}
         </p>
+      )}
+
+      {awaitingLinkedPhoto && linkedPhoto && !active && (
+        <LinkedPhotoPlaceholder photo={linkedPhoto} imageGrant={imageGrant} />
       )}
 
       {active && (
@@ -3652,6 +3757,8 @@ interface PhotoTileProps {
   height: number;
   index: number;
   priority: boolean;
+  /** A photo's link is loading or open: the tile shows its colour only. */
+  imageHeld?: boolean;
   tabbable: boolean;
   selectionActive: boolean;
   selected: boolean;
@@ -3695,6 +3802,7 @@ export const PhotoTile = memo(function PhotoTile({
   height,
   index,
   priority,
+  imageHeld = false,
   tabbable,
   selectionActive,
   selected,
@@ -3839,28 +3947,30 @@ export const PhotoTile = memo(function PhotoTile({
         }
       >
         <span className="absolute inset-0 block overflow-hidden">
-          <Image
-            // The button around this image is what a screen reader announces
-            // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
-            // straight after it, which tells nobody anything.
-            alt=""
-            src={thumbnailFailed ? fallbackSrc : src}
-            onError={() => setThumbnailFailed(true)}
-            fill
-            sizes={`${Math.ceil(width)}px`}
-            // Not next/image's `priority`: since Next 16 that is only a
-            // `<link rel=preload>`, which Chrome still fetches at Low, level
-            // with every lazy tile. What gets the row on screen first is the
-            // fetch priority itself.
-            loading={priority ? "eager" : undefined}
-            fetchPriority={priority ? "high" : undefined}
-            // A real justified layout — object-contain would letterbox a tile
-            // sized to the photo's own aspect ratio, so `fill` + the exact
-            // rendered box is enough; no crop, no letterbox.
-            className={`duration-toggle object-cover transition-transform ${
-              selected ? "scale-90" : "hover:scale-105"
-            }`}
-          />
+          {!imageHeld && (
+            <Image
+              // The button around this image is what a screen reader announces
+              // (`aria-label` below); an `alt` here would read "DSC_1234.jpg"
+              // straight after it, which tells nobody anything.
+              alt=""
+              src={thumbnailFailed ? fallbackSrc : src}
+              onError={() => setThumbnailFailed(true)}
+              fill
+              sizes={`${Math.ceil(width)}px`}
+              // Not next/image's `priority`: since Next 16 that is only a
+              // `<link rel=preload>`, which Chrome still fetches at Low, level
+              // with every lazy tile. What gets the row on screen first is the
+              // fetch priority itself.
+              loading={priority ? "eager" : undefined}
+              fetchPriority={priority ? "high" : undefined}
+              // A real justified layout — object-contain would letterbox a tile
+              // sized to the photo's own aspect ratio, so `fill` + the exact
+              // rendered box is enough; no crop, no letterbox.
+              className={`duration-toggle object-cover transition-transform ${
+                selected ? "scale-90" : "hover:scale-105"
+              }`}
+            />
+          )}
         </span>
         {photo.video && (
           // Top right is free on a video tile: it never carries the printer.

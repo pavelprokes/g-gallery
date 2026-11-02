@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { resolveEvent } from "@/lib/event-access";
 import { resolveShareLink } from "@/lib/share-access";
 import { compositeToken } from "@/lib/event-token";
-import { PHOTO_PARAM, isPhotoId } from "@/lib/photo-link";
+import { PHOTO_PARAM, isPhotoId, linkedPhotoParam } from "@/lib/photo-link";
 import { loadGalleryViewData } from "@/lib/shared-gallery";
 import { splitEventCards } from "@/lib/event-cards";
 import {
@@ -93,7 +93,12 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
   if (!event) notFound();
 
   const segments = slug ?? [];
-  if (segments.length === 0) redirect(`/s/${encodeURIComponent(token)}/${event.slug}`);
+  const searchParams = await props.searchParams;
+  // The query rides along: `?foto=` on a one-gallery wedding is a photo's link,
+  // and a redirect that dropped it opened the gallery without the photo.
+  if (segments.length === 0) {
+    redirect(`/s/${encodeURIComponent(token)}/${event.slug}${queryString(searchParams)}`);
+  }
 
   const requestedKey = segments[1];
 
@@ -131,7 +136,7 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
     );
   }
 
-  const data = await loadGalleryViewData(access.shareLink, locale);
+  const data = await loadGalleryViewData(access.shareLink, locale, linkedPhotoParam(searchParams));
   if (!data) notFound();
 
   return (
@@ -144,8 +149,8 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       photoCount={data.photoCount}
       videoCount={data.videoCount}
       archive={data.archive}
-      initialPhotos={data.initialPhotos}
-      initialCursor={data.initialCursor}
+      initialPages={data.initialPages}
+      linkedPhoto={data.linkedPhoto}
       photoOrder={data.photoOrder}
       imageGrant={data.imageGrant}
       viewers={data.viewers}
@@ -164,4 +169,16 @@ export default async function WeddingPage(props: PageProps<"/s/[token]/[[...slug
       backLabel={event.title}
     />
   );
+}
+
+/** `searchParams` back into `?a=1&b=2` (empty string when there are none). */
+function queryString(searchParams: Record<string, string | string[] | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) {
+      query.append(key, item);
+    }
+  }
+  const text = query.toString();
+  return text ? `?${text}` : "";
 }

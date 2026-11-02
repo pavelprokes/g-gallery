@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPhotoId, photoParam, withPhotoParam } from "./photo-link";
+import { isPhotoId, linkedPhotoParam, photoParam, withPhotoParam } from "./photo-link";
 
 describe("photoParam", () => {
   it("reads the photo id", () => {
@@ -40,5 +40,19 @@ describe("isPhotoId", () => {
     expect(isPhotoId("p1")).toBe(true);
     expect(isPhotoId(["p1", "p2"])).toBe(false);
     expect(isPhotoId(undefined)).toBe(false);
+  });
+});
+
+describe("linkedPhotoParam", () => {
+  it("reads what photoParam reads in the browser", () => {
+    for (const search of ["?foto=cmg1abc", "?foto=", "?foto=a.b", "?fbclid=x&foto=cmg1abc", ""]) {
+      const params = Object.fromEntries(new URLSearchParams(search));
+      expect(linkedPhotoParam(params)).toBe(photoParam(search));
+    }
+  });
+
+  it("takes the first of a repeated parameter, as URLSearchParams.get does", () => {
+    expect(linkedPhotoParam({ foto: ["first1", "second2"] })).toBe("first1");
+    expect(photoParam("?foto=first1&foto=second2")).toBe("first1");
   });
 });

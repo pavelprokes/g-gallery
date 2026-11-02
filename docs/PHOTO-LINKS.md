@@ -35,6 +35,10 @@ A dismissed sheet or a missing clipboard does nothing — the address bar still 
 - Same mechanics as a highlight's jump (docs/HIGHLIGHTS.md): pages are pulled until the photo is in
   the grid, one **instant** scroll puts its row in view (so closing lands there), then the lightbox
   opens on it — counted as a photo view like any open.
+- Since 2026-11-02 the server sends the pages up to the photo with the page itself, draws the photo
+  in an inert placeholder until the lightbox opens, and holds every other image until it is closed
+  (docs/GALLERY-LOADING.md) — so there is usually nothing left to pull, and the steps above run
+  as soon as the page hydrates. The steps themselves are unchanged.
 - The parameter comes off the gallery's own entry first, so Back from the photo is the gallery.
 - A photo that is gone (deleted, never here) opens nothing and the parameter is removed, so a dead
   link is not passed on.

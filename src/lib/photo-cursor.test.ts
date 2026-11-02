@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeCursor, encodeCursor } from "./photo-cursor";
+import { PHOTOS_PAGE_SIZE, decodeCursor, encodeCursor, toPages } from "./photo-cursor";
 
 const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
 
@@ -56,5 +56,35 @@ describe("photo cursor", () => {
     expect(
       decodeCursor(encode({ o: "FILE_NAME", key: "Svatba_01", id: "x" }), "FILE_NAME"),
     ).toBeNull();
+  });
+});
+
+describe("toPages", () => {
+  const photos = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `p${i}`,
+      orderKey: `k${String(i).padStart(4, "0")}`,
+    }));
+  const cursorOf = (photo: { id: string; orderKey: string }) =>
+    encodeCursor({ order: "FILE_NAME", key: photo.orderKey, id: photo.id });
+
+  it("cuts pages at the page size, each carrying its own last photo's cursor", () => {
+    const items = photos(PHOTOS_PAGE_SIZE * 2 + 5);
+    const pages = toPages("FILE_NAME", items, true);
+    expect(pages.map((page) => page.items.length)).toEqual([PHOTOS_PAGE_SIZE, PHOTOS_PAGE_SIZE, 5]);
+    expect(pages[0]!.nextCursor).toBe(cursorOf(items[PHOTOS_PAGE_SIZE - 1]!));
+    expect(pages[1]!.nextCursor).toBe(cursorOf(items[PHOTOS_PAGE_SIZE * 2 - 1]!));
+    expect(pages[2]!.nextCursor).toBe(cursorOf(items.at(-1)!));
+  });
+
+  it("ends without a cursor when nothing follows, also on an exact multiple", () => {
+    const pages = toPages("FILE_NAME", photos(PHOTOS_PAGE_SIZE * 2), false);
+    expect(pages).toHaveLength(2);
+    expect(pages[0]!.nextCursor).not.toBeNull();
+    expect(pages[1]!.nextCursor).toBeNull();
+  });
+
+  it("gives an empty gallery one empty page, as the first request would", () => {
+    expect(toPages("FILE_NAME", [], false)).toEqual([{ items: [], nextCursor: null }]);
   });
 });

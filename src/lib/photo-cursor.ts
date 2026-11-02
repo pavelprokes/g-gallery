@@ -56,3 +56,34 @@ export function decodeCursor(token: string, order: PhotoOrder): PhotoCursor | nu
     return null;
   }
 }
+
+/**
+ * Consecutive photos in the gallery's order cut into the pages the cursor
+ * would have produced one request at a time: `PHOTOS_PAGE_SIZE` each, every
+ * page but the last carrying the cursor of its own last photo, the last one
+ * carrying a cursor only when `hasMore` says photos follow it.
+ *
+ * Why not one big page: an infinite query refetches as many pages as it holds,
+ * from the first page's param on (TanStack's infiniteQueryBehavior). A single
+ * 343-photo first page would come back as 60 on the next invalidation, and an
+ * open lightbox at photo 343 would land on another photo. Pages with the very
+ * boundaries sequential fetching gives refetch into themselves
+ * (docs/GALLERY-LOADING.md).
+ */
+export function toPages<T extends { id: string; orderKey: string }>(
+  order: PhotoOrder,
+  items: readonly T[],
+  hasMore: boolean,
+): { items: T[]; nextCursor: string | null }[] {
+  const pages: { items: T[]; nextCursor: string | null }[] = [];
+  for (let start = 0; start < items.length || pages.length === 0; start += PHOTOS_PAGE_SIZE) {
+    const page = items.slice(start, start + PHOTOS_PAGE_SIZE);
+    const last = page.at(-1);
+    const more = start + PHOTOS_PAGE_SIZE < items.length || hasMore;
+    pages.push({
+      items: page,
+      nextCursor: more && last ? encodeCursor({ order, key: last.orderKey, id: last.id }) : null,
+    });
+  }
+  return pages;
+}
