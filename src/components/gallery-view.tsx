@@ -748,6 +748,7 @@ function LightboxPhoto({
             // `fill` images lazy-load by default; this one exists precisely to
             // be on screen in the frame the lightbox opens in.
             loading="eager"
+            fetchPriority="high"
             className={`object-contain ${selected ? "scale-[0.93]" : ""}`}
           />
         )}
@@ -768,7 +769,12 @@ function LightboxPhoto({
           className={`object-contain transition-transform duration-200 ${
             selected ? "scale-[0.93]" : ""
           }`}
-          priority
+          // The one image the viewer is waiting for: ahead of any grid tile
+          // still loading behind the dialog and of the neighbours being warmed.
+          // (`priority` would only add a preload for an image already in the
+          // document, at Low.)
+          loading="eager"
+          fetchPriority="high"
         />
         {overlay && (
           // Scaled with the photo when it is picked, so a spot lands — and is
@@ -1282,7 +1288,12 @@ function GalleryViewInner({
   // Cursor-paginated timeline (docs/AUDIT.md §6/§7 reopening threshold —
   // this is that reopening). Seeded with the server-rendered first page so
   // there is no client fetch for the initial paint.
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const {
+    data,
+    fetchNextPage: fetchNextPageCancelling,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["gallery-photos", token],
     queryFn: ({ pageParam, signal }) => fetchPhotosPage(token, pageParam, signal, photoOrder),
     initialPageParam: null as string | null,
@@ -1293,7 +1304,38 @@ function GalleryViewInner({
       ] as PhotosPage[],
       pageParams: [null],
     },
+    // The server rendered that first page for this very request. With the
+    // default `staleTime: 0` the seed counts as stale on arrival, so every
+    // visit fetched page one a second time straight after hydrating — one
+    // more function call and two queries for nothing, landing in the middle
+    // of a slow phone's first images. Uploads and deletions still refresh
+    // the grid: they invalidate the query explicitly. The refetch on regaining
+    // focus stays — it is how a gallery left open picks up photos added since.
+    refetchOnMount: false,
   });
+
+  /**
+   * Every "load the next page" in here — the scroll, the favourites filter, a
+   * chapter, a highlight or a photo link being reached, the lightbox's next
+   * button — goes through this. Two of those loops can fire in the same
+   * commit (a photo link that carries a chapter anchor), and with TanStack's
+   * default `cancelRefetch: true` the second call aborted the first one's
+   * request and asked for the same page again: every page went out twice. A
+   * call made while one of ours is in flight now joins it.
+   *
+   * Only ours: the default stays for everything else on purpose. A background
+   * refetch (the tab regaining focus, an upload's invalidation) is still
+   * cancelled in favour of the next page, so scrolling, the favourites filter
+   * and the lightbox's next button never wait for every loaded page to be
+   * fetched again first — which `cancelRefetch: false` everywhere would do.
+   */
+  const nextPageInFlight = useRef<Promise<unknown> | null>(null);
+  const fetchNextPage = useCallback(() => {
+    nextPageInFlight.current ??= fetchNextPageCancelling().finally(() => {
+      nextPageInFlight.current = null;
+    });
+    return nextPageInFlight.current;
+  }, [fetchNextPageCancelling]);
 
   /**
    * The gallery's real total, kept current. The `photoCount` prop is fixed at
@@ -1336,6 +1378,13 @@ function GalleryViewInner({
   /** The highlights (docs/HIGHLIGHTS.md) — like chapters, not part of the
    * viewer's own shortlist. */
   const showHighlights = !favoritesOnly && highlights.length > 0;
+  /**
+   * What the page opens on, and so the one image that gets the high fetch
+   * priority (docs/GALLERY-LOADING.md): the featured film's poster, else the
+   * first highlights, else the grid's first row of photos. Decided once here so
+   * the three cannot disagree.
+   */
+  const opensOn = featuredFilm ? "film" : showHighlights ? "highlights" : "grid";
 
   useEffect(() => {
     if (!favoritesOnly || !hasNextPage || isFetchingNextPage) return;
@@ -1836,8 +1885,11 @@ function GalleryViewInner({
   );
 
   /** The first row of photos gets the eager, high-priority load — row 0 when
-   * the gallery opens on a chapter header is that header. */
-  const firstPhotoRow = chapterRows[0]?.rowIndex === 0 ? 1 : 0;
+   * the gallery opens on a chapter header is that header — but only when the
+   * page opens on it. Under the film or the highlights it starts below the
+   * fold on a phone, and loading it first would take the bandwidth from the
+   * images that are actually on screen. -1 matches no row. */
+  const firstPhotoRow = opensOn !== "grid" ? -1 : chapterRows[0]?.rowIndex === 0 ? 1 : 0;
 
   const rowVirtualizer = useWindowVirtualizer({
     count: rows.length + (hasNextPage ? 1 : 0),
@@ -2902,6 +2954,7 @@ function GalleryViewInner({
           highlights={highlights}
           imageGrant={imageGrant}
           jumpingTo={jumpingToPhoto}
+          leading={opensOn === "highlights"}
           onJump={setJumpingToPhoto}
         />
       )}
@@ -3795,7 +3848,12 @@ export const PhotoTile = memo(function PhotoTile({
             onError={() => setThumbnailFailed(true)}
             fill
             sizes={`${Math.ceil(width)}px`}
-            priority={priority}
+            // Not next/image's `priority`: since Next 16 that is only a
+            // `<link rel=preload>`, which Chrome still fetches at Low, level
+            // with every lazy tile. What gets the row on screen first is the
+            // fetch priority itself.
+            loading={priority ? "eager" : undefined}
+            fetchPriority={priority ? "high" : undefined}
             // A real justified layout — object-contain would letterbox a tile
             // sized to the photo's own aspect ratio, so `fill` + the exact
             // rendered box is enough; no crop, no letterbox.

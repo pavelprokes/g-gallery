@@ -106,4 +106,41 @@ test.describe("gallery chapters", () => {
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
     });
   }
+
+  test("a photo link with a chapter anchor opens the photo, asking for each page once", async ({
+    page,
+  }) => {
+    // Two loops pull pages here — the photo's and the chapter's — and each
+    // used to abort the other's request and ask for the same page again
+    // (docs/GALLERY-LOADING.md).
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const response = await page.request.get(
+        `/api/g/${token}/photos${cursor ? `?cursor=${cursor}` : ""}`,
+      );
+      const body = (await response.json()) as {
+        items: { id: string }[];
+        nextCursor: string | null;
+      };
+      ids.push(...body.items.map((item) => item.id));
+      cursor = body.nextCursor;
+    } while (cursor);
+    const target = ids[lastChapterAt + 1]!;
+
+    const pages: string[] = [];
+    page.on("request", (request) => {
+      if (/\/api\/g\/[^/]+\/photos/.test(request.url())) pages.push(request.url());
+    });
+    await page.goto(`/g/${token}/${slug}?foto=${target}#${anchors.at(-1)}`);
+
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`foto=${target}`));
+    expect(pages.length).toBeGreaterThan(0);
+    expect(new Set(pages).size).toBe(pages.length);
+
+    await page.goBack();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(page).not.toHaveURL(/foto=/);
+  });
 });

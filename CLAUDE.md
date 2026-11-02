@@ -51,6 +51,10 @@ touching `src/lib/slideshow/*`, `src/components/slideshow/*` or adding any serve
 **`docs/ENGRAVING.md`** is the authority for the engraving plate (`/admin/e|g/[id]/engraving`, built
 2026-10-27) — read it before touching `src/lib/engraving/*` or `public/vendor/engraving/` (the leaf
 frame is traced from Pavel's template, the text layout is measured from it).
+**`docs/GALLERY-LOADING.md`** is the authority for the order a guest's gallery fetches its images
+and photo pages on a slow phone (adopted 2026-11-02) — read it before touching image
+`loading`/`fetchPriority`, the photos query in `gallery-view.tsx`, or how a `?foto=`/`#chapter` link
+opens; its link-compatibility table is the contract every such change is tested against.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
