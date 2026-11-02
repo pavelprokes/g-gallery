@@ -26,31 +26,46 @@ const SAMPLES = 6;
 const MIN_SAMPLES = 4;
 /** A ~50 kB grid thumbnail taking longer than this is a slow link. */
 const SLOW_IMAGE_MS = 1500;
+/**
+ * Grid-sized images only — the browser-made thumbnail, or a 384/640 px
+ * transformation — the size the threshold above is for. A 1920 px lightbox
+ * photo (the first image a photo's link loads) takes 1.5 s on a good phone link.
+ */
+const GRID_IMAGE = /\.thumb\.|width=(384|640)\b|fit:(384|640):/;
 
 export function isSlowConnection(signals: ConnectionSignals): boolean {
   if (signals.saveData) return true;
   // The browser's own estimate, from the round trips it measured, beats ours.
   if (signals.effectiveType !== undefined) return SLOW_TYPES.has(signals.effectiveType);
-  const durations = signals.imageDurations.slice(0, SAMPLES).toSorted((a, b) => a - b);
+  // Spread and sort, not toSorted: Safari before 16 is exactly who lands here.
+  const durations = [...signals.imageDurations.slice(0, SAMPLES)].sort((a, b) => a - b);
   if (durations.length < MIN_SAMPLES) return false;
   return durations[Math.floor(durations.length / 2)]! > SLOW_IMAGE_MS;
 }
 
-/** What this browser can tell about its connection right now. */
-export function connectionSignals(photosBase: string | undefined): ConnectionSignals {
+/**
+ * What this browser can tell about its connection right now. `imageHosts` are
+ * where photos come from: the CDN, and the signing Worker when grants are on.
+ * The image timings are only read where the browser has no estimate of its own.
+ */
+export function connectionSignals(imageHosts: readonly (string | undefined)[]): ConnectionSignals {
   const connection = (
     navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
   ).connection;
-  const imageDurations = photosBase
-    ? performance
-        .getEntriesByType("resource")
-        .filter(
-          (entry) =>
-            (entry as PerformanceResourceTiming).initiatorType === "img" &&
-            entry.name.startsWith(photosBase),
-        )
-        .map((entry) => entry.duration)
-    : [];
+  const hosts = imageHosts.filter((host): host is string => Boolean(host));
+  const imageDurations =
+    connection?.effectiveType === undefined
+      ? performance
+          .getEntriesByType("resource")
+          .filter(
+            (entry) =>
+              (entry as PerformanceResourceTiming).initiatorType === "img" &&
+              hosts.some((host) => entry.name.startsWith(host)) &&
+              GRID_IMAGE.test(entry.name),
+          )
+          .slice(0, SAMPLES)
+          .map((entry) => entry.duration)
+      : [];
   return {
     saveData: connection?.saveData,
     effectiveType: connection?.effectiveType,
@@ -59,10 +74,15 @@ export function connectionSignals(photosBase: string | undefined): ConnectionSig
 }
 
 /**
- * The lightbox's `sizes` that makes the browser pick the 1080 px candidate on
- * any screen: the candidate chosen is the smallest at least `sizes` × the
- * device pixel ratio wide, so `1080 / dpr` lands on 1080 exactly — a width
+ * The lightbox's `sizes` that asks for exactly 1080 device pixels: `1080 / dpr`
+ * CSS px makes the 1080 px candidate's density equal the device pixel ratio,
+ * which every selection rule takes — the plain "smallest wide enough" and
+ * Chromium's geometric mean between neighbouring candidates alike. A width
  * already in the variant list, so no new billed transformation.
+ *
+ * It saves where the screen alone would ask for more: a 3× iPhone (1170 px →
+ * 1920), any retina desktop. A 2.625× Pixel already lands on 1080 at 100vw by
+ * Chromium's rule; slow mode changes nothing there but the neighbours.
  */
 export function slowLightboxSizes(devicePixelRatio: number): string {
   return `${Math.floor(1080 / Math.max(devicePixelRatio, 1))}px`;

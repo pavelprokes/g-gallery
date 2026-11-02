@@ -83,12 +83,18 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
 - **Slow mode.** On a slow connection the lightbox asks for the 1080 px variant instead of 1920/2560
   and warms only the neighbour the viewer is heading to (`src/lib/slow-connection.ts`). Slow means:
   Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
-  Firefox — most guests are on an iPhone) the median time of the first images from the photo host
-  over 1.5 s. The `sizes` is `1080 / devicePixelRatio` px, which lands on the 1080 candidate on any
-  screen — a width already in the variant list, so no new billed transformation; the neighbour's
-  preload gets the same `sizes`, or it would warm a variant the image does not use. Read on every
-  open and move (events), so a photo's first render already asks for the right width. The linked
-  photo keeps `100vw`: the page's placeholder already fetched it at that.
+  Firefox — most guests are on an iPhone) the median time of the first grid-sized images (the
+  thumbnails, never a lightbox photo) from the photo hosts over 1.5 s.
+  - `sizes` is `1080 / devicePixelRatio` px: exactly 1080 device pixels, which every selection rule
+    lands on 1080 for — a width already in the variant list, so no new billed transformation. It
+    saves where the screen alone asks for more (a 3× iPhone: 1920; a retina desktop: 2560); a 2.6×
+    Pixel already gets 1080 at `100vw` by Chromium's geometric-mean rule.
+  - One rule (`lightboxSizesFor`) for the photo on screen and the neighbour's preload, or the
+    preload warms a variant the image does not use. The screen's width for the linked photo (the
+    page's placeholder already fetched it at that), while corrections are on, and when zoomed in.
+  - Read once per opening (an event, so the photo's first render has it) and kept while the
+    lightbox stays open, so a photo on screen never changes width under the viewer. An opening
+    always heads forward, whatever the last session's direction was.
 
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they

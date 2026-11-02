@@ -248,10 +248,10 @@ test.describe("share gallery viewer", () => {
 
 test.describe("slow mode", () => {
   // docs/GALLERY-LOADING.md. Chromium reports its connection; the others are
-  // judged by their first images. Here the browser is told it is on 3G.
-  for (const [what, effectiveType, width, warmed] of [
-    ["on a slow connection the lightbox asks for 1080 px and warms one neighbour", "3g", "1080", 1],
-    ["on a good connection it asks for the screen and warms every neighbour", "4g", null, 2],
+  // judged by their first images. Here the browser is told what it is on.
+  for (const [what, effectiveType, slow, warmed] of [
+    ["on a slow connection the lightbox asks for 1080 px and warms one neighbour", "3g", true, 1],
+    ["on a good connection it asks for the screen and warms every neighbour", "4g", false, 2],
   ] as const) {
     test(what, async ({ page }) => {
       await page.addInitScript((type) => {
@@ -271,9 +271,18 @@ test.describe("slow mode", () => {
       await expect
         .poll(() => full.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
         .toBe(true);
-      const src = await full.evaluate((img: HTMLImageElement) => img.currentSrc);
-      if (width) expect(src).toMatch(new RegExp(`(fit:|width=)${width}\\b`));
-      else expect(src).not.toMatch(/(fit:|width=)1080\b/);
+      // 1080 device pixels on any screen when slow; which candidate the screen
+      // alone picks is the browser's business (a 2.6× Pixel takes 1080 too).
+      const dpr = await page.evaluate(() => window.devicePixelRatio);
+      await expect(full).toHaveAttribute(
+        "sizes",
+        slow ? `${Math.floor(1080 / Math.max(dpr, 1))}px` : "100vw",
+      );
+      if (slow) {
+        expect(await full.evaluate((img: HTMLImageElement) => img.currentSrc)).toMatch(
+          /(fit:|width=)1080\b/,
+        );
+      }
 
       // The first photo has no previous one: next and the one after it
       // normally, only the next on a slow link.

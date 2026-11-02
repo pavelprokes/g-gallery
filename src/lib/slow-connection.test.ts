@@ -29,12 +29,14 @@ describe("isSlowConnection", () => {
 });
 
 describe("slowLightboxSizes", () => {
-  it("lands on the 1080 px candidate at every common pixel ratio", () => {
+  it("asks for 1080 device pixels — a width in the variant list — at every common ratio", () => {
+    expect(DEVICE_SIZES).toContain(1080);
     for (const dpr of [1, 1.5, 2, 2.625, 3, 3.5]) {
-      const css = Number.parseInt(slowLightboxSizes(dpr), 10);
-      const wanted = css * dpr;
-      const picked = DEVICE_SIZES.find((width) => width >= wanted);
-      expect(picked).toBe(1080);
+      const wanted = Number.parseInt(slowLightboxSizes(dpr), 10) * dpr;
+      // Short of 1080 by less than one CSS pixel and never above it: the 1080
+      // candidate's density is then the device pixel ratio, or a hair over.
+      expect(wanted).toBeGreaterThan(1080 - dpr);
+      expect(wanted).toBeLessThanOrEqual(1080);
     }
   });
 });
