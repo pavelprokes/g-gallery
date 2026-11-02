@@ -105,10 +105,11 @@ test.describe("gallery chapters", () => {
     await expect(page).toHaveURL(new RegExp(`#${anchors.at(-1)}$`));
     expect(jump).toHaveLength(1);
     expect(new URL(jump[0]!).searchParams.has("throughKey")).toBe(true);
-    // The rows the grid first laid out were about to be left: none of their
-    // photos was fetched — only the chapter's own (docs/GALLERY-LOADING.md).
+    // The rows the grid first laid out were about to be left: nothing far from
+    // the chapter was fetched — only its own rows and the overscan around them
+    // (docs/GALLERY-LOADING.md).
     await expect.poll(() => [...photoIndices].some((i) => i >= lastChapterAt)).toBe(true);
-    expect([...photoIndices].filter((i) => i < 40)).toEqual([]);
+    expect([...photoIndices].filter((i) => i < lastChapterAt - 40)).toEqual([]);
   });
 
   for (const [what, hash] of [
