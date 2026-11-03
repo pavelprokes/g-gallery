@@ -81,6 +81,25 @@ Pixel). Not on every change; when a change touches the gallery's loading, links 
 
 **Just a slow link** — `pnpm proxy:slow --net=3g` and point any browser at `127.0.0.1:8899`.
 
+## A change, before merging
+
+Previews have no database (`docs/VERCEL-ENV.md`), and the local seed has no image files, so a
+loading change is measured on a local build that shows a live gallery's real photos:
+
+```sh
+pnpm mirror:gallery "$G"   # the live gallery's photo list into the LOCAL database, keys pointing at the live CDN
+pnpm perf:build            # a production build whose images come from that CDN
+pnpm perf:start            # .env loaded first, so .env.production.local can never take over
+pnpm perf:gallery "http://<printed address>:3000/g/…" --devices=iphone,android,mac-firefox
+```
+
+The mirror reads only the public photos API and writes only a database on this machine (it refuses
+any other `DATABASE_URL`); films and chapters are not copied. It prints this machine's network
+address, not `127.0.0.1`: WebKit sends loopback past the proxy, so its page would load at full
+speed. Compare a build of `main` with the branch the same way — production's servers answer
+faster than a laptop, so production numbers are not the baseline. Stop `perf:start` before
+`pnpm test:e2e`, which would otherwise test this build instead of making its own.
+
 ## A real phone
 
 Some things only a real device shows (Safari's networking, real touch, memory pressure):
