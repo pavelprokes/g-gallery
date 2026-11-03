@@ -298,12 +298,10 @@ test.describe("fast browsing", () => {
   // answered here: thumbnails at once, full sizes (1080 px and up) after 2.5 s.
   const IMAGE = fs.readFileSync(path.join(__dirname, "..", "public", "qr-sign-table.webp"));
 
-  test("each step shows its own photo, and a full size left unfinished is dropped", async ({
-    page,
-    browserName,
-  }) => {
-    const dropped: string[] = [];
-    page.on("requestfailed", (request) => dropped.push(request.url()));
+  // A full size left before it drew is dropped only for a photo with a
+  // browser-made thumbnail to stand in (docs/GALLERY-LOADING.md); the seeded
+  // photos have none, so that half is measured with `pnpm perf:gallery`.
+  test("each step shows its own photo before full sizes arrive", async ({ page }) => {
     await page.route(/photo-\d+\.jpg/, async (route) => {
       const width = Number(/(?:fit:|width=)(\d+)/.exec(route.request().url())?.[1] ?? 0);
       if (width >= 1080) await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -347,15 +345,6 @@ test.describe("fast browsing", () => {
           { timeout: 1500 },
         )
         .toContain(file);
-    }
-    // The first photo's full size was still on its way when the viewer moved
-    // on: no element wants it any more, so the browser dropped it instead of
-    // letting it take the link from the thumbnails. (WebKit lets a load
-    // nothing wants finish; Chromium and Firefox drop it.)
-    if (browserName !== "webkit") {
-      await expect
-        .poll(() => dropped.some((url) => url.includes(files[0]!)), { timeout: 1500 })
-        .toBe(true);
     }
   });
 
@@ -421,6 +410,19 @@ test.describe("fast browsing", () => {
       .map((url) => /photo-\d+\.jpg/.exec(url)![0]);
     expect(raced).toContain(file);
     expect(raced.length).toBeLessThanOrEqual(2);
+    // And once it arrives (2.5 s here), the full size is what is on screen:
+    // the thumbnail gone, the frame's image this photo at that width. These
+    // seeded photos have no browser-made thumbnail — their tile and full size
+    // share one `src` — so the full size's load must still be reported.
+    const fullOnScreen = async () => {
+      const src = await dialog.evaluate((element) => {
+        const images = [...element.querySelectorAll("img")];
+        const only = images.length === 1 ? images[0] : null;
+        return only && only.complete && only.naturalWidth > 0 ? only.currentSrc : "";
+      });
+      return src.includes(file) && width(src) === width(landed!);
+    };
+    await expect.poll(fullOnScreen, { timeout: 6000 }).toBe(true);
   });
 });
 

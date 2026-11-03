@@ -313,14 +313,18 @@ const CHAPTER_BAR_HEIGHT = 56;
 /**
  * A pause on a lightbox photo (docs/GALLERY-LOADING.md): how long a hurrying
  * viewer (one who moved on before the photo they left had loaded) stays on a
- * photo before its full size is fetched, and how long any viewer stays on a
- * loaded photo before the next one's full size is warmed. A click a second —
- * looking for one photo — never pauses: it is shown thumbnails, and the link
- * stays free for them instead of carrying full sizes nobody stops to look at.
- * Clearly over a second, or a click every second lands just after each pause
- * and starts every full size anyway.
+ * photo before its full size is fetched. A click a second — looking for one
+ * photo — never pauses: it is shown thumbnails, and the link stays free for
+ * them instead of carrying full sizes nobody stops to look at. Clearly over a
+ * second, or a click every second lands just after each pause and starts
+ * every full size anyway.
  */
 const LIGHTBOX_PAUSE_MS = 1500;
+
+/** How long a loaded photo stays on screen before the next one is warmed. A
+ * hurrying viewer never gets here (their photo has not loaded), so this only
+ * keeps a single glance from starting a download. */
+const LIGHTBOX_WARM_MS = 250;
 
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
@@ -754,7 +758,8 @@ interface LightboxPhotoProps {
   sizes: string;
   /** The viewer is hurrying past photos: the full size waits for a pause. */
   settle: boolean;
-  loaded: boolean;
+  /** The photo whose full size last drew (the parent's `loadedPhotoId`). */
+  loadedId: string | null;
   selected: boolean;
   /** The full size of `photoId` has drawn — not always the photo on screen:
    * while the viewer races past photos, the full size follows only once they
@@ -788,7 +793,7 @@ function LightboxPhoto({
   preview,
   sizes,
   settle,
-  loaded,
+  loadedId,
   selected,
   onLoad,
   onError,
@@ -826,39 +831,50 @@ function LightboxPhoto({
   const [shown, setShown] = useState({ id: photo.id, src, sizes });
   // Loaded, as far as this frame goes, only if the element is on this photo:
   // while settling it still holds another one, whatever was loaded for this.
-  const drawnHere = loaded && shown.id === photo.id;
+  const drawnHere = loadedId === photo.id && shown.id === photo.id;
+  // Not for a photo whose full size has already drawn (back to the one just
+  // left): it is in the cache, there is nothing to spare the link from.
+  const hold = settle && loadedId !== photo.id;
   useEffect(() => {
     if (shown.id === photo.id && shown.src === src && shown.sizes === sizes) return;
     const timer = setTimeout(
       () => setShown({ id: photo.id, src, sizes }),
-      shown.id !== photo.id && settle ? LIGHTBOX_PAUSE_MS : 0,
+      shown.id !== photo.id && hold ? LIGHTBOX_PAUSE_MS : 0,
     );
     return () => clearTimeout(timer);
-  }, [photo.id, src, sizes, settle, shown]);
+  }, [photo.id, src, sizes, hold, shown]);
 
-  // Which photo the full-size element last drew. While the viewer hurries, the
-  // element can still be on a photo they have already left, its full size half
-  // downloaded; kept there, it would go on arriving and take the link from the
-  // thumbnails the next clicks draw. Unless its pixels are what holds the frame
-  // (it drew), it moves straight on to the new photo's thumbnail — a load no
-  // element wants any more is dropped by the browser — and to the full size
-  // once the viewer pauses.
-  const [drawnId, setDrawnId] = useState<string | null>(null);
-  const full = shown.id === photo.id || drawnId === shown.id || !preview ? shown : preview;
+  // While the viewer hurries, the full-size element can still be on a photo
+  // they have already left, its full size half downloaded; kept there, it
+  // would go on arriving and take the link from the thumbnails the next clicks
+  // draw. Unless its pixels are what holds the frame (it drew), it moves
+  // straight on to the new photo's thumbnail — Chromium and Firefox drop a
+  // load no element wants any more (WebKit lets it finish) — and to the full
+  // size once the viewer pauses. Only to a real thumbnail: a photo without one
+  // has the same `src` for its tile and its full size, only `sizes` differs,
+  // and next/image reports a load only when `src` changes — the full size
+  // would draw unreported, under its own tile stretched over it. With no tile
+  // width yet (no preview at all), the element stays where it is, as before.
+  const standIn =
+    hold && shown.id !== photo.id && loadedId !== shown.id && preview && preview.src !== src;
+  const full = standIn ? preview : shown;
 
   // The held-frame swap above stays silent on purpose — a spinner on every
   // swipe would fight the "no flicker" design. But past ~1.2s the still-shown
   // photo stops reading as "instant" and starts reading as "stuck", so a
   // slow-only indicator earns its place: it never appears on a normal
-  // connection, only once a fetch is actually running long. Keyed by photo id
-  // rather than a plain boolean so the flag clears on its own once a new
-  // photo arrives, with no synchronous reset inside the effect.
+  // connection, only once a fetch is actually running long — counted from the
+  // full size's request, not from the click: a hurrying viewer's waits for
+  // the pause first. Keyed by photo id rather than a plain boolean so the flag
+  // clears on its own once a new photo arrives, with no synchronous reset
+  // inside the effect.
   const [staleFor, setStaleFor] = useState<string | null>(null);
+  const requested = shown.id === photo.id;
   useEffect(() => {
-    if (drawnHere) return;
+    if (drawnHere || !requested) return;
     const timer = setTimeout(() => setStaleFor(photo.id), 1200);
     return () => clearTimeout(timer);
-  }, [photo.id, drawnHere]);
+  }, [photo.id, drawnHere, requested]);
   const showStale = staleFor === photo.id && !drawnHere;
 
   // Which photo's thumbnail has drawn. Browsing faster than full sizes arrive
@@ -921,9 +937,7 @@ function LightboxPhoto({
           // photo is current by the time next/image has decoded them, and not
           // the thumbnail standing in while the viewer hurries.
           onLoad={(event) => {
-            if (!drew(event.currentTarget, shown.src)) return;
-            setDrawnId(shown.id);
-            onLoad(shown.id);
+            if (drew(event.currentTarget, shown.src)) onLoad(shown.id);
           }}
           onError={(event) => {
             if (event.currentTarget.currentSrc.includes(keyOf(shown.src))) onError(shown.id);
@@ -2621,8 +2635,8 @@ function GalleryViewInner({
   const openPhoto = useCallback(
     (index: number) => {
       readConnection();
-      // A fresh opening heads forward, whatever the last one did: slow mode
-      // warms only the photo in that direction.
+      // A fresh opening heads forward, whatever the last one did: only the
+      // photo in that direction is warmed.
       setDirection(1);
       setHurried(false);
       setLightboxIndex(index);
@@ -3037,11 +3051,8 @@ function GalleryViewInner({
   }, [allowDownload, closeLightbox, lightboxIndex, move, namePromptFor, photos, pick]);
 
   /**
-   * Warms the next and previous photo while the current one is on screen,
-   * plus a third one two steps further in whichever direction the viewer was
-   * last moving — one-ahead alone always trails a viewer clicking "next"
-   * faster than a preload can land, so fast repeated browsing kept stalling
-   * on the swipe after the one this effect had time to warm.
+   * Warms the photo the viewer is heading to while the current one is on
+   * screen (what exactly, and when: below).
    *
    * Without this every swipe is a cold fetch of 120 kB on a phone and up to
    * 600 kB on a retina desktop, so the screen goes blank for as long as that
@@ -3063,7 +3074,7 @@ function GalleryViewInner({
    *   old photo. Only thumbnails served straight from the bucket, whose URL is
    *   the same whatever width the tile asks for (`widthFreeUrl`).
    * - One full size: the next photo in the viewer's direction, once the photo
-   *   on screen has loaded and the viewer has paused on it (LIGHTBOX_PAUSE_MS) — never
+   *   on screen has loaded and stayed a moment (LIGHTBOX_WARM_MS) — never
    *   alongside the photo being waited for, and never more than one: the
    *   previous photo has usually been seen (it is in the cache), and three at
    *   once kept a 4G link busy for seconds, so the thumbnails a hurrying
@@ -3150,10 +3161,9 @@ function GalleryViewInner({
         preload((link) => {
           link.imageSrcset = full.srcset;
           link.imageSizes = full.sizes;
-          link.fetchPriority = "low";
         });
       }
-    }, LIGHTBOX_PAUSE_MS);
+    }, LIGHTBOX_WARM_MS);
     return () => {
       clearTimeout(timer);
       for (const link of links) link.remove();
@@ -3723,8 +3733,9 @@ function GalleryViewInner({
               preview={preview}
               // Zoomed in, the viewer is asking for detail: the screen's width.
               sizes={zoomed ? "100vw" : lightboxSizesFor(active.id)}
-              settle={hurried}
-              loaded={loadedPhotoId === active.id}
+              // Zoomed in, the viewer is asking for detail: no pause.
+              settle={hurried && !zoomed}
+              loadedId={loadedPhotoId}
               selected={activeSelected}
               onLoad={setLoadedPhotoId}
               onError={setFailedPhotoId}
