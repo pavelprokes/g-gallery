@@ -61,7 +61,8 @@ Flags: `--devices=` (below), `--net=none|4g|slow4g|3g`, `--runs=` (median of eve
 `--ect=3g`,
 `--cap=60000`, `--json=file.jsonl` (every run, raw), `--md` (a Markdown table). Columns, all in
 ms from navigation: `fcp`, `firstTile` (the first tile on screen drawn), `screen` (every tile on the
-first screen drawn) with `screenTiles` and `imagesBeforeScreen` (images requested by then),
+first screen drawn) with `screenTiles` and `offscreenBefore` (images off screen requested before
+the screen's last one arrived — what shared the link with it),
 `preview` and `full` (the lightbox's first pixels and its full-size photo) with `imagesBeforePhoto`,
 then `images`, `kB` and `pages` (`/photos` requests) for the whole visit; `scroll` (each screen;
 15000 = not complete within 15 s), `steps` (median ms until the photo the counter shows is on top,
@@ -101,13 +102,14 @@ pnpm perf:gallery "http://<printed address>:3000/g/…" --devices=iphone,android
 
 The mirror reads only the public photos API and writes only a database on this machine (it refuses
 any other `DATABASE_URL`, and keeps the live token only as a hash); films and chapters are not
-copied, the order is the live one. `perf:build` and `perf:start` run only where `.env` is the
-one env file (a worktree, `.claude/worktrees/`): in the main checkout `.env.local` and
-`.env.production.local` would load production's credentials into the build. It prints this machine's network
-address, not `127.0.0.1`: WebKit sends loopback past the proxy, so its page would load at full
-speed. Compare a build of `main` with the branch the same way — production's servers answer
-faster than a laptop, so production numbers are not the baseline. Stop `perf:start` before
-`pnpm test:e2e`, which would otherwise test this build instead of making its own.
+copied, the order is the live one, and it belongs to its own local user, so `pnpm test:e2e` (which
+deletes everything the E2E user owns) leaves it alone. `perf:build` and `perf:start` run only where
+`.env` is the one env file (a worktree, `.claude/worktrees/`): in the main checkout `.env.local` and
+`.env.production.local` would load production's credentials into the build. It prints this machine's
+network address, not `127.0.0.1`: WebKit sends loopback past the proxy, so its page would load at
+full speed. Compare a build of `main` with the branch the same way — production's servers answer
+faster than a laptop, so production numbers are not the baseline. Stop `perf:start` before `pnpm
+test:e2e`, which would otherwise test this build instead of making its own.
 
 ## A real phone
 

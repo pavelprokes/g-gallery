@@ -48,10 +48,11 @@ async function main() {
     cursor = page.nextCursor;
   } while (cursor);
 
+  // Its own owner: `pnpm test:e2e` deletes everything the E2E user owns.
   const owner = await prisma.user.upsert({
-    where: { email: "e2e@example.com" },
+    where: { email: "mirror@example.com" },
     update: {},
-    create: { id: "e2e-user", name: "E2E Test User", email: "e2e@example.com", role: "admin" },
+    create: { id: "mirror-user", name: "Perf mirror", email: "mirror@example.com" },
   });
   // Found again by the token's hash, never by the token itself (CLAUDE.md, invariant 5).
   const storagePrefix = `${PREFIX}${hashShareToken(token).slice(0, 24)}`;
