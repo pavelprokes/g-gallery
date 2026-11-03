@@ -249,9 +249,9 @@ test.describe("share gallery viewer", () => {
 test.describe("slow mode", () => {
   // docs/GALLERY-LOADING.md. Chromium reports its connection; the others are
   // judged by their first images. Here the browser is told what it is on.
-  for (const [what, effectiveType, slow, warmed] of [
-    ["on a slow connection the lightbox asks for 1080 px and warms one neighbour", "3g", true, 1],
-    ["on a good connection it asks for the screen and warms every neighbour", "4g", false, 2],
+  for (const [what, effectiveType, slow] of [
+    ["on a slow connection the lightbox asks for 1080 px and warms the next photo", "3g", true],
+    ["on a good connection it asks for the screen and warms the next photo", "4g", false],
   ] as const) {
     test(what, async ({ page }) => {
       await page.addInitScript((type) => {
@@ -284,11 +284,10 @@ test.describe("slow mode", () => {
         );
       }
 
-      // The first photo has no previous one: next and the one after it
-      // normally, only the next on a slow link.
+      // One full size warmed, on any link: the next photo's.
       await expect
         .poll(() => page.locator('head link[rel="preload"][as="image"][imagesrcset]').count())
-        .toBe(warmed);
+        .toBe(1);
     });
   }
 });
@@ -299,9 +298,10 @@ test.describe("fast browsing", () => {
   // answered here: thumbnails at once, full sizes (1080 px and up) after 2.5 s.
   const IMAGE = fs.readFileSync(path.join(__dirname, "..", "public", "qr-sign-table.webp"));
 
-  test("each step shows its own photo and warms the next, before full sizes arrive", async ({
-    page,
-  }) => {
+  // A full size left before it drew is dropped only for a photo with a
+  // browser-made thumbnail to stand in (docs/GALLERY-LOADING.md); the seeded
+  // photos have none, so that half is measured with `pnpm perf:gallery`.
+  test("each step shows its own photo before full sizes arrive", async ({ page }) => {
     await page.route(/photo-\d+\.jpg/, async (route) => {
       const width = Number(/(?:fit:|width=)(\d+)/.exec(route.request().url())?.[1] ?? 0);
       if (width >= 1080) await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -345,16 +345,6 @@ test.describe("fast browsing", () => {
           { timeout: 1500 },
         )
         .toContain(file);
-      // And the next photo is already on its way, without waiting for this one.
-      await expect
-        .poll(
-          () =>
-            page
-              .locator('head link[rel="preload"][as="image"][imagesrcset]')
-              .evaluateAll((links) => links.map((link) => link.getAttribute("imagesrcset") ?? "")),
-          { timeout: 1000 },
-        )
-        .toContainEqual(expect.stringContaining(files[index + 1]!));
     }
   });
 
@@ -406,11 +396,11 @@ test.describe("fast browsing", () => {
         { timeout: 1500 },
       )
       .toContain(file);
-    // The photos raced past were never fetched at full size: the one stopped
-    // on, and the neighbours warmed once the viewer paused there. "Full size"
-    // is the width the lightbox asks for on this screen — read off the photo
-    // it lands on (a tile-sized thumbnail can be 1080 px on a 3× phone).
-    await page.waitForTimeout(600);
+    // The photos raced past were never fetched at full size: only the one
+    // stopped on, once the viewer has paused there (LIGHTBOX_PAUSE_MS, 1.5 s).
+    // "Full size" is the width the lightbox asks for on this screen — read off
+    // the photo it lands on (a tile-sized thumbnail can be 1080 px on a 3× phone).
+    await page.waitForTimeout(2200);
     const width = (url: string) => /(?:fit:|width=)(\d+)/.exec(url)?.[1];
     const landed = fullSizes.find((url) => url.includes(file));
     expect(landed).toBeDefined();
@@ -419,7 +409,20 @@ test.describe("fast browsing", () => {
       .filter((url) => width(url) === width(landed!))
       .map((url) => /photo-\d+\.jpg/.exec(url)![0]);
     expect(raced).toContain(file);
-    expect(raced.length).toBeLessThanOrEqual(4);
+    expect(raced.length).toBeLessThanOrEqual(2);
+    // And once it arrives (2.5 s here), the full size is what is on screen:
+    // the thumbnail gone, the frame's image this photo at that width. These
+    // seeded photos have no browser-made thumbnail — their tile and full size
+    // share one `src` — so the full size's load must still be reported.
+    const fullOnScreen = async () => {
+      const src = await dialog.evaluate((element) => {
+        const images = [...element.querySelectorAll("img")];
+        const only = images.length === 1 ? images[0] : null;
+        return only && only.complete && only.naturalWidth > 0 ? only.currentSrc : "";
+      });
+      return src.includes(file) && width(src) === width(landed!);
+    };
+    await expect.poll(fullOnScreen, { timeout: 6000 }).toBe(true);
   });
 });
 

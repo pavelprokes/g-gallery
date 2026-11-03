@@ -72,13 +72,21 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     same instant scroll under the dialog, the same Back. That is what keeps the contract below.
 - **Clicks are never ignored; loading waits for a pause.** Browsing a click a second or faster —
   looking for one photo, or trying to break it — every click moves the counter and the photo on
-  screen at once; nothing is throttled. What waits is the expensive part: a photo's full size, and
-  its neighbours' full sizes, are fetched only once a hurrying viewer has stayed on it for 250 ms
-  (`LIGHTBOX_SETTLE_MS`); an ordinary step (the photo left had loaded) shows the next full size at
-  once, usually from the warmed cache. Racing past ten photos fetches their thumbnails, not ten
-  0.5–1.5 MB full sizes that would all share the connection with the one finally stopped on. A load
-  is credited to the photo whose pixels the element actually drew (next/image reports after
-  decoding, by which time a fast click may have moved the element on).
+  screen at once; nothing is throttled. What waits is the expensive part: a hurrying viewer (one who
+  moved on before the photo they left had loaded) gets a photo's full size only once they have
+  stayed on it for 1.5 s (`LIGHTBOX_PAUSE_MS`) — a click a second is hurrying, and is shown
+  thumbnails (at a pause of exactly 1 s, a click every second landed just after each pause and
+  started every full size anyway). No pause for a photo whose full size has already drawn (back to
+  the one just left) or while zoomed in (the viewer is asking for detail). An ordinary step (the
+  photo left had loaded) shows the next full size at once, usually from the warmed cache. A full
+  size the viewer left before it arrived is dropped: unless the element drew it, the element moves
+  straight on to the new photo's thumbnail, and Chromium and Firefox cancel a load no element wants
+  (WebKit lets it finish). Only to a real thumbnail: a photo without one has the same `src` for its
+  tile and its full size (only `sizes` differs), and next/image reports a load only when `src`
+  changes — its full size would draw unreported, under its tile. The "still loading" spinner counts
+  its 1.2 s from the full size's request, not from the click. A load is credited to the photo whose
+  pixels the element actually drew (next/image reports after decoding, by which time a fast click
+  may have moved the element on).
 - **The right photo on screen at every step.** The lightbox keeps the previous photo's pixels until
   the next one can be drawn (never a black gap). Once the next photo's thumbnail has drawn it goes on
   top, on black, so the old photo cannot show around a different shape (portrait after landscape);
@@ -86,13 +94,22 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   previous one are preloaded at once (a few dozen kB each, only those served straight from the bucket,
   whose URL does not depend on the width), so that thumbnail is there at the next click. The photo
   layer is its own stacking context (`isolate`): the raised thumbnail never covers the arrows or bars.
-- **Neighbours after the first photo, at once while hurrying.** An opening's first photo is loaded
-  before its neighbours' full sizes are warmed — on a slow link the four would otherwise share it
-  while the viewer waits for the one. A viewer who moves on before the photo they left has loaded is
-  hurrying: then only the next photo in their direction is warmed, without waiting for the current
-  one but later than it (twice the pause), so the photo they stop on is not split four ways either. Measured on production before this: Chrome, Fast 4G, a click a second —
-  in 22 of 40 steps the photo drawn was not the one the counter showed. A film has nothing to wait
-  for, and a full size that fails to load counts as done.
+- **One neighbour, after the photo on screen.** The next photo's full size in the viewer's
+  direction is warmed once the photo on screen has loaded (or failed — a film has nothing to wait
+  for) and stayed 250 ms (`LIGHTBOX_WARM_MS`): never alongside the photo being waited for, never
+  while the viewer is clicking through (their photos have not loaded), and never more than one. The previous photo has usually been seen and is in the cache. Warming three
+  (next, previous, one further ahead) kept a 4G link busy for seconds with 1–1.7 MB retina files,
+  and the thumbnails a hurrying viewer clicked to arrived up to 3 s late: measured 2026-11-03 with
+  `pnpm perf:gallery` (docs/DEVICE-TESTING.md), a packet-level 4G link, a click every 400 ms —
+  Safari 12 of 15 steps and Chrome on a retina Mac 9 of 15 showed the photo before the one on the
+  counter, Chrome 9 of 15 even at a click a second. (The first fix, measured with DevTools'
+  per-request throttling in Chromium alone, had shown 0 of 40: that throttling never lets queued
+  bytes delay a later request, and WebKit could not be throttled at all.) Thumbnail preloads ask
+  for high priority, where browser and server honour it. After,
+  on a local build of the same gallery (`pnpm mirror:gallery`), steps where the counter's photo was
+  not on top by the next click: a click every 400 ms on 4G 0–6 of 30 (17–23 before); a click a
+  second 0 of 30 on 4G and 0 of 20 on Slow 4G (12 of 20 before); a photo every 3 s unchanged, its
+  full size on screen ~70 ms after the click.
 - **The next page before the end.** When the photo on screen is among the last five loaded, the
   lightbox fetches the next page of photos, so "next" never holds in place waiting for it — but not
   again after a failed page (a revoked link would otherwise be asked forever).
@@ -114,7 +131,7 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   film or the highlights above the grid are server-rendered and their images are already requested
   by the HTML, which cannot know the hash.
 - **Slow mode.** On a slow connection the lightbox asks for the 1080 px variant instead of 1920/2560
-  and warms only the neighbour the viewer is heading to (`src/lib/slow-connection.ts`). Slow means:
+  (`src/lib/slow-connection.ts`). Slow means:
   Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
   Firefox — most guests are on an iPhone) the median time of the first grid-sized images (the
   thumbnails, never a lightbox photo) from the photo hosts over 1.5 s.
