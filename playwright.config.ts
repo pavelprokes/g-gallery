@@ -43,6 +43,8 @@ process.env.MCP_DEV_TOKEN = localEnv.MCP_DEV_TOKEN;
 // intercepts it in the browser, nothing listens there.
 localEnv.MCP_OAUTH_REDIRECT_ORIGINS = "https://paperclip.example.test";
 
+const GUEST_SPECS = /(gallery-view|photo-links|chapters|highlights)\.spec\.ts/;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -69,6 +71,17 @@ export default defineConfig({
       testMatch: /gallery-view\.spec\.ts/,
       use: { ...devices["Pixel 7"] },
     },
+    // The other engines guests open a gallery in, on demand (`pnpm
+    // test:e2e:engines`, docs/DEVICE-TESTING.md): desktop Safari and Firefox,
+    // on the guest-facing specs. Off by default — Chromium and the iPhone
+    // already run every spec, and a third engine on every change doubles the
+    // run for what a change to the gallery's loading or links needs checking.
+    ...(process.env.E2E_ENGINES
+      ? [
+          { name: "desktop-safari", testMatch: GUEST_SPECS, use: { ...devices["Desktop Safari"] } },
+          { name: "firefox", testMatch: GUEST_SPECS, use: { ...devices["Desktop Firefox"] } },
+        ]
+      : []),
   ],
   webServer: {
     command: "pnpm build && pnpm start",

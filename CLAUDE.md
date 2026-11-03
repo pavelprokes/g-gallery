@@ -55,6 +55,9 @@ frame is traced from Pavel's template, the text layout is measured from it).
 and photo pages on a slow phone (adopted 2026-11-02) — read it before touching image
 `loading`/`fetchPriority`, the photos query in `gallery-view.tsx`, or how a `?foto=`/`#chapter` link
 opens; its link-compatibility table is the contract every such change is tested against.
+**`docs/DEVICE-TESTING.md`** is how to check a guest-facing change on iPhone, Safari, Firefox, Windows
+and slow links (adopted 2026-11-03) — `pnpm perf:gallery`, the throttling proxy, real Windows in CI;
+read it before measuring a gallery or claiming something works on a device.
 **`docs/I18N.md`** is the authority for guest-facing localization (cs/en/fr/de/es/sk/pl, adopted 2026-09-23) —
 read it before touching `src/i18n/*`, the message catalogs, the locale switcher, or anything that
 shows a guest a title, venue or promo text (those are translated per row, `translations` JSON).
