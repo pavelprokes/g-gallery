@@ -157,6 +157,13 @@ test.describe("gallery chapters", () => {
     await expect(page).toHaveURL(new RegExp(`foto=${target}`));
     expect(pages).toEqual([]);
 
+    // The lightbox pushes its history entry a moment after the dialog renders;
+    // a Back sent before that leaves the page (Firefox was fast enough to).
+    await expect
+      .poll(() =>
+        page.evaluate(() => (history.state as { galleryLightbox?: boolean })?.galleryLightbox),
+      )
+      .toBe(true);
     await page.goBack();
     await expect(page.getByRole("dialog")).not.toBeVisible();
     await expect(page).not.toHaveURL(/foto=/);

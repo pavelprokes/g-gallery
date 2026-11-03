@@ -48,11 +48,19 @@ async function main() {
     cursor = page.nextCursor;
   } while (cursor);
 
-  const owner = await prisma.user.upsert({
-    where: { email: "e2e@example.com" },
-    update: {},
-    create: { id: "e2e-user", name: "E2E Test User", email: "e2e@example.com", role: "admin" },
-  });
+  // Not the E2E user (`pnpm test:e2e` deletes everything it owns): the local
+  // admin you sign in as, so chapters or highlights can be added to the
+  // mirror in the admin — or, with none, a user of its own.
+  const owner =
+    (await prisma.user.findFirst({
+      where: { role: "admin", NOT: { email: "e2e@example.com" } },
+      orderBy: { createdAt: "asc" },
+    })) ??
+    (await prisma.user.upsert({
+      where: { email: "mirror@example.com" },
+      update: {},
+      create: { id: "mirror-user", name: "Perf mirror", email: "mirror@example.com" },
+    }));
   // Found again by the token's hash, never by the token itself (CLAUDE.md, invariant 5).
   const storagePrefix = `${PREFIX}${hashShareToken(token).slice(0, 24)}`;
   // The previous mirror of this gallery, and any mirror holding its photos

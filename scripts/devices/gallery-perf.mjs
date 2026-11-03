@@ -81,6 +81,14 @@ function screenState() {
     topSrc: video ? video.poster : top && drawn(top) ? top.currentSrc : null,
     tiles: tiles.length,
     tilesDrawn,
+    tileSrcs: tiles.flatMap((tile) =>
+      [...tile.querySelectorAll("img")].map((img) => img.currentSrc),
+    ),
+    // Every grid or highlight tile's image, on screen or not (the logo, the
+    // cover and the lightbox are not tiles).
+    allTileSrcs: [...document.querySelectorAll("main ul li button img")].map(
+      (img) => img.currentSrc || img.src,
+    ),
     effectiveType: navigator.connection?.effectiveType ?? null,
   };
 }
@@ -165,7 +173,19 @@ async function run(page, device, link, keys) {
     if (state.tiles > 0 && state.tilesDrawn === state.tiles && !result.screen) {
       result.screen = since();
       result.screenTiles = state.tiles;
-      result.imagesBeforeScreen = images.filter((image) => image.start <= result.screen).length;
+      // What shared the link with the screen: images off it requested before
+      // the screen's last image had arrived.
+      const onScreen = new Set(state.tileSrcs);
+      const offScreen = new Set(state.allTileSrcs.filter((src) => !onScreen.has(src)));
+      const ends = images
+        .filter((image) => onScreen.has(image.url))
+        .map((image) => image.end ?? since());
+      const screenEnd = ends.length > 0 ? Math.max(...ends) : null;
+      // Unknown, not 0, when the screen's own images were not seen going out.
+      result.offscreenBefore =
+        screenEnd === null
+          ? null
+          : images.filter((image) => offScreen.has(image.url) && image.start < screenEnd).length;
     }
     if (state.preview) result.preview ??= since();
     if (state.full && !result.full) {
@@ -234,15 +254,7 @@ const median = (values) => {
   const numbers = values.filter((value) => typeof value === "number").sort((a, b) => a - b);
   return numbers.length ? numbers[Math.floor((numbers.length - 1) / 2)] : null;
 };
-const SUMMARY = [
-  "fcp",
-  "firstTile",
-  "screen",
-  "screenTiles",
-  "imagesBeforeScreen",
-  "preview",
-  "full",
-];
+const SUMMARY = ["fcp", "firstTile", "screen", "screenTiles", "offscreenBefore", "preview", "full"];
 const COUNTS = ["imagesBeforePhoto", "images", "kB", "pages"];
 
 const rows = [];

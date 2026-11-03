@@ -5,15 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // key keeps the tests about behaviour rather than about wording.
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("next/image", () => ({
-  default: (props: { src: string }) => (
+  default: (props: { src: string; onLoad?: () => void; onError?: () => void }) => (
     // A tile only needs something that paints in jsdom; next/image needs a loader.
     // eslint-disable-next-line @next/next/no-img-element
-    <img alt="" src={props.src} />
+    <img alt="" src={props.src} onLoad={props.onLoad} onError={props.onError} />
   ),
 }));
 
 import { HeartButton, PhotoTile, PrinterButton } from "@/components/gallery-view";
 import type { GalleryPhoto } from "@/components/gallery-view";
+import { createScreenGate, type ScreenGate } from "@/lib/screen-gate";
 
 /**
  * Whether a tile's heart or printer is reachable on a phone is decided purely
@@ -178,4 +179,92 @@ describe("a long press on a tile", () => {
       expect(onPick).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("PhotoTile and the screen gate", () => {
+  const photo: GalleryPhoto = {
+    id: "photo_2",
+    objectKey: "galleries/x/b.jpg",
+    thumbObjectKey: null,
+    video: null,
+    fileName: "DSC_2.jpg",
+    width: 3000,
+    height: 2000,
+    placeholder: null,
+    favoriteCount: 0,
+    uploaderName: null,
+    orderKey: "2026-09-19T14:00:00.000Z",
+    faces: null,
+    focus: null,
+  };
+  const tile = (gate: ScreenGate, onScreen: boolean, screenClear: boolean) => (
+    <PhotoTile
+      photo={photo}
+      // No browser-made thumbnail: the tile and its fallback are one image.
+      src="b.jpg"
+      fallbackSrc="b.jpg"
+      width={170}
+      height={120}
+      index={0}
+      priority={false}
+      onScreen={onScreen}
+      screenGate={gate}
+      screenClear={screenClear}
+      tabbable
+      selectionActive={false}
+      selected={false}
+      allowDownload={false}
+      allowReactions={false}
+      allowPrintSelection={false}
+      markingMode={false}
+      isFavorite={false}
+      favoritePulse={false}
+      favoriteCount={0}
+      reactionState={undefined}
+      printQuantity={0}
+      onPick={() => {}}
+      onOpen={() => {}}
+      onToggleFavorite={() => {}}
+      onIncrementPrint={() => {}}
+      onDecrementPrint={() => {}}
+      onFocus={() => {}}
+      registerTileRef={() => {}}
+    />
+  );
+
+  it("on screen, holds the gate until its image fails for good — once, with no thumbnail", () => {
+    const gate = createScreenGate();
+    const { container } = render(tile(gate, true, false));
+    gate.open();
+    expect(gate.isClear()).toBe(false);
+    // The same image is all there is to fall back to: one error is final.
+    fireEvent.error(container.querySelector("img")!);
+    expect(gate.isClear()).toBe(true);
+  });
+
+  it("on screen, lets the gate go after a while if its image never answers", () => {
+    vi.useFakeTimers();
+    const gate = createScreenGate();
+    render(tile(gate, true, false));
+    gate.open();
+    vi.advanceTimersByTime(15_000);
+    expect(gate.isClear()).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("off screen, fetches only while the gate is clear, and keeps what has drawn", () => {
+    const gate = createScreenGate();
+    const { container, rerender } = render(tile(gate, false, false));
+    expect(container.querySelector("img")).toBeNull();
+    rerender(tile(gate, false, true));
+    expect(container.querySelector("img")).not.toBeNull();
+    // The next row coming on screen shuts the gate: a download not yet drawn goes…
+    rerender(tile(gate, false, false));
+    expect(container.querySelector("img")).toBeNull();
+    // …one that has drawn stays.
+    rerender(tile(gate, false, true));
+    fireEvent.load(container.querySelector("img")!);
+    rerender(tile(gate, false, false));
+    expect(container.querySelector("img")).not.toBeNull();
+  });
 });
