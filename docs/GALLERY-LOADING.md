@@ -10,7 +10,9 @@ of that changes. Read it before touching image `loading`/`fetchPriority`, the ph
 
 Production, Alice a Martin (547 photos, 9 chapters). Chromium on an emulated phone — Slow 4G
 (DevTools preset: 562.5 ms, 1.44 Mbps) and a 4× slower CPU — median of three runs.
-`node scripts/perf-gallery.mjs <gallery url>` reproduces it.
+That was DevTools throttling, Chromium only; runs since 2026-11-03 use `pnpm perf:gallery`
+(docs/DEVICE-TESTING.md) — a packet-level link for every engine, whose numbers are not comparable
+with these.
 
 | Opening                        | Today                                                                        |
 | ------------------------------ | ---------------------------------------------------------------------------- |

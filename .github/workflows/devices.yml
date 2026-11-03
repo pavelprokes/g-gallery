@@ -1,0 +1,70 @@
+name: Devices
+
+# Real Windows for the gallery's device runs (docs/DEVICE-TESTING.md): Edge,
+# Chrome and Firefox as Windows ships them, against a live gallery link, behind
+# the same throttled link the local runs use. On demand only — it measures
+# production (read-only page views, analytics never sent) and Windows minutes
+# bill double.
+#   gh workflow run devices.yml -f links="https://…/g/{token}/{slug}" -f net=slow4g
+
+on:
+  workflow_dispatch:
+    inputs:
+      links:
+        description: "Gallery link(s), space-separated"
+        required: true
+      devices:
+        description: "Devices (scripts/devices/devices.mjs)"
+        default: "win-edge,win-chrome,win-firefox,win-laptop"
+      net:
+        description: "none | 4g | slow4g | 3g"
+        default: "slow4g"
+      runs:
+        description: "Runs per link and device (median)"
+        default: "1"
+      extra:
+        description: "More flags, e.g. --scroll=3 or --browse=10 --interval=400"
+        default: ""
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Only what the scripts import: no Prisma client, no app build.
+      - name: Install Playwright
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # Edge and Chrome come with the runner image; Firefox and the plain
+      # Chromium (win-laptop, and the fallback of a branded build) are Playwright's.
+      - name: Install browsers
+        run: pnpm exec playwright install chromium firefox
+
+      - name: Measure
+        shell: bash
+        env:
+          LINKS: ${{ inputs.links }}
+          DEVICES: ${{ inputs.devices }}
+          NET: ${{ inputs.net }}
+          RUNS: ${{ inputs.runs }}
+          EXTRA: ${{ inputs.extra }}
+        run: |
+          # Word splitting on purpose: several links, several flags.
+          node scripts/devices/gallery-perf.mjs $LINKS --devices="$DEVICES" --net="$NET" \
+            --runs="$RUNS" $EXTRA --json=runs.jsonl --md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-runs
+          path: runs.jsonl
+          if-no-files-found: ignore
