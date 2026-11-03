@@ -146,6 +146,22 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     lightbox stays open, so a photo on screen never changes width under the viewer. An opening
     always heads forward, whatever the last session's direction was.
 
+- **The grid's screen first.** The tiles in the rows on screen (the virtualizer's own range, without
+  its overscan) fetch their images at once and hold a gate shut until they have drawn
+  (`src/lib/screen-gate.ts`); the tiles in the overscan rows fetch theirs only once nothing on
+  screen is still loading. A screen of a phone is 6–8 tiles, of a desktop 15–20; the overscan
+  doubled that, and on a slow link every image arrived late together instead of the screen first —
+  native `loading="lazy"` fetches anything within 1250–2500 px of the viewport, the overscan
+  included, at once. A tile that has drawn keeps its image; one scrolled away before drawing
+  unmounts its image, and Chromium drops that download for the rows the viewer moved on to. A tile
+  whose thumbnail and fallback both fail counts as drawn, so it cannot hold the rest back.
+  Measured on a local build of Alice a Martin (`pnpm mirror:gallery`), Slow 4G, median of three:
+  the first screen complete on Chrome at Windows' 125 % 14.3 → 8.1 s, a 1366×768 laptop 10.2 →
+  7.8 s, Firefox 13.1 → 9.1 s, a Pixel 7 (CPU 4×) 7.3 → 6.0 s; images off screen requested before
+  the screen's last one arrived 8–22 → 0–2. WebKit (iPhone, Safari) unchanged at 5.7 s and 9.2 s:
+  it already held lazy images back. On 3G the screen alone fills the link (~21 s either way); the
+  first tile unchanged everywhere (~3 s on Slow 4G).
+
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they
 cover) rely on. Revisit only with a measurement that shows the extra rows costing on-screen time
