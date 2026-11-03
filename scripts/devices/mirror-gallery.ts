@@ -55,7 +55,17 @@ async function main() {
   });
   // Found again by the token's hash, never by the token itself (CLAUDE.md, invariant 5).
   const storagePrefix = `${PREFIX}${hashShareToken(token).slice(0, 24)}`;
-  await prisma.gallery.deleteMany({ where: { storagePrefix } });
+  // The previous mirror of this gallery, and any mirror holding its photos
+  // (object keys are unique, so a second copy could not be made beside it).
+  await prisma.gallery.deleteMany({
+    where: {
+      storagePrefix: { startsWith: PREFIX },
+      OR: [
+        { storagePrefix },
+        { photos: { some: { objectKey: { in: items.map((item) => item.objectKey) } } } },
+      ],
+    },
+  });
   const eventDate = new Date("2026-08-22T00:00:00Z");
   const gallery = await prisma.gallery.create({
     data: {
