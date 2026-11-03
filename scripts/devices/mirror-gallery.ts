@@ -53,7 +53,9 @@ async function main() {
     update: {},
     create: { id: "e2e-user", name: "E2E Test User", email: "e2e@example.com", role: "admin" },
   });
-  await prisma.gallery.deleteMany({ where: { storagePrefix: `${PREFIX}${token}` } });
+  // Found again by the token's hash, never by the token itself (CLAUDE.md, invariant 5).
+  const storagePrefix = `${PREFIX}${hashShareToken(token).slice(0, 24)}`;
+  await prisma.gallery.deleteMany({ where: { storagePrefix } });
   const eventDate = new Date("2026-08-22T00:00:00Z");
   const gallery = await prisma.gallery.create({
     data: {
@@ -62,7 +64,9 @@ async function main() {
       eventDate,
       status: "PUBLISHED",
       publishedAt: new Date(),
-      storagePrefix: `${PREFIX}${token}`,
+      storagePrefix,
+      // By the capture times below, which follow the live gallery's order.
+      photoOrder: "TAKEN_AT",
     },
   });
   // Films are left out: a poster without its MP4 row would play nothing.

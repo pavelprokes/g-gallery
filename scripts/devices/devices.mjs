@@ -88,7 +88,18 @@ const BLOCKED_PATHS = String.raw`/_vercel/insights/|/api/g/[^/]+/(activity|ident
 export async function openDevice(name, { net = "none", cpu, ect } = {}) {
   const device = DEVICES[name];
   if (!device) throw new Error(`unknown device ${name}: ${Object.keys(DEVICES).join(", ")}`);
+  if (!(net in NETWORKS))
+    throw new Error(`unknown network ${net}: ${Object.keys(NETWORKS).join(", ")}`);
   const proxy = await startThrottleProxy(NETWORKS[net], { block: BLOCKED_HOSTS });
+  try {
+    return await launchBehind(proxy, name, device, { cpu, ect });
+  } catch (error) {
+    await proxy.close();
+    throw error;
+  }
+}
+
+async function launchBehind(proxy, name, device, { cpu, ect }) {
   const engine = { chromium, firefox, webkit }[device.engine];
   const launch = {
     proxy: { server: `http://127.0.0.1:${proxy.port}`, bypass: "<-loopback>" },
@@ -96,14 +107,15 @@ export async function openDevice(name, { net = "none", cpu, ect } = {}) {
     firefoxUserPrefs: { "network.proxy.allow_hijacking_localhost": true },
   };
   let browser;
-  let channel = device.channel;
+  let label = device.label;
   try {
-    browser = await engine.launch({ ...launch, channel });
+    browser = await engine.launch({ ...launch, channel: device.channel });
   } catch (error) {
-    if (!channel) throw error;
-    // The branded build is missing here (Edge on a Mac): its engine still is.
-    console.error(`${name}: ${channel} not installed, using Playwright's Chromium`);
-    channel = undefined;
+    if (!device.channel) throw error;
+    // The branded build is missing here (Edge on a Mac): its engine still is —
+    // and every row says so.
+    console.error(`${name}: ${device.channel} failed (${String(error).split("\n")[0]})`);
+    label = `${device.label} → Playwright Chromium`;
     browser = await engine.launch(launch);
   }
   const context = { ...device.context };
@@ -120,7 +132,11 @@ export async function openDevice(name, { net = "none", cpu, ect } = {}) {
     const realBeacon = navigator.sendBeacon?.bind(navigator);
     if (realBeacon) navigator.sendBeacon = (url, data) => blocked(url) || realBeacon(url, data);
   }, BLOCKED_PATHS);
-  if (ect) {
+  // Only Chromium has `navigator.connection`: Safari and Firefox take the
+  // gallery's other path (timing their own images), as they really do.
+  if (ect && device.engine !== "chromium")
+    console.error(`${name}: --ect ignored, no such API there`);
+  if (ect && device.engine === "chromium") {
     await browserContext.addInitScript((type) => {
       Object.defineProperty(navigator, "connection", {
         value: { effectiveType: type, saveData: false, addEventListener() {} },
@@ -138,9 +154,9 @@ export async function openDevice(name, { net = "none", cpu, ect } = {}) {
   return {
     browser,
     page,
-    device: { ...device, name, channel, cpu: device.engine === "chromium" ? rate : 1 },
+    device: { ...device, name, label, cpu: device.engine === "chromium" ? rate : 1 },
     close: async () => {
-      await browser.close();
+      await browser.close().catch(() => {});
       await proxy.close();
     },
   };

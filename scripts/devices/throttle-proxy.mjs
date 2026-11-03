@@ -36,20 +36,27 @@ export const NETWORKS = {
 const WINDOW = 64 * 1024;
 /** Released in slices, so a large chunk arrives progressively as it would. */
 const SLICE = 16 * 1024;
+/** With `lan`, what a phone needs and nothing else on this machine. */
+const LAN_PORTS = new Set([80, 443, 3000]);
+const LOOPBACK = /^(localhost|127\.\d+\.\d+\.\d+|::1|0\.0\.0\.0)$/i;
 
 /**
  * @param {{ rttMs: number, downKbps: number, upKbps: number } | null} network
  *   null relays at full speed (still useful for `block`).
- * @param {{ port?: number, host?: string, block?: RegExp }} [options]
+ * @param {{ port?: number, lan?: boolean, block?: RegExp }} [options]
  *   `block` refuses hosts outright (analytics, realtime), with no route
  *   interception in the browser — which would turn its HTTP cache off.
+ *   `lan` listens on every interface and forwards only to ports 80, 443 and
+ *   3000 off this machine: never to its loopback services (Postgres, MinIO…).
  */
-export function startThrottleProxy(network, { port = 0, host = "127.0.0.1", block } = {}) {
+export function startThrottleProxy(network, { port = 0, lan = false, block } = {}) {
   const oneWayMs = network ? network.rttMs / 2 : 0;
   const lane = (kbps) => ({ bytesPerMs: network ? kbps / 8 : Infinity, freeAt: 0 });
   const down = lane(network?.downKbps);
   const up = lane(network?.upKbps);
   const sockets = new Set();
+  const refused = (hostname, targetPort) =>
+    block?.test(hostname) || (lan && (LOOPBACK.test(hostname) || !LAN_PORTS.has(targetPort)));
 
   // Bytes leave in arrival order at the link's rate, plus half a round trip.
   // `lane.freeAt` is shared by every connection: one link, not one per socket.
@@ -63,7 +70,12 @@ export function startThrottleProxy(network, { port = 0, host = "127.0.0.1", bloc
       const now = performance.now();
       while (queue.length > 0 && queue[0].at <= now) {
         const { chunk } = queue.shift();
-        if (to.destroyed) continue;
+        if (to.destroyed) {
+          // Nobody to deliver to (the browser dropped it): stop the source too.
+          queue.length = 0;
+          from.destroy();
+          return;
+        }
         if (chunk) {
           to.write(chunk);
           queued -= chunk.length;
@@ -95,34 +107,32 @@ export function startThrottleProxy(network, { port = 0, host = "127.0.0.1", bloc
   const server = http.createServer((req, res) => {
     // A plain http:// request, sent to a proxy with its absolute address.
     const target = URL.canParse(req.url) ? new URL(req.url) : null;
-    if (!target || block?.test(target.hostname)) {
+    if (!target || refused(target.hostname, Number(target.port) || 80)) {
       res.writeHead(target ? 403 : 400).end();
       return;
     }
     const headers = { ...req.headers };
     delete headers["proxy-connection"];
     const upstream = http.request(target, { method: req.method, headers }, (response) => {
-      // The request's way there and the response's way back.
-      setTimeout(() => {
-        if (res.destroyed) return;
-        res.writeHead(response.statusCode ?? 502, response.headers);
-        relay(response, res, down);
-      }, network?.rttMs ?? 0);
+      // Node sends the head with the first chunk (or the end), which `relay`
+      // delays by the way back; the way there was charged on the request.
+      res.writeHead(response.statusCode ?? 502, response.headers);
+      relay(response, res, down);
     });
     upstream.on("error", () => res.destroy());
     relay(req, upstream, up);
   });
 
   server.on("connect", (req, client, head) => {
-    const target = URL.canParse(`http://${req.url}`) ? new URL(`http://${req.url}`) : null;
-    if (!target || block?.test(target.hostname)) {
+    // "host:port" by hand: a URL would drop port 80 as the default and leave "".
+    const colon = req.url.lastIndexOf(":");
+    const hostname = req.url.slice(0, colon).replace(/^\[|\]$/g, "");
+    const targetPort = Number(req.url.slice(colon + 1));
+    if (colon < 1 || !Number.isInteger(targetPort) || refused(hostname, targetPort)) {
       client.end("HTTP/1.1 403 Forbidden\r\n\r\n");
       return;
     }
-    const upstream = net.connect(
-      Number(target.port) || 443,
-      target.hostname.replace(/^\[|\]$/g, ""),
-    );
+    const upstream = net.connect(targetPort, hostname);
     sockets.add(client).add(upstream);
     client.on("close", () => sockets.delete(client));
     upstream.on("close", () => sockets.delete(upstream));
@@ -142,7 +152,7 @@ export function startThrottleProxy(network, { port = 0, host = "127.0.0.1", bloc
 
   return new Promise((resolve, reject) => {
     server.once("error", reject);
-    server.listen(port, host, () =>
+    server.listen(port, lan ? "0.0.0.0" : "127.0.0.1", () =>
       resolve({
         port: server.address().port,
         close: () =>
@@ -170,7 +180,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   }
   const proxy = await startThrottleProxy(NETWORKS[name], {
     port: Number(args.port ?? 8899),
-    host: args.lan ? "0.0.0.0" : "127.0.0.1",
+    lan: Boolean(args.lan),
   });
   const addresses = args.lan
     ? Object.values(os.networkInterfaces())
@@ -180,5 +190,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     : ["127.0.0.1"];
   console.log(`${name} proxy on ${addresses.map((a) => `${a}:${proxy.port}`).join(", ")}`);
   console.log(JSON.stringify(NETWORKS[name]));
-  if (args.lan) console.log("Open to this whole network while it runs — Ctrl+C when done.");
+  if (args.lan) {
+    console.log(
+      "Open to this whole network (ports 80, 443, 3000) while it runs — Ctrl+C when done.",
+    );
+  }
 }

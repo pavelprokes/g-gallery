@@ -19,6 +19,7 @@
 // beacons and presence never leave the browser (devices.mjs).
 import fs from "node:fs";
 import { DEVICES, openDevice } from "./devices.mjs";
+import { NETWORKS } from "./throttle-proxy.mjs";
 
 const args = Object.fromEntries(
   process.argv
@@ -38,6 +39,11 @@ if (links.length === 0 || names.some((name) => !DEVICES[name])) {
   process.exit(1);
 }
 const net = args.net ?? "slow4g";
+// A typo would otherwise measure an unthrottled link under the typed name.
+if (!(net in NETWORKS)) {
+  console.error(`--net must be one of: ${Object.keys(NETWORKS).join(", ")}`);
+  process.exit(1);
+}
 const runs = Number(args.runs ?? 1);
 const cap = Number(args.cap ?? 60_000);
 const scrolls = Number(args.scroll ?? 0);
@@ -64,13 +70,15 @@ function screenState() {
       });
   const tilesDrawn = tiles.filter((tile) => [...tile.querySelectorAll("img")].some(drawn)).length;
   const top = photoImgs.find((img) => img.classList.contains("z-10")) ?? photoImgs.at(-1);
+  // A film shows its poster on the <video>, no <img>.
+  const video = dialog?.querySelector("video");
   return {
     fcp: performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? null,
     dialog: !!dialog,
     foto: new URLSearchParams(location.search).get("foto"),
     preview: photoImgs.some(drawn),
     full: photoImgs.find((img) => drawn(img) && full(img.currentSrc))?.currentSrc ?? null,
-    topSrc: top && drawn(top) ? top.currentSrc : null,
+    topSrc: video ? video.poster : top && drawn(top) ? top.currentSrc : null,
     tiles: tiles.length,
     tilesDrawn,
     effectiveType: navigator.connection?.effectiveType ?? null,
@@ -82,11 +90,14 @@ async function photoKeys(link) {
   const url = new URL(link);
   const token = url.pathname.split("/")[2];
   const keys = new Map();
-  if (!url.pathname.startsWith("/g/")) return keys;
+  // Without the photos, every step would count as wrong.
+  if (!url.pathname.startsWith("/g/")) throw new Error(`--browse needs a /g/ link: ${link}`);
   let cursor = null;
   do {
-    const query = cursor ? `?cursor=${cursor}` : "";
-    const page = await (await fetch(`${url.origin}/api/g/${token}/photos${query}`)).json();
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const response = await fetch(`${url.origin}/api/g/${token}/photos${query}`);
+    if (!response.ok) throw new Error(`photos API ${response.status} for ${link}`);
+    const page = await response.json();
     for (const item of page.items ?? [])
       keys.set(
         item.id,
@@ -213,6 +224,7 @@ async function run(page, device, link, keys) {
       if (!(want && now.topSrc?.includes(want))) wrong += 1;
       result.steps.push(shown);
     }
+    result.wrong = wrong;
     result.wrongSteps = `${wrong}/${browse}`;
   }
   return result;
@@ -256,14 +268,21 @@ for (const link of links) {
       const value = median(results.map((result) => result[key]));
       if (value !== null) row[key] = value;
     }
-    const last = results.at(-1);
-    if (last.scrollScreens)
-      row.scroll = last.scrollScreens.map((screen) => screen.ms ?? "–").join(" / ");
-    if (last.steps) {
-      row.steps = median(last.steps);
-      row.wrongSteps = last.wrongSteps;
+    // Across every run, like the columns above: each screen's median, and the
+    // steps of all runs together — one never shown counts as the whole interval.
+    const screens = results.map((result) => result.scrollScreens ?? []);
+    if (screens[0].length > 0) {
+      row.scroll = screens[0]
+        .map((_, step) => median(screens.map((list) => list[step]?.ms ?? 15_000)))
+        .join(" / ");
     }
-    if (last.effectiveType) row.ect = last.effectiveType;
+    const steps = results.flatMap((result) => result.steps ?? []);
+    if (steps.length > 0) {
+      row.steps = median(steps.map((ms) => ms ?? interval));
+      row.wrongSteps = `${results.reduce((sum, result) => sum + result.wrong, 0)}/${steps.length}`;
+    }
+    const effectiveType = results.at(-1).effectiveType;
+    if (effectiveType) row.ect = effectiveType;
     rows.push(row);
     console.error(JSON.stringify(row));
   }

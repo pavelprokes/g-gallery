@@ -44,9 +44,10 @@ jobs:
       - name: Install Playwright
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      # Edge and Chrome come with the runner image; Firefox is Playwright's build.
-      - name: Install Firefox
-        run: pnpm exec playwright install firefox
+      # Edge and Chrome come with the runner image; Firefox and the plain
+      # Chromium (win-laptop, and the fallback of a branded build) are Playwright's.
+      - name: Install browsers
+        run: pnpm exec playwright install chromium firefox
 
       - name: Measure
         shell: bash
