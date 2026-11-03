@@ -102,8 +102,9 @@ pnpm perf:gallery "http://<printed address>:3000/g/…" --devices=iphone,android
 
 The mirror reads only the public photos API and writes only a database on this machine (it refuses
 any other `DATABASE_URL`, and keeps the live token only as a hash); films and chapters are not
-copied, the order is the live one, and it belongs to its own local user, so `pnpm test:e2e` (which
-deletes everything the E2E user owns) leaves it alone. `perf:build` and `perf:start` run only where
+copied, the order is the live one, and it belongs to your local admin (or a user of its own), not
+the E2E user, so `pnpm test:e2e` (which deletes everything that user owns) leaves it alone and
+chapters or highlights can be added to it in the admin. `perf:build` and `perf:start` run only where
 `.env` is the one env file (a worktree, `.claude/worktrees/`): in the main checkout `.env.local` and
 `.env.production.local` would load production's credentials into the build. It prints this machine's
 network address, not `127.0.0.1`: WebKit sends loopback past the proxy, so its page would load at

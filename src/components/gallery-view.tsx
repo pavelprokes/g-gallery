@@ -330,6 +330,12 @@ const LIGHTBOX_WARM_MS = 250;
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
+/** The longest a tile on screen holds the rows around it back while its own
+ * image neither loads nor fails (a stalled request): after this, they load
+ * anyway. ponytail: one fixed bound; a 3G screen can take longer to fill,
+ * and then shares the link again for its last seconds. */
+const SCREEN_WAIT_MS = 15_000;
+
 /** Movement under this is still a tap, not a drag — fingers are never still. */
 const TAP_SLOP_PX = 8;
 
@@ -2238,7 +2244,9 @@ function GalleryViewInner({
   const screenClear = useSyncExternalStore(screenGate.subscribe, screenGate.isClear, () => false);
   // Opened after the first rows' effects have registered the tiles on screen
   // (children's effects run first), so no first render lets every tile through.
-  const gridLaidOut = virtualRows.length > 0;
+  // A row of photos, not the "loading more" placeholder the virtualizer also
+  // renders before the grid has its width.
+  const gridLaidOut = virtualRows.some((virtualRow) => rows[virtualRow.index] !== undefined);
   useEffect(() => {
     if (gridLaidOut) screenGate.open();
   }, [gridLaidOut, screenGate]);
@@ -3613,6 +3621,10 @@ function GalleryViewInner({
             );
           }
 
+          const rowOnScreen =
+            onScreenRows !== null &&
+            virtualRow.index >= onScreenRows.startIndex &&
+            virtualRow.index <= onScreenRows.endIndex;
           return (
             <li
               key={first ? gridEntryKey(first, photoIdOf) : virtualRow.index}
@@ -3668,13 +3680,11 @@ function GalleryViewInner({
                     index={index}
                     priority={virtualRow.index === firstPhotoRow}
                     imageHeld={imagesHeld || landingHeld}
-                    onScreen={
-                      onScreenRows !== null &&
-                      virtualRow.index >= onScreenRows.startIndex &&
-                      virtualRow.index <= onScreenRows.endIndex
-                    }
+                    onScreen={rowOnScreen}
                     screenGate={screenGate}
-                    screenClear={screenClear}
+                    // Constant on screen, so the gate flipping re-renders only
+                    // the tiles off it.
+                    screenClear={rowOnScreen || screenClear}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}
@@ -4254,18 +4264,26 @@ export const PhotoTile = memo(function PhotoTile({
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   // The screen first (docs/GALLERY-LOADING.md): on screen, the tile holds the
-  // gate shut until its image has drawn (or both sources failed — a tile that
-  // never draws must not hold the rest back); off screen, it fetches its image
-  // only once the gate is clear. A tile that has drawn keeps its image
-  // whatever happens to the gate, and one that scrolls away before drawing
-  // lets its download go, for the rows the viewer has moved on to.
-  const [settled, setSettled] = useState(false);
+  // gate shut until its image has drawn — or failed for good, or for at most
+  // SCREEN_WAIT_MS: a tile that never draws must not hold the rest back. Off
+  // screen, it fetches its image only once the gate is clear. A tile that has
+  // drawn keeps its image; one off screen that has not lets its download go
+  // when the gate shuts for the next row coming on screen — measured, keeping
+  // those running made scrolling a screen in Firefox on Slow 4G 7.4 s instead
+  // of 2.4 s. Drawn is for this `src`: a new one (a fresh grant, a replaced
+  // photo) waits its turn like any other.
+  const [settledSrc, setSettledSrc] = useState<string | null>(null);
+  const settled = settledSrc === src;
+  const showImage = !imageHeld && (settled || onScreen || screenClear);
   useEffect(() => {
     if (!onScreen || settled || !screenGate) return;
     screenGate.wait(photo.id);
-    return () => screenGate.done(photo.id);
+    const deadline = setTimeout(() => screenGate.done(photo.id), SCREEN_WAIT_MS);
+    return () => {
+      clearTimeout(deadline);
+      screenGate.done(photo.id);
+    };
   }, [onScreen, settled, screenGate, photo.id]);
-  const showImage = !imageHeld && (settled || onScreen || screenClear);
 
   // Local to this tile, not shared — a touch gesture and the synthetic click
   // that follows it always target the same DOM node, so there is no reason
@@ -4380,8 +4398,14 @@ export const PhotoTile = memo(function PhotoTile({
               // straight after it, which tells nobody anything.
               alt=""
               src={thumbnailFailed ? fallbackSrc : src}
-              onLoad={() => setSettled(true)}
-              onError={() => (thumbnailFailed ? setSettled(true) : setThumbnailFailed(true))}
+              onLoad={() => setSettledSrc(src)}
+              // Failed for good once the fallback has failed too — or at once
+              // when there is no thumbnail and the fallback is the same image.
+              onError={() =>
+                thumbnailFailed || src === fallbackSrc
+                  ? setSettledSrc(src)
+                  : setThumbnailFailed(true)
+              }
               fill
               sizes={`${Math.ceil(width)}px`}
               // Not next/image's `priority`: since Next 16 that is only a

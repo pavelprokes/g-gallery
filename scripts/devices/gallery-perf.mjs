@@ -84,6 +84,11 @@ function screenState() {
     tileSrcs: tiles.flatMap((tile) =>
       [...tile.querySelectorAll("img")].map((img) => img.currentSrc),
     ),
+    // Every grid or highlight tile's image, on screen or not (the logo, the
+    // cover and the lightbox are not tiles).
+    allTileSrcs: [...document.querySelectorAll("main ul li button img")].map(
+      (img) => img.currentSrc || img.src,
+    ),
     effectiveType: navigator.connection?.effectiveType ?? null,
   };
 }
@@ -171,12 +176,16 @@ async function run(page, device, link, keys) {
       // What shared the link with the screen: images off it requested before
       // the screen's last image had arrived.
       const onScreen = new Set(state.tileSrcs);
-      const screenEnd = Math.max(
-        ...images.filter((image) => onScreen.has(image.url)).map((image) => image.end ?? since()),
-      );
-      result.offscreenBefore = images.filter(
-        (image) => !onScreen.has(image.url) && image.start < screenEnd,
-      ).length;
+      const offScreen = new Set(state.allTileSrcs.filter((src) => !onScreen.has(src)));
+      const ends = images
+        .filter((image) => onScreen.has(image.url))
+        .map((image) => image.end ?? since());
+      const screenEnd = ends.length > 0 ? Math.max(...ends) : null;
+      // Unknown, not 0, when the screen's own images were not seen going out.
+      result.offscreenBefore =
+        screenEnd === null
+          ? null
+          : images.filter((image) => offScreen.has(image.url) && image.start < screenEnd).length;
     }
     if (state.preview) result.preview ??= since();
     if (state.full && !result.full) {

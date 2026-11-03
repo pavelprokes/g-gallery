@@ -152,9 +152,13 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   screen is still loading. A screen of a phone is 6–8 tiles, of a desktop 15–20; the overscan
   doubled that, and on a slow link every image arrived late together instead of the screen first —
   native `loading="lazy"` fetches anything within 1250–2500 px of the viewport, the overscan
-  included, at once. A tile that has drawn keeps its image; one scrolled away before drawing
-  unmounts its image, and Chromium drops that download for the rows the viewer moved on to. A tile
-  whose thumbnail and fallback both fail counts as drawn, so it cannot hold the rest back.
+  included, at once. A tile that has drawn keeps its image; one off screen that has not lets its
+  download go when the gate shuts for the next row coming on screen (keeping those running was
+  measured: scrolling a screen in Firefox on Slow 4G took 7.4 s instead of 2.4 s); a new `src` (a
+  fresh grant, a replaced photo) waits its turn like any other. A tile whose image fails for good — its
+  fallback too, or at once when there is no browser-made thumbnail and the fallback is the same
+  image — counts as drawn, and none holds the rest back for longer than 15 s (`SCREEN_WAIT_MS`, a
+  stalled request).
   Measured on a local build of Alice a Martin (`pnpm mirror:gallery`), Slow 4G, median of three:
   the first screen complete on Chrome at Windows' 125 % 14.3 → 8.1 s, a 1366×768 laptop 10.2 →
   7.8 s, Firefox 13.1 → 9.1 s, a Pixel 7 (CPU 4×) 7.3 → 6.0 s; images off screen requested before
