@@ -77,6 +77,8 @@ Devices (`scripts/devices/devices.mjs`): `iphone`, `iphone-se`, `ipad`, `android
 **Real Windows** — Actions → Devices → Run workflow, or
 `gh workflow run devices.yml -f links="$G" -f net=slow4g -f extra="--scroll=3"`. Edge, Chrome and
 Firefox on `windows-latest`, the table lands in the run's summary, raw runs as an artifact.
+Started by Pavel, not by an agent: a gallery link is a credential (its token opens the gallery),
+and the run's inputs show it to everyone who can see the repository's Actions.
 
 **The end-to-end suite on more engines** — `pnpm test:e2e:engines` runs the guest-facing specs
 (gallery, photo links, chapters, highlights) on desktop Safari and Firefox, against the local

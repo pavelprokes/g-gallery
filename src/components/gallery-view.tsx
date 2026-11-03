@@ -311,11 +311,16 @@ function replaceUrl(url: string) {
 const CHAPTER_BAR_HEIGHT = 56;
 
 /**
- * How long the viewer stays on a lightbox photo before its full size, and its
- * neighbours', are fetched (docs/GALLERY-LOADING.md). Under a pause a person
- * notices; long enough that racing through photos fetches only thumbnails.
+ * A pause on a lightbox photo (docs/GALLERY-LOADING.md): how long a hurrying
+ * viewer (one who moved on before the photo they left had loaded) stays on a
+ * photo before its full size is fetched, and how long any viewer stays on a
+ * loaded photo before the next one's full size is warmed. A click a second —
+ * looking for one photo — never pauses: it is shown thumbnails, and the link
+ * stays free for them instead of carrying full sizes nobody stops to look at.
+ * Clearly over a second, or a click every second lands just after each pause
+ * and starts every full size anyway.
  */
-const LIGHTBOX_SETTLE_MS = 250;
+const LIGHTBOX_PAUSE_MS = 1500;
 
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
@@ -811,12 +816,13 @@ function LightboxPhoto({
   }, [photo.id, reset]);
 
   // While the viewer hurries past photos, the full size follows only once they
-  // pause on one. Clicked through ten in a second — on purpose or not — the
-  // counter and the thumbnail move with every click, but only the photo they
-  // stop on is downloaded at full size (docs/GALLERY-LOADING.md): ten 0.5–1.5 MB
-  // images in flight at once made each step slower than the last. An ordinary
-  // step — the photo left had loaded, the next is likely warm — follows at
-  // once, and so does a change of width for the same photo (zoom, slow mode).
+  // pause on one (LIGHTBOX_PAUSE_MS). Clicked through ten in a second — on
+  // purpose or not — the counter and the thumbnail move with every click, but
+  // only the photo they stop on is downloaded at full size
+  // (docs/GALLERY-LOADING.md): ten 0.5–1.5 MB images in flight at once made
+  // each step slower than the last. An ordinary step — the photo left had
+  // loaded, the next is likely warm — follows at once, and so does a change of
+  // width for the same photo (zoom, slow mode).
   const [shown, setShown] = useState({ id: photo.id, src, sizes });
   // Loaded, as far as this frame goes, only if the element is on this photo:
   // while settling it still holds another one, whatever was loaded for this.
@@ -825,10 +831,20 @@ function LightboxPhoto({
     if (shown.id === photo.id && shown.src === src && shown.sizes === sizes) return;
     const timer = setTimeout(
       () => setShown({ id: photo.id, src, sizes }),
-      shown.id !== photo.id && settle ? LIGHTBOX_SETTLE_MS : 0,
+      shown.id !== photo.id && settle ? LIGHTBOX_PAUSE_MS : 0,
     );
     return () => clearTimeout(timer);
   }, [photo.id, src, sizes, settle, shown]);
+
+  // Which photo the full-size element last drew. While the viewer hurries, the
+  // element can still be on a photo they have already left, its full size half
+  // downloaded; kept there, it would go on arriving and take the link from the
+  // thumbnails the next clicks draw. Unless its pixels are what holds the frame
+  // (it drew), it moves straight on to the new photo's thumbnail — a load no
+  // element wants any more is dropped by the browser — and to the full size
+  // once the viewer pauses.
+  const [drawnId, setDrawnId] = useState<string | null>(null);
+  const full = shown.id === photo.id || drawnId === shown.id || !preview ? shown : preview;
 
   // The held-frame swap above stays silent on purpose — a spinner on every
   // swipe would fight the "no flicker" design. But past ~1.2s the still-shown
@@ -898,13 +914,16 @@ function LightboxPhoto({
           // The dialog itself is labelled with the photo's position; repeating
           // a file name here would only make a screen reader say "DSC_1234.jpg".
           alt=""
-          src={shown.src}
+          src={full.src}
           fill
-          sizes={shown.sizes}
+          sizes={full.sizes}
           // Reported for the photo whose pixels these are — not whichever
-          // photo is current by the time next/image has decoded them.
+          // photo is current by the time next/image has decoded them, and not
+          // the thumbnail standing in while the viewer hurries.
           onLoad={(event) => {
-            if (drew(event.currentTarget, shown.src)) onLoad(shown.id);
+            if (!drew(event.currentTarget, shown.src)) return;
+            setDrawnId(shown.id);
+            onLoad(shown.id);
           }}
           onError={(event) => {
             if (event.currentTarget.currentSrc.includes(keyOf(shown.src))) onError(shown.id);
@@ -2559,8 +2578,8 @@ function GalleryViewInner({
 
   /**
    * Slow mode (docs/GALLERY-LOADING.md): on a slow connection the lightbox asks
-   * for the 1080 px variant instead of 1920/2560 and warms one neighbour
-   * instead of three. Null when the connection is not slow. Read once per
+   * for the 1080 px variant instead of 1920/2560. Null when the connection is
+   * not slow. Read once per
    * opening — an event, so the photo's first render already has it (read in an
    * effect, the full size would start at the screen's width and be asked for
    * again a render later) — and kept while the lightbox stays open, so a photo
@@ -3043,15 +3062,12 @@ function GalleryViewInner({
    *   previous one, a few dozen kB each — what the next step draws over the
    *   old photo. Only thumbnails served straight from the bucket, whose URL is
    *   the same whatever width the tile asks for (`widthFreeUrl`).
-   * - Full sizes, three ways (docs/GALLERY-LOADING.md):
-   *   - the photo on screen first: until it has loaded, warming three more
-   *     would split a slow link four ways while the viewer waits on the one;
-   *   - then next, previous and one further ahead, after the viewer has
-   *     paused (LIGHTBOX_SETTLE_MS) — racing past photos leaves no full-size
-   *     downloads behind;
-   *   - hurrying (moving on before the photo left had loaded), only the next
-   *     one, and later still, so the photo they stop on is not split four ways
-   *     either. Slow mode warms only the next one too.
+   * - One full size: the next photo in the viewer's direction, once the photo
+   *   on screen has loaded and the viewer has paused on it (LIGHTBOX_PAUSE_MS) — never
+   *   alongside the photo being waited for, and never more than one: the
+   *   previous photo has usually been seen (it is in the cache), and three at
+   *   once kept a 4G link busy for seconds, so the thumbnails a hurrying
+   *   viewer clicks to arrived late (docs/GALLERY-LOADING.md).
    * A video neighbour is never warmed: its poster is fetched at one fixed width
    * of its own, and warming it from this srcset would bill a second variant.
    */
@@ -3076,28 +3092,18 @@ function GalleryViewInner({
       });
     const shown =
       active.video !== null || loadedPhotoId === active.id || failedPhotoId === active.id;
-    // Still hurrying (the photo on screen not loaded yet) or slow: only the
-    // next one. Once it has loaded, the viewer has stopped: all three.
-    const neighbours = !(shown || hurried)
-      ? []
-      : (hurried && !shown) || slowSizes
-        ? [at(lightboxIndex + direction)]
-        : [at(lightboxIndex + 1), at(lightboxIndex - 1), at(lightboxIndex + 2 * direction)];
-    const fulls = neighbours.filter(warmable).map((photo) => ({
+    const fulls = (shown ? [at(lightboxIndex + direction)] : []).filter(warmable).map((photo) => ({
       srcset: fullWidthSrcSet(srcFor(photo.objectKey, imageGrant), imageLoader),
       // The same `sizes` the lightbox will give it, or the preload warms a
       // variant the browser then does not use.
       sizes: lightboxSizesFor(photo.id),
     }));
-    const delay = hurried && !shown ? 2 * LIGHTBOX_SETTLE_MS : LIGHTBOX_SETTLE_MS;
-    return JSON.stringify({ thumbs, fulls, delay });
+    return JSON.stringify({ thumbs, fulls });
   }, [
     lightboxIndex,
     photos,
     active,
     direction,
-    hurried,
-    slowSizes,
     loadedPhotoId,
     failedPhotoId,
     imageGrant,
@@ -3110,7 +3116,6 @@ function GalleryViewInner({
     const plan = JSON.parse(warmKey) as {
       thumbs: string[];
       fulls: { srcset: string; sizes: string }[];
-      delay: number;
     };
     const links: HTMLLinkElement[] = [];
     const preload = (fill: (link: HTMLLinkElement) => void) => {
@@ -3132,9 +3137,12 @@ function GalleryViewInner({
       document.head.append(link);
       links.push(link);
     };
+    // Thumbnails ahead of the full size, where the browser and the server
+    // honour priorities: they are what the next click draws.
     for (const href of plan.thumbs) {
       preload((link) => {
         link.href = href;
+        link.fetchPriority = "high";
       });
     }
     const timer = setTimeout(() => {
@@ -3142,9 +3150,10 @@ function GalleryViewInner({
         preload((link) => {
           link.imageSrcset = full.srcset;
           link.imageSizes = full.sizes;
+          link.fetchPriority = "low";
         });
       }
-    }, plan.delay);
+    }, LIGHTBOX_PAUSE_MS);
     return () => {
       clearTimeout(timer);
       for (const link of links) link.remove();
