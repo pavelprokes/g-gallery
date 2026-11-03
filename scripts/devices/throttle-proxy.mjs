@@ -11,6 +11,7 @@
 // (iPhone: Settings → Wi-Fi → ⓘ → Configure Proxy → Manual → this Mac's
 // address and the port). While it runs, anyone on that network can use it as
 // a proxy: stop it when done.
+import dns from "node:dns/promises";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
@@ -38,7 +39,16 @@ const WINDOW = 64 * 1024;
 const SLICE = 16 * 1024;
 /** With `lan`, what a phone needs and nothing else on this machine. */
 const LAN_PORTS = new Set([80, 443, 3000]);
-const LOOPBACK = /^(localhost|127\.\d+\.\d+\.\d+|::1|0\.0\.0\.0)$/i;
+/** Never reached from the network: this machine's own loopback and the like —
+ * checked on the resolved address, which no spelling of a name can dodge
+ * (`127.1`, `::ffff:127.0.0.1`, a DNS name pointing at 127.0.0.1). */
+const LOCAL = new net.BlockList();
+LOCAL.addSubnet("127.0.0.0", 8);
+LOCAL.addSubnet("0.0.0.0", 8);
+LOCAL.addSubnet("169.254.0.0", 16);
+LOCAL.addAddress("::1", "ipv6");
+LOCAL.addAddress("::", "ipv6");
+LOCAL.addSubnet("fe80::", 10, "ipv6");
 
 /**
  * @param {{ rttMs: number, downKbps: number, upKbps: number } | null} network
@@ -55,8 +65,17 @@ export function startThrottleProxy(network, { port = 0, lan = false, block } = {
   const down = lane(network?.downKbps);
   const up = lane(network?.upKbps);
   const sockets = new Set();
-  const refused = (hostname, targetPort) =>
-    block?.test(hostname) || (lan && (LOOPBACK.test(hostname) || !LAN_PORTS.has(targetPort)));
+  /** Where to connect for `hostname`, or null when refused. With `lan`, the
+   * name is resolved once, every address checked, and the checked one is
+   * what gets connected to — a second lookup cannot answer differently. */
+  async function destination(hostname, targetPort) {
+    if (!Number.isInteger(targetPort) || block?.test(hostname)) return null;
+    if (!lan) return hostname;
+    if (!LAN_PORTS.has(targetPort)) return null;
+    const addresses = await dns.lookup(hostname, { all: true }).catch(() => []);
+    const local = ({ address, family }) => LOCAL.check(address, family === 6 ? "ipv6" : "ipv4");
+    return addresses.length > 0 && !addresses.some(local) ? addresses[0].address : null;
+  }
 
   // Bytes leave in arrival order at the link's rate, plus half a round trip.
   // `lane.freeAt` is shared by every connection: one link, not one per socket.
@@ -104,16 +123,27 @@ export function startThrottleProxy(network, { port = 0, lan = false, block } = {
     to.on("error", () => from.destroy());
   }
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     // A plain http:// request, sent to a proxy with its absolute address.
     const target = URL.canParse(req.url) ? new URL(req.url) : null;
-    if (!target || refused(target.hostname, Number(target.port) || 80)) {
+    const targetPort = Number(target?.port) || 80;
+    const address = target
+      ? await destination(target.hostname.replace(/^\[|\]$/g, ""), targetPort)
+      : null;
+    if (!target || !address) {
       res.writeHead(target ? 403 : 400).end();
       return;
     }
     const headers = { ...req.headers };
     delete headers["proxy-connection"];
-    const upstream = http.request(target, { method: req.method, headers }, (response) => {
+    const options = {
+      host: address,
+      port: targetPort,
+      path: target.pathname + target.search,
+      method: req.method,
+      headers, // the browser's own Host header names the site
+    };
+    const upstream = http.request(options, (response) => {
       // Node sends the head with the first chunk (or the end), which `relay`
       // delays by the way back; the way there was charged on the request.
       res.writeHead(response.statusCode ?? 502, response.headers);
@@ -123,16 +153,20 @@ export function startThrottleProxy(network, { port = 0, lan = false, block } = {
     relay(req, upstream, up);
   });
 
-  server.on("connect", (req, client, head) => {
+  server.on("connect", async (req, client, head) => {
+    client.on("error", () => client.destroy());
     // "host:port" by hand: a URL would drop port 80 as the default and leave "".
     const colon = req.url.lastIndexOf(":");
-    const hostname = req.url.slice(0, colon).replace(/^\[|\]$/g, "");
     const targetPort = Number(req.url.slice(colon + 1));
-    if (colon < 1 || !Number.isInteger(targetPort) || refused(hostname, targetPort)) {
+    const address =
+      colon > 0
+        ? await destination(req.url.slice(0, colon).replace(/^\[|\]$/g, ""), targetPort)
+        : null;
+    if (!address || client.destroyed) {
       client.end("HTTP/1.1 403 Forbidden\r\n\r\n");
       return;
     }
-    const upstream = net.connect(targetPort, hostname);
+    const upstream = net.connect(targetPort, address);
     sockets.add(client).add(upstream);
     client.on("close", () => sockets.delete(client));
     upstream.on("close", () => sockets.delete(upstream));
