@@ -205,7 +205,7 @@
     "deleteConfirm": "¿Borrar esta foto de la galería? No se puede deshacer.",
     "selected": "Seleccionada",
     "select": "Seleccionar",
-    "preparingDownload": "Preparando la descarga",
+    "preparingDownload": "Preparando la descarga…",
     "downloadOriginal": "Descargar original",
     "sharePhoto": "Compartir foto",
     "photoLinkCopied": "Enlace a la foto copiado",
@@ -252,8 +252,8 @@
     },
     "offline": {
       "unsupported": "Este navegador no admite galerías sin conexión.",
-      "notEnoughSpace": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed}.",
-      "notEnoughSpaceWithFree": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed} y hay {free} libres.",
+      "notEnoughSpace": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed}. Libera espacio o guarda solo las fotos que has marcado.",
+      "notEnoughSpaceWithFree": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed} y hay {free} libres. Libera espacio o guarda solo las fotos que has marcado.",
       "tryAgain": "Reintentar",
       "downloading": "Descargando en el dispositivo… {percent}%",
       "downloadingWithBytes": "Descargando en el dispositivo… {percent}% · {bytes}",
@@ -268,7 +268,7 @@
       "downloadFailedAnnounce": "La descarga ha fallado.",
       "saveOffline": "Guarda {count, plural, one {# foto} other {# fotos}} en este dispositivo y velas sin cobertura.",
       "estimatedSize": "Ocupa unos {size}. Se guarda con el tamaño de esta pantalla, no los originales.",
-      "onlyEngagedOption": "Solo las fotos a las que he reaccionado, marcado para imprimir o seleccionado ({count, plural, one {# foto} other {# fotos}})",
+      "onlyEngagedOption": "Solo las fotos que he marcado: favoritas, con reacción, para imprimir o seleccionadas ({count, plural, one {# foto} other {# fotos}})",
       "makeAvailable": "Disponible sin conexión",
       "iconLabel": "Sin conexión",
       "iconTitle": "Guardar fotos en este dispositivo para verlas sin cobertura",
@@ -282,7 +282,7 @@
     "saveFailed": "Tu última marca no se ha guardado: comprueba la conexión e inténtalo de nuevo. Si el enlace ha caducado, escribe a quien te lo envió.",
     "downloadAllLabelSized": "Descargar todo ({size})",
     "downloadAllStaleTitle": "Descarga todas las fotos menos las más recientes: el archivo se está regenerando.",
-    "archivePreparingLabel": "Preparando archivo",
+    "archivePreparingLabel": "Preparando archivo…",
     "archivePreparingTitle": "El archivo completo aún se está preparando. Elige las fotos que quieras y descárgalas ahora, o vuelve dentro de un rato.",
     "transfer": {
       "startTitle": "Continuar en otro dispositivo",
@@ -363,7 +363,7 @@
     "wrongPassword": "Contraseña incorrecta. Revisa las mayúsculas e inténtalo de nuevo más tarde, o pídele al fotógrafo que te la reenvíe."
   },
   "promo": {
-    "cardAriaLabel": "{headline} — abre {cta} en una ventana nueva"
+    "cardAriaLabel": "{headline} – {cta} (se abre en una ventana nueva)"
   },
   "corrections": {
     "toolbar": "Retoques",

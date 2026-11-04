@@ -205,7 +205,7 @@
     "deleteConfirm": "Delete this photo from the gallery? This can't be undone.",
     "selected": "Selected",
     "select": "Select",
-    "preparingDownload": "Preparing download",
+    "preparingDownload": "Preparing download…",
     "downloadOriginal": "Download original",
     "sharePhoto": "Share photo",
     "photoLinkCopied": "Link to the photo copied",
@@ -252,8 +252,8 @@
     },
     "offline": {
       "unsupported": "This browser doesn't support offline galleries.",
-      "notEnoughSpace": "Not enough space on this device. The gallery needs about {needed}.",
-      "notEnoughSpaceWithFree": "Not enough space on this device. The gallery needs about {needed}, and {free} is free.",
+      "notEnoughSpace": "Not enough space on this device. The gallery needs about {needed}. Free up some space, or save only the photos you've marked.",
+      "notEnoughSpaceWithFree": "Not enough space on this device. The gallery needs about {needed}, and {free} is free. Free up some space, or save only the photos you've marked.",
       "tryAgain": "Try again",
       "downloading": "Downloading to device… {percent}%",
       "downloadingWithBytes": "Downloading to device… {percent}% · {bytes}",
@@ -268,7 +268,7 @@
       "downloadFailedAnnounce": "The download failed.",
       "saveOffline": "Save {count, plural, one {# photo} other {# photos}} to this device and browse them without signal.",
       "estimatedSize": "Takes about {size}. Saves the size for this screen, not the originals.",
-      "onlyEngagedOption": "Only photos I reacted to, picked for print, or selected ({count, plural, one {# photo} other {# photos}})",
+      "onlyEngagedOption": "Only photos I've marked — favorited, reacted to, picked for print or selected ({count, plural, one {# photo} other {# photos}})",
       "makeAvailable": "Make available offline",
       "iconLabel": "Offline",
       "iconTitle": "Save photos to this device for viewing without signal",
@@ -282,7 +282,7 @@
     "saveFailed": "Your last mark didn't save — check your connection and try again. If the link has expired, message whoever sent it to you.",
     "downloadAllLabelSized": "Download all ({size})",
     "downloadAllStaleTitle": "Downloads every photo except the very newest — the archive is being rebuilt.",
-    "archivePreparingLabel": "Preparing archive",
+    "archivePreparingLabel": "Preparing archive…",
     "archivePreparingTitle": "The full archive is still being prepared. Pick the photos you want and download those now, or check back shortly.",
     "transfer": {
       "startTitle": "Continue on another device",
@@ -363,7 +363,7 @@
     "wrongPassword": "Wrong password. Check for capital letters and please try again later, or ask the photographer to resend it."
   },
   "promo": {
-    "cardAriaLabel": "{headline} — opens {cta} in a new window"
+    "cardAriaLabel": "{headline} — {cta} (opens in a new window)"
   },
   "corrections": {
     "toolbar": "Edit requests",

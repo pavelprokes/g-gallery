@@ -138,8 +138,57 @@ describe("message catalogs", () => {
       const answer = faq.find((entry) =>
         /\b(5|pěti|five|cinq|fünf|cinco|päť|pięć|pięciu|piatich)\b/.test(entry.a),
       );
-      expect(answer?.a, locale).toContain(`${minutes} min`);
+      // cs/sk/pl keep the number and its unit together with a non-breaking space.
+      expect(answer?.a, locale).toMatch(new RegExp(`\\b${minutes}[ \\u00a0]min`));
     }
+  });
+
+  // Czech and Slovak typography keeps a one-letter preposition or conjunction
+  // ("v galerii", "a zkus") on the line of the word after it, Polish likewise
+  // ("w galerii", "i od gości"), and a number with its unit ("{count} ks").
+  // A regular space there lets the line break leave "v" dangling at a line end.
+  // The catalogs use U+00A0 instead; this catches a new string that forgets.
+  const NBSP_RULES: Partial<Record<Locale, RegExp>> = {
+    cs: /(^|[\s„(])[ksvzouaiKSVZOUAI] /,
+    sk: /(^|[\s„(])[ksvzouaiKSVZOUAI] /,
+    pl: /(^|[\s„(])[wziaouWZIAOU] /,
+  };
+  const NUMBER_UNIT = /[\d}] (ks|min|minut|minút|sekund|%)(?=[\s.,)]|$)/;
+  // Rewritten separately from this rule's introduction; they join it once
+  // their new copy keeps the non-breaking spaces too.
+  const NBSP_EXEMPT = new Set(["gallery.emptyGallery", "guestUpload.rejection.sizeMismatch"]);
+
+  function leaves(value: unknown, prefix = ""): [string, string][] {
+    if (typeof value === "string") return [[prefix, value]];
+    if (value && typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+        leaves(child, prefix ? `${prefix}.${key}` : key),
+      );
+    }
+    return [];
+  }
+
+  for (const [locale, rule] of Object.entries(NBSP_RULES) as [Locale, RegExp][]) {
+    it(`${locale}.json keeps one-letter words and units on the next word's line`, () => {
+      const offenders = leaves(CATALOGS[locale])
+        .filter(([key]) => !NBSP_EXEMPT.has(key))
+        .filter(([, message]) => rule.test(message) || NUMBER_UNIT.test(message))
+        .map(([key, message]) => `${key}: ${message}`);
+      expect(offenders).toEqual([]);
+    });
+  }
+
+  it("the non-breaking space rule catches a regular space and spares placeholders", () => {
+    const rule = NBSP_RULES.cs as RegExp;
+    expect(rule.test("Ukázat v galerii")).toBe(true);
+    expect(rule.test("V galerii")).toBe(true);
+    expect(rule.test("„a tak")).toBe(true);
+    expect(rule.test("Ukázat v galerii")).toBe(false);
+    expect(rule.test("{a} fotek")).toBe(false);
+    expect(rule.test("<a>Napiš mi</a> pošlu")).toBe(false);
+    expect(rule.test("Wi-Fi a na")).toBe(false);
+    expect(NUMBER_UNIT.test("{pieces} ks")).toBe(true);
+    expect(NUMBER_UNIT.test("{pieces} ks")).toBe(false);
   });
 
   // "Usually within an hour of the last upload": the build waits out the quiet

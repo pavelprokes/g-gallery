@@ -16,7 +16,7 @@
     "website": "svatebni-fotograf-cechy.cz",
     "copyright": "© {year} Pavel Prokeš. Wszelkie prawa zastrzeżone.",
     "builtBy": "Tę stronę stworzył osobiście Pavel Prokeš.",
-    "guide": "Jak korzystać z galerii",
+    "guide": "Jak korzystać z galerii",
     "links": "Linki",
     "help": "Pomoc do galerii",
     "slideshow": "Darmowy film ze zdjęć ślubnych",
@@ -24,43 +24,43 @@
   },
   "manifest": {
     "name": "Galeria zdjęć ślubnych",
-    "description": "Zdjęcia ze ślubu pod jednym linkiem — od fotografa i od gości."
+    "description": "Zdjęcia ze ślubu pod jednym linkiem — od fotografa i od gości."
   },
   "marketing": {
     "pageTitle": "Pomoc do galerii ślubnej · Pavel Prokeš, fotograf ślubny",
-    "pageDescription": "Jedna galeria na wszystkie zdjęcia ze ślubu — gotowy zestaw od fotografa albo wspólna galeria, do której goście dodają własne zdjęcia przez kod QR. Bez aplikacji i bez konta.",
+    "pageDescription": "Jedna galeria na wszystkie zdjęcia ze ślubu — gotowy zestaw od fotografa albo wspólna galeria, do której goście dodają własne zdjęcia przez kod QR. Bez aplikacji i bez konta.",
     "kicker": "Galeria zdjęć ślubnych",
-    "heroTitle": "Wszystkie zdjęcia ze ślubu pod jednym linkiem — od fotografa i od gości",
-    "heroLead": "Tę galerię przysłał Ci fotograf albo przekazali ją Młodzi — link lub kod QR może podawać dalej każda ze stron. Tu znajdziesz, jak do niej wejść, co możesz w niej robić i co zrobić, gdy coś nie działa.",
+    "heroTitle": "Wszystkie zdjęcia ze ślubu pod jednym linkiem — od fotografa i od gości",
+    "heroLead": "Tę galerię przysłał Ci fotograf albo przekazali ją Młodzi — link lub kod QR może podawać dalej każda ze stron. Tu znajdziesz, jak do niej wejść, co możesz w niej robić i co zrobić, gdy coś nie działa.",
     "forYourWedding": "Planujesz własny ślub? Zobacz, jak działa galeria dla gości →",
     "guideLink": "Instrukcja krok po kroku",
     "backToMainSite": "← Wróć do svatebni-fotograf-cechy.cz",
-    "heroImageAlt": "Siatka zdjęć ślubnych w galerii, pokazana na iPhonie",
-    "twoWaysHeading": "Dwa sposoby, w jakie możesz dostać galerię",
+    "heroImageAlt": "Siatka zdjęć ślubnych w galerii, pokazana na iPhonie",
+    "twoWaysHeading": "Dwa sposoby, w jakie możesz dostać galerię",
     "fromPhotographerTitle": "Galeria od fotografa",
-    "fromPhotographerBody": "Po sesji fotograf wysyła Ci link do gotowych zdjęć w wysokiej rozdzielczości. Galeria jest dostępna jeszcze długo po ślubie, pobiera się jednym kliknięciem i nie wymaga konta.",
+    "fromPhotographerBody": "Po sesji fotograf wysyła Ci link do gotowych zdjęć w wysokiej rozdzielczości. Galeria jest dostępna jeszcze długo po ślubie, pobiera się jednym kliknięciem i nie wymaga konta.",
     "fromGuestsTitle": "Bonus: galeria od gości",
-    "fromGuestsBody": "W cenie pakietu fotografii ślubnej. Goście skanują kod QR na stole i dodają własne zdjęcia ze ślubu prosto do wspólnej galerii — bez aplikacji i bez rejestracji.",
+    "fromGuestsBody": "W cenie pakietu fotografii ślubnej. Goście skanują kod QR na stole i dodają własne zdjęcia ze ślubu prosto do wspólnej galerii — bez aplikacji i bez rejestracji.",
     "howItWorksHeading": "Jak to działa",
     "howItWorksSteps": [
       {
         "title": "1. Dostajesz link",
-        "body": "Od fotografa lub od Młodych — mailem, SMS-em albo na drukowanej kartce z kodem QR. Czasem jest też hasło."
+        "body": "Od fotografa lub od Młodych — mailem, SMS-em albo na drukowanej kartce z kodem QR. Czasem jest też hasło."
       },
       {
-        "title": "2. Otwórz go w przeglądarce",
-        "body": "Nic nie musisz instalować ani zakładać konta — działa na telefonie i na komputerze."
+        "title": "2. Otwórz go w przeglądarce",
+        "body": "Nic nie musisz instalować ani zakładać konta — działa na telefonie i na komputerze."
       },
       {
         "title": "3. Przeglądaj, pobieraj, dodawaj zdjęcia",
-        "body": "To zależy od tego, co fotograf włączył w tej galerii — pełną listę funkcji znajdziesz poniżej."
+        "body": "To zależy od tego, co fotograf włączył w tej galerii — pełną listę funkcji znajdziesz poniżej."
       }
     ],
-    "highlightsHeading": "Dwie rzeczy, z których goście korzystają najczęściej",
+    "highlightsHeading": "Dwie rzeczy, z których goście korzystają najczęściej",
     "highlights": {
       "download": {
         "title": "Pobierz wszystkie zdjęcia naraz",
-        "body": "Jeden przycisk, jeden plik ZIP ze wszystkimi zdjęciami w pełnej rozdzielczości — bez klikania w każde z osobna."
+        "body": "Jeden przycisk, jeden plik ZIP ze wszystkimi zdjęciami w pełnej rozdzielczości — bez klikania w każde z osobna."
       },
       "projector": {
         "title": "Pokaz zdjęć na żywo na weselu",
@@ -71,11 +71,11 @@
     "faq": [
       {
         "q": "Skąd wziąć kod QR albo link do galerii?",
-        "a": "Od fotografa lub prosto od Młodych — obie strony mogą przekazywać link lub kod QR dalej: w rodzinnym czacie albo na kartce przy stoliku fotograficznym. Jeśli go nie masz, po prostu poproś jedną z nich."
+        "a": "Od fotografa lub prosto od Młodych — obie strony mogą przekazywać link lub kod QR dalej: w rodzinnym czacie albo na kartce przy stoliku fotograficznym. Jeśli go nie masz, po prostu poproś jedną z nich."
       },
       {
         "q": "Nie znam hasła — co teraz?",
-        "a": "Zna je tylko fotograf — nikt inny nie może go zresetować ani obejść. Napisz do niego i poproś o hasło jeszcze raz. Nie zgaduj: po pięciu błędnych próbach link blokuje się na 15 min dla wszystkich, którzy go mają."
+        "a": "Zna je tylko fotograf — nikt inny nie może go zresetować ani obejść. Napisz do niego i poproś o hasło jeszcze raz. Nie zgaduj: po pięciu błędnych próbach link blokuje się na 15 min dla wszystkich, którzy go mają."
       },
       {
         "q": "Link nie działa albo pokazuje, że wygasł.",
@@ -83,67 +83,67 @@
       },
       {
         "q": "Czy działa bez zasięgu?",
-        "a": "Gdy otworzysz galerię i włączysz tryb offline (ikona pobierania na górnym pasku), możesz przeglądać zdjęcia bez połączenia — przydatne w chacie bez zasięgu."
+        "a": "Gdy otworzysz galerię i włączysz tryb offline (ikona pobierania na górnym pasku), możesz przeglądać zdjęcia bez połączenia — przydatne w chacie bez zasięgu."
       },
       {
         "q": "Jak pobrać wszystkie zdjęcia naraz?",
-        "a": "Przycisk „Pobierz wszystko” pobiera całą galerię jako jeden plik ZIP. Przygotowuje się sam, zwykle w ciągu godziny od wgrania ostatniego zdjęcia — dłużej przy większych galeriach. Do tego czasu możesz pobierać zdjęcia pojedynczo."
+        "a": "Przycisk „Pobierz wszystko” pobiera całą galerię jako jeden plik ZIP. Przygotowuje się sam, zwykle w ciągu godziny od wgrania ostatniego zdjęcia — dłużej przy większych galeriach. Do tego czasu możesz pobierać zdjęcia pojedynczo."
       },
       {
-        "q": "W jakim języku jest galeria?",
-        "a": "W siedmiu: czeskim, angielskim, francuskim, niemieckim, hiszpańskim, słowackim i polskim. Galeria dopasowuje się do języka telefonu, a w stopce zmienisz go w każdej chwili. Tytuły i opisy galerii pisze fotograf, więc mogą zostać po czesku."
+        "q": "W jakim języku jest galeria?",
+        "a": "W siedmiu: czeskim, angielskim, francuskim, niemieckim, hiszpańskim, słowackim i polskim. Galeria dopasowuje się do języka telefonu, a w stopce zmienisz go w każdej chwili. Tytuły i opisy galerii pisze fotograf, więc mogą zostać po czesku."
       },
       {
         "q": "Czy ze zdjęć da się zrobić film na Instagram albo TikToka?",
-        "a": "Tak. Do każdego ślubu fotograf układa z galerii krótki film (15 lub 30 sekund) w dwóch wersjach: pionowej 9:16 do Stories, Reels i TikToka oraz poziomej 16:9 na YouTube i strony. Obie wersje znajdziesz w galerii do pobrania. Są bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
+        "a": "Tak. Do każdego ślubu fotograf układa z galerii krótki film (15 lub 30 sekund) w dwóch wersjach: pionowej 9:16 do Stories, Reels i TikToka oraz poziomej 16:9 na YouTube i strony. Obie wersje znajdziesz w galerii do pobrania. Są bez dźwięku i napisów — muzykę dodasz od razu w Instagramie albo TikToku."
       }
     ],
     "guestTipsHeading": "Wskazówki dla gości, którzy robią zdjęcia",
-    "guestTipsIntro": "Jeśli fotograf lub Młodzi włączyli w tej galerii wgrywanie zdjęć, każdy na weselu może dodać własne zdjęcia — obok zdjęć fotografa.",
-    "guestTipsImageAlt": "Kartka z kodem QR na stole weselnym, wśród świec i nakryć",
+    "guestTipsIntro": "Jeśli fotograf lub Młodzi włączyli w tej galerii wgrywanie zdjęć, każdy na weselu może dodać własne zdjęcia — obok zdjęć fotografa.",
+    "guestTipsImageAlt": "Kartka z kodem QR na stole weselnym, wśród świec i nakryć",
     "guestTips": [
-      "Nic nie trzeba instalować. Wystarczy link lub kod QR od fotografa albo Młodych, przycisk „Dodaj zdjęcia” oraz zwykły wybór plików lub aparat w telefonie.",
-      "Spokojnie możesz zablokować telefon w trakcie wgrywania — wgrywanie trwa w tle i wznowi się, gdy wrócisz.",
-      "Podaj swoje imię, jeśli galeria o to poprosi — dzięki temu Młodzi będą później wiedzieć, czyje to zdjęcie.",
-      "Dodane przez pomyłkę? Usuń zdjęcie samodzielnie w galerii — nie musisz do nikogo pisać.",
-      "Zdjęcia z iPhone’a działają bez problemu — do przeglądarki trafiają automatycznie w standardowym formacie. Jedyny wyjątek: jeśli w Ustawienia → Zdjęcia → Przenoszenie na Maca lub PC masz włączone „Zachowaj oryginały” (większość osób tak nie ma), wgrywanie może czasem się nie udać — przełącz na „Automatycznie” i spróbuj ponownie."
+      "Nic nie trzeba instalować. Wystarczy link lub kod QR od fotografa albo Młodych, przycisk „Dodaj zdjęcia” oraz zwykły wybór plików lub aparat w telefonie.",
+      "Spokojnie możesz zablokować telefon w trakcie wgrywania — wgrywanie trwa w tle i wznowi się, gdy wrócisz.",
+      "Podaj swoje imię, jeśli galeria o to poprosi — dzięki temu Młodzi będą później wiedzieć, czyje to zdjęcie.",
+      "Dodane przez pomyłkę? Usuń zdjęcie samodzielnie w galerii — nie musisz do nikogo pisać.",
+      "Zdjęcia z iPhone’a działają bez problemu — do przeglądarki trafiają automatycznie w standardowym formacie. Jedyny wyjątek: jeśli w Ustawienia → Zdjęcia → Przenoszenie na Maca lub PC masz włączone „Zachowaj oryginały” (większość osób tak nie ma), wgrywanie może czasem się nie udać — przełącz na „Automatycznie” i spróbuj ponownie."
     ],
     "featuresHeading": "Wszystko, co potrafi galeria",
-    "featuresIntro": "Od tego, z czego skorzystasz najczęściej, po dodatki na konkretne chwile wesela.",
+    "featuresIntro": "Od tego, z czego skorzystasz najczęściej, po dodatki na konkretne chwile wesela.",
     "features": [
-      "Jeden link, nic do instalowania — otwiera się w każdej zwykłej przeglądarce, na telefonie i na komputerze.",
-      "Szybka siatka zdjęć i widok na pełnym ekranie, płynny nawet na starszym telefonie.",
-      "Udostępnianie jednego zdjęcia – jednym przyciskiem wyślesz link prosto do zdjęcia, które właśnie oglądasz, a podgląd wiadomości pokaże właśnie je.",
-      "Siedem języków — czeski, angielski, francuski, niemiecki, hiszpański, słowacki i polski. Galeria dopasowuje się do języka telefonu, a zmienisz go w stopce.",
+      "Jeden link, nic do instalowania — otwiera się w każdej zwykłej przeglądarce, na telefonie i na komputerze.",
+      "Szybka siatka zdjęć i widok na pełnym ekranie, płynny nawet na starszym telefonie.",
+      "Udostępnianie jednego zdjęcia – jednym przyciskiem wyślesz link prosto do zdjęcia, które właśnie oglądasz, a podgląd wiadomości pokaże właśnie je.",
+      "Siedem języków — czeski, angielski, francuski, niemiecki, hiszpański, słowacki i polski. Galeria dopasowuje się do języka telefonu, a zmienisz go w stopce.",
       "Pobieranie całej galerii jednym kliknięciem (ZIP).",
-      "Filmy prosto w galerii — film od fotografa odtworzysz na telefonie i komputerze i pobierzesz razem ze zdjęciami.",
-      "Krótki film do mediów społecznościowych — do każdego ślubu fotograf układa ze zdjęć z galerii film w dwóch wersjach: pionowej (9:16) do Stories, Reels i TikToka oraz poziomej (16:9) na YouTube lub stronę.",
-      "Ulubione i reakcje — oznacz zdjęcia, które podobają Ci się najbardziej.",
-      "Wybór do druku — zaznacz zdjęcia do wydruku razem z liczbą odbitek.",
-      "Najlepsze zdjęcia dnia i rozdziały — gdy fotograf je włączy, na górze czeka wybór najlepszych ujęć, a jednym dotknięciem przeskoczysz np. do ceremonii albo przyjęcia.",
-      "Hasło i limity czasu — fotograf decyduje, kto wejdzie i na jak długo.",
+      "Filmy prosto w galerii — film od fotografa odtworzysz na telefonie i komputerze i pobierzesz razem ze zdjęciami.",
+      "Krótki film do mediów społecznościowych — do każdego ślubu fotograf układa ze zdjęć z galerii film w dwóch wersjach: pionowej (9:16) do Stories, Reels i TikToka oraz poziomej (16:9) na YouTube lub stronę.",
+      "Ulubione i reakcje — oznacz zdjęcia, które podobają Ci się najbardziej.",
+      "Wybór do druku — zaznacz zdjęcia do wydruku razem z liczbą odbitek.",
+      "Najlepsze zdjęcia dnia i rozdziały — gdy fotograf je włączy, na górze czeka wybór najlepszych ujęć, a jednym dotknięciem przeskoczysz np. do ceremonii albo przyjęcia.",
+      "Hasło i limity czasu — fotograf decyduje, kto wejdzie i na jak długo.",
       "Tryb offline — po pobraniu zdjęcia można oglądać bez zasięgu.",
-      "Kontynuuj na innym urządzeniu — przenieś ulubione, reakcje i wybór do druku z telefonu na komputer jednorazowym kodem.",
+      "Kontynuuj na innym urządzeniu — przenieś ulubione, reakcje i wybór do druku z telefonu na komputer jednorazowym kodem.",
       "Powiadomienia, gdy fotograf doda nowe zdjęcia.",
-      "Zdjęcia od gości — goście dodają własne ujęcia ze ślubu prosto do galerii, bez aplikacji i bez konta.",
-      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty.",
-      "Kilka galerii pod jednym rosnącym linkiem — wybór najlepszych ujęć, pełny zestaw i galeria gości, bez wysyłania nowego linku."
+      "Zdjęcia od gości — goście dodają własne ujęcia ze ślubu prosto do galerii, bez aplikacji i bez konta.",
+      "Pokaz na żywo — nowe zdjęcia gości pojawiają się na ekranie w ciągu mniej więcej pół minuty.",
+      "Kilka galerii pod jednym rosnącym linkiem — wybór najlepszych ujęć, pełny zestaw i galeria gości, bez wysyłania nowego linku."
     ],
     "footerText": "Tę galerię prowadzi Twój fotograf.",
-    "footerLinkText": "Fotograf ślubny w Czechach →"
+    "footerLinkText": "Fotograf ślubny w Czechach →"
   },
   "errors": {
     "linkNotFoundTitle": "Ten link donikąd nie prowadzi",
-    "linkNotFoundLead": "Komunikatory często ucinają linki w połowie przy wklejaniu — zdarza się to cały czas. Spróbuj otworzyć go jeszcze raz prosto z oryginalnej wiadomości albo zeskanuj kod QR, jeśli go masz pod ręką.",
+    "linkNotFoundLead": "Komunikatory często ucinają linki w połowie przy wklejaniu — zdarza się to cały czas. Spróbuj otworzyć go jeszcze raz prosto z oryginalnej wiadomości albo zeskanuj kod QR, jeśli go masz pod ręką.",
     "linkNotFoundHint": "Nadal nic? Napisz do osoby, która przysłała Ci link — ona wciąż go ma.",
     "genericNotFoundTitle": "Nic tu nie ma",
     "genericNotFoundLead": "Ten adres donikąd nie prowadzi.",
-    "adminNotFoundLead": "Tego adresu nie ma w panelu administracyjnym.",
+    "adminNotFoundLead": "Tego adresu nie ma w panelu administracyjnym.",
     "adminNotFoundAction": "Wróć do pulpitu",
     "galleryErrorTitle": "Coś poszło nie tak",
     "galleryErrorLead": "Nie udało się wczytać galerii. Spróbuj ponownie.",
     "tryAgain": "Spróbuj ponownie",
-    "contact": "Nadal nic? <a>Napisz do mnie</a>, zajrzę w to.",
+    "contact": "Nadal nic? <a>Napisz do mnie</a>, zajrzę w to.",
     "shareLinkDeadTitle": "Ten link już nie działa",
     "shareLinkDeadLead": "Galeria tu była, ale dostęp przez ten link się skończył.",
     "shareLinkDeadHint": "Młodzi lub fotograf mogą przesłać Ci nowy.",
@@ -159,10 +159,10 @@
     "chaptersNavLabel": "Rozdziały",
     "chapterEyebrow": "Rozdział {number}",
     "highlightsTitle": "Najlepsze chwile dnia",
-    "highlightOpen": "Pokaż w galerii: {fileName}",
+    "highlightOpen": "Pokaż w galerii: {fileName}",
     "emptyEvent": "Na razie pusto. Gdy fotograf coś doda, pojawi się to pod tym adresem.",
     "emptyCard": "Na razie pusto",
-    "guestCardHint": "Dodaj też własne zdjęcia z telefonu",
+    "guestCardHint": "Dodaj też własne zdjęcia z telefonu",
     "selectedCount": "{count, plural, one {# zaznaczone} few {# zaznaczone} many {# zaznaczonych} other {# zaznaczonych}}",
     "zipPreparingAnnounce": "Przygotowuję pobieranie…",
     "zipErrorAnnounce": "Nie udało się przygotować pobierania. Spróbuj ponownie.",
@@ -178,10 +178,10 @@
     "downloadOneTitle": "Pobierz zdjęcie",
     "downloadOneVideoTitle": "Pobierz wideo",
     "downloadPromptTitle": "Zaraz pobierzesz całą galerię",
-    "downloadPromptSize": "{items} w pełnej rozdzielczości, {size}.",
-    "downloadPromptAdvice": "Przy wolnym łączu to chwilę potrwa. Najlepiej przez Wi-Fi i na komputerze z wolnym miejscem — dla danych mobilnych to bardzo dużo.",
+    "downloadPromptSize": "{items} w pełnej rozdzielczości, {size}.",
+    "downloadPromptAdvice": "Przy wolnym łączu to chwilę potrwa. Najlepiej przez Wi-Fi i na komputerze z wolnym miejscem — dla danych mobilnych to bardzo dużo.",
     "downloadPromptResume": "Jeśli pobieranie się przerwie, większość przeglądarek potrafi je wznowić. Nie zaczniesz od nowa.",
-    "downloadPromptAlternative": "Nie możesz pobrać albo nie masz gdzie zapisać? <a>Napisz do mnie</a>, a prześlę Ci zdjęcia inaczej — przez serwis do wymiany plików albo na pendrivie.",
+    "downloadPromptAlternative": "Nie możesz pobrać albo nie masz gdzie zapisać? <a>Napisz do mnie</a>, a prześlę Ci zdjęcia inaczej — przez serwis do wymiany plików albo na pendrivie.",
     "downloadPromptConfirm": "Pobierz",
     "downloadPromptCancel": "Anuluj",
     "downloadPromptEmailSubject": "Pobieranie galerii: {title}",
@@ -190,26 +190,26 @@
     "selectAllLoaded": "Zaznacz wszystkie wczytane",
     "downloadSelected": "{count, plural, one {Pobierz # zdjęcie} few {Pobierz # zdjęcia (ZIP)} many {Pobierz # zdjęć (ZIP)} other {Pobierz # zdjęć (ZIP)}}",
     "preparingShort": "Przygotowuję…",
-    "photosListAriaLabel": "Zdjęcia w galerii",
+    "photosListAriaLabel": "Zdjęcia w galerii",
     "loadingMorePhotos": "Wczytuję kolejne zdjęcia…",
     "emptyGallery": "W tej galerii nie ma jeszcze zdjęć. Gdy fotograf je doda, pojawią się tutaj — wystarczy odświeżyć stronę.",
-    "searchingFavorites": "Szukam Twoich ulubionych w reszcie galerii…",
+    "searchingFavorites": "Szukam Twoich ulubionych w reszcie galerii…",
     "noFavoritesYet": "Nie masz jeszcze żadnych ulubionych.",
-    "lightboxAriaLabel": "Zdjęcie {index} z {total}",
+    "lightboxAriaLabel": "Zdjęcie {index} z {total}",
     "previous": "Poprzednie",
     "next": "Następne",
     "close": "Zamknij",
     "deleting": "Usuwanie…",
     "deleteMyPhoto": "Usuń moje zdjęcie",
     "uploaderLabel": "Autor zdjęcia",
-    "deleteConfirm": "Usunąć to zdjęcie z galerii? Tego nie można cofnąć.",
+    "deleteConfirm": "Usunąć to zdjęcie z galerii? Tego nie można cofnąć.",
     "selected": "Zaznaczone",
     "select": "Zaznacz",
-    "preparingDownload": "Przygotowuję pobieranie",
+    "preparingDownload": "Przygotowuję pobieranie…",
     "downloadOriginal": "Pobierz oryginał",
     "sharePhoto": "Udostępnij zdjęcie",
     "photoLinkCopied": "Link do zdjęcia skopiowany",
-    "privacyNotice": "Wizyty liczymy anonimowo, tylko w tej przeglądarce — bez adresu IP.",
+    "privacyNotice": "Wizyty liczymy anonimowo, tylko w tej przeglądarce — bez adresu IP.",
     "optOut": "Nie licz mnie",
     "optedOutNotice": "Twoje wizyty nie są liczone.",
     "optOutConfirmTitle": "Przestać liczyć Twoje wizyty?",
@@ -222,7 +222,7 @@
     "playVideo": "Odtwórz wideo",
     "videoUnavailable": "Nie można teraz odtworzyć wideo. Spróbuj ponownie później.",
     "addToFavorites": "Dodaj do ulubionych",
-    "removeFromFavorites": "Usuń z ulubionych",
+    "removeFromFavorites": "Usuń z ulubionych",
     "markForPrint": "Oznacz do wydruku",
     "markingModeLabel": "Oznaczaj",
     "markingModeOffTitle": "Pokaż ikony oznaczania na zdjęciach",
@@ -236,10 +236,10 @@
     "markForPrintOthers": "Oznacz do wydruku – inni chcą już {count, plural, one {# odbitkę} few {# odbitki} many {# odbitek} other {# odbitek}}",
     "printSyncSaving": "Zapisuję…",
     "printSyncSaved": "Zapisano",
-    "printSyncOffline": "Brak połączenia – {count, plural, one {# zmiana czeka i zapisze się} few {# zmiany czekają i zapiszą się} many {# zmian czeka i zapisze się} other {# zmian czeka i zapisze się}} automatycznie po powrocie online.",
+    "printSyncOffline": "Brak połączenia – {count, plural, one {# zmiana czeka i zapisze się} few {# zmiany czekają i zapiszą się} many {# zmian czeka i zapisze się} other {# zmian czeka i zapisze się}} automatycznie po powrocie online.",
     "viewerChipsAriaLabel": "Kto oglądał tę galerię",
     "namePromptTitle": "Jak podpisać Twoje zdjęcia?",
-    "namePromptHint": "Inni zobaczą to imię przy Twoich ulubionych zdjęciach i przy zdjęciach, które dodasz. Możesz je pominąć.",
+    "namePromptHint": "Inni zobaczą to imię przy Twoich ulubionych zdjęciach i przy zdjęciach, które dodasz. Możesz je pominąć.",
     "namePromptPlaceholder": "Np. Ewa",
     "namePromptSkip": "Pomiń",
     "namePromptSave": "Zapisz",
@@ -252,8 +252,8 @@
     },
     "offline": {
       "unsupported": "Ta przeglądarka nie obsługuje galerii offline.",
-      "notEnoughSpace": "Za mało miejsca na tym urządzeniu. Galeria potrzebuje około {needed}.",
-      "notEnoughSpaceWithFree": "Za mało miejsca na tym urządzeniu. Galeria potrzebuje około {needed}, a wolne jest {free}.",
+      "notEnoughSpace": "Za mało miejsca na tym urządzeniu. Galeria potrzebuje około {needed}. Zwolnij trochę miejsca albo zapisz tylko swoje oznaczone zdjęcia.",
+      "notEnoughSpaceWithFree": "Za mało miejsca na tym urządzeniu. Galeria potrzebuje około {needed}, a wolne jest {free}. Zwolnij trochę miejsca albo zapisz tylko swoje oznaczone zdjęcia.",
       "tryAgain": "Spróbuj ponownie",
       "downloading": "Pobieranie na urządzenie… {percent}%",
       "downloadingWithBytes": "Pobieranie na urządzenie… {percent}% · {bytes}",
@@ -262,13 +262,13 @@
       "availableOffline": "✓ Galeria jest dostępna offline",
       "availableOfflineWithBytes": "✓ Galeria jest dostępna offline ({bytes})",
       "availableOfflineNote": "Zapisane zdjęcia mają rozmiar dopasowany do ekranu, to nie oryginały. Przeglądarka może po jakimś czasie sama je zwolnić — na iPhonie mniej więcej po tygodniu bez otwierania galerii — wtedy po prostu pobierz je ponownie.",
-      "removeFromDevice": "Usuń z urządzenia",
+      "removeFromDevice": "Usuń z urządzenia",
       "availableOfflineAnnounce": "Pobrano — galeria jest dostępna offline.",
       "downloadFailed": "Nie udało się dokończyć pobierania.",
       "downloadFailedAnnounce": "Pobieranie się nie powiodło.",
-      "saveOffline": "Zapisz na tym urządzeniu {count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}} i przeglądaj je bez zasięgu.",
-      "estimatedSize": "Zajmie około {size}. Zdjęcia zapiszą się w rozmiarze dopasowanym do ekranu, nie jako oryginały.",
-      "onlyEngagedOption": "Tylko zdjęcia z moją reakcją, oznaczone do wydruku lub zaznaczone ({count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}})",
+      "saveOffline": "Zapisz na tym urządzeniu {count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}} i przeglądaj je bez zasięgu.",
+      "estimatedSize": "Zajmie około {size}. Zdjęcia zapiszą się w rozmiarze dopasowanym do ekranu, nie jako oryginały.",
+      "onlyEngagedOption": "Tylko moje oznaczone zdjęcia — ulubione, z reakcją, do wydruku lub zaznaczone ({count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}})",
       "makeAvailable": "Zapisz do użytku offline",
       "iconLabel": "Offline",
       "iconTitle": "Zapisz zdjęcia na tym urządzeniu, by oglądać je bez zasięgu",
@@ -279,23 +279,23 @@
       "empty": "Nie ma tu jeszcze zdjęć.",
       "exit": "Wyjdź"
     },
-    "saveFailed": "Ostatnie oznaczenie nie zostało zapisane — sprawdź połączenie i spróbuj ponownie. Jeśli link wygasł, napisz do osoby, która go przysłała.",
+    "saveFailed": "Ostatnie oznaczenie nie zostało zapisane — sprawdź połączenie i spróbuj ponownie. Jeśli link wygasł, napisz do osoby, która go przysłała.",
     "downloadAllLabelSized": "Pobierz wszystko ({size})",
     "downloadAllStaleTitle": "Pobiera wszystkie zdjęcia oprócz najnowszych — archiwum jest właśnie odbudowywane.",
-    "archivePreparingLabel": "Przygotowuję archiwum",
-    "archivePreparingTitle": "Pełne archiwum jest jeszcze w przygotowaniu. Wybierz zdjęcia, które chcesz, i pobierz je już teraz, albo zajrzyj tu za chwilę.",
+    "archivePreparingLabel": "Przygotowuję archiwum…",
+    "archivePreparingTitle": "Pełne archiwum jest jeszcze w przygotowaniu. Wybierz zdjęcia, które chcesz, i pobierz je już teraz, albo zajrzyj tu za chwilę.",
     "transfer": {
       "startTitle": "Kontynuuj na innym urządzeniu",
       "haveCode": "Mam kod",
       "codeTitle": "Wpisz ten kod na drugim urządzeniu",
-      "codeHint": "Kod jest ważny 15 minut i działa jednorazowo. Przenosi Twoje ulubione, reakcje i wybór do wydruku.",
-      "enterTitle": "Kod z pierwszego urządzenia",
-      "enterHint": "Osiem znaków. Wielkość liter i myślnik nie mają znaczenia.",
+      "codeHint": "Kod jest ważny 15 minut i działa jednorazowo. Przenosi Twoje ulubione, reakcje i wybór do wydruku.",
+      "enterTitle": "Kod z pierwszego urządzenia",
+      "enterHint": "Osiem znaków. Wielkość liter i myślnik nie mają znaczenia.",
       "submit": "Przenieś",
       "adopted": "Gotowe",
       "close": "Zamknij",
-      "errorNothingYet": "Niczego tu jeszcze nie oznaczono, więc nie ma co przenosić. Dodaj zdjęcie do ulubionych i spróbuj ponownie.",
-      "errorWrongCode": "Ten kod się nie zgadza. Sprawdź go i spróbuj ponownie.",
+      "errorNothingYet": "Niczego tu jeszcze nie oznaczono, więc nie ma co przenosić. Dodaj zdjęcie do ulubionych i spróbuj ponownie.",
+      "errorWrongCode": "Ten kod się nie zgadza. Sprawdź go i spróbuj ponownie.",
       "errorExpired": "Kod wygasł. Wygeneruj nowy na pierwszym urządzeniu.",
       "errorNoIdentity": "Przeglądarka nie pozwoliła nam nic zapisać. Sprawdź, czy dane witryn nie są zablokowane dla tej strony.",
       "errorGeneric": "Przeniesienie właśnie się nie udało. Spróbuj ponownie za chwilę."
@@ -307,8 +307,8 @@
     "addPhotos": "Dodaj zdjęcia",
     "takePhoto": "Zrób zdjęcie",
     "preparing": "{count, plural, one {Przygotowuję zdjęcie…} few {Przygotowuję # zdjęcia…} many {Przygotowuję # zdjęć…} other {Przygotowuję # zdjęć…}}",
-    "uploadingProgress": "Wgrywanie: {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
-    "resumingProgress": "Dokańczam wgrywanie — {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
+    "uploadingProgress": "Wgrywanie: {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
+    "resumingProgress": "Dokańczam wgrywanie — {done} z {total} · ekran zostaje włączony. Jeśli coś przerwie wgrywanie, wznowi się, gdy wrócisz.",
     "discardRest": "Odrzuć resztę",
     "doneSome": "Wgrano. Wszyscy na weselu to zobaczą.",
     "doneNone": "Nic nie zostało wgrane. Wybierz zdjęcia jeszcze raz — najlepiej działają mniejsze partie.",
@@ -324,7 +324,7 @@
     "nameSheetPlaceholder": "np. Ewa",
     "nameSheetPickPhotos": "Wybierz zdjęcia",
     "nameSheetSkip": "Kontynuuj bez imienia",
-    "renameHint": "Zmieni się przy wszystkich Twoich zdjęciach w tej galerii.",
+    "renameHint": "Zmieni się przy wszystkich Twoich zdjęciach w tej galerii.",
     "renameSave": "Zapisz",
     "renameRemove": "Usuń imię",
     "renameCancel": "Anuluj",
@@ -333,15 +333,15 @@
     "changeName": "Zmień",
     "addName": "Dodaj swoje imię",
     "rejection": {
-      "unsupportedHeic": "Tego formatu (HEIC) jeszcze nie obsługujemy. W Ustawieniach → Aparat → Formaty wybierz „Najbardziej kompatybilne” i spróbuj ponownie.",
+      "unsupportedHeic": "Tego formatu (HEIC) jeszcze nie obsługujemy. W Ustawieniach → Aparat → Formaty wybierz „Najbardziej kompatybilne” i spróbuj ponownie.",
       "unsupportedVideo": "Filmów jeszcze nie przyjmujemy, tylko zdjęcia.",
       "unsupportedGeneric": "Nie obsługujemy tego typu pliku. Spróbuj innego zdjęcia.",
       "fileTooLarge": "To zdjęcie jest za duże.",
       "quotaViewerFull": "Dodano już dużo Twoich zdjęć — na razie nie możesz dodać więcej. Dziękujemy!",
       "quotaAlbumFull": "Galeria jest na razie pełna. Daj znać osobie, która przysłała Ci link.",
-      "deniedPasswordRequired": "Odśwież stronę i wpisz hasło.",
+      "deniedPasswordRequired": "Odśwież stronę i wpisz hasło.",
       "deniedGeneric": "Ta galeria nie przyjmuje już nowych zdjęć.",
-      "rateLimited": "Wysyłasz naraz bardzo dużo — poczekaj chwilę i spróbuj ponownie.",
+      "rateLimited": "Wysyłasz naraz bardzo dużo — poczekaj chwilę i spróbuj ponownie.",
       "sizeMismatch": "Zdjęcie nie przesłało się w całości. Próbujemy jeszcze raz.",
       "genericFailure": "Wgrywanie się nie udało. Spróbuj ponownie, gdy złapiesz lepszy zasięg."
     }
@@ -354,28 +354,28 @@
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · fotograf ślubny",
     "title": "Ta galeria jest chroniona hasłem",
-    "hint": "Fotograf przysłał Ci hasło razem z linkiem.",
+    "hint": "Fotograf przysłał Ci hasło razem z linkiem.",
     "passwordLabel": "Hasło do galerii",
     "placeholder": "Hasło",
     "verifying": "Sprawdzam…",
     "submit": "Zobacz galerię",
     "missingPassword": "Wpisz hasło.",
-    "wrongPassword": "Błędne hasło. Sprawdź wielkie litery i spróbuj ponownie później albo poproś fotografa o ponowne wysłanie hasła."
+    "wrongPassword": "Błędne hasło. Sprawdź wielkie litery i spróbuj ponownie później albo poproś fotografa o ponowne wysłanie hasła."
   },
   "promo": {
-    "cardAriaLabel": "{headline} — otwiera {cta} w nowym oknie"
+    "cardAriaLabel": "{headline} — {cta} (otwiera się w nowym oknie)"
   },
   "corrections": {
     "toolbar": "Poprawki",
-    "toolbarTitle": "Prośby o poprawki – napisz, co poprawić na zdjęciach",
+    "toolbarTitle": "Prośby o poprawki – napisz, co poprawić na zdjęciach",
     "pinTitle": "PIN do poprawek",
-    "pinHint": "Fotograf wysłał Ci 6-cyfrowy PIN razem z galerią. Wpisujesz go przy każdym wejściu w ten tryb.",
+    "pinHint": "Fotograf wysłał Ci 6-cyfrowy PIN razem z galerią. Wpisujesz go przy każdym wejściu w ten tryb.",
     "pinSubmit": "Wejdź",
     "pinWrong": "PIN się nie zgadza. Spróbuj ponownie.",
-    "pinLocked": "Za dużo prób. Spróbuj ponownie za {minutes} min.",
+    "pinLocked": "Za dużo prób. Spróbuj ponownie za {minutes} min.",
     "cancel": "Anuluj",
-    "barTitle": "Prośby o poprawki",
-    "barCount": "{count, plural, =0 {na razie brak} one {# zdjęcie z prośbą} few {# zdjęcia z prośbą} many {# zdjęć z prośbą} other {# zdjęcia z prośbą}}",
+    "barTitle": "Prośby o poprawki",
+    "barCount": "{count, plural, =0 {na razie brak} one {# zdjęcie z prośbą} few {# zdjęcia z prośbą} many {# zdjęć z prośbą} other {# zdjęcia z prośbą}}",
     "exit": "Zakończ",
     "expired": "Tryb poprawek się zakończył. Aby dodać kolejne, wpisz PIN ponownie.",
     "badge": "{count, plural, one {# prośba} few {# prośby} many {# próśb} other {# prośby}}",
@@ -395,6 +395,6 @@
     "confirmDelete": "Na pewno usunąć?",
     "resolved": "Poprawione ✓",
     "error": "Nie udało się zapisać. Spróbuj ponownie.",
-    "privacy": "Widzisz je tylko Ty i fotograf, goście nie."
+    "privacy": "Widzisz je tylko Ty i fotograf, goście nie."
   }
 }

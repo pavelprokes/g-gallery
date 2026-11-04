@@ -205,7 +205,7 @@
     "deleteConfirm": "Dieses Foto aus der Galerie löschen? Das lässt sich nicht rückgängig machen.",
     "selected": "Ausgewählt",
     "select": "Auswählen",
-    "preparingDownload": "Download wird vorbereitet",
+    "preparingDownload": "Download wird vorbereitet…",
     "downloadOriginal": "Original herunterladen",
     "sharePhoto": "Foto teilen",
     "photoLinkCopied": "Link zum Foto kopiert",
@@ -252,8 +252,8 @@
     },
     "offline": {
       "unsupported": "Dieser Browser unterstützt keine Offline-Galerien.",
-      "notEnoughSpace": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}.",
-      "notEnoughSpaceWithFree": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}, frei sind {free}.",
+      "notEnoughSpace": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}. Geben Sie Speicherplatz frei oder speichern Sie nur die Fotos, die Sie markiert haben.",
+      "notEnoughSpaceWithFree": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}, frei sind {free}. Geben Sie Speicherplatz frei oder speichern Sie nur die Fotos, die Sie markiert haben.",
       "tryAgain": "Erneut versuchen",
       "downloading": "Wird auf das Gerät geladen … {percent} %",
       "downloadingWithBytes": "Wird auf das Gerät geladen … {percent} % · {bytes}",
@@ -268,7 +268,7 @@
       "downloadFailedAnnounce": "Der Download ist fehlgeschlagen.",
       "saveOffline": "{count, plural, one {# Foto} other {# Fotos}} auf diesem Gerät speichern und ohne Empfang ansehen.",
       "estimatedSize": "Benötigt etwa {size}. Gespeichert wird die Größe für diesen Bildschirm, nicht die Originale.",
-      "onlyEngagedOption": "Nur Fotos, auf die ich reagiert, die ich für den Druck markiert oder ausgewählt habe ({count, plural, one {# Foto} other {# Fotos}})",
+      "onlyEngagedOption": "Nur Fotos, die ich markiert habe – Favoriten, mit Reaktion, für den Druck oder ausgewählt ({count, plural, one {# Foto} other {# Fotos}})",
       "makeAvailable": "Offline verfügbar machen",
       "iconLabel": "Offline",
       "iconTitle": "Fotos auf diesem Gerät speichern, um sie ohne Empfang anzusehen",
@@ -282,7 +282,7 @@
     "saveFailed": "Ihre letzte Markierung wurde nicht gespeichert – prüfen Sie Ihre Verbindung und versuchen Sie es erneut. Ist der Link abgelaufen, schreiben Sie der Person, die ihn Ihnen geschickt hat.",
     "downloadAllLabelSized": "Alle herunterladen ({size})",
     "downloadAllStaleTitle": "Lädt alle Fotos außer den allerneuesten herunter – das Archiv wird gerade neu erstellt.",
-    "archivePreparingLabel": "Archiv wird vorbereitet",
+    "archivePreparingLabel": "Archiv wird vorbereitet…",
     "archivePreparingTitle": "Das komplette Archiv wird noch vorbereitet. Wählen Sie die gewünschten Fotos aus und laden Sie diese jetzt herunter, oder schauen Sie in Kürze wieder vorbei.",
     "transfer": {
       "startTitle": "Auf einem anderen Gerät fortfahren",
@@ -307,7 +307,7 @@
     "addPhotos": "Fotos hinzufügen",
     "takePhoto": "Foto aufnehmen",
     "preparing": "{count, plural, one {Foto wird vorbereitet …} other {# Fotos werden vorbereitet …}}",
-    "uploadingProgress": "Hochgeladen: {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
+    "uploadingProgress": "Wird hochgeladen: {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
     "resumingProgress": "Ihr Upload wird abgeschlossen – {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
     "discardRest": "Rest verwerfen",
     "doneSome": "Hochgeladen. Alle auf der Hochzeit werden es sehen.",
@@ -328,8 +328,8 @@
     "renameSave": "Speichern",
     "renameRemove": "Namen entfernen",
     "renameCancel": "Abbrechen",
-    "uploadingAs": "Hinzugefügt als {name}",
-    "uploadingAnonymously": "Ohne Namen hinzugefügt",
+    "uploadingAs": "Sie laden als {name} hoch",
+    "uploadingAnonymously": "Sie laden ohne Namen hoch",
     "changeName": "Ändern",
     "addName": "Namen hinzufügen",
     "rejection": {
@@ -363,7 +363,7 @@
     "wrongPassword": "Falsches Passwort. Achten Sie auf Groß- und Kleinschreibung und versuchen Sie es später erneut, oder bitten Sie den Fotografen, es noch einmal zu schicken."
   },
   "promo": {
-    "cardAriaLabel": "{headline} – öffnet {cta} in einem neuen Fenster"
+    "cardAriaLabel": "{headline} – {cta} (öffnet sich in einem neuen Fenster)"
   },
   "corrections": {
     "toolbar": "Änderungswünsche",

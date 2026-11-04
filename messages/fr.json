@@ -87,7 +87,7 @@
       },
       {
         "q": "Comment télécharger toutes les photos d'un coup ?",
-        "a": "Le bouton « Tout télécharger » récupère toute la galerie en un seul ZIP. Il se prépare tout seul, en général dans l'heure qui suit le dernier envoi de photos – plus longtemps pour les grandes galeries. En attendant, vous pouvez télécharger les photos une par une."
+        "a": "Le bouton « Tout télécharger » récupère toute la galerie en un seul ZIP. Il se prépare tout seul, en général dans l'heure qui suit le dernier envoi de photos – plus longtemps pour les grandes galeries. En attendant, vous pouvez télécharger les photos une par une."
       },
       {
         "q": "En quelle langue est la galerie ?",
@@ -159,7 +159,7 @@
     "chaptersNavLabel": "Chapitres",
     "chapterEyebrow": "Chapitre {number}",
     "highlightsTitle": "Les plus beaux moments de la journée",
-    "highlightOpen": "Voir dans la galerie : {fileName}",
+    "highlightOpen": "Voir dans la galerie : {fileName}",
     "emptyEvent": "Rien ici pour l'instant. Dès que le photographe ajoutera quelque chose, ça apparaîtra à cette adresse.",
     "emptyCard": "Vide pour l'instant",
     "guestCardHint": "Ajoutez aussi vos photos de téléphone",
@@ -205,14 +205,14 @@
     "deleteConfirm": "Supprimer cette photo de la galerie ? Cette action est irréversible.",
     "selected": "Sélectionnée",
     "select": "Sélectionner",
-    "preparingDownload": "Préparation du téléchargement",
+    "preparingDownload": "Préparation du téléchargement…",
     "downloadOriginal": "Télécharger l'original",
     "sharePhoto": "Partager la photo",
     "photoLinkCopied": "Lien vers la photo copié",
     "privacyNotice": "Nous comptons les visites de façon anonyme, uniquement via ce navigateur – sans adresse IP.",
     "optOut": "Ne pas me compter",
     "optedOutNotice": "Vos visites ne sont pas comptées.",
-    "optOutConfirmTitle": "Ne plus compter vos visites ?",
+    "optOutConfirmTitle": "Ne plus compter vos visites ?",
     "optOutConfirmHint": "Votre prénom disparaîtra de toutes les galeries. Les photos que vous avez ajoutées y restent, mais vous ne pourrez plus les supprimer d'ici. C'est définitif.",
     "optOutCancel": "Annuler",
     "optOutFailed": "Cela n'a pas fonctionné. Veuillez réessayer.",
@@ -230,8 +230,8 @@
     "printQuantity": "À imprimer ({count}×)",
     "decreasePrintQuantity": "Retirer un tirage",
     "increasePrintQuantity": "Ajouter un tirage",
-    "printSummary": "À imprimer : {photos, plural, one {# photo} other {# photos}} · {pieces, plural, one {# exemplaire} other {# exemplaires}}",
-    "printSummaryEveryone": "Avec tout le monde : {photos, plural, one {# photo} other {# photos}} · {pieces, plural, one {# exemplaire} other {# exemplaires}}",
+    "printSummary": "À imprimer : {photos, plural, one {# photo} other {# photos}} · {pieces, plural, one {# exemplaire} other {# exemplaires}}",
+    "printSummaryEveryone": "Avec tout le monde : {photos, plural, one {# photo} other {# photos}} · {pieces, plural, one {# exemplaire} other {# exemplaires}}",
     "printOthers": "D'autres en veulent déjà {count, plural, one {# exemplaire} other {# exemplaires}}",
     "markForPrintOthers": "Marquer pour impression – d'autres en veulent déjà {count, plural, one {# exemplaire} other {# exemplaires}}",
     "printSyncSaving": "Enregistrement…",
@@ -252,8 +252,8 @@
     },
     "offline": {
       "unsupported": "Ce navigateur ne prend pas en charge les galeries hors ligne.",
-      "notEnoughSpace": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}.",
-      "notEnoughSpaceWithFree": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}, il reste {free}.",
+      "notEnoughSpace": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}. Libérez de l'espace ou n'enregistrez que les photos que vous avez marquées.",
+      "notEnoughSpaceWithFree": "Pas assez d'espace sur cet appareil. La galerie a besoin d'environ {needed}, il reste {free}. Libérez de l'espace ou n'enregistrez que les photos que vous avez marquées.",
       "tryAgain": "Réessayer",
       "downloading": "Téléchargement sur l'appareil… {percent} %",
       "downloadingWithBytes": "Téléchargement sur l'appareil… {percent} % · {bytes}",
@@ -268,7 +268,7 @@
       "downloadFailedAnnounce": "Le téléchargement a échoué.",
       "saveOffline": "Enregistrez {count, plural, one {# photo} other {# photos}} sur cet appareil pour les regarder même sans réseau.",
       "estimatedSize": "Prend environ {size}. Enregistre la taille adaptée à cet écran, pas les originaux.",
-      "onlyEngagedOption": "Seulement les photos que j'ai mises en favori, marquées pour impression ou auxquelles j'ai réagi ({count, plural, one {# photo} other {# photos}})",
+      "onlyEngagedOption": "Seulement les photos que j'ai marquées – en favori, avec une réaction, pour impression ou sélectionnées ({count, plural, one {# photo} other {# photos}})",
       "makeAvailable": "Rendre disponible hors ligne",
       "iconLabel": "Hors ligne",
       "iconTitle": "Enregistrer les photos sur cet appareil pour les regarder sans réseau",
@@ -282,7 +282,7 @@
     "saveFailed": "Votre dernier marquage n'a pas été enregistré – vérifiez votre connexion et réessayez. Si le lien a expiré, écrivez à la personne qui vous l'a envoyé.",
     "downloadAllLabelSized": "Tout télécharger ({size})",
     "downloadAllStaleTitle": "Télécharge toutes les photos sauf les toutes dernières – l'archive est en cours de mise à jour.",
-    "archivePreparingLabel": "Préparation de l'archive",
+    "archivePreparingLabel": "Préparation de l'archive…",
     "archivePreparingTitle": "L'archive complète est encore en préparation. Choisissez les photos qui vous intéressent et téléchargez-les tout de suite, ou revenez un peu plus tard.",
     "transfer": {
       "startTitle": "Continuer sur un autre appareil",
@@ -319,7 +319,7 @@
     "consentPrefix": "En envoyant, vous confirmez avoir le droit de partager ces photos. Vous voulez en retirer une ?",
     "consentEmailLinkText": "Écrivez-nous",
     "consentNoEmailFallback": "Dites-le au photographe ou aux mariés, ils la supprimeront tout de suite",
-    "nameSheetTitle": "Comment vous appelez-vous ?",
+    "nameSheetTitle": "Comment vous appelez-vous ?",
     "nameSheetHint": "Votre prénom apparaîtra avec les photos que vous ajoutez – pour que les mariés sachent qui remercier.",
     "nameSheetPlaceholder": "Ex. Camille",
     "nameSheetPickPhotos": "Choisir des photos",
@@ -363,7 +363,7 @@
     "wrongPassword": "Mot de passe incorrect. Vérifiez les majuscules et réessayez un peu plus tard, ou demandez au photographe de vous le renvoyer."
   },
   "promo": {
-    "cardAriaLabel": "{headline} – ouvre {cta} dans une nouvelle fenêtre"
+    "cardAriaLabel": "{headline} – {cta} (s'ouvre dans une nouvelle fenêtre)"
   },
   "corrections": {
     "toolbar": "Retouches",
@@ -382,7 +382,7 @@
     "panelTitle": "Demandes pour cette photo",
     "empty": "Rien pour cette photo. Écrivez ce qu'il faut modifier.",
     "newLabel": "Nouvelle demande",
-    "placeholder": "Ex. : retoucher la tache sur la robe",
+    "placeholder": "Ex. : retoucher la tache sur la robe",
     "markSpot": "Marquer l'endroit",
     "placing": "Touchez la photo…",
     "placeHint": "Touchez l'endroit de la photo concerné par la demande.",
@@ -392,7 +392,7 @@
     "editLabel": "Modifier la demande {n}",
     "save": "Enregistrer",
     "delete": "Supprimer",
-    "confirmDelete": "Supprimer ?",
+    "confirmDelete": "Supprimer ?",
     "resolved": "Retouchée ✓",
     "error": "Échec de l'enregistrement. Veuillez réessayer.",
     "privacy": "Seuls vous et le photographe les voyez, pas vos invités."
