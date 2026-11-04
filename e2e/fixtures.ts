@@ -41,10 +41,14 @@ export async function selectFirstPhoto(page: Page, isMobile: boolean): Promise<v
     await page.getByRole("checkbox").first().click();
     return;
   }
-  const tile = page
+  // A handle, not a locator: once selection starts the tile's label changes
+  // from "Otevřít …" to "Vybrat …", and the touchend must reach the same tile.
+  const tile = await page
     .getByRole("list", { name: "Fotky v galerii" })
     .locator('button[aria-label^="Otevřít"]')
-    .first();
+    .first()
+    .elementHandle();
+  if (!tile) throw new Error("no photo tile to long-press");
   await tile.dispatchEvent("touchstart");
   // LONG_PRESS_MS is 450 in gallery-view.tsx; the touchend after it only
   // clears the already-fired timer.
