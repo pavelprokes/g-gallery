@@ -373,6 +373,7 @@
     "pinSubmit": "Enter",
     "pinWrong": "That PIN doesn't match. Please try again.",
     "pinLocked": "Too many attempts. Try again in {minutes} min.",
+    "pinError": "We couldn't check the PIN just now. Check your connection and try again.",
     "cancel": "Cancel",
     "barTitle": "Edit requests",
     "barCount": "{count, plural, =0 {none yet} one {# photo with a request} other {# photos with a request}}",

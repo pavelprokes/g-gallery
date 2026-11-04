@@ -120,6 +120,7 @@ import {
   ShareIcon,
 } from "@/components/ui/icons";
 import { useCorrections } from "@/components/corrections/use-corrections";
+import { correctionDraftKey } from "@/components/corrections/corrections-helpers";
 import {
   CorrectionBadge,
   CorrectionMarkers,
@@ -3468,12 +3469,30 @@ function GalleryViewInner({
         />
       )}
 
-      {corrections.active && (
-        <CorrectionsBar photoCount={corrections.photoCount} onExit={corrections.exit} />
-      )}
-      {!corrections.active && corrections.expired && (
-        <CorrectionsExpired onReenter={() => setPinOpen(true)} />
-      )}
+      {(corrections.active || corrections.expired) &&
+        (() => {
+          // Under the chapter bar and the print summary below, never on them.
+          const placement = {
+            belowChapters: showChapters,
+            printSummary:
+              allowPrintSelection &&
+              !optedOut &&
+              (markingMode || printSelections.size > 0 || printSync.pending > 0)
+                ? printOthers.size > 0
+                  ? ("tall" as const)
+                  : ("short" as const)
+                : ("none" as const),
+          };
+          return corrections.active ? (
+            <CorrectionsBar
+              photoCount={corrections.photoCount}
+              onExit={corrections.exit}
+              placement={placement}
+            />
+          ) : (
+            <CorrectionsExpired onReenter={() => setPinOpen(true)} placement={placement} />
+          );
+        })()}
       {pinOpen && (
         <CorrectionsPinSheet
           onEnter={async (pin) => {
@@ -3967,6 +3986,7 @@ function GalleryViewInner({
           {panelOpen && (
             <CorrectionsPanel
               key={active.id}
+              draftKey={correctionDraftKey(galleryId, active.id)}
               fileName={active.fileName}
               comments={corrections.byPhoto.get(active.id) ?? []}
               placing={placingSpot}
@@ -3976,14 +3996,18 @@ function GalleryViewInner({
               onPlacingChange={setPlacingSpot}
               onClearDraft={() => setDraftSpot(null)}
               onCreate={async (body) => {
-                const ok = await corrections.create(
+                const result = await corrections.create(
                   active.id,
                   body,
                   draftSpot?.x ?? null,
                   draftSpot?.y ?? null,
+                  correctionDraftKey(galleryId, active.id),
                 );
-                if (ok) setDraftSpot(null);
-                return ok;
+                // `session`: the key ran out under the text. It is kept (with
+                // its spot) and sent again once the PIN is entered again.
+                if (result !== "error") setDraftSpot(null);
+                if (result === "session") setPinOpen(true);
+                return result === "ok";
               }}
               onUpdate={(id, body) => corrections.update(id, { body })}
               onRemove={corrections.remove}

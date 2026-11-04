@@ -373,6 +373,7 @@
     "pinSubmit": "Entrer",
     "pinWrong": "Ce code ne correspond pas. Veuillez réessayer.",
     "pinLocked": "Trop de tentatives. Réessayez dans {minutes} min.",
+    "pinError": "Impossible de vérifier le code pour le moment. Vérifiez votre connexion et réessayez.",
     "cancel": "Annuler",
     "barTitle": "Demandes de retouche",
     "barCount": "{count, plural, =0 {aucune pour l'instant} one {# photo avec demande} other {# photos avec demande}}",
