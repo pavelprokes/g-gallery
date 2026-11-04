@@ -1,4 +1,4 @@
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 /**
  * Extends the base `test` with CPU/network throttling on the
@@ -27,3 +27,28 @@ export const test = base.extend({
 });
 
 export { expect };
+
+/**
+ * Starts the download selection on the first photo the way the viewer's device
+ * does: a click on the tile's checkbox with a mouse, a long press on the photo
+ * on a touch screen — where the idle checkbox is not drawn at all
+ * (`pointer-coarse:hidden`, so a tap on a tile corner opens the photo instead of
+ * silently selecting it). Once selection is on, every checkbox is pinned and
+ * clickable on both.
+ */
+export async function selectFirstPhoto(page: Page, isMobile: boolean): Promise<void> {
+  if (!isMobile) {
+    await page.getByRole("checkbox").first().click();
+    return;
+  }
+  const tile = page
+    .getByRole("list", { name: "Fotky v galerii" })
+    .locator('button[aria-label^="Otevřít"]')
+    .first();
+  await tile.dispatchEvent("touchstart");
+  // LONG_PRESS_MS is 450 in gallery-view.tsx; the touchend after it only
+  // clears the already-fired timer.
+  await page.waitForTimeout(600);
+  await tile.dispatchEvent("touchend");
+  await expect(page.getByRole("checkbox").first()).toHaveAttribute("aria-checked", "true");
+}

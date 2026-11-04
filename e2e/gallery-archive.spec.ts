@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, selectFirstPhoto } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -96,11 +96,11 @@ test.describe("pre-built archive: the download control", () => {
     // bytes are moving.
     await page.goto(`/g/${seed.archives.large.token}/${seed.archives.large.slug}`);
 
-    await page.getByRole("link", { name: /Stáhnout vše \(6\.1 GB\)/ }).click();
+    await page.getByRole("link", { name: /Stáhnout vše \(6,1\sGB\)/ }).click();
 
     const dialog = page.getByRole("dialog", { name: "Stahuješ celou galerii" });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("6.1 GB");
+    await expect(dialog).toContainText(/6,1\sGB/);
     await expect(dialog).toContainText(/plném rozlišení/);
     await expect(dialog).toContainText(/Wi-Fi/);
     await expect(dialog).toContainText(/navázat/);
@@ -138,7 +138,10 @@ test.describe("pre-built archive: the download control", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  test("a viewer can still take photos now while the archive is missing", async ({ page }) => {
+  test("a viewer can still take photos now while the archive is missing", async ({
+    page,
+    isMobile,
+  }) => {
     // The promise the "Připravujeme archiv" tooltip makes: selecting photos
     // and downloading those does not depend on the pre-built archive at all.
     // If this breaks, the honest empty state becomes a dead end.
@@ -147,7 +150,7 @@ test.describe("pre-built archive: the download control", () => {
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await expect(grid).toBeVisible();
 
-    await page.getByRole("checkbox").first().click();
+    await selectFirstPhoto(page, isMobile);
     await expect(
       page.locator(".sticky").getByRole("button", { name: "Stáhnout 1 fotku" }),
     ).toBeVisible();
