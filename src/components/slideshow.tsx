@@ -9,6 +9,8 @@ import { srcFor } from "@/lib/image-src";
 import { holdScreenAwake } from "@/lib/wake-lock";
 import { slideshowTiming } from "@/lib/slideshow-settings";
 import { projectionShot, shotKeyframes, transformFor } from "@/lib/projection-camera";
+import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 
 /**
  * The projection for the party (docs/GUEST-GALLERIES.md, F5): photos on the
@@ -16,7 +18,8 @@ import { projectionShot, shotKeyframes, transformFor } from "@/lib/projection-ca
  *
  * Deliberately without controls. This runs on a projector nobody is standing
  * next to — arrows, counters and a scrubber would only be things for a guest
- * to poke at. Escape or a click leaves; that is the whole interface.
+ * to poke at. Escape or a click leaves; that is the whole interface (plus an
+ * exit button that shows for a moment on open and on pointer movement).
  *
  * A photo whose faces are known moves the way the social video's camera does
  * (src/lib/projection-camera.ts): a slow push towards the people or a pull
@@ -28,6 +31,8 @@ import { projectionShot, shotKeyframes, transformFor } from "@/lib/projection-ca
 const { advanceMs: ADVANCE_MS, fadeMs: FADE_MS } = slideshowTiming();
 /** How often to look for photos guests have added since this started. */
 const REFRESH_MS = 30_000;
+/** How long the exit button stays after opening or the last pointer move. */
+const EXIT_SHOWN_MS = 3_000;
 
 export function Slideshow({
   photos,
@@ -112,16 +117,51 @@ export function Slideshow({
     return () => clearInterval(timer);
   }, [onRefresh]);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const exitRef = useRef<HTMLButtonElement>(null);
+  // Focus on the one control, so Tab cannot walk the gallery behind and Enter
+  // leaves; it goes back to the projector button on close.
+  useFocusTrap(dialogRef, true, exitRef);
+  useScrollLock();
+
+  // Read by the fullscreen listener, which is set up once.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // The projector must not go to sleep, and the page should own the screen.
   useEffect(() => {
     let lock: { release: () => void } | null = null;
+    let closed = false;
+    // `holdScreenAwake` re-acquires the lock itself whenever the tab becomes
+    // visible again (the browser drops it on hide). Closed before it resolved:
+    // hand it straight back, or the screen stays on after the slideshow.
     void holdScreenAwake().then((held) => {
-      lock = held;
+      if (closed) held?.release();
+      else lock = held;
     });
-    void document.documentElement.requestFullscreen?.().catch(() => undefined);
+
+    // Escape in fullscreen is the browser's: it leaves fullscreen and the page
+    // never sees the key. When this slideshow is what went fullscreen, leaving
+    // fullscreen leaves the slideshow too — one Escape, not two.
+    let ownsFullscreen = false;
+    const onFullscreenChange = () => {
+      if (ownsFullscreen && !document.fullscreenElement) onCloseRef.current();
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    void document.documentElement
+      .requestFullscreen?.()
+      .then(() => {
+        ownsFullscreen = !closed;
+      })
+      .catch(() => undefined);
 
     return () => {
+      closed = true;
       lock?.release();
+      // Before exiting, so our own exit is not read as the viewer's.
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     };
   }, []);
@@ -134,13 +174,34 @@ export function Slideshow({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The exit button shows for a few seconds on open and again whenever the
+  // pointer moves, then fades — a phone has no hover to find it with, and a
+  // projector should not carry a button for the whole party.
+  const [exitShown, setExitShown] = useState(true);
+  const hideExit = useRef<number | null>(null);
+  const revealExit = useCallback(() => {
+    setExitShown(true);
+    if (hideExit.current !== null) clearTimeout(hideExit.current);
+    hideExit.current = window.setTimeout(() => setExitShown(false), EXIT_SHOWN_MS);
+  }, []);
+  useEffect(() => {
+    hideExit.current = window.setTimeout(() => setExitShown(false), EXIT_SHOWN_MS);
+    return () => {
+      if (hideExit.current !== null) clearTimeout(hideExit.current);
+    };
+  }, []);
+
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={t("ariaLabel")}
-      className="fixed inset-0 z-50 bg-black"
+      tabIndex={-1}
+      className="fixed inset-0 z-50 bg-black outline-none"
       onClick={onClose}
+      onPointerMove={revealExit}
+      onPointerDown={revealExit}
     >
       {slots.map((slot, index) =>
         slot ? (
@@ -160,11 +221,15 @@ export function Slideshow({
         </p>
       )}
 
-      {/* The only affordance, and it fades out of the way. */}
+      {/* The only affordance, and it fades out of the way. Clear of the notch
+          and the rounded corners in landscape. */}
       <button
+        ref={exitRef}
         type="button"
         onClick={onClose}
-        className="absolute top-4 right-4 rounded-full bg-white/10 px-3 py-2 text-sm text-white opacity-0 transition-opacity duration-300 hover:opacity-100 focus-visible:opacity-100"
+        className={`on-media absolute top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] flex min-h-11 items-center rounded-full bg-black/55 px-4 text-sm text-white transition-opacity duration-300 hover:opacity-100 focus-visible:opacity-100 active:bg-black/70 ${
+          exitShown ? "opacity-100" : "opacity-0"
+        }`}
       >
         {t("exit")}
       </button>

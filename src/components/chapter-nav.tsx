@@ -4,6 +4,17 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import type { GalleryChapter } from "@/lib/gallery-chapters";
+import { mediaCounts } from "@/lib/video";
+
+/**
+ * A script-driven smooth scroll ignores `prefers-reduced-motion` (only CSS
+ * `scroll-behavior` honours it), so the chip row asks first. This is the
+ * row's own sideways scroll only — the jump to a chapter is always instant
+ * (docs/CHAPTERS.md).
+ */
+function sideScrollBehavior(): ScrollBehavior {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
 
 /**
  * The chapter bar's sideways scrolling: whether each side has more to show,
@@ -14,8 +25,11 @@ import type { GalleryChapter } from "@/lib/gallery-chapters";
  * right for a thin strip the pointer only crosses on purpose (it would be
  * wrong for anything tall enough to rest the pointer on while scrolling the
  * page — which is why the highlights no longer scroll sideways at all).
+ *
+ * Also the lightbox's action row, which overflows on a phone: there `more`
+ * feeds the same `edgeMask` fade, so the row visibly has more to show.
  */
-function useSideScroll<T extends HTMLElement>(content: unknown) {
+export function useSideScroll<T extends HTMLElement>(content: unknown) {
   const scrollerRef = useRef<T>(null);
   const [more, setMore] = useState({ before: false, after: false });
 
@@ -63,7 +77,10 @@ function useSideScroll<T extends HTMLElement>(content: unknown) {
   const page = (direction: 1 | -1) => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
+    scroller.scrollBy({
+      left: direction * scroller.clientWidth * 0.8,
+      behavior: sideScrollBehavior(),
+    });
   };
 
   return { scrollerRef, more, page };
@@ -112,7 +129,7 @@ export function ChapterBar({
     const left = chip.offsetLeft - 16;
     const right = chip.offsetLeft + chip.offsetWidth + 16;
     if (left < scroller.scrollLeft || right > scroller.scrollLeft + scroller.clientWidth) {
-      scroller.scrollTo({ left, behavior: "smooth" });
+      scroller.scrollTo({ left, behavior: sideScrollBehavior() });
     }
     // `scrollerRef` is a stable ref object; listed because it now comes from
     // a hook and the linter cannot tell.
@@ -127,7 +144,9 @@ export function ChapterBar({
       {more.before && <ScrollArrow side="before" onClick={() => page(-1)} />}
       <div
         ref={scrollerRef}
-        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 sm:px-3 [&::-webkit-scrollbar]:hidden"
+        // `overscroll-x-contain`: a trackpad swipe that reaches the end of the
+        // row must not carry on into the browser's swipe-to-go-Back.
+        className="relative flex h-full min-w-0 flex-1 [scrollbar-width:none] items-center gap-2 overflow-x-auto overscroll-x-contain px-4 sm:px-3 [&::-webkit-scrollbar]:hidden"
         style={{ maskImage: edgeMask(more), WebkitMaskImage: edgeMask(more) }}
       >
         {chapters.map((chapter) => {
@@ -172,7 +191,10 @@ export function ChapterBar({
                 if (event.repeat) return;
                 onJump(chapter.id);
               }}
-              className={`text-body flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 whitespace-nowrap transition-colors ${
+              // A name can be 60 characters: capped, so one long chip never
+              // fills the row on a phone; the full name is in `title`.
+              title={chapter.title}
+              className={`text-body flex min-h-11 max-w-[70vw] shrink-0 items-center gap-2 rounded-full border px-4 whitespace-nowrap transition-colors ${
                 current
                   ? "border-brand-ink bg-brand-ink dark:border-brand-tint dark:bg-brand-tint dark:text-brand-ink text-white"
                   : "border-brand-border hover:bg-brand-tint dark:hover:bg-brand-ink/40 dark:border-neutral-700"
@@ -184,7 +206,7 @@ export function ChapterBar({
                   className="motion-loop size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
                 />
               )}
-              {chapter.title}
+              <span className="min-w-0 truncate">{chapter.title}</span>
             </a>
           );
         })}
@@ -198,7 +220,7 @@ export function ChapterBar({
  * A chip cut off by the edge of the row fades out instead of ending in a hard
  * line — visual only: a mask never takes clicks away from what is under it.
  */
-function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
+export function edgeMask(more: { before: boolean; after: boolean }): string | undefined {
   if (!more.before && !more.after) return undefined;
   const start = more.before ? "transparent 0, black 1.5rem" : "black 0";
   const end = more.after ? "black calc(100% - 1.5rem), transparent 100%" : "black 100%";
@@ -269,6 +291,10 @@ export function ChapterHeaderRow({
                 focusRef.current = null;
               }
             }}
+            // One line, truncated: the row's height is fixed (the virtualizer
+            // lays it out before it renders), so a second line has nowhere
+            // to go. The full name is in `title`.
+            title={chapter.title}
             className="truncate text-2xl font-semibold tracking-tight sm:text-3xl"
             // Focused only to move a screen reader here after a jump; it is
             // not a control, so no ring. Inline, because the global
@@ -278,8 +304,8 @@ export function ChapterHeaderRow({
             {chapter.title}
           </h2>
         </div>
-        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 shrink-0 pb-0.5">
-          {t("photoCount", { count: chapter.count })}
+        <p className="text-body text-brand-ink/70 dark:text-brand-tint/70 shrink-0 pb-0.5">
+          {mediaCounts(t, chapter.count, chapter.videoCount ?? 0).join(" · ")}
         </p>
       </div>
     </li>

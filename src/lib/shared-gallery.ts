@@ -392,23 +392,52 @@ export async function loadGalleryViewData(
  * ponytail: counts are fixed at page load, so a photo added or removed while
  * the page is open shows in the grid but not in "84 fotek" until a reload.
  * Placement does not use them (src/lib/gallery-grid.ts), only the label does.
+ *
+ * Videos are counted apart (a second COUNT per chapter), so a chapter of 40
+ * photos and 2 films reads "40 fotek, 2 videa" like the page header, not
+ * "42 fotek" (docs/VIDEO.md).
  */
 async function chaptersWithCounts(
   galleryId: string,
   order: PhotoOrder,
   total: number,
-  chapters: Omit<GalleryChapter, "count">[],
+  chapters: Omit<GalleryChapter, "count" | "videoCount">[],
 ): Promise<GalleryChapter[]> {
   if (chapters.length === 0) return [];
-  const before = await Promise.all(
-    chapters.map((chapter) =>
-      prisma.photo.count({
-        where: { galleryId, status: "CONFIRMED", ...beforePosition(order, chapter.start) },
-      }),
+  const confirmed = { galleryId, status: "CONFIRMED" } as const;
+  const isVideo = { videoObjectKey: { not: null } };
+  const [before, videosBefore, totalVideos] = await Promise.all([
+    Promise.all(
+      chapters.map((chapter) =>
+        prisma.photo.count({ where: { ...confirmed, ...beforePosition(order, chapter.start) } }),
+      ),
     ),
-  );
+    Promise.all(
+      chapters.map((chapter) =>
+        prisma.photo.count({
+          where: { ...confirmed, ...isVideo, ...beforePosition(order, chapter.start) },
+        }),
+      ),
+    ),
+    prisma.photo.count({ where: { ...confirmed, ...isVideo } }),
+  ]);
+  return chapterCounts(chapters, { before, total }, { before: videosBefore, total: totalVideos });
+}
+
+/**
+ * Each chapter's share of a running count: from how many items sit before its
+ * start to how many sit before the next one's (or the total, for the last).
+ * Chapters left with nothing are dropped. Exported for its unit test.
+ */
+export function chapterCounts<C>(
+  chapters: readonly C[],
+  all: { before: readonly number[]; total: number },
+  videos: { before: readonly number[]; total: number },
+): (C & { count: number; videoCount: number })[] {
+  const span = (counts: { before: readonly number[]; total: number }, i: number) =>
+    (counts.before[i + 1] ?? counts.total) - counts.before[i]!;
   return chapters
-    .map((chapter, i) => ({ ...chapter, count: (before[i + 1] ?? total) - before[i]! }))
+    .map((chapter, i) => ({ ...chapter, count: span(all, i), videoCount: span(videos, i) }))
     .filter((chapter) => chapter.count > 0);
 }
 

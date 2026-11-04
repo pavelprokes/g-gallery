@@ -194,6 +194,7 @@
     "loadingMorePhotos": "Wczytuję kolejne zdjęcia…",
     "emptyGallery": "W tej galerii nie ma jeszcze zdjęć. Gdy fotograf je doda, pojawią się tutaj — wystarczy odświeżyć stronę.",
     "searchingFavorites": "Szukam Twoich ulubionych w reszcie galerii…",
+    "emptyGuestGallery": "Nie ma tu jeszcze zdjęć. Dodaj pierwsze przyciskiem na dole.",
     "noFavoritesYet": "Nie masz jeszcze żadnych ulubionych.",
     "lightboxAriaLabel": "Zdjęcie {index} z {total}",
     "previous": "Poprzednie",

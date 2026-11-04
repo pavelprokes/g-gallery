@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Fotky v galerii",
     "loadingMorePhotos": "Načítám další fotky…",
     "emptyGallery": "V galerii zatím nejsou žádné fotky. Až je fotograf přidá, objeví se tady – stačí načíst stránku znovu.",
+    "emptyGuestGallery": "Zatím tu nejsou žádné fotky. Buď první – přidej je tlačítkem dole.",
     "searchingFavorites": "Hledám tvoje oblíbené ve zbytku galerie…",
     "noFavoritesYet": "Zatím tu nemáš žádnou oblíbenou fotku.",
     "lightboxAriaLabel": "Fotka {index} z {total}",
