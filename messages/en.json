@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Photos in the gallery",
     "loadingMorePhotos": "Loading more photos…",
     "emptyGallery": "There are no photos in this gallery yet. Once the photographer adds them, they'll show up here — just reload the page.",
+    "emptyGuestGallery": "No photos yet. Be the first – add yours with the button below.",
     "searchingFavorites": "Looking for your favorites in the rest of the gallery…",
     "noFavoritesYet": "You haven't added any favorites yet.",
     "lightboxAriaLabel": "Photo {index} of {total}",

@@ -38,8 +38,9 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       aria-label={LOCALES.map((code) => t(code)).join(" / ")}
       value={locale}
       onChange={(event) => choose(event.target.value as Locale)}
-      // h-11: the 44 px hit region Apple HIG asks for.
-      className={`hover:bg-brand-tint hover:text-brand-ink h-11 shrink-0 cursor-pointer rounded-full border border-neutral-300 bg-transparent px-4 text-sm font-semibold text-neutral-600 transition-colors dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className ?? ""}`}
+      // h-11: the 44 px hit region Apple HIG asks for. text-base (16 px):
+      // anything smaller and iOS Safari zooms the page in when it is focused.
+      className={`hover:bg-brand-tint hover:text-brand-ink h-11 shrink-0 cursor-pointer rounded-full border border-neutral-300 bg-transparent px-4 text-base font-semibold text-neutral-600 transition-colors dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className ?? ""}`}
     >
       {LOCALES.map((code) => (
         <option key={code} value={code} lang={code}>

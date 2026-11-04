@@ -2,6 +2,20 @@
 
 import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useScrollLock } from "@/lib/use-scroll-lock";
+
+/**
+ * What the guest had typed when they last dismissed the sheet with a tap on
+ * the backdrop or Escape — kept for this page's lifetime, so a stray tap
+ * beside the sheet does not cost them their name. Module state, not storage:
+ * an unconfirmed draft is not something to remember past a reload.
+ */
+let nameDraft = "";
+
+/** Exported for the colocated test. */
+export function resetNameDraft() {
+  nameDraft = "";
+}
 
 /**
  * The one place a guest is asked their name (docs/GUEST-GALLERIES.md §6): before
@@ -44,6 +58,19 @@ export function NameSheet({
   const ownInputRef = useRef<HTMLInputElement>(null);
   const inputRef = externalInputRef ?? ownInputRef;
 
+  // An empty field picks up the draft a dismissal left behind. Once, on open:
+  // clearing the field afterwards is the guest's own doing.
+  const restored = useRef(false);
+  const latest = useRef({ value, onChange });
+  useEffect(() => {
+    latest.current = { value, onChange };
+  });
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (!latest.current.value && nameDraft) latest.current.onChange(nameDraft);
+  }, []);
+
   // Focus goes straight to the field. The sheet always opens from a tap, and
   // React flushes a discrete event's effects inside that event, so this still
   // counts as a user gesture on iOS — which is what brings the keyboard up
@@ -52,8 +79,14 @@ export function NameSheet({
     <Sheet
       title={title}
       hint={hint}
-      onSubmit={onSubmit}
-      onDismiss={onDismiss}
+      onSubmit={() => {
+        nameDraft = "";
+        onSubmit();
+      }}
+      onDismiss={() => {
+        nameDraft = value;
+        onDismiss();
+      }}
       initialFocusRef={inputRef}
       field={(titleId) => (
         <input
@@ -108,6 +141,7 @@ export function Sheet({
   const keyboardInset = useKeyboardInset();
 
   useFocusTrap(containerRef, true, initialFocusRef);
+  useScrollLock();
 
   return (
     <div
@@ -133,23 +167,20 @@ export function Sheet({
       }}
     >
       <form
-        className="animate-sheet-rise w-full rounded-t-2xl bg-white px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:max-w-sm sm:rounded-xl sm:pt-5 sm:pb-5 dark:bg-neutral-900"
+        // No grabber: it promises a drag-to-dismiss this sheet does not have
+        // (the backdrop and Escape dismiss it), so a guest dragging it got
+        // nothing. `pt-5` takes the room it held.
+        className="animate-sheet-rise w-full rounded-t-2xl bg-white px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:max-w-sm sm:rounded-xl sm:pt-5 sm:pb-5 dark:bg-neutral-900"
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit();
         }}
       >
-        {/* A grabber reads as "this is a sheet" on a phone. Decoration only:
-            the sheet is dismissed by the backdrop or Escape, not by dragging. */}
-        <div
-          aria-hidden
-          className="mx-auto mb-4 h-1 w-10 rounded-full bg-neutral-300 sm:hidden dark:bg-neutral-700"
-        />
         <h2 id={titleId} className="text-title font-semibold">
           {title}
         </h2>
-        <p id={hintId} className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1">
+        <p id={hintId} className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-1">
           {hint}
         </p>
         {field?.(titleId)}

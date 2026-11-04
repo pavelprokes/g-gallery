@@ -3,7 +3,7 @@
 import type { Face } from "@/lib/social-video/faces";
 import type { Focus } from "@/lib/social-video/focus";
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -68,7 +68,7 @@ import { PROMO_ASPECT, type GalleryPromo } from "@/lib/promo-card";
 import type { PhotoOrder } from "@/lib/photo-order";
 import type { GalleryChapter, TimelinePosition } from "@/lib/gallery-chapters";
 import { PromoTile } from "@/components/promo-tile";
-import { ChapterBar, ChapterHeaderRow } from "@/components/chapter-nav";
+import { ChapterBar, ChapterHeaderRow, edgeMask, useSideScroll } from "@/components/chapter-nav";
 import { GalleryHighlights } from "@/components/gallery-highlights";
 import type { GalleryHighlight } from "@/lib/gallery-highlights";
 import { photoParam, withPhotoParam } from "@/lib/photo-link";
@@ -84,6 +84,7 @@ import {
 } from "@/lib/zoom-pan";
 import { srcFor } from "@/lib/image-src";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import { NameSheet, Sheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SiteFooterIdentity } from "@/components/site-footer-identity";
@@ -1076,10 +1077,18 @@ function LightboxVideo({ video, allowDownload, poster, onSwipe }: LightboxVideoP
             {!started && (
               <button
                 type="button"
-                onClick={() => void videoRef.current?.play()}
+                onClick={() => {
+                  const element = videoRef.current;
+                  if (!element) return;
+                  // This button unmounts on play and focus would fall to the
+                  // page; on the video, Space pauses it (the lightbox leaves a
+                  // focused video its keys) instead of selecting the film.
+                  element.focus({ preventScroll: true });
+                  void element.play();
+                }}
                 aria-label={t("playVideo")}
                 // The ring keeps it visible on a black poster (a fade-in frame).
-                className="on-media absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-2 ring-white/80 backdrop-blur-sm transition-colors hover:bg-black/70"
+                className="on-media absolute top-1/2 left-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white ring-2 ring-white/80 backdrop-blur-sm transition-colors hover:bg-black/70 active:bg-black/80"
               >
                 <PlayIcon className="ms-1 h-8 w-8" />
               </button>
@@ -1359,6 +1368,20 @@ function GalleryViewInner({
    * sixty red hearts that reached nobody.
    */
   const [saveFailed, setSaveFailed] = useState(false);
+  /**
+   * The guest uploader's fixed bar, measured, so the toast above can sit over
+   * it. The uploader keeps a spacer exactly the bar's height in the flow (and
+   * the bar itself out of it), so the wrapper's own height is the bar's.
+   */
+  const uploaderRef = useRef<HTMLDivElement>(null);
+  const [uploaderBarHeight, setUploaderBarHeight] = useState(0);
+  useEffect(() => {
+    const el = uploaderRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setUploaderBarHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [allowUpload]);
   /**
    * The undo for an optimistic write that the name prompt interrupted. Only one
    * interaction can be waiting on the prompt at a time, so one slot is enough;
@@ -2154,10 +2177,18 @@ function GalleryViewInner({
    *
    * Favourites-only mode drops them: that view is the viewer's own shortlist,
    * and a credit card in the middle of it is neither theirs nor a favourite.
+   *
+   * Slots resolve against the gallery's real total, not the pages loaded so
+   * far; a card past the loaded photos waits for its page instead of standing
+   * in at the end of them and then jumping.
    */
   const entries = useMemo<GridEntry<GalleryPhoto>[]>(
-    () => buildGridEntries(photos, favoritesOnly ? [] : promos),
-    [photos, promos, favoritesOnly],
+    () =>
+      buildGridEntries(photos, favoritesOnly ? [] : promos, {
+        total: liveCount,
+        complete: !hasNextPage,
+      }),
+    [photos, promos, favoritesOnly, liveCount, hasNextPage],
   );
 
   const rows = useMemo<JustifiedRow<GridEntry<GalleryPhoto>>[]>(() => {
@@ -2784,6 +2815,11 @@ function GalleryViewInner({
   // Close is the one control that is always present and always enabled, so it
   // is the only stable landing spot for focus when the lightbox opens.
   useFocusTrap(lightboxRef, isLightboxOpen, lightboxCloseRef);
+  // A wheel or a swipe over the dialog must not scroll the grid behind it:
+  // that mounts rows and starts their downloads while the viewer waits for
+  // the one photo on screen (docs/GALLERY-LOADING.md). The lightbox's own
+  // programmatic scroll (keeping the photo's tile in view) still works.
+  useScrollLock(isLightboxOpen);
 
   /**
    * One history entry per open lightbox, not per photo browsed inside it, so
@@ -2990,6 +3026,33 @@ function GalleryViewInner({
   const chromeClasses = chromeInert
     ? "pointer-events-none opacity-0 transition-opacity duration-200"
     : "opacity-100 transition-opacity duration-200";
+
+  /** The counter's total, the same for the eye and for a screen reader.
+   * `liveCount` is the gallery's real total — unlike `photos.length`, it does
+   * not depend on how many pages have loaded; the favourites filter narrows to
+   * a subset it does not describe, so that keeps the loaded-so-far count. */
+  const lightboxTotal = favoritesOnly ? photos.length : liveCount;
+  const format = useFormatter();
+
+  // The action row scrolls sideways on a phone (it is wider than the screen);
+  // the fade at an edge says there is more, as on the chapter bar.
+  const { scrollerRef: actionRowRef, more: actionRowMore } = useSideScroll<HTMLDivElement>(
+    active?.id,
+  );
+
+  // Focus inside the chrome when it goes inert is dropped to <body> (or left
+  // on a control nobody can see), and the next Tab walks the grid behind the
+  // dialog. Park it on the dialog itself; the trap keeps it there.
+  useEffect(() => {
+    if (!chromeInert) return;
+    const dialog = lightboxRef.current;
+    const focused = document.activeElement;
+    if (!dialog) return;
+    const lost = !focused || focused === document.body;
+    const hidden =
+      focused instanceof HTMLElement && dialog.contains(focused) && !!focused.closest("[inert]");
+    if (lost || hidden) dialog.focus({ preventScroll: true });
+  }, [chromeInert]);
 
   /**
    * Takes back one of this viewer's own uploads. Irreversible, so it asks —
@@ -3227,7 +3290,10 @@ function GalleryViewInner({
   // an outer margin — the page edge matches the seam between two photos
   // instead of framing the grid, which is what Google Photos does.
   return (
-    <main className="mx-auto max-w-[1600px] px-0 pt-5 pb-10 sm:px-1 sm:pt-10 sm:pb-14 lg:pt-12">
+    // Landscape on a notched phone (viewport-fit=cover): the side insets pad
+    // the page, so no tile sits under the notch. The grid measures the list's
+    // own box, which is inside this padding.
+    <main className="mx-auto max-w-[1600px] ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)] pt-5 pb-10 sm:ps-[calc(0.25rem+env(safe-area-inset-left))] sm:pe-[calc(0.25rem+env(safe-area-inset-right))] sm:pt-10 sm:pb-14 lg:pt-12">
       <div aria-live="polite" className="sr-only">
         {selection.ids.size > 0 ? t("selectedCount", { count: selection.ids.size }) : ""}
       </div>
@@ -3241,18 +3307,28 @@ function GalleryViewInner({
           state it replaces was sixty red hearts that reached nobody. Fixed to
           the bottom so it is seen while scrolling a long gallery, above the
           lightbox's own z-index so it survives being opened, and dismissible
-          because the viewer may simply want to carry on looking. */}
+          because the viewer may simply want to carry on looking. Clear of the
+          home indicator, and above the guest uploader's bar when there is
+          one (measured: the bar grows with its status lines). */}
       {saveFailed && (
         <div
           role="alert"
-          className="bg-brand-ink text-caption fixed inset-x-3 bottom-3 z-[60] mx-auto flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-white shadow-lg"
+          className="bg-brand-ink text-caption fixed inset-x-3 z-[60] mx-auto flex max-w-md items-start gap-3 rounded-xl px-4 py-3 text-white shadow-lg"
+          style={{
+            bottom:
+              uploaderBarHeight > 0
+                ? `calc(${uploaderBarHeight}px + 0.75rem)`
+                : "max(0.75rem, env(safe-area-inset-bottom))",
+          }}
         >
           <span className="flex-1">{t("saveFailed")}</span>
           <button
             type="button"
             onClick={() => setSaveFailed(false)}
             aria-label={t("close")}
-            className="on-media -m-1 shrink-0 rounded-full p-1 text-white/70 hover:text-white"
+            // A 44 px target around the 16 px glyph, pulled into the padding
+            // so the toast does not grow for it.
+            className="on-media -my-2.5 -me-2.5 flex size-11 shrink-0 items-center justify-center rounded-full text-white/70 hover:text-white active:bg-white/15"
           >
             <CloseIcon className="h-4 w-4" />
           </button>
@@ -3265,7 +3341,9 @@ function GalleryViewInner({
           {backHref && (
             <a
               href={backHref}
-              className="text-body text-brand-ink/60 dark:text-brand-tint/60 mb-1 inline-block underline"
+              // A 44 px tall target for a one-line link; the negative margins
+              // keep the header's spacing where it was.
+              className="text-body text-brand-ink/70 dark:text-brand-tint/70 -mt-2.5 -mb-1.5 inline-flex min-h-11 items-center underline"
             >
               ← {backLabel ?? t("back")}
             </a>
@@ -3274,9 +3352,9 @@ function GalleryViewInner({
             {title}
           </h1>
           {subtitle && (
-            <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-0.5">{subtitle}</p>
+            <p className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-0.5">{subtitle}</p>
           )}
-          <PhotographerCredit className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-0.5" />
+          <PhotographerCredit className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-0.5" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Touch only: a mouse already reveals both icons on hover, so on a
@@ -3596,7 +3674,7 @@ function GalleryViewInner({
               <li
                 key="loading"
                 aria-hidden
-                className="text-body text-brand-ink/60 dark:text-brand-tint/60 absolute top-0 left-0 flex w-full items-center justify-center"
+                className="text-body text-brand-ink/70 dark:text-brand-tint/70 absolute top-0 left-0 flex w-full items-center justify-center"
                 style={{
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
@@ -3718,9 +3796,13 @@ function GalleryViewInner({
       </ul>
 
       {photos.length === 0 && (
-        <p className={`${GUTTER} text-body text-brand-ink/60 dark:text-brand-tint/60`}>
+        <p className={`${GUTTER} text-body text-brand-ink/70 dark:text-brand-tint/70`}>
           {!favoritesOnly
-            ? t("emptyGallery")
+            ? // Guests can add photos here: "the photographer will add them"
+              // would be wrong, right above the bar that says otherwise.
+              allowUpload
+              ? t("emptyGuestGallery")
+              : t("emptyGallery")
             : hasNextPage
               ? t("searchingFavorites")
               : t("noFavoritesYet")}
@@ -3736,7 +3818,7 @@ function GalleryViewInner({
           ref={lightboxRef}
           role="dialog"
           aria-modal="true"
-          aria-label={t("lightboxAriaLabel", { index: activeIndex! + 1, total: photos.length })}
+          aria-label={t("lightboxAriaLabel", { index: activeIndex! + 1, total: lightboxTotal })}
           tabIndex={-1}
           className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 outline-none ${
             panelOpen ? "max-md:pb-[45dvh] md:pr-96" : ""
@@ -3801,7 +3883,7 @@ function GalleryViewInner({
             disabled={activeIndex === 0}
             // Landscape on a notched phone puts the safe-area inset on the
             // side, not the bottom; without this the circle sits under it.
-            className={`absolute left-0 ps-[env(safe-area-inset-left)] ${chromeClasses}`}
+            className={`absolute left-0 ps-[env(safe-area-inset-left)] [&:active:enabled>span]:bg-black/70 ${chromeClasses}`}
             aria-label={t("previous")}
           >
             <ChevronLeftIcon />
@@ -3813,13 +3895,14 @@ function GalleryViewInner({
             }}
             inert={chromeInert}
             disabled={activeIndex! >= photos.length - 1 && !hasNextPage}
-            className={`absolute right-0 pe-[env(safe-area-inset-right)] ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
+            className={`absolute right-0 pe-[env(safe-area-inset-right)] [&:active:enabled>span]:bg-black/70 ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
             aria-label={t("next")}
           >
             <ChevronRightIcon />
           </NavButton>
           <div
-            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))] ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
+            // Landscape on a notched phone: the insets are on the sides.
+            className={`absolute inset-x-0 top-0 flex items-center gap-3 p-4 ps-[max(1rem,env(safe-area-inset-left))] pe-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] ${panelOpen ? "md:right-96" : ""} ${chromeClasses}`}
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
@@ -3829,7 +3912,7 @@ function GalleryViewInner({
                 type="button"
                 onClick={closeLightbox}
                 aria-label={t("close")}
-                className="on-media flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+                className="on-media flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 active:bg-white/25"
               >
                 <CloseIcon className="h-5 w-5" />
               </button>
@@ -3839,7 +3922,7 @@ function GalleryViewInner({
                   type="button"
                   disabled={deleting}
                   onClick={() => void deleteMine(active.id)}
-                  className="flex h-11 items-center rounded-full px-3 text-sm text-white transition-colors hover:bg-white/15 disabled:opacity-50"
+                  className="flex h-11 items-center rounded-full px-3 text-sm text-white transition-colors hover:bg-white/15 active:bg-white/25 disabled:opacity-50"
                 >
                   {deleting ? t("deleting") : t("deleteMyPhoto")}
                 </button>
@@ -3851,7 +3934,7 @@ function GalleryViewInner({
                   onClick={() => pick(activeIndex!, active.id, false)}
                   aria-pressed={activeSelected}
                   aria-label={activeSelected ? t("selected") : t("select")}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors active:bg-white/25 ${
                     activeSelected ? "" : "hover:bg-white/15"
                   }`}
                 >
@@ -3864,14 +3947,13 @@ function GalleryViewInner({
               )}
             </div>
 
-            {/* `liveCount` is the gallery's real, server-side total — unlike
-                `photos.length`, it doesn't depend on how many pages of the
-                infinite scroll have loaded yet, so the counter never needs a
-                "+" to hedge an incomplete count. Favoriting filters the list
-                to a subset `liveCount` doesn't describe, so that case keeps
-                the old loaded-so-far behaviour. */}
-            <span className="ml-auto shrink-0 rounded-full bg-black/55 px-3 py-1.5 text-sm text-white/70 tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
-              {activeIndex! + 1} / {favoritesOnly ? photos.length : liveCount}
+            {/* `lightboxTotal`: the gallery's real total (see there), so the
+                counter never needs a "+" to hedge an incomplete count — except
+                in favourites-only mode, which counts what has loaded. Numbers
+                in the viewer's locale ("1 234" in Czech), as ICU's # does in
+                every message. Full white: 70 % on the glass failed contrast. */}
+            <span className="ml-auto shrink-0 rounded-full bg-black/55 px-3 py-1.5 text-sm text-white tabular-nums pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md">
+              {format.number(activeIndex! + 1)} / {format.number(lightboxTotal)}
               {favoritesOnly && hasNextPage && "+"}
             </span>
           </div>
@@ -3902,9 +3984,17 @@ function GalleryViewInner({
               the viewport rather than wrapping: a control bar that becomes two
               rows moves every button the viewer had just learned the position
               of. `bottom` clears the home indicator — the guest uploader was
-              the only surface in the app already doing this. */}
+              the only surface in the app already doing this. The edge that has
+              more to show fades out (the chapter bar's `edgeMask`), so the row
+              reads as scrollable rather than cut off; `overscroll-x-contain`
+              keeps a swipe that reaches its end from turning into Back. */}
           <div
-            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] ${panelOpen ? "max-md:bottom-[calc(45dvh+0.5rem)]" : ""} flex max-w-[calc(100vw-1.5rem)] [scrollbar-width:none] items-center gap-1 overflow-x-auto rounded-full bg-black/55 px-2 py-1.5 [-ms-overflow-style:none] pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
+            ref={actionRowRef}
+            className={`absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] ${panelOpen ? "max-md:bottom-[calc(45dvh+0.5rem)]" : ""} flex max-w-[calc(100vw-1.5rem-env(safe-area-inset-left)-env(safe-area-inset-right))] [scrollbar-width:none] items-center gap-1 overflow-x-auto overscroll-x-contain rounded-full bg-black/55 px-2 py-1.5 [-ms-overflow-style:none] pointer-fine:bg-black/40 pointer-fine:backdrop-blur-md [&::-webkit-scrollbar]:hidden ${chromeClasses}`}
+            style={{
+              maskImage: edgeMask(actionRowMore),
+              WebkitMaskImage: edgeMask(actionRowMore),
+            }}
             inert={chromeInert}
             onClick={(event) => event.stopPropagation()}
           >
@@ -3942,7 +4032,7 @@ function GalleryViewInner({
                 aria-label={
                   zipState === "preparing" ? t("preparingDownload") : t("downloadOriginal")
                 }
-                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 disabled:opacity-50"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 active:bg-white/25 disabled:opacity-50"
               >
                 <DownloadIcon className="h-5 w-5" />
               </button>
@@ -3952,7 +4042,7 @@ function GalleryViewInner({
               onClick={() => void sharePhoto(active.id)}
               aria-label={t("sharePhoto")}
               title={t("sharePhoto")}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15 active:bg-white/25"
             >
               {linkCopiedFor === active.id ? (
                 <CheckIcon className="h-5 w-5" />
@@ -4092,7 +4182,7 @@ function GalleryViewInner({
         />
       )}
 
-      <footer className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mx-4 mt-10 border-t pt-4 sm:mx-3">
+      <footer className="text-caption text-brand-ink/70 dark:text-brand-tint/70 mx-4 mt-10 border-t pt-4 sm:mx-3">
         {/* In the footer, not the toolbar (Pavel, 2026-09-23): the language is
             autodetected, so almost nobody needs the switch — and the toolbar
             over the photos is the one place every guest looks. Whoever does
@@ -4145,17 +4235,20 @@ function GalleryViewInner({
       )}
 
       {allowUpload && (
-        <GuestUploader
-          token={token}
-          onUploaded={async () => {
-            await queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
-            // Newly uploaded photos are deletable straight away, so the
-            // "mine" set has to catch up with what just landed.
-            const anonKey = getViewerId();
-            if (anonKey) setMine(new Set(await fetchMyPhotoIds(token, anonKey)));
-          }}
-          onRenamed={() => queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] })}
-        />
+        // Measured for the save-failed toast (`uploaderBarHeight`).
+        <div ref={uploaderRef}>
+          <GuestUploader
+            token={token}
+            onUploaded={async () => {
+              await queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] });
+              // Newly uploaded photos are deletable straight away, so the
+              // "mine" set has to catch up with what just landed.
+              const anonKey = getViewerId();
+              if (anonKey) setMine(new Set(await fetchMyPhotoIds(token, anonKey)));
+            }}
+            onRenamed={() => queryClient.invalidateQueries({ queryKey: ["gallery-photos", token] })}
+          />
+        </div>
       )}
     </main>
   );
@@ -4289,9 +4382,14 @@ export const PhotoTile = memo(function PhotoTile({
   // that follows it always target the same DOM node, so there is no reason
   // for this to live in the parent (and mutating a ref passed down as a prop
   // is against the rules-of-hooks lint now enforced here).
-  const longPress = useRef<{ timer: number | null; fired: boolean }>({
+  const longPress = useRef<{
+    timer: number | null;
+    fired: boolean;
+    start: { x: number; y: number } | null;
+  }>({
     timer: null,
     fired: false,
+    start: null,
   });
 
   const cancelLongPress = useCallback(() => {
@@ -4315,7 +4413,9 @@ export const PhotoTile = memo(function PhotoTile({
 
   return (
     <div
-      className={`group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:transition-opacity ${scrimClasses}`}
+      // With downloads on, a long press is our selection gesture: iOS's own
+      // long-press menu ("Save to Photos", "Copy") must not open over it.
+      className={`group relative shrink-0 select-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-black/45 after:to-transparent after:transition-opacity ${allowDownload ? "[-webkit-touch-callout:none]" : ""} ${scrimClasses}`}
       style={{ width, height }}
       onTouchStart={(event) => {
         if (!allowDownload) return;
@@ -4328,13 +4428,30 @@ export const PhotoTile = memo(function PhotoTile({
         // stepper, since nothing idle was drawn on touch; marking mode puts
         // one of these on every tile in the gallery.
         if (!tileButton.current?.contains(event.target as Node)) return;
+        const touch = event.touches[0];
         longPress.current.fired = false;
+        longPress.current.start = touch ? { x: touch.clientX, y: touch.clientY } : null;
         longPress.current.timer = window.setTimeout(() => {
           longPress.current.fired = true;
           onPick(index, photo.id, false);
         }, LONG_PRESS_MS);
       }}
-      onTouchMove={cancelLongPress}
+      // A finger held still still wobbles by a pixel or two, and a touchmove
+      // fires for each: only a move past the tap slop is a scroll that should
+      // cancel the press.
+      onTouchMove={(event) => {
+        const start = longPress.current.start;
+        const touch = event.touches[0];
+        if (
+          start &&
+          touch &&
+          Math.abs(touch.clientX - start.x) <= TAP_SLOP_PX &&
+          Math.abs(touch.clientY - start.y) <= TAP_SLOP_PX
+        ) {
+          return;
+        }
+        cancelLongPress();
+      }}
       onTouchEnd={cancelLongPress}
       onTouchCancel={cancelLongPress}
       // A long press otherwise raises the browser's "save image" sheet on top
@@ -4375,7 +4492,10 @@ export const PhotoTile = memo(function PhotoTile({
         // against a photograph. The clip that used to live here moved to the
         // wrapper below, because the ring's dark outer halo is a box-shadow
         // drawn outside the border box and `overflow-hidden` would eat it.
-        className={`on-media relative block h-full w-full ${selected ? "bg-brand-primary" : ""}`}
+        //
+        // `active:brightness-90`: the press itself shows, now that the
+        // platform's tap highlight is off (globals.css).
+        className={`on-media relative block h-full w-full active:brightness-90 ${selected ? "bg-brand-primary" : ""}`}
         style={selected ? undefined : { backgroundColor: placeholderStyle(photo.placeholder) }}
         aria-label={
           selectionActive
@@ -4535,7 +4655,7 @@ export function HeartButton({
   // every heart once the viewer has asked for marking mode.
   const alwaysOn = !bare && (pinned || active || count > 0);
   const restingClasses = bare
-    ? "hover:bg-white/15"
+    ? "hover:bg-white/15 active:bg-white/25"
     : // Fades in under a mouse. `pointer-coarse:hidden` rather than a mere
       // `opacity-0`, so a phone is not left with an invisible 44px tap target
       // sitting in the corner of every photo.
@@ -4604,7 +4724,7 @@ export function PrinterButton({
     const idleSizeClasses =
       size === "lg" ? idleBox : `${idleBox} drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]`;
     const restingClasses = bare
-      ? "hover:bg-white/15"
+      ? "hover:bg-white/15 active:bg-white/25"
       : // Somebody else's copies are information, like a heart's count — so,
         // like the heart, the printer then shows without a hover or a toggle.
         pinned || others > 0
@@ -4651,7 +4771,7 @@ export function PrinterButton({
         type="button"
         onClick={onDecrement}
         aria-label={t("decreasePrintQuantity")}
-        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 ${stepBtnSize}`}
+        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 active:bg-white/30 ${stepBtnSize}`}
       >
         <MinusIcon className={stepIconSize} />
       </button>
@@ -4674,7 +4794,7 @@ export function PrinterButton({
         onClick={onIncrement}
         disabled={quantity >= MAX_PRINT_QUANTITY}
         aria-label={t("increasePrintQuantity")}
-        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent ${stepBtnSize}`}
+        className={`on-media flex items-center justify-center rounded-full hover:bg-white/20 active:bg-white/30 disabled:opacity-40 disabled:hover:bg-transparent ${stepBtnSize}`}
       >
         <PlusIcon className={stepIconSize} />
       </button>
@@ -4688,7 +4808,8 @@ export function PrinterButton({
  * Hidden until hover on pointer devices — 500 permanent circles would shout
  * over the photos. Tailwind 4 gates `hover:` behind `(hover: hover)`, so on a
  * phone the hover rule never fires and the checkbox appears only once
- * selection mode has been entered by long press.
+ * selection mode has been entered by long press. Until then it is not
+ * rendered on a coarse pointer at all — `opacity-0` alone left it taking taps.
  *
  * Same `CheckIcon` glyph, same size, in both states — like `HeartIcon`'s own
  * `active` toggle, selection doesn't swap to a different icon, so it never
@@ -4727,7 +4848,11 @@ function SelectCheck({
           ? "border-white opacity-100"
           : pinned
             ? "border-transparent opacity-100"
-            : "border-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+            : // `pointer-coarse:hidden`, like the idle heart: an invisible
+              // 44 px checkbox in every tile's corner turned a tap meant to
+              // open the photo into a silent selection. Keyboard focus with
+              // a fine pointer still reveals it.
+              "border-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
       }`}
     >
       <CheckIcon
@@ -4764,7 +4889,7 @@ function ReactionBar({
             aria-label={reactionLabels[kind]}
             title={reactionLabels[kind]}
             className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-sm transition-transform ${
-              mine ? "scale-110 bg-white/25" : "hover:bg-white/15"
+              mine ? "scale-110 bg-white/25" : "hover:bg-white/15 active:bg-white/25"
             }`}
           >
             <span aria-hidden>{REACTION_EMOJI[kind]}</span>
@@ -4785,7 +4910,7 @@ function ReactionBadge({ state }: { state: PhotoReactionState | undefined }) {
   const kinds = REACTION_KINDS.filter((kind) => (state?.counts[kind] ?? 0) > 0).slice(0, 3);
 
   return (
-    <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-xs text-white backdrop-blur-sm">
+    <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-xs text-white backdrop-blur-sm">
       <span aria-hidden>{kinds.map((kind) => REACTION_EMOJI[kind]).join("")}</span>
       <span className="tabular-nums">{total}</span>
     </span>
@@ -4841,6 +4966,7 @@ function DownloadAllPrompt({
   const t = useTranslations("gallery");
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(containerRef, true);
+  useScrollLock();
   const email = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
 
   return (
@@ -4872,14 +4998,14 @@ function DownloadAllPrompt({
             size: sizeBytes ? formatBytes(sizeBytes) : "",
           })}
         </p>
-        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+        <p className="text-body text-brand-ink/70 dark:text-brand-tint/70">
           {t("downloadPromptAdvice")}
         </p>
-        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+        <p className="text-body text-brand-ink/70 dark:text-brand-tint/70">
           {t("downloadPromptResume")}
         </p>
         {email && (
-          <p className="text-body text-brand-ink/60 dark:text-brand-tint/60">
+          <p className="text-body text-brand-ink/70 dark:text-brand-tint/70">
             {t.rich("downloadPromptAlternative", {
               a: (chunks) => (
                 <a

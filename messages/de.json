@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Fotos in der Galerie",
     "loadingMorePhotos": "Weitere Fotos werden geladen …",
     "emptyGallery": "In dieser Galerie sind noch keine Fotos. Sobald der Fotograf sie hinzufügt, erscheinen sie hier – laden Sie die Seite einfach neu.",
+    "emptyGuestGallery": "Noch keine Fotos. Machen Sie den Anfang – fügen Sie Ihre mit der Schaltfläche unten hinzu.",
     "searchingFavorites": "Ihre Favoriten im Rest der Galerie werden gesucht …",
     "noFavoritesYet": "Sie haben noch keine Favoriten hinzugefügt.",
     "lightboxAriaLabel": "Foto {index} von {total}",

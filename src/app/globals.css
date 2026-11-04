@@ -201,6 +201,30 @@ body {
   ::after {
     border-color: var(--hairline);
   }
+
+  /*
+   * The touch baseline. iOS and Android flash a grey/blue box over anything tapped; on a
+   * photo grid that box is the tile's whole rectangle, and it fights the controls' own
+   * press states (`active:` utilities on the tiles and the lightbox's buttons), which
+   * are the feedback that replaces it.
+   *
+   * `touch-action: manipulation` drops the double-tap-to-zoom wait on controls only —
+   * pinch zoom stays everywhere (it is part of `manipulation`), and the page itself is
+   * left alone. In `@layer base`, so a `touch-none` utility on a gesture surface still
+   * wins.
+   */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  [role="button"],
+  label,
+  select,
+  summary {
+    touch-action: manipulation;
+  }
 }
 
 /*
