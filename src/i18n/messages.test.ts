@@ -156,7 +156,7 @@ describe("message catalogs", () => {
   const NUMBER_UNIT = /[\d}] (ks|min|minut|minút|sekund|%)(?=[\s.,)]|$)/;
   // Rewritten separately from this rule's introduction; they join it once
   // their new copy keeps the non-breaking spaces too.
-  const NBSP_EXEMPT = new Set(["gallery.emptyGallery", "guestUpload.rejection.sizeMismatch"]);
+  const NBSP_EXEMPT = new Set<string>([]);
 
   function leaves(value: unknown, prefix = ""): [string, string][] {
     if (typeof value === "string") return [[prefix, value]];
