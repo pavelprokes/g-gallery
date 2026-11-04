@@ -3428,6 +3428,7 @@ function GalleryViewInner({
               token={token}
               objectKeys={allPhotos.map((photo) => photo.objectKey)}
               engagedObjectKeys={engagedObjectKeys}
+              photoCount={liveCount}
             />
           )}
           <PresenceStrip galleryId={galleryId} optedOut={optedOut} />

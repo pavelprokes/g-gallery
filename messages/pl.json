@@ -261,6 +261,7 @@
       "downloadStarted": "Pobieranie rozpoczęte, {percent}%.",
       "availableOffline": "✓ Galeria jest dostępna offline",
       "availableOfflineWithBytes": "✓ Galeria jest dostępna offline ({bytes})",
+      "savedOfTotal": "Na tym urządzeniu jest {saved} z {total, plural, one {# zdjęcia} few {# zdjęć} many {# zdjęć} other {# zdjęcia}}.",
       "availableOfflineNote": "Zapisane zdjęcia mają rozmiar dopasowany do ekranu, to nie oryginały. Przeglądarka może po jakimś czasie sama je zwolnić — na iPhonie mniej więcej po tygodniu bez otwierania galerii — wtedy po prostu pobierz je ponownie.",
       "removeFromDevice": "Usuń z urządzenia",
       "availableOfflineAnnounce": "Pobrano — galeria jest dostępna offline.",
@@ -353,7 +354,8 @@
   "presence": {
     "someone": "Ktoś właśnie ogląda",
     "count": "{count, plural, one {# osoba ogląda teraz} few {# osoby oglądają teraz} many {# osób ogląda teraz} other {# osób ogląda teraz}}",
-    "named": "{names} {count, plural, one {ogląda} few {oglądają} many {oglądają} other {oglądają}}"
+    "named": "{names} {count, plural, one {ogląda} few {oglądają} many {oglądają} other {oglądają}}",
+    "others": "{count, plural, one {# inna osoba} few {# inne osoby} many {# innych osób} other {# innej osoby}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · fotograf ślubny",

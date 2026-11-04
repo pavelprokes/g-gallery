@@ -262,6 +262,7 @@
       "availableOffline": "✓ Galéria je dostupná offline",
       "availableOfflineWithBytes": "✓ Galéria je dostupná offline ({bytes})",
       "availableOfflineNote": "Uložené fotky sú v zmenšenej veľkosti pre túto obrazovku, nie originály. Prehliadač ich môže po čase sám uvoľniť – na iPhone zhruba po týždni bez otvorenia; potom stačí stiahnuť znova.",
+      "savedOfTotal": "V zariadení je {saved} z {total, plural, one {# fotky} other {# fotiek}}.",
       "removeFromDevice": "Odstrániť zo zariadenia",
       "availableOfflineAnnounce": "Stiahnuté, galéria je dostupná offline.",
       "downloadFailed": "Sťahovanie sa nepodarilo dokončiť.",
@@ -353,7 +354,8 @@
   "presence": {
     "someone": "Niekto sa práve pozerá",
     "count": "{count, plural, one {# človek sa práve pozerá} few {# ľudia sa práve pozerajú} other {# ľudí sa práve pozerá}}",
-    "named": "{names} {count, plural, one {sa pozerá} other {sa pozerajú}}"
+    "named": "{names} {count, plural, one {sa pozerá} other {sa pozerajú}}",
+    "others": "{count, plural, one {ďalší #} few {ďalší #} other {ďalších #}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · svadobný fotograf",

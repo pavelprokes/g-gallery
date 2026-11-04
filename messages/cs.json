@@ -261,6 +261,7 @@
       "downloadStarted": "Stahování zahájeno, {percent} %.",
       "availableOffline": "✓ Galerie je dostupná offline",
       "availableOfflineWithBytes": "✓ Galerie je dostupná offline ({bytes})",
+      "savedOfTotal": "V zařízení je {saved} z {total, plural, one {# fotky} other {# fotek}}.",
       "availableOfflineNote": "Uložené fotky jsou ve zmenšené velikosti pro tuhle obrazovku, ne originály. Prohlížeč je může po čase sám uvolnit – na iPhonu zhruba po týdnu bez otevření; pak stačí stáhnout znovu.",
       "removeFromDevice": "Odstranit ze zařízení",
       "availableOfflineAnnounce": "Staženo, galerie je dostupná offline.",
@@ -353,7 +354,8 @@
   "presence": {
     "someone": "Někdo se právě dívá",
     "count": "{count, plural, one {# člověk se právě dívá} few {# lidé se právě dívají} other {# lidí se právě dívá}}",
-    "named": "{names} {count, plural, one {se dívá} other {se dívají}}"
+    "named": "{names} {count, plural, one {se dívá} other {se dívají}}",
+    "others": "{count, plural, one {další #} few {další #} other {dalších #}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · svatební fotograf",

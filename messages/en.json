@@ -261,6 +261,7 @@
       "downloadStarted": "Download started, {percent}%.",
       "availableOffline": "✓ Gallery is available offline",
       "availableOfflineWithBytes": "✓ Gallery is available offline ({bytes})",
+      "savedOfTotal": "{saved} of {total, plural, one {# photo} other {# photos}} are saved on this device.",
       "availableOfflineNote": "Saved photos are sized for this screen, not the originals. The browser may free them up after a while on its own — on iPhone, roughly a week without opening the gallery — just download again if that happens.",
       "removeFromDevice": "Remove from device",
       "availableOfflineAnnounce": "Downloaded — the gallery is available offline.",
@@ -353,7 +354,8 @@
   "presence": {
     "someone": "Someone is viewing right now",
     "count": "{count, plural, one {# person is viewing right now} other {# people are viewing right now}}",
-    "named": "{names} {count, plural, one {is viewing} other {are viewing}}"
+    "named": "{names} {count, plural, one {is viewing} other {are viewing}}",
+    "others": "{count, plural, one {# other} other {# others}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · wedding photographer",

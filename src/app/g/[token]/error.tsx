@@ -11,13 +11,19 @@ import { Button } from "@/components/ui/button";
  * (see the "no retry button" rule on `DeadEnd`). Everything else about it is
  * the shared `GuestScreen`: same card, same mark, same footer identity, so a
  * transient failure does not look like a different website.
+ *
+ * `retry`, not `reset`: per the Next 16.3 docs `reset` only re-renders the
+ * children it already has, so a server render that failed (a database blip, a
+ * dropped connection on the venue's Wi-Fi) would fail again from the same
+ * payload; `retry` fetches the segment afresh. The wedding page
+ * (`src/app/s/[token]/error.tsx`) re-exports this same screen.
  */
 export default function GalleryError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   const t = useTranslations("errors");
 
@@ -37,7 +43,7 @@ export default function GalleryError({
       </p>
 
       <div className="mt-6 flex justify-center">
-        <Button type="button" variant="primary" size="lg" onClick={() => reset()}>
+        <Button type="button" variant="primary" size="lg" onClick={() => retry()}>
           {t("tryAgain")}
         </Button>
       </div>

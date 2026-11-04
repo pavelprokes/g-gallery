@@ -1,16 +1,21 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   cacheKeyForToken,
   checkSpace,
   ensureServiceWorker,
   estimateBytes,
+  fetchGalleryIndex,
   formatBytes,
+  OFFLINE_META_PATH,
+  offlineGridUrl,
+  offlinePageUrl,
   offlineSupport,
   offlineUrls,
   requestPersistence,
+  type OfflineMeta,
   type OfflineProgress,
 } from "@/lib/offline";
 import { Button } from "@/components/ui/button";
@@ -31,10 +36,14 @@ export function OfflineToggle({
   token,
   objectKeys,
   engagedObjectKeys,
+  photoCount,
 }: {
   token: string;
+  /** The photos loaded so far — a fallback when the full list cannot be read. */
   objectKeys: readonly string[];
   engagedObjectKeys: readonly string[];
+  /** The whole gallery's count, loaded or not: what "save all" means. */
+  photoCount: number;
 }) {
   // `offlineSupport()` reads `window`, so it can't run in the initializer:
   // the server has no `window` and would compute "unsupported" while the
@@ -42,6 +51,7 @@ export function OfflineToggle({
   // "checking" — a straight SSR/CSR content mismatch. Both sides start at
   // "checking" (renders nothing) and the real answer arrives after mount.
   const t = useTranslations("gallery.offline");
+  const locale = useLocale();
   const [state, setState] = useState<State>("checking");
   const [progress, setProgress] = useState<OfflineProgress | null>(null);
   const [free, setFree] = useState<number | null>(null);
@@ -51,11 +61,18 @@ export function OfflineToggle({
   // is anything to narrow to. Until then there's nothing to filter down to,
   // so it falls back to the whole gallery regardless of this flag.
   const [onlyEngaged, setOnlyEngaged] = useState(true);
+  const [meta, setMeta] = useState<OfflineMeta | null>(null);
   const keyRef = useRef<string | null>(null);
 
   const effectiveOnlyEngaged = onlyEngaged && engagedObjectKeys.length > 0;
-  const activeObjectKeys = effectiveOnlyEngaged ? engagedObjectKeys : objectKeys;
-  const estimated = perPhotoBytes * activeObjectKeys.length;
+  // The whole gallery, not the pages the grid happens to have loaded: the
+  // complete key list is read when the download starts (`fetchGalleryIndex`).
+  // Engagement can only be read off the loaded photos, so that scope is what
+  // it is — and the "N of M" line after saving says so.
+  const activeCount = effectiveOnlyEngaged
+    ? engagedObjectKeys.length
+    : Math.max(photoCount, objectKeys.length);
+  const estimated = perPhotoBytes * activeCount;
 
   useEffect(() => {
     let cancelled = false;
@@ -84,13 +101,16 @@ export function OfflineToggle({
       // exactly why this is read from the cache rather than from localStorage.
       const cache = await caches.open(`gg-offline-${key}`);
       const stored = (await cache.keys()).length;
-      if (!cancelled) setState(stored > 0 ? "on" : "off");
+      const savedMeta = stored > 0 ? await readMeta(cache) : null;
+      if (cancelled) return;
+      setMeta(savedMeta);
+      setState(stored > 0 ? "on" : "off");
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [objectKeys.length, token]);
+  }, [token]);
 
   const start = useCallback(async () => {
     const key = keyRef.current;
@@ -100,12 +120,23 @@ export function OfflineToggle({
     setProgress({
       done: 0,
       failed: 0,
-      total: activeObjectKeys.length * 2,
+      total: activeCount * 2,
       bytes: 0,
       aborted: null,
     });
 
-    const space = await checkSpace(estimated);
+    // Every page of the gallery, not just the ones scrolled to — both for the
+    // keys to save and so the grid can lay itself out offline: the service
+    // worker keeps these API pages for a saved gallery and answers the grid's
+    // "next page" from them (public/sw.js). A failed page leaves the loaded
+    // photos as a floor; the "N of M" line then tells the truth.
+    const index = await fetchGalleryIndex(token, window.location.origin);
+    const keys = effectiveOnlyEngaged
+      ? [...engagedObjectKeys]
+      : [...new Set([...index.objectKeys, ...objectKeys])];
+    const total = Math.max(photoCount, index.complete ? index.objectKeys.length : 0, keys.length);
+
+    const space = await checkSpace(perPhotoBytes * keys.length);
     setFree(space.free);
     if (!space.ok) {
       setState("no_space");
@@ -127,9 +158,16 @@ export function OfflineToggle({
       if (data.type === "PRECACHE_PROGRESS") {
         setProgress({ ...data });
       } else if (data.type === "PRECACHE_DONE") {
-        setProgress({ ...data });
-        setState(data.aborted === "quota" ? "no_space" : data.done > 0 ? "on" : "error");
         navigator.serviceWorker.removeEventListener("message", onMessage);
+        setProgress({ ...data });
+        if (data.aborted === "quota" || data.done === 0) {
+          setState(data.aborted === "quota" ? "no_space" : "error");
+          return;
+        }
+        void writeMeta(key, keys, total).then((written) => {
+          setMeta(written);
+          setState("on");
+        });
       }
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
@@ -137,15 +175,24 @@ export function OfflineToggle({
     worker.postMessage({
       type: "PRECACHE",
       key,
-      urls: offlineUrls(activeObjectKeys, window.location.href),
+      urls: offlineUrls(keys, offlinePageUrl(window.location.href), index.pageUrls),
     });
-  }, [estimated, activeObjectKeys]);
+  }, [
+    activeCount,
+    effectiveOnlyEngaged,
+    engagedObjectKeys,
+    objectKeys,
+    perPhotoBytes,
+    photoCount,
+    token,
+  ]);
 
   const remove = useCallback(async () => {
     const key = keyRef.current;
     if (!key) return;
     await caches.delete(`gg-offline-${key}`);
     setProgress(null);
+    setMeta(null);
     setState("off");
   }, []);
 
@@ -163,8 +210,11 @@ export function OfflineToggle({
   if (state === "no_space") {
     const message =
       free !== null
-        ? t("notEnoughSpaceWithFree", { needed: formatBytes(estimated), free: formatBytes(free) })
-        : t("notEnoughSpace", { needed: formatBytes(estimated) });
+        ? t("notEnoughSpaceWithFree", {
+            needed: formatBytes(estimated, locale),
+            free: formatBytes(free, locale),
+          })
+        : t("notEnoughSpace", { needed: formatBytes(estimated, locale) });
     return (
       <div className="space-y-2">
         <Note>{message}</Note>
@@ -184,7 +234,7 @@ export function OfflineToggle({
       <div className="space-y-2">
         <p className="text-sm">
           {progress && progress.bytes > 0
-            ? t("downloadingWithBytes", { percent, bytes: formatBytes(progress.bytes) })
+            ? t("downloadingWithBytes", { percent, bytes: formatBytes(progress.bytes, locale) })
             : t("downloading", { percent })}
         </p>
         <div
@@ -210,9 +260,12 @@ export function OfflineToggle({
       <div className="space-y-2">
         <p className="text-sm">
           {progress && progress.bytes > 0
-            ? t("availableOfflineWithBytes", { bytes: formatBytes(progress.bytes) })
+            ? t("availableOfflineWithBytes", { bytes: formatBytes(progress.bytes, locale) })
             : t("availableOffline")}
         </p>
+        {meta && meta.saved < meta.total && (
+          <p className="text-sm">{t("savedOfTotal", { saved: meta.saved, total: meta.total })}</p>
+        )}
         <p className="text-xs text-neutral-500">{t("availableOfflineNote")}</p>
         <Button variant="secondary" onClick={() => void remove()}>
           {t("removeFromDevice")}
@@ -236,12 +289,12 @@ export function OfflineToggle({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm">{t("saveOffline", { count: activeObjectKeys.length })}</p>
+      <p className="text-sm">{t("saveOffline", { count: activeCount })}</p>
       <p className="text-xs text-neutral-500">
-        {t("estimatedSize", { size: formatBytes(estimated) })}
+        {t("estimatedSize", { size: formatBytes(estimated, locale) })}
       </p>
       {engagedObjectKeys.length > 0 && (
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-11 items-center gap-2 text-sm">
           <input
             type="checkbox"
             className="size-4"
@@ -251,7 +304,7 @@ export function OfflineToggle({
           {t("onlyEngagedOption", { count: engagedObjectKeys.length })}
         </label>
       )}
-      <Button onClick={() => void start()} disabled={activeObjectKeys.length === 0}>
+      <Button onClick={() => void start()} disabled={activeCount === 0}>
         {t("makeAvailable")}
       </Button>
     </div>
@@ -269,6 +322,7 @@ export function OfflineIconButton(props: {
   token: string;
   objectKeys: readonly string[];
   engagedObjectKeys: readonly string[];
+  photoCount: number;
 }) {
   const t = useTranslations("gallery.offline");
   const [open, setOpen] = useState(false);
@@ -313,13 +367,26 @@ export function OfflineIconButton(props: {
     };
   }, [open]);
 
+  // `pointerdown`, not `mousedown`: iOS Safari fires no mouse events for a tap
+  // on something that is not clickable (the page around the panel), so the
+  // panel never closed on an iPhone. Escape closes it from the keyboard and
+  // hands focus back to the button that opened it.
   useEffect(() => {
     if (!open) return;
-    function onPointerDown(event: MouseEvent) {
+    function onPointerDown(event: PointerEvent) {
       if (panelRef.current && !panelRef.current.contains(event.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      panelRef.current?.querySelector<HTMLButtonElement>("button[aria-expanded]")?.focus();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   return (
@@ -344,11 +411,51 @@ export function OfflineIconButton(props: {
             token={props.token}
             objectKeys={props.objectKeys}
             engagedObjectKeys={props.engagedObjectKeys}
+            photoCount={props.photoCount}
           />
         </Card>
       )}
     </div>
   );
+}
+
+async function readMeta(cache: Cache): Promise<OfflineMeta | null> {
+  try {
+    const response = await cache.match(new URL(OFFLINE_META_PATH, location.origin).href);
+    return response ? ((await response.json()) as OfflineMeta) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Counts what actually landed — a photo counts once its grid image is in the
+ * cache — and records it beside the gallery, so the panel can say "N of M"
+ * again after a reload. Read back from the cache rather than from the worker's
+ * tally, which counts URLs (two per photo), not photos.
+ */
+async function writeMeta(
+  key: string,
+  objectKeys: readonly string[],
+  total: number,
+): Promise<OfflineMeta | null> {
+  try {
+    const cache = await caches.open(`gg-offline-${key}`);
+    const stored = new Set((await cache.keys()).map((request) => request.url));
+    const saved = new Set(
+      objectKeys.filter((objectKey) =>
+        stored.has(new URL(offlineGridUrl(objectKey), location.href).href),
+      ),
+    ).size;
+    const meta: OfflineMeta = { saved, total: Math.max(total, saved) };
+    await cache.put(
+      new URL(OFFLINE_META_PATH, location.origin).href,
+      new Response(JSON.stringify(meta), { headers: { "content-type": "application/json" } }),
+    );
+    return meta;
+  } catch {
+    return null;
+  }
 }
 
 function Note({ children }: { children: React.ReactNode }) {

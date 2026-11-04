@@ -12,6 +12,7 @@ import { mintImageGrant } from "@/lib/shared-gallery";
 import { srcFor } from "@/lib/image-src";
 import { PhotographerCredit } from "@/components/photographer-credit";
 import { CardLoop } from "@/components/card-loop";
+import { LinkPending } from "@/components/link-pending";
 import { mediaCounts, videoSrc } from "@/lib/video";
 
 /**
@@ -74,12 +75,12 @@ export async function EventHub({
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
       <header>
         <h1 className="text-page sm:text-display font-semibold text-balance">{event.title}</h1>
-        <p className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1">
+        <p className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-1">
           {[event.eventDate ? formatDate(event.eventDate, locale) : null, event.venue]
             .filter(Boolean)
             .join(" · ")}
         </p>
-        <PhotographerCredit className="text-body text-brand-ink/60 dark:text-brand-tint/60 mt-1" />
+        <PhotographerCredit className="text-body text-brand-ink/70 dark:text-brand-tint/70 mt-1" />
       </header>
 
       {event.cards.length === 0 ? (
@@ -97,7 +98,7 @@ export async function EventHub({
                   <li key={card.id} className={wide ? "sm:col-span-2" : undefined}>
                     <Link
                       href={hrefFor(card)}
-                      className={`group relative block overflow-hidden rounded-xl bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 dark:bg-neutral-900 ${
+                      className={`group duration-flip ease-standard relative block overflow-hidden rounded-xl bg-neutral-100 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.98] dark:bg-neutral-900 ${
                         wide ? "aspect-[4/3] sm:aspect-[2/1]" : "aspect-[4/3] sm:aspect-[3/2]"
                       }`}
                       style={
@@ -140,6 +141,7 @@ export async function EventHub({
                         </p>
                         <p className="text-caption mt-0.5 text-white/80">{metaFor(card)}</p>
                       </div>
+                      <LinkPending className="bg-brand-ink/35 absolute inset-0 text-white" />
                     </Link>
                   </li>
                 );
@@ -153,7 +155,7 @@ export async function EventHub({
                 <li key={card.id}>
                   <Link
                     href={hrefFor(card)}
-                    className="duration-flip flex items-center gap-4 rounded-xl border p-3 transition-colors hover:border-neutral-400 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:border-neutral-600"
+                    className="duration-flip relative flex items-center gap-4 rounded-xl border p-3 transition-colors hover:border-neutral-400 focus-visible:outline-2 focus-visible:outline-offset-2 active:bg-neutral-100 dark:hover:border-neutral-600 dark:active:bg-neutral-900"
                   >
                     <div
                       className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"
@@ -175,7 +177,7 @@ export async function EventHub({
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-lead font-medium">{card.title}</p>
-                      <p className="text-caption text-brand-ink/60 dark:text-brand-tint/60">
+                      <p className="text-caption text-brand-ink/70 dark:text-brand-tint/70">
                         {metaFor(card)}
                       </p>
                       <p className="text-caption text-brand-primary dark:text-brand-border mt-1 flex items-center gap-1.5">
@@ -184,6 +186,7 @@ export async function EventHub({
                       </p>
                     </div>
                     <ChevronRightIcon className="text-brand-ink/45 dark:text-brand-tint/45 h-5 w-5 shrink-0" />
+                    <LinkPending className="text-brand-primary dark:text-brand-border absolute inset-0 rounded-xl bg-white/60 dark:bg-neutral-950/60" />
                   </Link>
                 </li>
               ))}
@@ -192,7 +195,7 @@ export async function EventHub({
         </div>
       )}
 
-      <footer className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mt-10 border-t pt-4">
+      <footer className="text-caption text-brand-ink/70 dark:text-brand-tint/70 mt-10 border-t pt-4">
         <LocaleSwitcher className="mb-4" />
         <SiteFooterIdentity />
       </footer>

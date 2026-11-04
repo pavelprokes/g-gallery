@@ -59,11 +59,17 @@ export function nextFailedUnlockState(
   currentLockedUntil: Date | null,
   now: number = Date.now(),
 ): { failedUnlockAttempts: number; unlockLockedUntil: Date | null } {
-  const attempts = currentAttempts + 1;
+  // A lockout that has run out starts the count afresh. Nothing else resets the
+  // counter on expiry (only a right password does), so without this the first
+  // typo after the 15 minutes would re-lock the link for everyone at once.
+  const lockExpired = currentLockedUntil !== null && currentLockedUntil.getTime() <= now;
+  const attempts = (lockExpired ? 0 : currentAttempts) + 1;
+  const activeLock = lockExpired ? null : currentLockedUntil;
   return {
     failedUnlockAttempts: attempts,
+    // An active lock is never pushed further out; otherwise lock on reaching the limit.
     unlockLockedUntil:
-      attempts >= UNLOCK_ATTEMPT_LIMIT ? new Date(now + UNLOCK_LOCKOUT_MS) : currentLockedUntil,
+      activeLock ?? (attempts >= UNLOCK_ATTEMPT_LIMIT ? new Date(now + UNLOCK_LOCKOUT_MS) : null),
   };
 }
 

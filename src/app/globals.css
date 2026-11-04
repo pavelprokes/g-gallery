@@ -348,7 +348,7 @@ button:disabled,
  * `.motion-loop` is the opt-in that keeps looping. It must be added to:
  *   src/components/gallery-view.tsx — the `animate-spin` load-more spinner
  *   src/components/guest-uploader.tsx — the `animate-spin` upload spinner
- *   src/components/presence-strip.tsx — the `animate-ping` presence dot
+ *   src/components/link-pending.tsx — the `animate-spin` wedding-hub card spinner
  *   any progress bar (currently the three `transition-all` fills in uploader.tsx,
  *     guest-uploader.tsx and offline-toggle.tsx)
  * Nothing else. If a loop is decorative, it does not get the class.
