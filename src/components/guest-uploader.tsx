@@ -2,11 +2,12 @@
 
 import { UploadProgressRing } from "@/components/upload-progress-ring";
 import { NameSheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   type ChangeEvent,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -30,9 +31,12 @@ import {
   dequeueUpload,
   enqueueUploads,
   listQueuedUploads,
+  type QueuedUpload,
 } from "@/lib/upload-queue";
+import { GUEST_MAX_FILE_BYTES } from "@/lib/guest-quota";
 import { holdScreenAwake } from "@/lib/wake-lock";
 import {
+  CANCELLED,
   fetchPendingUploads,
   runUploads,
   UploadRejection,
@@ -63,6 +67,57 @@ interface Item {
   file: File;
   state: UploadItemState;
   error?: string;
+  /** Refused before the run started — told to the guest by name, never retried. */
+  skipped?: boolean;
+}
+
+/** Refusals after which retrying cannot help, so no retry button is offered. */
+const FINAL_FATAL_CODES = new Set(["quota_exceeded", "upload_denied", "unauthorized"]);
+
+/** How often the byte progress is repainted — progress events arrive far faster. */
+const PROGRESS_TICK_MS = 250;
+
+/** A failed file worth offering again: not refused up front, not given up on purpose. */
+export function isRetryable(item: Pick<Item, "state" | "error" | "skipped">): boolean {
+  return item.state === "error" && !item.skipped && item.error !== CANCELLED;
+}
+
+/** Queue ids of exactly the files `runUploads` skipped — the rest must stay resumable. */
+export function skippedQueueIds(
+  queued: readonly { id: string }[],
+  skips: readonly { index: number }[],
+): string[] {
+  return skips.flatMap(({ index }) => {
+    const entry = queued[index];
+    return entry ? [entry.id] : [];
+  });
+}
+
+/** Fraction of the run's bytes that has landed, for the progress ring. */
+export function byteProgress(items: readonly Item[], sentBytes: readonly number[]): number {
+  let sent = 0;
+  let total = 0;
+  items.forEach((item, index) => {
+    // A failed file sends nothing more; counting it would hold the ring short
+    // of full for the rest of the run.
+    if (item.state === "error") return;
+    const size = item.file.size;
+    total += size;
+    if (item.state === "done") sent += size;
+    else if (item.state === "uploading") sent += Math.min(sentBytes[index] ?? 0, size);
+  });
+  return total > 0 ? sent / total : 0;
+}
+
+/** "25 MB" in the guest's language, with a non-breaking space inside. */
+export function formatMegabytes(bytes: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit: "megabyte",
+    maximumFractionDigits: 0,
+  })
+    .format(bytes / (1024 * 1024))
+    .replace(/ /g, " ");
 }
 
 export function GuestUploader({
@@ -78,11 +133,18 @@ export function GuestUploader({
 }) {
   const t = useTranslations("guestUpload");
   const tRejection = useTranslations("guestUpload.rejection");
+  const locale = useLocale();
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
+  /** The fatal refusal leaves nothing a retry could fix (quota, revoked link). */
+  const [fatalIsFinal, setFatalIsFinal] = useState(false);
+  /** Files refused before the run, grouped by reason, each naming its files. */
+  const [skipNotes, setSkipNotes] = useState<{ message: string; names: string[] }[]>([]);
+  const [progress, setProgress] = useState(0);
   const [sheet, setSheet] = useState<SheetMode | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
+  const progressLabelId = useId();
   /**
    * Where focus goes once the sheet closed on a pick. The bar button that
    * opened it no longer exists at that point — answering swaps it for the
@@ -119,6 +181,25 @@ export function GuestUploader({
    * bar sat silent through it — indistinguishable from nothing happening.
    */
   const [preparing, setPreparing] = useState(0);
+  /**
+   * One run at a time, from any source — a pick, the resume on return, the
+   * retry button. The ref is the guard (state updates are not synchronous);
+   * `busy` mirrors it for rendering, so the buttons are disabled meanwhile.
+   */
+  const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false);
+  /** The entries of the last run, by index — what the retry button re-runs. */
+  const queuedRef = useRef<QueuedUpload[]>([]);
+  /** Stops the current run from starting new files ("Zahodit zbytek"). */
+  const stopRef = useRef<AbortController | null>(null);
+  /** Bytes sent per file, written many times a second — kept out of state. */
+  const bytesRef = useRef<number[]>([]);
+  const itemsRef = useRef<Item[]>([]);
+  /**
+   * After a refusal that ends the run, coming back to the tab must not quietly
+   * send the same request again; only the guest's own action does.
+   */
+  const autoResumeBlockedRef = useRef(false);
 
   // GDPR take-down route (docs/GUEST-GALLERIES.md §10). Read from the
   // environment rather than hard-coded: an address invented here would be a
@@ -130,119 +211,220 @@ export function GuestUploader({
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }, []);
 
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  /** Runs `task` unless another run is already preparing or uploading. */
+  const exclusive = useCallback(async (task: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await task();
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+
   /**
    * Runs a set of already-queued entries. Each one is removed from the queue
    * the moment it lands, so an interrupted run resumes with exactly what is
    * left rather than starting over.
    */
   const run = useCallback(
-    async (queued: { id: string; file: File }[]) => {
+    async (queued: QueuedUpload[], resumed: boolean) => {
       const files = queued.map((entry) => entry.file);
+      queuedRef.current = queued;
+      bytesRef.current = files.map(() => 0);
       setItems(files.map((file) => ({ file, state: "pending" as const })));
       setFatal(null);
+      setFatalIsFinal(false);
+      setSkipNotes([]);
+      setProgress(0);
+      setResuming(resumed);
       setRunning(true);
+      const stop = new AbortController();
+      stopRef.current = stop;
+      /** Every dequeue, so the run ends only once the queue says what is left. */
+      const dequeues: Promise<void>[] = [];
 
       // Removes the commonest cause of a dead upload: the display timing out
       // while the phone lies on a table. Best-effort — never depended on.
       const wakeLock = await holdScreenAwake();
-
-      const anonKey = getViewerId();
-      // Read now rather than captured: the sheet sets it a moment before this
-      // run starts, and a resumed run must carry whatever the guest chose since.
-      const credentials = {
-        kind: "guest" as const,
-        shareToken: token,
-        anonKey,
-        displayName: anonKey ? getViewerName() : null,
-      };
-
-      // Fetched here rather than on mount: most people who open the gallery
-      // never upload anything, and 80 guests each firing a lookup they will
-      // not use is a request per page view for nothing. It is also what makes
-      // a resumed run re-use its half-finished rows instead of duplicating.
-      const resumeIds = matchResumeTargets(files, await fetchPendingUploads(credentials));
-
       let landed = 0;
-      await runUploads({
-        files,
-        credentials,
-        resumeIds,
-        onItem: (index, patch) => {
-          if (patch.state === "done") {
-            landed += 1;
-            const entry = queued[index];
-            if (entry) void dequeueUpload(entry.id);
-          }
-          update(index, patch);
-        },
-        onFatal: (rejection) => setFatal(guestRejectionMessage(rejection, tRejection)),
-        onSkipped: (rejection, count) => {
-          // Nothing will ever make these acceptable, so they leave the queue
-          // rather than being retried on every visit.
-          for (const entry of queued) void dequeueUpload(entry.id);
-          const message = guestRejectionMessage(rejection, tRejection);
-          setFatal(count > 1 ? `${message} ${t("skippedNote", { count })}` : message);
-        },
-      });
 
-      wakeLock?.release();
-      setRunning(false);
-      if (landed > 0) {
-        // Photos are only visible once the server flipped them to CONFIRMED,
-        // so the grid is stale until it refetches.
-        void onUploaded();
+      try {
+        const anonKey = getViewerId();
+        // Read now rather than captured: the sheet sets it a moment before this
+        // run starts, and a resumed run must carry whatever the guest chose since.
+        const credentials = {
+          kind: "guest" as const,
+          shareToken: token,
+          anonKey,
+          displayName: anonKey ? getViewerName() : null,
+        };
+
+        // Fetched here rather than on mount: most people who open the gallery
+        // never upload anything, and 80 guests each firing a lookup they will
+        // not use is a request per page view for nothing. It is also what makes
+        // a resumed run re-use its half-finished rows instead of duplicating.
+        const resumeIds = matchResumeTargets(files, await fetchPendingUploads(credentials));
+
+        await runUploads({
+          files,
+          credentials,
+          resumeIds,
+          stop: stop.signal,
+          onItem: (index, patch) => {
+            if (patch.state === "done") {
+              landed += 1;
+              const entry = queued[index];
+              if (entry) dequeues.push(dequeueUpload(entry.id));
+            }
+            update(index, patch);
+          },
+          onBytes: (index, sent) => {
+            bytesRef.current[index] = sent;
+          },
+          onFatal: (rejection) => {
+            setFatal(guestRejectionMessage(rejection, tRejection, locale));
+            setFatalIsFinal(FINAL_FATAL_CODES.has(rejection.code));
+            autoResumeBlockedRef.current = true;
+          },
+          onSkipped: (_first, _count, skips) => {
+            // Nothing will ever make these acceptable, so they leave the queue
+            // rather than being retried on every visit. Only these: the other
+            // photos are still queued and must stay resumable.
+            for (const id of skippedQueueIds(queued, skips)) dequeues.push(dequeueUpload(id));
+            const skippedIndices = new Set(skips.map(({ index }) => index));
+            setItems((prev) =>
+              prev.map((item, i) => (skippedIndices.has(i) ? { ...item, skipped: true } : item)),
+            );
+            const groups = new Map<string, string[]>();
+            for (const { rejection } of skips) {
+              const message = guestRejectionMessage(rejection, tRejection, locale);
+              const names = groups.get(message) ?? [];
+              if (rejection.detail.fileName) names.push(rejection.detail.fileName);
+              groups.set(message, names);
+            }
+            setSkipNotes([...groups].map(([message, names]) => ({ message, names })));
+          },
+        });
+      } finally {
+        await Promise.all(dequeues);
+        wakeLock?.release();
+        stopRef.current = null;
+        setRunning(false);
+        setResuming(false);
+        if (landed > 0) {
+          // Photos are only visible once the server flipped them to CONFIRMED,
+          // so the grid is stale until it refetches.
+          void onUploaded();
+        }
       }
     },
-    [onUploaded, t, tRejection, token, update],
+    [locale, onUploaded, tRejection, token, update],
   );
 
   const start = useCallback(
-    async (files: File[]) => {
-      setFatal(null);
-      setPreparing(files.length);
-      try {
-        const queued = await enqueueUploads(token, files);
-        setPreparing(0);
-        await run(queued);
-      } catch (error) {
-        // Nothing may ever fail silently here. A guest who picked a photo and
-        // saw the bar go back to how it was has no idea whether it worked, and
-        // the honest answer is that it did not.
-        console.error("[g-gallery/upload] could not start:", error);
-        setFatal(t("startFailed"));
-        setRunning(false);
-      } finally {
-        setPreparing(0);
-      }
-    },
-    [run, t, token],
+    (files: File[]) =>
+      exclusive(async () => {
+        autoResumeBlockedRef.current = false;
+        setFatal(null);
+        setPreparing(files.length);
+        try {
+          const queued = await enqueueUploads(token, files);
+          setPreparing(0);
+          await run(queued, false);
+        } catch (error) {
+          // Nothing may ever fail silently here. A guest who picked a photo and
+          // saw the bar go back to how it was has no idea whether it worked, and
+          // the honest answer is that it did not.
+          console.error("[g-gallery/upload] could not start:", error);
+          setFatal(t("startFailed"));
+        } finally {
+          setPreparing(0);
+        }
+      }),
+    [exclusive, run, t, token],
   );
 
   /**
-   * Anything left from a previous visit finishes on its own. The files are in
-   * IndexedDB, so this works even when the page was discarded entirely and the
-   * File objects are long gone from memory — which is the whole point of the
-   * queue (docs/GUEST-GALLERIES.md §11, F3).
+   * Anything left from a previous visit — or from this one, cut off by a lost
+   * connection — finishes on its own. The files are in IndexedDB, so this works
+   * even when the page was discarded entirely and the File objects are long
+   * gone from memory (docs/GUEST-GALLERIES.md §11, F3).
    */
-  useEffect(() => {
-    let cancelled = false;
-    void listQueuedUploads(token).then((queued) => {
-      if (cancelled || queued.length === 0) return;
-      setResuming(true);
-      void run(queued)
-        .catch((error: unknown) => {
+  const resumeQueued = useCallback(
+    () =>
+      exclusive(async () => {
+        try {
+          const queued = await listQueuedUploads(token);
+          if (queued.length === 0) return;
+          await run(queued, true);
+        } catch (error) {
           console.error("[g-gallery/upload] could not resume:", error);
           setFatal(t("resumeFailed"));
-        })
-        .finally(() => setResuming(false));
-    });
-    return () => {
-      cancelled = true;
+        }
+      }),
+    [exclusive, run, t, token],
+  );
+
+  /** "Zkusit znovu (N)": the failed files of the last run, File objects still in memory. */
+  const retryFailed = useCallback(
+    () =>
+      exclusive(async () => {
+        autoResumeBlockedRef.current = false;
+        const again = queuedRef.current.filter((_entry, index) => {
+          const item = itemsRef.current[index];
+          return item !== undefined && isRetryable(item);
+        });
+        if (again.length === 0) return;
+        try {
+          await run(again, false);
+        } catch (error) {
+          console.error("[g-gallery/upload] could not retry:", error);
+          setFatal(t("startFailed"));
+        }
+      }),
+    [exclusive, run, t],
+  );
+
+  // Once per gallery on mount, then again whenever the guest comes back to the
+  // tab or the phone regains a network: an upload cut off by switching apps or
+  // by walking out of the venue's Wi-Fi picks up without anyone re-picking.
+  // `exclusive` makes a call during a run a no-op, so none of these can start
+  // a second run alongside the first.
+  const resumeRef = useRef(resumeQueued);
+  useEffect(() => {
+    resumeRef.current = resumeQueued;
+  }, [resumeQueued]);
+  useEffect(() => {
+    void resumeRef.current();
+    const onReturn = () => {
+      if (document.visibilityState !== "visible" || autoResumeBlockedRef.current) return;
+      void resumeRef.current();
     };
-    // Deliberately keyed on the token alone: this must fire once per gallery,
-    // not again every time `run` is recreated.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("online", onReturn);
+    return () => {
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("online", onReturn);
+    };
   }, [token]);
+
+  // Byte progress for the ring, repainted on a timer rather than per event.
+  useEffect(() => {
+    if (!running) return;
+    const paint = () => setProgress(byteProgress(itemsRef.current, bytesRef.current));
+    const timer = window.setInterval(paint, PROGRESS_TICK_MS);
+    return () => {
+      window.clearInterval(timer);
+      paint();
+    };
+  }, [running]);
 
   useEffect(() => {
     const bar = barRef.current;
@@ -253,7 +435,7 @@ export function GuestUploader({
   }, []);
 
   const done = items.filter((i) => i.state === "done").length;
-  const failed = items.filter((i) => i.state === "error").length;
+  const failed = items.filter(isRetryable).length;
   const finished = items.length > 0 && !running;
 
   /**
@@ -314,6 +496,22 @@ export function GuestUploader({
     if (list.length > 0) void start(list);
   };
 
+  // The end state of a run. A refusal that ended it still leaves what already
+  // landed in the gallery; saying nothing about that reads as "all lost".
+  const summary = !finished
+    ? null
+    : fatal
+      ? done > 0
+        ? t("landedCount", { count: done })
+        : null
+      : done > 0 && failed > 0
+        ? t("donePartial", { done, failed })
+        : done > 0
+          ? t("doneSome")
+          : failed > 0 || skipNotes.length === 0
+            ? t("doneNone")
+            : null;
+
   return (
     <>
       {/* Keeps the fixed bar from covering the end of the page. Measured,
@@ -323,59 +521,78 @@ export function GuestUploader({
 
       <div
         ref={barRef}
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 backdrop-blur dark:bg-neutral-950/95"
+        className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 dark:bg-neutral-950/95 pointer-fine:backdrop-blur"
       >
         <div className="mx-auto max-w-5xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {fatal && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{fatal}</p>}
+          {/* Always mounted, so a screen reader hears what is inserted later. */}
+          <div role="alert">
+            {fatal && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{fatal}</p>}
+            {skipNotes.length > 0 && (
+              <ul className="mb-2 space-y-1 text-sm text-red-600 dark:text-red-400">
+                {skipNotes.map(({ message, names }) => (
+                  <li key={message}>
+                    {message}
+                    {names.length > 0 && <span className="block truncate">{fileList(names)}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-          {preparing > 0 && (
-            <p className="mb-2 flex items-center gap-2 text-sm">
-              <span
-                aria-hidden
-                className="motion-loop inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
-              />
-              {t("preparing", { count: preparing })}
-            </p>
-          )}
+          <div role="status" aria-live="polite">
+            {preparing > 0 && (
+              <p className="mb-2 flex items-center gap-2 text-sm">
+                <span
+                  aria-hidden
+                  className="motion-loop inline-block size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-neutral-100"
+                />
+                {t("preparing", { count: preparing })}
+              </p>
+            )}
 
-          {running && (
-            <div className="mb-2">
-              <p className="text-sm">
+            {running && (
+              <p id={progressLabelId} className="text-sm">
                 {resuming
                   ? t("resumingProgress", { done, total: items.length })
                   : t("uploadingProgress", { done, total: items.length })}
-                {resuming && (
-                  <button
-                    type="button"
-                    className="ml-2 underline"
-                    onClick={() => {
-                      // Stops it coming back on the next visit. Requests
-                      // already in flight finish — there is nothing to gain
-                      // from abandoning bytes that are nearly there.
-                      void clearQueuedUploads(token);
-                      setResuming(false);
-                    }}
-                  >
-                    {t("discardRest")}
-                  </button>
-                )}
               </p>
-              <div className="mt-1 flex items-center gap-2">
-                <UploadProgressRing done={done} total={items.length} />
-              </div>
+            )}
+
+            {summary && <p className="mb-2 text-sm">{summary}</p>}
+          </div>
+
+          {running && (
+            <div className="mt-1 mb-2 flex items-center gap-3">
+              <UploadProgressRing progress={progress} labelledBy={progressLabelId} />
+              {resuming && (
+                <button
+                  type="button"
+                  className="-my-3 inline-block py-3 text-sm underline"
+                  onClick={() => {
+                    // Stops it coming back on the next visit, and stops this
+                    // run from starting the files that are left. Requests
+                    // already in flight finish — there is nothing to gain
+                    // from abandoning bytes that are nearly there.
+                    void clearQueuedUploads(token);
+                    stopRef.current?.abort();
+                    setResuming(false);
+                  }}
+                >
+                  {t("discardRest")}
+                </button>
+              )}
             </div>
           )}
 
-          {finished && !fatal && (
-            <p className="mb-2 text-sm">
-              {done > 0 ? t("doneSome") : t("doneNone")}
-              {failed > 0 && (
-                <span className="text-red-600 dark:text-red-400">
-                  {" "}
-                  · {t("failedSuffix", { count: failed })}
-                </span>
-              )}
-            </p>
+          {finished && failed > 0 && !fatalIsFinal && (
+            <button
+              type="button"
+              disabled={busy}
+              className="duration-flip mb-2 min-h-11 rounded-lg border px-4 text-sm font-medium transition-transform ease-out active:scale-[0.97] disabled:opacity-50"
+              onClick={() => void retryFailed()}
+            >
+              {t("retryFailed", { count: failed })}
+            </button>
           )}
 
           {/*
@@ -386,8 +603,8 @@ export function GuestUploader({
             iPhone — the one device this bar exists for. Tapping here taps the
             input itself, which every browser handles natively.
           */}
-          {!optedOut && !needsName && !running && preparing === 0 && (
-            <p className="text-caption text-brand-ink/60 dark:text-brand-tint/60 mb-2 flex min-w-0 items-center gap-1">
+          {!optedOut && !needsName && !busy && (
+            <p className="text-caption text-brand-ink/70 dark:text-brand-tint/70 mb-2 flex min-w-0 items-center gap-1">
               <span className="truncate">
                 {name ? t("uploadingAs", { name }) : t("uploadingAnonymously")}
               </span>
@@ -410,7 +627,7 @@ export function GuestUploader({
               source="library"
               label={t("addPhotos")}
               primary
-              disabled={running}
+              disabled={busy}
               asksName={needsName}
               onAsk={() => openSheet({ kind: "pick", source: "library" })}
               onPick={pick}
@@ -421,7 +638,7 @@ export function GuestUploader({
               }}
               source="camera"
               label={t("takePhoto")}
-              disabled={running}
+              disabled={busy}
               asksName={needsName}
               onAsk={() => openSheet({ kind: "pick", source: "camera" })}
               onPick={pick}
@@ -508,7 +725,10 @@ function SourceButton({
   onAsk: () => void;
   onPick: (files: FileList | null) => void;
 }) {
-  const className = `relative flex min-h-12 items-center justify-center rounded-lg px-4 text-base transition-colors duration-flip focus-visible:outline-2 focus-visible:outline-offset-2 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 ${
+  // Colours and the press scale only — never `transition-all`, which would
+  // animate layout too. The press is short and eases out, so it reads as the
+  // button giving under the thumb rather than as an animation.
+  const className = `relative flex min-h-12 items-center justify-center rounded-lg px-4 text-base transition-[background-color,border-color,transform] duration-flip ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 ${
     primary
       ? "bg-brand-primary hover:bg-brand-primary-dark flex-1 font-semibold text-white"
       : "border font-medium"
@@ -604,14 +824,18 @@ function PickSheet({
 function guestRejectionMessage(
   rejection: UploadRejection,
   t: ReturnType<typeof useTranslations<"guestUpload.rejection">>,
+  locale: string,
 ): string {
   switch (rejection.code) {
     case "unsupported_type":
       if (rejection.detail.reason === "heic") return t("unsupportedHeic");
       if (rejection.detail.reason === "video") return t("unsupportedVideo");
+      if (rejection.detail.reason === "empty") return t("emptyFile");
       return t("unsupportedGeneric");
     case "file_too_large":
-      return t("fileTooLarge");
+      return t("fileTooLarge", {
+        max: formatMegabytes(rejection.detail.maxBytes ?? GUEST_MAX_FILE_BYTES, locale),
+      });
     case "quota_exceeded":
       return rejection.detail.reason === "VIEWER_FULL" ? t("quotaViewerFull") : t("quotaAlbumFull");
     case "upload_denied":
@@ -625,4 +849,10 @@ function guestRejectionMessage(
     default:
       return t("genericFailure");
   }
+}
+
+/** The refused files' names, a few of them — forty HEICs must not fill the screen. */
+function fileList(names: string[]): string {
+  const shown = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${shown} +${names.length - 3}` : shown;
 }

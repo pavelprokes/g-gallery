@@ -1,5 +1,6 @@
 "use client";
 
+import { GUEST_MAX_FILE_BYTES } from "@/lib/guest-quota";
 import { classifyContentType } from "@/lib/upload-content-types";
 import { makeThumbnail } from "@/lib/thumbnail";
 import type { ExistingPhoto } from "@/lib/upload-resume";
@@ -24,7 +25,11 @@ const PRESIGN_BATCH = 8;
 // and makes each failure costlier (browsers cap HTTP/1.1 at ~6 per host, and
 // the thumbnail PUTs share that host).
 const CONCURRENCY = 4;
-const MAX_RETRIES = 3;
+// Five attempts, 0.5 + 1 + 2 + 4 s apart: long enough to ride out a phone
+// handing over from venue Wi-Fi to LTE, which takes a few seconds and does not
+// always flip `navigator.onLine`. A connection the browser *knows* is gone
+// does not spend attempts at all — see `waitForOnline`.
+const MAX_RETRIES = 5;
 
 export type UploadCredentials =
   | { kind: "owner"; galleryId: string }
@@ -281,6 +286,43 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
+/** True only when the browser positively knows it has no network. */
+function isOffline(): boolean {
+  // `window` too: without it there is no `online` event to wait for, and the
+  // caller would spin instead of waiting.
+  return (
+    typeof window !== "undefined" && typeof navigator !== "undefined" && navigator.onLine === false
+  );
+}
+
+/**
+ * Resolves once the browser is back online. Used instead of spending a retry
+ * while there is provably no network: a guest walking out of the venue's Wi-Fi
+ * would otherwise burn every attempt in seconds and see the photo fail for
+ * nothing. Rejects with an AbortError if any given signal fires meanwhile.
+ */
+function waitForOnline(...signals: (AbortSignal | undefined)[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const live = signals.filter((signal): signal is AbortSignal => signal !== undefined);
+    if (live.some((signal) => signal.aborted)) return reject(abortError());
+    if (!isOffline()) return resolve();
+    const cleanup = () => {
+      window.removeEventListener("online", onOnline);
+      for (const signal of live) signal.removeEventListener("abort", onAbort);
+    };
+    const onOnline = () => {
+      cleanup();
+      resolve();
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(abortError());
+    };
+    window.addEventListener("online", onOnline);
+    for (const signal of live) signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 async function uploadOne(
   file: File,
   target: PresignedUpload,
@@ -398,6 +440,12 @@ async function uploadOne(
       if (isAbort(error) || error instanceof SignatureExpired) throw error;
       // A refusal with a reason will not become an acceptance on retry.
       if (error instanceof UploadRejection && FATAL_CODES.has(error.code)) throw error;
+      if (!(error instanceof UploadRejection) && isOffline()) {
+        // No network at all: wait for it rather than counting this attempt.
+        await waitForOnline(signal);
+        attempt -= 1;
+        continue;
+      }
       await sleep(2 ** attempt * 500, signal);
     }
   }
@@ -434,8 +482,15 @@ export interface UploadRunOptions {
   onItem: (index: number, patch: { state: UploadItemState; error?: string }) => void;
   /** A refusal that ends the run — quota, revoked link, lost session. */
   onFatal: (rejection: UploadRejection) => void;
-  /** Files skipped before the run started. The rest still upload. */
-  onSkipped?: (rejection: UploadRejection, count: number) => void;
+  /**
+   * Files skipped before the run started — `rejection` is the first one,
+   * `skips` lists every one by index with its own reason. The rest still upload.
+   */
+  onSkipped?: (
+    rejection: UploadRejection,
+    count: number,
+    skips: { index: number; rejection: UploadRejection }[],
+  ) => void;
   /**
    * Bytes of the original sent so far, many times a second. Keep it out of
    * React state — a ref repainted on a timer — or 2 000 files will jank.
@@ -443,6 +498,13 @@ export interface UploadRunOptions {
   onBytes?: (index: number, sent: number) => void;
   /** Aborts in-flight PUTs; everything unfinished ends as `error` / `CANCELLED`. */
   signal?: AbortSignal;
+  /**
+   * Gentler than `signal`: no new file starts, but those already on the wire
+   * finish (docs/GUEST-GALLERIES.md §11, "Zahodit zbytek" — there is nothing to
+   * gain from abandoning bytes that are nearly there). Files that never
+   * started end as `error` / `CANCELLED`.
+   */
+  stop?: AbortSignal;
 }
 
 interface Job {
@@ -462,6 +524,7 @@ export async function runUploads({
   onSkipped,
   onBytes,
   signal,
+  stop,
 }: UploadRunOptions): Promise<void> {
   // Unsupported files are dropped here rather than left for the server, which
   // validates a presign batch as a whole: one HEIC among eight photos would
@@ -469,19 +532,24 @@ export async function runUploads({
   // easily have three of them in a format we cannot store, and losing the
   // other thirty-seven to that is not a trade anyone would accept at 11pm.
   // The server still checks — this is a better failure, not the only one.
+  //
+  // The same goes for size: the server refuses a whole batch for one file over
+  // the guest ceiling (413) or one empty file (400), so both are caught here
+  // too and named, instead of failing three good photos alongside them.
   const queue: number[] = [];
-  let firstSkip: UploadRejection | null = null;
-  let skipped = 0;
+  const skips: { index: number; rejection: UploadRejection }[] = [];
 
-  const skip = (index: number, reason: string) => {
-    skipped += 1;
-    const rejection = new UploadRejection("unsupported_type", {
-      reason,
-      fileName: files[index]!.name,
-    });
-    firstSkip ??= rejection;
-    onItem(index, { state: "error", error: `unsupported_type:${reason}` });
+  const refuse = (index: number, rejection: UploadRejection, error: string) => {
+    skips.push({ index, rejection });
+    onItem(index, { state: "error", error });
   };
+  const skip = (index: number, reason: string) =>
+    refuse(
+      index,
+      new UploadRejection("unsupported_type", { reason, fileName: files[index]!.name }),
+      `unsupported_type:${reason}`,
+    );
+  const photoMaxBytes = credentials.kind === "guest" ? GUEST_MAX_FILE_BYTES : Infinity;
 
   for (const [index, file] of files.entries()) {
     const verdict = classifyContentType(file.type || "image/jpeg", {
@@ -489,6 +557,18 @@ export async function runUploads({
     });
     if (!verdict.ok) {
       skip(index, verdict.reason);
+      continue;
+    }
+    if (file.size === 0) {
+      skip(index, "empty");
+      continue;
+    }
+    if (!verdict.video && file.size > photoMaxBytes) {
+      refuse(
+        index,
+        new UploadRejection("file_too_large", { fileName: file.name, maxBytes: photoMaxBytes }),
+        "file_too_large",
+      );
       continue;
     }
     // A video's own problems (location, codec) are in its header, so they are
@@ -509,7 +589,7 @@ export async function runUploads({
     queue.push(index);
   }
 
-  if (firstSkip) onSkipped?.(firstSkip, skipped);
+  if (skips.length > 0) onSkipped?.(skips[0]!.rejection, skips.length, skips);
   if (queue.length === 0) return;
 
   // Rolling pool: workers pull the next signed file the moment they are free,
@@ -530,18 +610,31 @@ export async function runUploads({
   let signing: Promise<void> | null = null;
   let fatal: UploadRejection | null = null;
 
+  const stopped = () => Boolean(fatal || signal?.aborted || stop?.aborted);
+
   const topUp = () => {
-    if (signing || fatal || signal?.aborted || toSign.length === 0) return;
+    if (signing || stopped() || toSign.length === 0) return;
     if (signed.length >= CONCURRENCY) return;
     const indices = toSign.splice(0, Math.min(PRESIGN_BATCH, CONCURRENCY));
-    signing = presign(
-      credentials,
-      indices.map((index) => files[index]!),
-      indices.map((index) => resumeIds[index]),
-      signal,
-      indices.map((index) => replaceIds[index]),
-      indices.map((index) => names[index]),
-    )
+    const sign = async (): Promise<PresignedUpload[]> => {
+      for (;;) {
+        await waitForOnline(signal, stop);
+        try {
+          return await presign(
+            credentials,
+            indices.map((index) => files[index]!),
+            indices.map((index) => resumeIds[index]),
+            signal,
+            indices.map((index) => replaceIds[index]),
+            indices.map((index) => names[index]),
+          );
+        } catch (error) {
+          // The network went away mid-request: wait for it, then sign again.
+          if (isAbort(error) || error instanceof UploadRejection || !isOffline()) throw error;
+        }
+      }
+    };
+    signing = sign()
       .then((targets) =>
         indices.forEach((index, position) => {
           const target = targets[position];
@@ -556,9 +649,11 @@ export async function runUploads({
           fatal = error;
           return;
         }
+        // Only this batch failed; the rest of the run carries on, so this is
+        // reported per file — never through `onFatal`, which ends the run in
+        // the caller's eyes and hides what did land.
         const message = error instanceof UploadRejection ? error.code : (error as Error).message;
         indices.forEach((index) => settle(index, { state: "error", error: message }));
-        if (error instanceof UploadRejection) onFatal(error);
       })
       .finally(() => {
         signing = null;
@@ -567,7 +662,7 @@ export async function runUploads({
 
   const next = async (): Promise<Job | null> => {
     for (;;) {
-      if (fatal || signal?.aborted) return null;
+      if (stopped()) return null;
       topUp();
       const job = signed.shift();
       if (job) {
@@ -628,7 +723,7 @@ export async function runUploads({
 
   // Everything that never started is marked so the list does not sit on
   // "pending" forever with no explanation.
-  const leftover = fatal ? undefined : signal?.aborted ? CANCELLED : undefined;
+  const leftover = fatal ? undefined : signal?.aborted || stop?.aborted ? CANCELLED : undefined;
   for (const index of queue)
     if (!settled.has(index)) settle(index, { state: "error", error: leftover });
   if (fatal) onFatal(fatal);
