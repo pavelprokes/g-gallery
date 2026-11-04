@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { formatDuration } from "@/lib/video";
 import { placeholderStyle } from "@/lib/placeholder";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import { CloseIcon, PlayIcon } from "@/components/ui/icons";
 
 /**
@@ -97,6 +98,12 @@ export function FeaturedFilmCard({
  * the lightbox, full screen, with a close button and nothing to move to.
  * Loading every page before it just to open the lightbox would fetch the whole
  * gallery's metadata for one tap.
+ *
+ * Its own history entry, as the lightbox has (src/components/gallery-view.tsx):
+ * one `pushState` on open, every close path goes through `history.back()`,
+ * and `popstate` is the one place `onClose` runs — so Android's Back closes
+ * the film instead of leaving the gallery. No `?foto=` in that entry: the
+ * photo-link contract (docs/PHOTO-LINKS.md) covers the lightbox only.
  */
 export function FilmDialog({
   label,
@@ -104,6 +111,7 @@ export function FilmDialog({
   children,
 }: {
   label: string;
+  /** Runs once the dialog's history entry has been left (Back, or a close). */
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -111,13 +119,27 @@ export function FilmDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useFocusTrap(dialogRef, true, closeRef);
+  useScrollLock();
+
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    window.history.pushState({ galleryFilm: true }, "");
+    const onPopState = () => onCloseRef.current();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+  const close = useCallback(() => window.history.back(), []);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [close]);
   return (
     <div
       ref={dialogRef}
@@ -126,15 +148,15 @@ export function FilmDialog({
       aria-label={label}
       tabIndex={-1}
       className="fixed inset-0 z-50 bg-black outline-none"
-      onClick={onClose}
+      onClick={close}
     >
       {children}
       <button
         ref={closeRef}
         type="button"
-        onClick={onClose}
+        onClick={close}
         aria-label={t("close")}
-        className="on-media absolute top-[max(1rem,env(safe-area-inset-top))] right-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white"
+        className="on-media absolute top-[max(1rem,env(safe-area-inset-top))] right-[max(0.75rem,env(safe-area-inset-right))] flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white active:bg-white/25"
       >
         <CloseIcon className="h-5 w-5" />
       </button>

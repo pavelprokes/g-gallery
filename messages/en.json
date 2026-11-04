@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Photos in the gallery",
     "loadingMorePhotos": "Loading more photos…",
     "emptyGallery": "There are no photos in this gallery yet. Once the photographer adds them, they'll show up here — just reload the page.",
+    "emptyGuestGallery": "No photos yet. Be the first – add yours with the button below.",
     "searchingFavorites": "Looking for your favorites in the rest of the gallery…",
     "noFavoritesYet": "You haven't added any favorites yet.",
     "lightboxAriaLabel": "Photo {index} of {total}",
@@ -205,7 +206,7 @@
     "deleteConfirm": "Delete this photo from the gallery? This can't be undone.",
     "selected": "Selected",
     "select": "Select",
-    "preparingDownload": "Preparing download",
+    "preparingDownload": "Preparing download…",
     "downloadOriginal": "Download original",
     "sharePhoto": "Share photo",
     "photoLinkCopied": "Link to the photo copied",
@@ -252,8 +253,8 @@
     },
     "offline": {
       "unsupported": "This browser doesn't support offline galleries.",
-      "notEnoughSpace": "Not enough space on this device. The gallery needs about {needed}.",
-      "notEnoughSpaceWithFree": "Not enough space on this device. The gallery needs about {needed}, and {free} is free.",
+      "notEnoughSpace": "Not enough space on this device. The gallery needs about {needed}. Free up some space, or save only the photos you've marked.",
+      "notEnoughSpaceWithFree": "Not enough space on this device. The gallery needs about {needed}, and {free} is free. Free up some space, or save only the photos you've marked.",
       "tryAgain": "Try again",
       "downloading": "Downloading to device… {percent}%",
       "downloadingWithBytes": "Downloading to device… {percent}% · {bytes}",
@@ -261,6 +262,7 @@
       "downloadStarted": "Download started, {percent}%.",
       "availableOffline": "✓ Gallery is available offline",
       "availableOfflineWithBytes": "✓ Gallery is available offline ({bytes})",
+      "savedOfTotal": "{saved} of {total, plural, one {# photo} other {# photos}} are saved on this device.",
       "availableOfflineNote": "Saved photos are sized for this screen, not the originals. The browser may free them up after a while on its own — on iPhone, roughly a week without opening the gallery — just download again if that happens.",
       "removeFromDevice": "Remove from device",
       "availableOfflineAnnounce": "Downloaded — the gallery is available offline.",
@@ -268,7 +270,7 @@
       "downloadFailedAnnounce": "The download failed.",
       "saveOffline": "Save {count, plural, one {# photo} other {# photos}} to this device and browse them without signal.",
       "estimatedSize": "Takes about {size}. Saves the size for this screen, not the originals.",
-      "onlyEngagedOption": "Only photos I reacted to, picked for print, or selected ({count, plural, one {# photo} other {# photos}})",
+      "onlyEngagedOption": "Only photos I've marked — favorited, reacted to, picked for print or selected ({count, plural, one {# photo} other {# photos}})",
       "makeAvailable": "Make available offline",
       "iconLabel": "Offline",
       "iconTitle": "Save photos to this device for viewing without signal",
@@ -282,7 +284,7 @@
     "saveFailed": "Your last mark didn't save — check your connection and try again. If the link has expired, message whoever sent it to you.",
     "downloadAllLabelSized": "Download all ({size})",
     "downloadAllStaleTitle": "Downloads every photo except the very newest — the archive is being rebuilt.",
-    "archivePreparingLabel": "Preparing archive",
+    "archivePreparingLabel": "Preparing archive…",
     "archivePreparingTitle": "The full archive is still being prepared. Pick the photos you want and download those now, or check back shortly.",
     "transfer": {
       "startTitle": "Continue on another device",
@@ -310,9 +312,12 @@
     "uploadingProgress": "Uploading {done} of {total} · keeping the screen on. If this gets interrupted, it'll pick up again once you're back.",
     "resumingProgress": "Finishing your upload — {done} of {total} · keeping the screen on. If this gets interrupted, it'll pick up again once you're back.",
     "discardRest": "Discard the rest",
-    "doneSome": "Uploaded. Everyone at the wedding will see it.",
+    "doneSome": "Uploaded. Everyone at the wedding will see them.",
     "doneNone": "Nothing was uploaded. Pick the photos again — smaller batches work best.",
     "failedSuffix": "{count, plural, one {# photo didn't make it} other {# photos didn't make it}}",
+    "donePartial": "Done – {done} in the gallery. {failed} didn't make it – please try again.",
+    "landedCount": "{count, plural, one {# photo is} other {# photos are}} already in the gallery.",
+    "retryFailed": "Try again ({count})",
     "skippedNote": "(We skipped {count, plural, one {# file} other {# files}} — the rest are still uploading.)",
     "startFailed": "Couldn't start the upload. Please try again.",
     "resumeFailed": "Couldn't finish an upload left over from before.",
@@ -336,20 +341,22 @@
       "unsupportedHeic": "We can't handle this format (HEIC) yet. In Settings → Camera → Formats, switch to “Most Compatible” and try again.",
       "unsupportedVideo": "We don't accept videos yet, just photos.",
       "unsupportedGeneric": "We can't handle this file type. Try a different photo.",
-      "fileTooLarge": "That photo is too large.",
+      "emptyFile": "This file is empty. Pick the photo again straight from your phone's photo library.",
+      "fileTooLarge": "This photo is too big (over {max}). Try sending it straight from your phone's photo library.",
       "quotaViewerFull": "You've already added a lot of photos — you can't add more for now. Thanks!",
       "quotaAlbumFull": "The gallery is full for now. Please let whoever sent you the link know.",
       "deniedPasswordRequired": "Please reload the page and enter the password.",
       "deniedGeneric": "This gallery isn't accepting new photos anymore.",
       "rateLimited": "You're sending a lot at once — give it a moment and try again.",
-      "sizeMismatch": "The photo didn't fully transfer. We're trying again.",
+      "sizeMismatch": "The photo didn't fully transfer. Please add it again, or tap “Try again”.",
       "genericFailure": "The upload didn't go through. Please try again once you have a better signal."
     }
   },
   "presence": {
     "someone": "Someone is viewing right now",
     "count": "{count, plural, one {# person is viewing right now} other {# people are viewing right now}}",
-    "named": "{names} {count, plural, one {is viewing} other {are viewing}}"
+    "named": "{names} {count, plural, one {is viewing} other {are viewing}}",
+    "others": "{count, plural, one {# other} other {# others}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · wedding photographer",
@@ -363,7 +370,7 @@
     "wrongPassword": "Wrong password. Check for capital letters and please try again later, or ask the photographer to resend it."
   },
   "promo": {
-    "cardAriaLabel": "{headline} — opens {cta} in a new window"
+    "cardAriaLabel": "{headline} — {cta} (opens in a new window)"
   },
   "corrections": {
     "toolbar": "Edit requests",
@@ -373,6 +380,7 @@
     "pinSubmit": "Enter",
     "pinWrong": "That PIN doesn't match. Please try again.",
     "pinLocked": "Too many attempts. Try again in {minutes} min.",
+    "pinError": "We couldn't check the PIN just now. Check your connection and try again.",
     "cancel": "Cancel",
     "barTitle": "Edit requests",
     "barCount": "{count, plural, =0 {none yet} one {# photo with a request} other {# photos with a request}}",

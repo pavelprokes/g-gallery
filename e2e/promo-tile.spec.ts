@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, selectFirstPhoto } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -85,15 +85,18 @@ test.describe("promo tile in the gallery grid", () => {
     await expect(page.getByText(`${seed.promoSlot} / ${seed.photoCount}`)).toBeVisible();
   });
 
-  test("cannot be selected or downloaded", async ({ page }) => {
+  test("cannot be selected or downloaded", async ({ page, isMobile }) => {
     await page.goto(`/g/${seed.token}/${seed.slug}`);
+
+    // On a touch screen the idle checkboxes are not drawn until selection
+    // starts (long press), so count them once it has.
+    await selectFirstPhoto(page, isMobile);
 
     // One checkbox per photo, none for the card.
     await expect.poll(async () => page.getByRole("checkbox").count()).toBe(seed.photoCount);
     await expect(promo(page).getByRole("checkbox")).toHaveCount(0);
 
     // "Select all" is the whole gallery — and the whole gallery is photos.
-    await page.getByRole("checkbox").first().click();
     await page
       .locator(".sticky")
       .getByRole("button", { name: /Vybrat vše/ })

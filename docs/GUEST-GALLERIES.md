@@ -86,7 +86,10 @@ the QR sign, the bookmark and the link in the family chat all point at the event
   view, but the address bar still says `/s/…`, so what guests bookmark and forward is the wedding
   page. Redirecting would hand eighty people a URL that can never grow a second card.
 - `public/sw.js` already drops a gallery's offline copy on 403/404/410; it must do the same for a
-  gallery removed from an event.
+  gallery removed from an event. Expired and revoked links render with status 200 (a page cannot
+  set its own), so since 2026-11-04 `ShareLinkDead` and `EventPartGone` carry
+  `<meta name="gg-share-link-dead">` and the service worker drops the copy when a refreshed page
+  has it.
 - A new gallery on an event people already know is a notification event, not a silent change.
 
 ## 3. Data model
@@ -519,7 +522,18 @@ by hash, never by ciphertext.
   Not "you can lock the phone" — on iOS, JavaScript is suspended when the screen locks and there is
   no API that keeps bytes flowing. What is promised is that nothing is lost, which is true.
 - A resumed run shows _Zahodit zbytek_ for anyone who abandoned it on purpose. Requests already in
-  flight finish; there is nothing to gain from abandoning bytes that are nearly there.
+  flight finish; there is nothing to gain from abandoning bytes that are nearly there. Since
+  2026-11-04 it also stops the run from _starting_ further files (a `stop` signal to `runUploads`);
+  the rest end as CANCELLED, not failed.
+- **Resume without a reload (2026-11-04).** iOS usually brings back the same tab rather than
+  reloading it, so the queue is also resumed on `visibilitychange`→visible and on `online`, never
+  while a run is active (one guard covers picking, resuming and retrying). A network error while
+  `navigator.onLine` is false waits for `online` instead of spending a retry; retries go up to
+  five (0.5/1/2/4 s). Failed files that are still queued get a _Zkusit znovu (N)_ button. Neither
+  the auto-resume nor the button runs after a refusal that ended the run (quota, revoked link).
+- **One bad file no longer sinks its batch (2026-11-04).** Empty files and guest photos over
+  `GUEST_MAX_FILE_BYTES` are refused before presign, by name, like unsupported types; a failed
+  presign batch is reported per file and is not fatal. Only the skipped files leave the queue.
 
 ### F5 projection, as built (2026-08-23)
 

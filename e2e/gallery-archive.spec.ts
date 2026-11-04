@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, selectFirstPhoto } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -87,7 +87,7 @@ test.describe("pre-built archive: the download control", () => {
     await page.goto(`/g/${seed.archives.ready.token}/${seed.archives.ready.slug}`);
     const link = page.getByRole("link", { name: /Stáhnout vše \(/ });
     await expect(link).toHaveAttribute("href", /\.zip$/);
-    await expect(page.getByRole("dialog", { name: /Stahujete celou galerii/ })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: /Stahuješ celou galerii/ })).toHaveCount(0);
   });
 
   test("a multi-gigabyte archive says what it involves before it starts", async ({ page }) => {
@@ -96,11 +96,11 @@ test.describe("pre-built archive: the download control", () => {
     // bytes are moving.
     await page.goto(`/g/${seed.archives.large.token}/${seed.archives.large.slug}`);
 
-    await page.getByRole("link", { name: /Stáhnout vše \(6\.1 GB\)/ }).click();
+    await page.getByRole("link", { name: /Stáhnout vše \(6,1\sGB\)/ }).click();
 
-    const dialog = page.getByRole("dialog", { name: "Stahujete celou galerii" });
+    const dialog = page.getByRole("dialog", { name: "Stahuješ celou galerii" });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText("6.1 GB");
+    await expect(dialog).toContainText(/6,1\sGB/);
     await expect(dialog).toContainText(/plném rozlišení/);
     await expect(dialog).toContainText(/Wi-Fi/);
     await expect(dialog).toContainText(/navázat/);
@@ -108,9 +108,9 @@ test.describe("pre-built archive: the download control", () => {
     // The way out that does not involve downloading 6 GB at all — and the
     // subject names the gallery, so the photographer knows which wedding is
     // asking without working it out from the sender.
-    await expect(dialog).toContainText(/nemáte kam/);
+    await expect(dialog).toContainText(/nemáš kam/);
     await expect(dialog).toContainText(/flashce/);
-    await expect(dialog.getByRole("link", { name: /Napište mi/ })).toHaveAttribute(
+    await expect(dialog.getByRole("link", { name: /Napiš mi/ })).toHaveAttribute(
       "href",
       /^mailto:.*subject=Sta%C5%BEen%C3%AD%20galerie%3A%20/,
     );
@@ -127,7 +127,7 @@ test.describe("pre-built archive: the download control", () => {
     await page.goto(`/g/${seed.archives.large.token}/${seed.archives.large.slug}`);
     await page.getByRole("link", { name: /Stáhnout vše \(/ }).click();
 
-    const dialog = page.getByRole("dialog", { name: "Stahujete celou galerii" });
+    const dialog = page.getByRole("dialog", { name: "Stahuješ celou galerii" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Zrušit" }).click();
     await expect(dialog).toHaveCount(0);
@@ -138,7 +138,10 @@ test.describe("pre-built archive: the download control", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  test("a viewer can still take photos now while the archive is missing", async ({ page }) => {
+  test("a viewer can still take photos now while the archive is missing", async ({
+    page,
+    isMobile,
+  }) => {
     // The promise the "Připravujeme archiv" tooltip makes: selecting photos
     // and downloading those does not depend on the pre-built archive at all.
     // If this breaks, the honest empty state becomes a dead end.
@@ -147,7 +150,7 @@ test.describe("pre-built archive: the download control", () => {
     const grid = page.getByRole("list", { name: "Fotky v galerii" });
     await expect(grid).toBeVisible();
 
-    await page.getByRole("checkbox").first().click();
+    await selectFirstPhoto(page, isMobile);
     await expect(
       page.locator(".sticky").getByRole("button", { name: "Stáhnout 1 fotku" }),
     ).toBeVisible();

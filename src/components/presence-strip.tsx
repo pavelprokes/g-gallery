@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   channelForGallery,
@@ -23,6 +23,7 @@ import { getViewerId, getViewerName } from "@/lib/viewer-id";
  */
 export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; optedOut: boolean }) {
   const t = useTranslations("presence");
+  const locale = useLocale();
   const [others, setOthers] = useState<{ count: number; names: string[] }>({
     count: 0,
     names: [],
@@ -89,20 +90,48 @@ export function PresenceStrip({ galleryId, optedOut }: { galleryId: string; opte
 
   if (others.count === 0) return null;
 
-  const label =
-    others.names.length > 0
-      ? t("named", { names: others.names.slice(0, 3).join(", "), count: others.names.length })
-      : others.count === 1
-        ? t("someone")
-        : t("count", { count: others.count });
+  const label = presenceLabel(others, locale, t);
 
   return (
-    <span className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-      <span className="relative flex h-2 w-2" aria-hidden>
-        <span className="motion-loop absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+    <span
+      title={label}
+      className="flex max-w-64 min-w-0 items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+    >
+      {/* The ping is decoration (the words already say someone is here), so it
+          has no `.motion-loop`: under reduced motion it stops, the dot stays. */}
+      <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
       </span>
-      {label}
+      <span className="min-w-0 truncate">{label}</span>
     </span>
   );
+}
+
+/** At most this many names; everyone past them is "and N others". */
+const MAX_NAMES = 3;
+
+/**
+ * "Jana, Petr a další 2 se dívají". Names joined the locale's way
+ * (`Intl.ListFormat`, "a" / "and" / "et" …, with the serial comma where the
+ * language uses one), and the overflow counted from the real total — the
+ * viewers who never gave a name included — rather than from the names alone,
+ * which used to say "Jana se dívá" with five people watching.
+ */
+export function presenceLabel(
+  others: { count: number; names: string[] },
+  locale: string,
+  t: (
+    key: "named" | "others" | "someone" | "count",
+    values?: Record<string, string | number>,
+  ) => string,
+): string {
+  if (others.names.length === 0) {
+    return others.count === 1 ? t("someone") : t("count", { count: others.count });
+  }
+  const shown = others.names.slice(0, MAX_NAMES);
+  const overflow = Math.max(0, others.count - shown.length);
+  const parts = overflow > 0 ? [...shown, t("others", { count: overflow })] : shown;
+  const names = new Intl.ListFormat(locale, { type: "conjunction" }).format(parts);
+  return t("named", { names, count: shown.length + overflow });
 }

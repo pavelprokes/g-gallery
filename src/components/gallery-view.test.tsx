@@ -164,6 +164,31 @@ describe("a long press on a tile", () => {
     expect(onPick).toHaveBeenCalledWith(0, "photo_1", false);
   });
 
+  // A held finger wobbles: a pixel or two of touchmove is still a press, and
+  // only a real move (a scroll) cancels it.
+  it("survives a wobble within the tap slop and cancels on a real move", () => {
+    const onPick = vi.fn();
+    renderTile(onPick);
+    const tile = screen.getByLabelText("openPhoto");
+    fireEvent.touchStart(tile, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(tile, { touches: [{ clientX: 103, clientY: 98 }] });
+    vi.advanceTimersByTime(600);
+    expect(onPick).toHaveBeenCalledTimes(1);
+
+    onPick.mockClear();
+    fireEvent.touchStart(tile, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(tile, { touches: [{ clientX: 100, clientY: 130 }] });
+    vi.advanceTimersByTime(600);
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  // Tailwind 4 gates hover behind (hover: hover), so on a phone an idle
+  // checkbox was invisible but still took the tap meant to open the photo.
+  it("does not render the idle checkbox on touch", () => {
+    renderTile(() => {});
+    expect(hiddenOnTouch(screen.getByLabelText("selectPhoto"))).toBe(true);
+  });
+
   // The heart, the printer and the checkbox sit over the tile's button but are
   // still children of the same div, so their touchstart bubbles to its
   // handler. Holding the heart used to favourite the photo *and* drop the

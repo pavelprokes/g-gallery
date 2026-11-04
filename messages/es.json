@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Fotos de la galería",
     "loadingMorePhotos": "Cargando más fotos…",
     "emptyGallery": "Todavía no hay fotos en esta galería. Cuando el fotógrafo las añada, aparecerán aquí; solo tendrás que recargar la página.",
+    "emptyGuestGallery": "Todavía no hay fotos. Añade las primeras con el botón de abajo.",
     "searchingFavorites": "Buscando tus favoritas en el resto de la galería…",
     "noFavoritesYet": "Aún no has añadido ninguna favorita.",
     "lightboxAriaLabel": "Foto {index} de {total}",
@@ -205,7 +206,7 @@
     "deleteConfirm": "¿Borrar esta foto de la galería? No se puede deshacer.",
     "selected": "Seleccionada",
     "select": "Seleccionar",
-    "preparingDownload": "Preparando la descarga",
+    "preparingDownload": "Preparando la descarga…",
     "downloadOriginal": "Descargar original",
     "sharePhoto": "Compartir foto",
     "photoLinkCopied": "Enlace a la foto copiado",
@@ -252,8 +253,8 @@
     },
     "offline": {
       "unsupported": "Este navegador no admite galerías sin conexión.",
-      "notEnoughSpace": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed}.",
-      "notEnoughSpaceWithFree": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed} y hay {free} libres.",
+      "notEnoughSpace": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed}. Libera espacio o guarda solo las fotos que has marcado.",
+      "notEnoughSpaceWithFree": "No hay espacio suficiente en este dispositivo. La galería necesita unos {needed} y hay {free} libres. Libera espacio o guarda solo las fotos que has marcado.",
       "tryAgain": "Reintentar",
       "downloading": "Descargando en el dispositivo… {percent}%",
       "downloadingWithBytes": "Descargando en el dispositivo… {percent}% · {bytes}",
@@ -261,6 +262,7 @@
       "downloadStarted": "Descarga iniciada, {percent}%.",
       "availableOffline": "✓ La galería está disponible sin conexión",
       "availableOfflineWithBytes": "✓ La galería está disponible sin conexión ({bytes})",
+      "savedOfTotal": "{saved} de {total, plural, one {# foto} other {# fotos}} están guardadas en este dispositivo.",
       "availableOfflineNote": "Las fotos guardadas tienen el tamaño de esta pantalla, no son los originales. El navegador puede liberarlas por su cuenta pasado un tiempo (en iPhone, más o menos una semana sin abrir la galería); si pasa, vuelve a descargarlas.",
       "removeFromDevice": "Quitar del dispositivo",
       "availableOfflineAnnounce": "Descargada: la galería está disponible sin conexión.",
@@ -268,7 +270,7 @@
       "downloadFailedAnnounce": "La descarga ha fallado.",
       "saveOffline": "Guarda {count, plural, one {# foto} other {# fotos}} en este dispositivo y velas sin cobertura.",
       "estimatedSize": "Ocupa unos {size}. Se guarda con el tamaño de esta pantalla, no los originales.",
-      "onlyEngagedOption": "Solo las fotos a las que he reaccionado, marcado para imprimir o seleccionado ({count, plural, one {# foto} other {# fotos}})",
+      "onlyEngagedOption": "Solo las fotos que he marcado: favoritas, con reacción, para imprimir o seleccionadas ({count, plural, one {# foto} other {# fotos}})",
       "makeAvailable": "Disponible sin conexión",
       "iconLabel": "Sin conexión",
       "iconTitle": "Guardar fotos en este dispositivo para verlas sin cobertura",
@@ -282,7 +284,7 @@
     "saveFailed": "Tu última marca no se ha guardado: comprueba la conexión e inténtalo de nuevo. Si el enlace ha caducado, escribe a quien te lo envió.",
     "downloadAllLabelSized": "Descargar todo ({size})",
     "downloadAllStaleTitle": "Descarga todas las fotos menos las más recientes: el archivo se está regenerando.",
-    "archivePreparingLabel": "Preparando archivo",
+    "archivePreparingLabel": "Preparando archivo…",
     "archivePreparingTitle": "El archivo completo aún se está preparando. Elige las fotos que quieras y descárgalas ahora, o vuelve dentro de un rato.",
     "transfer": {
       "startTitle": "Continuar en otro dispositivo",
@@ -313,6 +315,9 @@
     "doneSome": "Subidas. Todos los que estén en la boda las verán.",
     "doneNone": "No se ha subido nada. Elige las fotos otra vez; funciona mejor en tandas pequeñas.",
     "failedSuffix": "{count, plural, one {# foto no se ha subido} other {# fotos no se han subido}}",
+    "donePartial": "Listo: {done, plural, one {# foto está} other {# fotos están}} en la galería. {failed, plural, one {# foto no se ha subido} other {# fotos no se han subido}}; inténtalo de nuevo, por favor.",
+    "landedCount": "{count, plural, one {# foto ya está} other {# fotos ya están}} en la galería.",
+    "retryFailed": "Reintentar ({count})",
     "skippedNote": "(Hemos omitido {count, plural, one {# archivo} other {# archivos}}; el resto se sigue subiendo.)",
     "startFailed": "No se ha podido iniciar la subida. Inténtalo de nuevo.",
     "resumeFailed": "No se ha podido terminar una subida pendiente de antes.",
@@ -336,20 +341,22 @@
       "unsupportedHeic": "Todavía no admitimos este formato (HEIC). En Ajustes → Cámara → Formatos, elige «Más compatible» y vuelve a intentarlo.",
       "unsupportedVideo": "Todavía no aceptamos vídeos, solo fotos.",
       "unsupportedGeneric": "No admitimos este tipo de archivo. Prueba con otra foto.",
-      "fileTooLarge": "Esa foto es demasiado grande.",
+      "emptyFile": "Este archivo está vacío. Vuelve a elegir la foto directamente desde la galería del móvil.",
+      "fileTooLarge": "Esta foto es demasiado grande (más de {max}). Prueba a enviarla directamente desde la galería del móvil, no desde un álbum compartido o un chat.",
       "quotaViewerFull": "Ya has añadido muchas fotos y por ahora no puedes añadir más. ¡Gracias!",
       "quotaAlbumFull": "La galería está llena por ahora. Avisa a quien te envió el enlace.",
       "deniedPasswordRequired": "Recarga la página e introduce la contraseña.",
       "deniedGeneric": "Esta galería ya no acepta fotos nuevas.",
       "rateLimited": "Estás enviando muchas a la vez: espera un momento y vuelve a intentarlo.",
-      "sizeMismatch": "La foto no se ha transferido por completo. Lo estamos intentando de nuevo.",
+      "sizeMismatch": "La foto no se ha transferido por completo. Vuelve a añadirla o toca «Reintentar».",
       "genericFailure": "La subida no se ha completado. Inténtalo de nuevo cuando tengas mejor cobertura."
     }
   },
   "presence": {
     "someone": "Alguien está viendo la galería ahora mismo",
     "count": "{count, plural, one {# persona está viendo la galería ahora mismo} other {# personas están viendo la galería ahora mismo}}",
-    "named": "{names} {count, plural, one {está viendo la galería} other {están viendo la galería}}"
+    "named": "{names} {count, plural, one {está viendo la galería} other {están viendo la galería}}",
+    "others": "{count, plural, one {# persona más} other {# personas más}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · fotógrafo de bodas",
@@ -363,7 +370,7 @@
     "wrongPassword": "Contraseña incorrecta. Revisa las mayúsculas e inténtalo de nuevo más tarde, o pídele al fotógrafo que te la reenvíe."
   },
   "promo": {
-    "cardAriaLabel": "{headline} — abre {cta} en una ventana nueva"
+    "cardAriaLabel": "{headline} – {cta} (se abre en una ventana nueva)"
   },
   "corrections": {
     "toolbar": "Retoques",
@@ -373,6 +380,7 @@
     "pinSubmit": "Entrar",
     "pinWrong": "El PIN no coincide. Inténtalo de nuevo.",
     "pinLocked": "Demasiados intentos. Vuelve a intentarlo en {minutes} min.",
+    "pinError": "No hemos podido comprobar el PIN ahora mismo. Revisa tu conexión e inténtalo de nuevo.",
     "cancel": "Cancelar",
     "barTitle": "Peticiones de retoque",
     "barCount": "{count, plural, =0 {ninguna todavía} one {# foto con petición} other {# fotos con petición}}",

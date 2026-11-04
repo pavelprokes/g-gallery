@@ -1,10 +1,17 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Sheet, SHEET_PRIMARY, SHEET_SECONDARY } from "@/components/name-sheet";
 import { PencilIcon } from "@/components/ui/icons";
 import type { Correction, EnterResult } from "@/components/corrections/use-corrections";
+import {
+  correctionsBarTop,
+  pinFromInput,
+  readCorrectionDraft,
+  writeCorrectionDraft,
+} from "@/components/corrections/corrections-helpers";
+import { useKeyboardInset } from "@/lib/use-keyboard-inset";
 
 // The guest side of the corrections mode (docs/CORRECTIONS.md): the PIN sheet,
 // the bar that says the mode is on, the panel beside the photo in the
@@ -38,7 +45,7 @@ export function CorrectionsPinSheet({
           ? t("pinLocked", {
               minutes: Math.max(1, Math.ceil((result.until.getTime() - Date.now()) / 60_000)),
             })
-          : t("error"),
+          : t("pinError"),
     );
   }
 
@@ -57,14 +64,15 @@ export function CorrectionsPinSheet({
             value={pin}
             onChange={(event) => {
               setError(null);
-              setPin(event.target.value.replace(/\D/g, "").slice(0, 6));
+              // No `maxLength`: it would cut a pasted "PIN …: 123456" to
+              // its first six characters before the digits could be found.
+              setPin(pinFromInput(event.target.value));
             }}
             // A numeric keypad on a phone, and the PIN from a message offered
             // above the keyboard where the platform does that.
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="\d{6}"
-            maxLength={6}
             placeholder="••••••"
             className="border-brand-border focus:border-brand-primary w-full rounded-lg border bg-white px-4 py-3 text-center text-2xl font-semibold tracking-[0.5em] tabular-nums outline-none dark:bg-neutral-800"
           />
@@ -90,11 +98,33 @@ export function CorrectionsPinSheet({
   );
 }
 
+/** Where the bar sits: under the chapter bar and the print summary, if shown. */
+export interface CorrectionsBarPlacement {
+  belowChapters: boolean;
+  printSummary: "none" | "short" | "tall";
+}
+
+// 36 px to the eye, 48 px to a finger: the bar keeps its slim look while an
+// invisible box around the button takes the tap.
+const BAR_BUTTON =
+  "relative min-h-9 shrink-0 rounded-full bg-white/15 px-3 font-medium before:absolute before:-inset-x-1 before:-inset-y-1.5 hover:bg-white/25";
+
 /** Says the mode is on, how much is in it, and how to leave. */
-export function CorrectionsBar({ photoCount, onExit }: { photoCount: number; onExit: () => void }) {
+export function CorrectionsBar({
+  photoCount,
+  onExit,
+  placement,
+}: {
+  photoCount: number;
+  onExit: () => void;
+  placement: CorrectionsBarPlacement;
+}) {
   const t = useTranslations("corrections");
   return (
-    <div className="pointer-events-none sticky top-2 z-30 flex h-0 items-start justify-center px-3">
+    <div
+      className="pointer-events-none sticky z-30 flex h-0 items-start justify-center px-3"
+      style={{ top: correctionsBarTop(placement) }}
+    >
       <div
         role="status"
         className="text-body pointer-events-auto flex min-h-11 max-w-md items-center gap-3 rounded-[22px] bg-black/70 py-1.5 pr-1.5 pl-4 text-white pointer-fine:backdrop-blur-md"
@@ -104,11 +134,7 @@ export function CorrectionsBar({ photoCount, onExit }: { photoCount: number; onE
           <span className="font-medium">{t("barTitle")}</span>
           <span className="text-white/70"> · {t("barCount", { count: photoCount })}</span>
         </span>
-        <button
-          type="button"
-          onClick={onExit}
-          className="min-h-9 rounded-full bg-white/15 px-3 font-medium hover:bg-white/25"
-        >
+        <button type="button" onClick={onExit} className={BAR_BUTTON}>
           {t("exit")}
         </button>
       </div>
@@ -117,20 +143,25 @@ export function CorrectionsBar({ photoCount, onExit }: { photoCount: number; onE
 }
 
 /** The mode ended under the viewer — the key expired or the PIN was changed. */
-export function CorrectionsExpired({ onReenter }: { onReenter: () => void }) {
+export function CorrectionsExpired({
+  onReenter,
+  placement,
+}: {
+  onReenter: () => void;
+  placement: CorrectionsBarPlacement;
+}) {
   const t = useTranslations("corrections");
   return (
-    <div className="pointer-events-none sticky top-2 z-30 flex h-0 items-start justify-center px-3">
+    <div
+      className="pointer-events-none sticky z-30 flex h-0 items-start justify-center px-3"
+      style={{ top: correctionsBarTop(placement) }}
+    >
       <div
         role="status"
         className="text-body pointer-events-auto flex min-h-11 max-w-md items-center gap-3 rounded-[22px] bg-black/70 py-1.5 pr-1.5 pl-4 text-white"
       >
         <span>{t("expired")}</span>
-        <button
-          type="button"
-          onClick={onReenter}
-          className="min-h-9 shrink-0 rounded-full bg-white/15 px-3 font-medium hover:bg-white/25"
-        >
+        <button type="button" onClick={onReenter} className={BAR_BUTTON}>
           {t("pinSubmit")}
         </button>
       </div>
@@ -271,6 +302,7 @@ function Spot({
  * phone — the lightbox makes room for it either way.
  */
 export function CorrectionsPanel({
+  draftKey,
   fileName,
   comments,
   placing,
@@ -282,6 +314,8 @@ export function CorrectionsPanel({
   onUpdate,
   onRemove,
 }: {
+  /** Where the unsent text is kept per photo (`correctionDraftKey`). */
+  draftKey: string;
   fileName: string;
   comments: Correction[];
   placing: boolean;
@@ -294,9 +328,14 @@ export function CorrectionsPanel({
   onRemove: (id: string) => Promise<boolean>;
 }) {
   const t = useTranslations("corrections");
-  const [body, setBody] = useState("");
+  // The panel remounts per photo; the text typed on each waits in the tab's
+  // session storage until it is sent.
+  const [body, setBody] = useState(() => readCorrectionDraft(draftKey));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Lifted over the on-screen keyboard (iOS lays it over the page instead of
+  // shrinking it), and never taller than what is left above it.
+  const keyboardInset = useKeyboardInset();
 
   async function add() {
     const text = body.trim();
@@ -305,6 +344,7 @@ export function CorrectionsPanel({
     setError(null);
     const ok = await onCreate(text);
     setBusy(false);
+    // The stored draft is dropped by the hook once the comment is saved.
     if (ok) setBody("");
     else setError(t("error"));
   }
@@ -313,9 +353,10 @@ export function CorrectionsPanel({
     <aside
       aria-label={t("panelTitle")}
       onClick={(event) => event.stopPropagation()}
-      className="fixed inset-x-0 bottom-0 z-10 flex max-h-[45dvh] flex-col rounded-t-2xl bg-white text-neutral-900 shadow-2xl md:inset-x-auto md:top-0 md:right-0 md:bottom-0 md:max-h-none md:w-96 md:rounded-none dark:bg-neutral-900 dark:text-neutral-100"
+      style={{ "--kb": `${keyboardInset}px` } as CSSProperties}
+      className="fixed inset-x-0 bottom-(--kb) z-10 flex max-h-[min(45dvh,calc(100dvh_-_var(--kb)_-_4rem))] flex-col rounded-t-2xl bg-white text-neutral-900 shadow-2xl md:inset-x-auto md:top-0 md:right-0 md:max-h-none md:w-96 md:rounded-none dark:bg-neutral-900 dark:text-neutral-100"
     >
-      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-6">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:pt-6">
         <h2 className="text-title font-semibold">{t("panelTitle")}</h2>
         <p className="text-caption truncate text-neutral-500">{fileName}</p>
 
@@ -346,7 +387,10 @@ export function CorrectionsPanel({
             {t("newLabel")}
             <textarea
               value={body}
-              onChange={(event) => setBody(event.target.value)}
+              onChange={(event) => {
+                setBody(event.target.value);
+                writeCorrectionDraft(draftKey, event.target.value);
+              }}
               maxLength={1000}
               rows={3}
               placeholder={t("placeholder")}

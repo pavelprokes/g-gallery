@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, selectFirstPhoto } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -224,11 +224,11 @@ test.describe("share gallery viewer", () => {
     await expect(tiles.last()).toBeFocused();
   });
 
-  test("shift-click selects a range and the toolbar reflects it", async ({ page }) => {
+  test("shift-click selects a range and the toolbar reflects it", async ({ page, isMobile }) => {
     await page.goto(`/g/${seed.token}/${seed.slug}`);
     const checkboxes = page.getByRole("checkbox");
 
-    await checkboxes.first().click();
+    await selectFirstPhoto(page, isMobile);
     await checkboxes.nth(2).click({ modifiers: ["Shift"] });
 
     // "3 vybrané" also appears in the sr-only aria-live announcement

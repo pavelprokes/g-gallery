@@ -193,6 +193,7 @@
     "photosListAriaLabel": "Fotos in der Galerie",
     "loadingMorePhotos": "Weitere Fotos werden geladen …",
     "emptyGallery": "In dieser Galerie sind noch keine Fotos. Sobald der Fotograf sie hinzufügt, erscheinen sie hier – laden Sie die Seite einfach neu.",
+    "emptyGuestGallery": "Noch keine Fotos. Machen Sie den Anfang – fügen Sie Ihre mit der Schaltfläche unten hinzu.",
     "searchingFavorites": "Ihre Favoriten im Rest der Galerie werden gesucht …",
     "noFavoritesYet": "Sie haben noch keine Favoriten hinzugefügt.",
     "lightboxAriaLabel": "Foto {index} von {total}",
@@ -205,7 +206,7 @@
     "deleteConfirm": "Dieses Foto aus der Galerie löschen? Das lässt sich nicht rückgängig machen.",
     "selected": "Ausgewählt",
     "select": "Auswählen",
-    "preparingDownload": "Download wird vorbereitet",
+    "preparingDownload": "Download wird vorbereitet…",
     "downloadOriginal": "Original herunterladen",
     "sharePhoto": "Foto teilen",
     "photoLinkCopied": "Link zum Foto kopiert",
@@ -252,8 +253,8 @@
     },
     "offline": {
       "unsupported": "Dieser Browser unterstützt keine Offline-Galerien.",
-      "notEnoughSpace": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}.",
-      "notEnoughSpaceWithFree": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}, frei sind {free}.",
+      "notEnoughSpace": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}. Geben Sie Speicherplatz frei oder speichern Sie nur die Fotos, die Sie markiert haben.",
+      "notEnoughSpaceWithFree": "Nicht genug Speicherplatz auf diesem Gerät. Die Galerie benötigt etwa {needed}, frei sind {free}. Geben Sie Speicherplatz frei oder speichern Sie nur die Fotos, die Sie markiert haben.",
       "tryAgain": "Erneut versuchen",
       "downloading": "Wird auf das Gerät geladen … {percent} %",
       "downloadingWithBytes": "Wird auf das Gerät geladen … {percent} % · {bytes}",
@@ -261,6 +262,7 @@
       "downloadStarted": "Download gestartet, {percent} %.",
       "availableOffline": "✓ Galerie ist offline verfügbar",
       "availableOfflineWithBytes": "✓ Galerie ist offline verfügbar ({bytes})",
+      "savedOfTotal": "{saved} von {total, plural, one {# Foto} other {# Fotos}} sind auf diesem Gerät gespeichert.",
       "availableOfflineNote": "Gespeicherte Fotos sind auf diesen Bildschirm zugeschnitten, nicht die Originale. Der Browser kann sie nach einer Weile von selbst wieder freigeben – auf dem iPhone etwa nach einer Woche ohne Öffnen der Galerie. Laden Sie sie dann einfach erneut herunter.",
       "removeFromDevice": "Vom Gerät entfernen",
       "availableOfflineAnnounce": "Heruntergeladen – die Galerie ist offline verfügbar.",
@@ -268,7 +270,7 @@
       "downloadFailedAnnounce": "Der Download ist fehlgeschlagen.",
       "saveOffline": "{count, plural, one {# Foto} other {# Fotos}} auf diesem Gerät speichern und ohne Empfang ansehen.",
       "estimatedSize": "Benötigt etwa {size}. Gespeichert wird die Größe für diesen Bildschirm, nicht die Originale.",
-      "onlyEngagedOption": "Nur Fotos, auf die ich reagiert, die ich für den Druck markiert oder ausgewählt habe ({count, plural, one {# Foto} other {# Fotos}})",
+      "onlyEngagedOption": "Nur Fotos, die ich markiert habe – Favoriten, mit Reaktion, für den Druck oder ausgewählt ({count, plural, one {# Foto} other {# Fotos}})",
       "makeAvailable": "Offline verfügbar machen",
       "iconLabel": "Offline",
       "iconTitle": "Fotos auf diesem Gerät speichern, um sie ohne Empfang anzusehen",
@@ -282,7 +284,7 @@
     "saveFailed": "Ihre letzte Markierung wurde nicht gespeichert – prüfen Sie Ihre Verbindung und versuchen Sie es erneut. Ist der Link abgelaufen, schreiben Sie der Person, die ihn Ihnen geschickt hat.",
     "downloadAllLabelSized": "Alle herunterladen ({size})",
     "downloadAllStaleTitle": "Lädt alle Fotos außer den allerneuesten herunter – das Archiv wird gerade neu erstellt.",
-    "archivePreparingLabel": "Archiv wird vorbereitet",
+    "archivePreparingLabel": "Archiv wird vorbereitet…",
     "archivePreparingTitle": "Das komplette Archiv wird noch vorbereitet. Wählen Sie die gewünschten Fotos aus und laden Sie diese jetzt herunter, oder schauen Sie in Kürze wieder vorbei.",
     "transfer": {
       "startTitle": "Auf einem anderen Gerät fortfahren",
@@ -307,12 +309,15 @@
     "addPhotos": "Fotos hinzufügen",
     "takePhoto": "Foto aufnehmen",
     "preparing": "{count, plural, one {Foto wird vorbereitet …} other {# Fotos werden vorbereitet …}}",
-    "uploadingProgress": "Hochgeladen: {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
+    "uploadingProgress": "Wird hochgeladen: {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
     "resumingProgress": "Ihr Upload wird abgeschlossen – {done} von {total} · der Bildschirm bleibt an. Wird der Vorgang unterbrochen, geht es weiter, sobald Sie zurück sind.",
     "discardRest": "Rest verwerfen",
     "doneSome": "Hochgeladen. Alle auf der Hochzeit werden es sehen.",
     "doneNone": "Es wurde nichts hochgeladen. Wählen Sie die Fotos erneut aus – kleinere Mengen funktionieren am besten.",
     "failedSuffix": "{count, plural, one {# Foto hat es nicht geschafft} other {# Fotos haben es nicht geschafft}}",
+    "donePartial": "Fertig – {done, plural, one {# Foto ist} other {# Fotos sind}} in der Galerie. {failed, plural, one {# Foto hat es nicht geschafft} other {# Fotos haben es nicht geschafft}} – bitte versuchen Sie es erneut.",
+    "landedCount": "{count, plural, one {# Foto ist} other {# Fotos sind}} bereits in der Galerie.",
+    "retryFailed": "Erneut versuchen ({count})",
     "skippedNote": "({count, plural, one {# Datei} other {# Dateien}} übersprungen – der Rest wird noch hochgeladen.)",
     "startFailed": "Der Upload konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
     "resumeFailed": "Ein früherer, unterbrochener Upload konnte nicht abgeschlossen werden.",
@@ -328,28 +333,30 @@
     "renameSave": "Speichern",
     "renameRemove": "Namen entfernen",
     "renameCancel": "Abbrechen",
-    "uploadingAs": "Hinzugefügt als {name}",
-    "uploadingAnonymously": "Ohne Namen hinzugefügt",
+    "uploadingAs": "Sie laden als {name} hoch",
+    "uploadingAnonymously": "Sie laden ohne Namen hoch",
     "changeName": "Ändern",
     "addName": "Namen hinzufügen",
     "rejection": {
       "unsupportedHeic": "Dieses Format (HEIC) können wir noch nicht verarbeiten. Stellen Sie unter Einstellungen → Kamera → Formate auf „Maximale Kompatibilität“ um und versuchen Sie es erneut.",
       "unsupportedVideo": "Videos nehmen wir noch nicht an, nur Fotos.",
       "unsupportedGeneric": "Diesen Dateityp können wir nicht verarbeiten. Versuchen Sie ein anderes Foto.",
-      "fileTooLarge": "Dieses Foto ist zu groß.",
+      "emptyFile": "Diese Datei ist leer. Wählen Sie das Foto erneut direkt aus der Fotomediathek Ihres Handys.",
+      "fileTooLarge": "Dieses Foto ist zu groß (über {max}). Senden Sie es am besten direkt aus der Fotomediathek Ihres Handys, nicht aus einem geteilten Album oder Chat.",
       "quotaViewerFull": "Sie haben schon viele Fotos hinzugefügt – im Moment sind keine weiteren möglich. Danke!",
       "quotaAlbumFull": "Die Galerie ist vorerst voll. Bitte geben Sie der Person Bescheid, die Ihnen den Link geschickt hat.",
       "deniedPasswordRequired": "Bitte laden Sie die Seite neu und geben Sie das Passwort ein.",
       "deniedGeneric": "Diese Galerie nimmt keine neuen Fotos mehr an.",
       "rateLimited": "Sie senden gerade sehr viel auf einmal – warten Sie kurz und versuchen Sie es dann erneut.",
-      "sizeMismatch": "Das Foto wurde nicht vollständig übertragen. Wir versuchen es erneut.",
+      "sizeMismatch": "Das Foto wurde nicht vollständig übertragen. Bitte fügen Sie es erneut hinzu oder tippen Sie auf „Erneut versuchen“.",
       "genericFailure": "Der Upload hat nicht geklappt. Bitte versuchen Sie es erneut, sobald Sie besseren Empfang haben."
     }
   },
   "presence": {
     "someone": "Gerade sieht jemand zu",
     "count": "{count, plural, one {Gerade sieht # Person zu} other {Gerade sehen # Personen zu}}",
-    "named": "{names} {count, plural, one {sieht} other {sehen}} gerade zu"
+    "named": "{names} {count, plural, one {sieht} other {sehen}} gerade zu",
+    "others": "{count, plural, one {# weitere Person} other {# weitere Personen}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · Hochzeitsfotograf",
@@ -363,7 +370,7 @@
     "wrongPassword": "Falsches Passwort. Achten Sie auf Groß- und Kleinschreibung und versuchen Sie es später erneut, oder bitten Sie den Fotografen, es noch einmal zu schicken."
   },
   "promo": {
-    "cardAriaLabel": "{headline} – öffnet {cta} in einem neuen Fenster"
+    "cardAriaLabel": "{headline} – {cta} (öffnet sich in einem neuen Fenster)"
   },
   "corrections": {
     "toolbar": "Änderungswünsche",
@@ -373,6 +380,7 @@
     "pinSubmit": "Öffnen",
     "pinWrong": "Die PIN stimmt nicht. Bitte versuchen Sie es erneut.",
     "pinLocked": "Zu viele Versuche. Bitte in {minutes} Min. erneut versuchen.",
+    "pinError": "Die PIN konnte gerade nicht geprüft werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "cancel": "Abbrechen",
     "barTitle": "Änderungswünsche",
     "barCount": "{count, plural, =0 {noch keine} one {# Foto mit Wunsch} other {# Fotos mit Wunsch}}",

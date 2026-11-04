@@ -23,6 +23,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // The browser's own bar (Android Chrome, Safari's tab tint) matches the page
+  // instead of the default grey: `body` in globals.css — white, and Tailwind's
+  // neutral-950 (oklch 14.5 % 0 0 ≈ #0a0a0a) under a dark system scheme.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 /**

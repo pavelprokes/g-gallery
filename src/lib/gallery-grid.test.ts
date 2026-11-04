@@ -63,6 +63,56 @@ describe("buildGridEntries", () => {
     expect(entries[2]!.kind).toBe("promo");
   });
 
+  // docs/PROMO-CARDS.md: slots resolve against the whole gallery. A slot-120
+  // card in a 300-photo gallery with one 60-photo page loaded used to show as
+  // tile 61, then jump to 120 when the second page arrived.
+  it("holds back a promo whose slot is past the loaded pages while more remain", () => {
+    const entries = buildGridEntries(photos(60), [promo({ slot: 120 })], {
+      total: 300,
+      complete: false,
+    });
+    expect(entries).toHaveLength(60);
+    expect(entries.every((e) => e.kind === "photo")).toBe(true);
+  });
+
+  it("places it at its slot, and nowhere else, once the pages reach it", () => {
+    const entries = buildGridEntries(photos(180), [promo({ slot: 120 })], {
+      total: 300,
+      complete: false,
+    });
+    expect(entries.findIndex((e) => e.kind === "promo")).toBe(119);
+  });
+
+  it("places a slot right after the loaded photos without waiting", () => {
+    const entries = buildGridEntries(photos(60), [promo({ slot: 61 })], {
+      total: 300,
+      complete: false,
+    });
+    expect(entries.findIndex((e) => e.kind === "promo")).toBe(60);
+  });
+
+  it("clamps a slot past the gallery's end only once every page is in", () => {
+    const extent = { total: 70, complete: false };
+    expect(
+      buildGridEntries(photos(60), [promo({ slot: 500 })], extent).some((e) => e.kind === "promo"),
+    ).toBe(false);
+    const done = buildGridEntries(photos(70), [promo({ slot: 500 })], {
+      total: 70,
+      complete: true,
+    });
+    expect(done.at(-1)!.kind).toBe("promo");
+  });
+
+  // The total is fixed at page load and can be stale (a photo deleted since).
+  it("clamps to the photos actually loaded when the total overstates them", () => {
+    const entries = buildGridEntries(photos(8), [promo({ slot: 9 })], {
+      total: 10,
+      complete: true,
+    });
+    expect(entries).toHaveLength(9);
+    expect(entries[8]!.kind).toBe("promo");
+  });
+
   it("renders a promo even when the gallery is empty", () => {
     const entries = buildGridEntries([], [promo({ slot: 5 })]);
     expect(entries).toEqual([{ kind: "promo", promo: promo({ slot: 5 }) }]);

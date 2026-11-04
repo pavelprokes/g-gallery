@@ -37,6 +37,9 @@ export interface GalleryChapter {
   /** Photos in the chapter at page load — for the header's "84 fotek" only;
    * placement never depends on it. */
   count: number;
+  /** How many of `count` are videos — the header counts them apart, as the
+   * page header does (docs/VIDEO.md). */
+  videoCount?: number;
 }
 
 /**

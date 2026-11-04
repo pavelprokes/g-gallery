@@ -38,12 +38,25 @@ export type GridEntry<P> =
    * `entries` — the grid lays it out as a full-width row of its own. */
   | { kind: "chapter"; chapter: GalleryChapter };
 
+/** How much of the gallery `photos` is: its real total, and whether every
+ * page has arrived. Without it, `photos` is taken to be the whole gallery. */
+export interface GalleryExtent {
+  /** The gallery's confirmed total — what slots resolve against. */
+  total: number;
+  /** No further page to fetch: `photos` is everything there is. */
+  complete: boolean;
+}
+
 /**
  * Interleaves promo placements into the photo stream at their slots.
  *
- * Slots are resolved against the *full* gallery, not the pages loaded so far,
- * so a card at slot 5 is the 5th tile from the very first paint and does not
- * jump when the next page arrives.
+ * Slots are resolved against the *full* gallery (`extent.total`), not the
+ * pages loaded so far, so a card at slot 5 is the 5th tile from the very first
+ * paint and does not jump when the next page arrives (docs/PROMO-CARDS.md). A
+ * card whose slot lies past the photos loaded so far waits for them rather
+ * than standing in at the end of the loaded ones — a slot-120 card would
+ * otherwise show as tile 61 and then move. Only once every page is in does a
+ * slot past the end clamp to it (the total can be a reload stale).
  *
  * Two promos landing on the same index keep their relative order by slot, then
  * by id — deterministic, so the grid does not reshuffle between renders.
@@ -51,13 +64,16 @@ export type GridEntry<P> =
 export function buildGridEntries<P>(
   photos: readonly P[],
   promos: readonly GalleryPromo[],
+  extent: GalleryExtent = { total: photos.length, complete: true },
 ): GridEntry<P>[] {
   if (promos.length === 0) {
     return photos.map((photo, photoIndex) => ({ kind: "photo", photo, photoIndex }));
   }
 
   const placed = [...promos]
-    .map((promo) => ({ promo, at: promoInsertIndex(promo.slot, photos.length) }))
+    .map((promo) => ({ promo, at: promoInsertIndex(promo.slot, extent.total) }))
+    .filter(({ at }) => extent.complete || at <= photos.length)
+    .map(({ promo, at }) => ({ promo, at: Math.min(at, photos.length) }))
     .sort(
       (a, b) => a.at - b.at || a.promo.slot - b.promo.slot || (a.promo.id < b.promo.id ? -1 : 1),
     );
