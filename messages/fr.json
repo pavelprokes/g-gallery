@@ -261,6 +261,7 @@
       "downloadStarted": "Téléchargement lancé, {percent} %.",
       "availableOffline": "✓ La galerie est disponible hors ligne",
       "availableOfflineWithBytes": "✓ La galerie est disponible hors ligne ({bytes})",
+      "savedOfTotal": "{saved} sur {total, plural, one {# photo} other {# photos}} sont enregistrées sur cet appareil.",
       "availableOfflineNote": "Les photos enregistrées sont adaptées à cet écran, ce ne sont pas les originaux. Le navigateur peut les libérer de lui-même au bout d'un moment – sur iPhone, environ une semaine sans ouvrir la galerie ; il suffira alors de les retélécharger.",
       "removeFromDevice": "Retirer de l'appareil",
       "availableOfflineAnnounce": "Téléchargée – la galerie est disponible hors ligne.",
@@ -349,7 +350,8 @@
   "presence": {
     "someone": "Quelqu'un regarde en ce moment",
     "count": "{count, plural, one {# personne regarde en ce moment} other {# personnes regardent en ce moment}}",
-    "named": "{names} {count, plural, one {regarde} other {regardent}}"
+    "named": "{names} {count, plural, one {regarde} other {regardent}}",
+    "others": "{count, plural, one {# autre personne} other {# autres personnes}}"
   },
   "sharePassword": {
     "eyebrow": "Pavel Prokeš · photographe de mariage",

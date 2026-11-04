@@ -33,13 +33,46 @@ describe("share-access rate limiting", () => {
 
     it("keeps extending nothing further once already past the threshold", () => {
       const now = 5_000;
-      const existingLock = new Date(now + UNLOCK_LOCKOUT_MS);
+      // Deliberately not `now + UNLOCK_LOCKOUT_MS`: a fresh lockout would equal
+      // that, and the test would pass whether or not the lock is extended.
+      const existingLock = new Date(now + 60_000);
       const result = nextFailedUnlockState(UNLOCK_ATTEMPT_LIMIT, existingLock, now);
       expect(result.failedUnlockAttempts).toBe(UNLOCK_ATTEMPT_LIMIT + 1);
       // Once locked, a further wrong attempt (which verifySharePassword should
       // normally never reach, since isUnlockLocked short-circuits first) does
       // not push the lockout further out.
       expect(result.unlockLockedUntil).toEqual(existingLock);
+    });
+
+    it("counts from zero again once a lockout has expired", () => {
+      const now = 10_000_000;
+      const expired = new Date(now - 1);
+      expect(nextFailedUnlockState(UNLOCK_ATTEMPT_LIMIT, expired, now)).toEqual({
+        failedUnlockAttempts: 1,
+        unlockLockedUntil: null,
+      });
+    });
+
+    it("treats a lockout ending exactly now as expired", () => {
+      const now = 10_000_000;
+      expect(nextFailedUnlockState(UNLOCK_ATTEMPT_LIMIT, new Date(now), now)).toEqual({
+        failedUnlockAttempts: 1,
+        unlockLockedUntil: null,
+      });
+    });
+
+    it("locks again after a full fresh series of wrong attempts past an expired lockout", () => {
+      let now = 10_000_000;
+      let state: ReturnType<typeof nextFailedUnlockState> = {
+        failedUnlockAttempts: UNLOCK_ATTEMPT_LIMIT,
+        unlockLockedUntil: new Date(now - 1),
+      };
+      for (let i = 0; i < UNLOCK_ATTEMPT_LIMIT; i++) {
+        now += 1_000;
+        state = nextFailedUnlockState(state.failedUnlockAttempts, state.unlockLockedUntil, now);
+      }
+      expect(state.failedUnlockAttempts).toBe(UNLOCK_ATTEMPT_LIMIT);
+      expect(state.unlockLockedUntil).toEqual(new Date(now + UNLOCK_LOCKOUT_MS));
     });
   });
 

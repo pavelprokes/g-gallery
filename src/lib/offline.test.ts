@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { estimateBytes, formatBytes, offlineUrls, widthsForThisDevice } from "./offline";
+import {
+  estimateBytes,
+  fetchGalleryIndex,
+  formatBytes,
+  offlinePageUrl,
+  offlineUrls,
+  photosApiUrl,
+  widthsForThisDevice,
+} from "./offline";
 import { DEVICE_SIZES, IMAGE_SIZES } from "./image-sizes";
 
 function setViewport(width: number, dpr: number) {
@@ -110,5 +118,81 @@ describe("formatBytes", () => {
 
   it("never shows 0 kB for something that exists", () => {
     expect(formatBytes(120)).toBe("1 kB");
+  });
+});
+
+describe("formatBytes with a locale", () => {
+  it("writes the number and unit the locale's way, with a no-break space", () => {
+    expect(formatBytes(7.34 * 1024 ** 3, "cs")).toBe("7,3 GB");
+    expect(formatBytes(7.34 * 1024 ** 3, "en")).toBe("7.3 GB");
+    expect(formatBytes(84 * 1024 ** 2, "fr")).toBe("84 Mo");
+    expect(formatBytes(4096, "de")).toBe("4 kB");
+  });
+
+  it("drops a trailing zero rather than printing 2,0", () => {
+    expect(formatBytes(2 * 1024 ** 3, "cs")).toBe("2 GB");
+  });
+});
+
+describe("offlinePageUrl", () => {
+  it("keeps the gallery, not the photo or chapter open when it was saved", () => {
+    expect(offlinePageUrl("https://app/g/tok/slug?foto=abc&fbclid=x#obrad")).toBe(
+      "https://app/g/tok/slug?fbclid=x",
+    );
+    expect(offlinePageUrl("https://app/g/tok")).toBe("https://app/g/tok");
+  });
+});
+
+describe("photosApiUrl", () => {
+  it("is the address the grid asks for, cursor encoded the same way", () => {
+    expect(photosApiUrl("https://app", "t/k", null)).toBe("https://app/api/g/t%2Fk/photos");
+    expect(photosApiUrl("https://app", "tok", "a+b/c=")).toBe(
+      "https://app/api/g/tok/photos?cursor=a%2Bb%2Fc%3D",
+    );
+  });
+});
+
+describe("fetchGalleryIndex", () => {
+  const page = (keys: string[], nextCursor: string | null) =>
+    new Response(JSON.stringify({ items: keys.map((objectKey) => ({ objectKey })), nextCursor }));
+  const asFetch = (impl: (url: string) => Promise<Response>) => impl as unknown as typeof fetch;
+
+  it("follows the cursors to the end and keeps every page's address", async () => {
+    const index = await fetchGalleryIndex(
+      "tok",
+      "https://app",
+      asFetch(async (url) =>
+        url.includes("cursor=c1") ? page(["c"], null) : page(["a", "b"], "c1"),
+      ),
+    );
+    expect(index).toEqual({
+      objectKeys: ["a", "b", "c"],
+      pageUrls: ["https://app/api/g/tok/photos", "https://app/api/g/tok/photos?cursor=c1"],
+      complete: true,
+    });
+  });
+
+  it("reports an incomplete list when a page fails", async () => {
+    const index = await fetchGalleryIndex(
+      "tok",
+      "https://app",
+      asFetch(async (url) =>
+        url.includes("cursor") ? new Response("", { status: 403 }) : page(["a"], "c1"),
+      ),
+    );
+    expect(index.complete).toBe(false);
+    expect(index.objectKeys).toEqual(["a"]);
+    expect(index.pageUrls).toHaveLength(1);
+  });
+
+  it("treats a network error as incomplete, not as a crash", async () => {
+    const index = await fetchGalleryIndex(
+      "tok",
+      "https://app",
+      asFetch(async () => {
+        throw new TypeError("offline");
+      }),
+    );
+    expect(index).toEqual({ objectKeys: [], pageUrls: [], complete: false });
   });
 });
