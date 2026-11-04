@@ -446,3 +446,208 @@ describe("runUploads — expiry and late presign", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("runUploads — sizes the server would refuse for the whole batch", () => {
+  const jpeg = (name: string, size = 10) =>
+    new File([new Uint8Array(size)], name, { type: "image/jpeg" });
+
+  function stubPresign() {
+    let photo = 0;
+    const signedNames: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes("/api/uploads/presign")) {
+          const files = JSON.parse(String(init?.body)).files as { fileName: string }[];
+          files.forEach((f) => signedNames.push(f.fileName));
+          const uploads = files.map(() => ({
+            photoId: `p${++photo}`,
+            objectKey: "k",
+            url: "u",
+            headers: {},
+          }));
+          return new Response(JSON.stringify({ uploads }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+    return signedNames;
+  }
+
+  it("refuses a guest photo over the ceiling by name and uploads the other three", async () => {
+    const signedNames = stubPresign();
+    const big = jpeg("BIG.jpg");
+    // The real bytes are never read for a refused file; only its size is.
+    Object.defineProperty(big, "size", { value: 30 * 1024 * 1024 });
+    const files = [jpeg("a.jpg"), big, jpeg("b.jpg"), jpeg("c.jpg")];
+    const results: Record<number, { state: string; error?: string }> = {};
+    const skipped: { index: number; code: string; fileName?: string; maxBytes?: number }[] = [];
+
+    await runUploads({
+      files,
+      credentials: { kind: "guest", shareToken: "tok", anonKey: "anon" },
+      resumeIds: files.map(() => undefined),
+      onItem: (index, patch) => {
+        results[index] = patch;
+      },
+      onFatal: () => {
+        throw new Error("one big photo must not end the run");
+      },
+      onSkipped: (_first, _count, skips) =>
+        skips.forEach(({ index, rejection }) =>
+          skipped.push({
+            index,
+            code: rejection.code,
+            fileName: rejection.detail.fileName,
+            maxBytes: rejection.detail.maxBytes,
+          }),
+        ),
+    });
+
+    expect(results[0]?.state).toBe("done");
+    expect(results[2]?.state).toBe("done");
+    expect(results[3]?.state).toBe("done");
+    expect(results[1]).toEqual({ state: "error", error: "file_too_large" });
+    expect(skipped).toEqual([
+      { index: 1, code: "file_too_large", fileName: "BIG.jpg", maxBytes: 25 * 1024 * 1024 },
+    ]);
+    expect(signedNames).toEqual(["a.jpg", "b.jpg", "c.jpg"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("skips an empty file instead of letting it fail the batch", async () => {
+    const signedNames = stubPresign();
+    const files = [jpeg("empty.jpg", 0), jpeg("ok.jpg")];
+    const skipped: { index: number; reason?: string }[] = [];
+
+    await runUploads({
+      files,
+      credentials: { kind: "owner", galleryId: "gal_1" },
+      resumeIds: files.map(() => undefined),
+      onItem: () => undefined,
+      onFatal: () => {
+        throw new Error("not fatal");
+      },
+      onSkipped: (_first, _count, skips) =>
+        skips.forEach(({ index, rejection }) =>
+          skipped.push({ index, reason: rejection.detail.reason }),
+        ),
+    });
+
+    expect(skipped).toEqual([{ index: 0, reason: "empty" }]);
+    expect(signedNames).toEqual(["ok.jpg"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a failed presign batch per file, never as fatal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "boom" }), { status: 500 })),
+    );
+    const results: Record<number, { state: string; error?: string }> = {};
+    let fatalCalls = 0;
+
+    await runUploads({
+      files: [jpeg("a.jpg"), jpeg("b.jpg")],
+      credentials: { kind: "guest", shareToken: "tok", anonKey: null },
+      resumeIds: [undefined, undefined],
+      onItem: (index, patch) => {
+        results[index] = patch;
+      },
+      onFatal: () => {
+        fatalCalls += 1;
+      },
+    });
+
+    expect(fatalCalls).toBe(0);
+    expect(results[0]).toEqual({ state: "error", error: "network" });
+    expect(results[1]).toEqual({ state: "error", error: "network" });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("runUploads — stop and offline", () => {
+  const jpegs = (count: number) =>
+    Array.from(
+      { length: count },
+      (_, i) => new File([new Uint8Array(10 + i)], `IMG_${i}.jpg`, { type: "image/jpeg" }),
+    );
+
+  function stubServer() {
+    let photo = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/api/uploads/presign")) {
+        const files = JSON.parse(String(init?.body)).files as unknown[];
+        const uploads = files.map(() => ({
+          photoId: `p${++photo}`,
+          objectKey: "k",
+          url: "u",
+          headers: {},
+        }));
+        return new Response(JSON.stringify({ uploads }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("lets files already on the wire finish and cancels the rest on stop", async () => {
+    stubServer();
+    let release!: () => void;
+    FakeXHR.hold = new Promise((resolve) => {
+      release = resolve;
+    });
+    const files = jpegs(6);
+    const results: Record<number, { state: string; error?: string }> = {};
+    const stop = new AbortController();
+
+    const run = runUploads({
+      files,
+      credentials: { kind: "guest", shareToken: "tok", anonKey: null },
+      resumeIds: files.map(() => undefined),
+      stop: stop.signal,
+      onItem: (index, patch) => {
+        results[index] = patch;
+      },
+      onFatal: () => undefined,
+    });
+
+    await vi.waitFor(() => expect(FakeXHR.open).toBe(4));
+    stop.abort();
+    release();
+    await run;
+
+    const states = Object.values(results);
+    expect(states.filter((r) => r.state === "done")).toHaveLength(4);
+    expect(states.filter((r) => r.state === "error" && r.error === CANCELLED)).toHaveLength(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("waits for the network instead of spending retries while offline", async () => {
+    const fetchMock = stubServer();
+    const onLine = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const states: string[] = [];
+
+    const run = runUploads({
+      files: jpegs(1),
+      credentials: { kind: "guest", shareToken: "tok", anonKey: null },
+      resumeIds: [undefined],
+      onItem: (_index, patch) => states.push(patch.state),
+      onFatal: () => undefined,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Nothing was even signed while the phone had no network.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(states).toEqual([]);
+
+    onLine.mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    await run;
+
+    expect(states.at(-1)).toBe("done");
+    onLine.mockRestore();
+    vi.unstubAllGlobals();
+  });
+});
