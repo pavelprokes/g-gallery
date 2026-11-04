@@ -373,6 +373,7 @@
     "pinSubmit": "Entrar",
     "pinWrong": "El PIN no coincide. Inténtalo de nuevo.",
     "pinLocked": "Demasiados intentos. Vuelve a intentarlo en {minutes} min.",
+    "pinError": "No hemos podido comprobar el PIN ahora mismo. Revisa tu conexión e inténtalo de nuevo.",
     "cancel": "Cancelar",
     "barTitle": "Peticiones de retoque",
     "barCount": "{count, plural, =0 {ninguna todavía} one {# foto con petición} other {# fotos con petición}}",

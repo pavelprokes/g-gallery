@@ -373,6 +373,7 @@
     "pinSubmit": "Vstúpiť",
     "pinWrong": "PIN nesedí. Skúste to prosím znova.",
     "pinLocked": "Príliš veľa pokusov. Skúste to znova o {minutes} min.",
+    "pinError": "PIN sa teraz nepodarilo overiť. Skontrolujte pripojenie a skúste to znova.",
     "cancel": "Zrušiť",
     "barTitle": "Režim pripomienok",
     "barCount": "{count, plural, =0 {zatiaľ bez pripomienok} one {# fotka s pripomienkou} few {# fotky s pripomienkou} other {# fotiek s pripomienkou}}",

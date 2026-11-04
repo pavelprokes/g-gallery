@@ -373,6 +373,7 @@
     "pinSubmit": "Wejdź",
     "pinWrong": "PIN się nie zgadza. Spróbuj ponownie.",
     "pinLocked": "Za dużo prób. Spróbuj ponownie za {minutes} min.",
+    "pinError": "Nie udało się teraz sprawdzić PIN-u. Sprawdź połączenie i spróbuj ponownie.",
     "cancel": "Anuluj",
     "barTitle": "Prośby o poprawki",
     "barCount": "{count, plural, =0 {na razie brak} one {# zdjęcie z prośbą} few {# zdjęcia z prośbą} many {# zdjęć z prośbą} other {# zdjęcia z prośbą}}",

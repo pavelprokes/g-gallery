@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { writeCorrectionDraft } from "@/components/corrections/corrections-helpers";
 
 // The corrections mode on the guest side (docs/CORRECTIONS.md). The session
 // key lives in this hook's state only: a reload, a closed tab or "Ukončit"
@@ -23,6 +24,12 @@ export type EnterResult =
   | { ok: false; reason: "locked"; until: Date }
   | { ok: false; reason: "error" };
 
+/**
+ * How adding a comment went. `session`: the key died under it (expired, new
+ * PIN) — the text is kept and sent again after the next PIN.
+ */
+export type CreateResult = "ok" | "error" | "session";
+
 export interface CorrectionsState {
   /** The link offers the mode at all. */
   available: boolean;
@@ -34,7 +41,14 @@ export interface CorrectionsState {
   photoCount: number;
   enter: (pin: string) => Promise<EnterResult>;
   exit: () => void;
-  create: (photoId: string, body: string, x: number | null, y: number | null) => Promise<boolean>;
+  create: (
+    photoId: string,
+    body: string,
+    x: number | null,
+    y: number | null,
+    /** The draft to drop once the comment is saved, even by a retry after the PIN. */
+    draftKey?: string,
+  ) => Promise<CreateResult>;
   update: (
     id: string,
     patch: { body?: string; x?: number | null; y?: number | null },
@@ -42,10 +56,44 @@ export interface CorrectionsState {
   remove: (id: string) => Promise<boolean>;
 }
 
+interface PendingCreate {
+  photoId: string;
+  body: string;
+  x: number | null;
+  y: number | null;
+  draftKey?: string;
+}
+
+/** Sends a comment again under a fresh key; the saved comment, or null. */
+export async function retryCreate(
+  url: string,
+  session: string,
+  pending: PendingCreate,
+): Promise<Correction | null> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "create",
+      photoId: pending.photoId,
+      body: pending.body,
+      x: pending.x,
+      y: pending.y,
+      session,
+    }),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const data = (await response.json().catch(() => null)) as { comment?: Correction } | null;
+  return data?.comment ?? null;
+}
+
 export function useCorrections(token: string, available: boolean): CorrectionsState {
   const [session, setSession] = useState<{ key: string; expiresAt: number } | null>(null);
   const [comments, setComments] = useState<Correction[]>([]);
   const [expired, setExpired] = useState(false);
+  // A comment the server turned away for a dead key: sent again, with the new
+  // key, as soon as the PIN is entered again.
+  const pendingCreate = useRef<PendingCreate | null>(null);
   const url = `/api/g/${encodeURIComponent(token)}/corrections`;
 
   const end = useCallback((becauseExpired: boolean) => {
@@ -71,15 +119,21 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
   );
 
   const call = useCallback(
-    async (method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>) => {
-      if (!session) return null;
+    async (
+      method: "POST" | "PATCH" | "DELETE",
+      body: Record<string, unknown>,
+    ): Promise<Response | "session" | null> => {
+      if (!session) return "session";
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, session: session.key }),
       }).catch(() => null);
       // A new PIN or an expired key: out of the mode, with a word why.
-      if (response?.status === 401) end(true);
+      if (response?.status === 401) {
+        end(true);
+        return "session";
+      }
       // Resolved by the photographer meanwhile: show it as such.
       if (response?.status === 409) {
         const list = await fetchList(session.key);
@@ -109,6 +163,18 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
         // corrections and write them again: no list, no mode.
         const list = await fetchList(data.session);
         if (!list) return { ok: false, reason: "error" };
+        // The comment the dead key turned away, sent before the panel opens
+        // again — so its text is not offered a second time beside it.
+        const pending = pendingCreate.current;
+        pendingCreate.current = null;
+        if (pending) {
+          const saved = await retryCreate(url, data.session, pending);
+          if (saved) {
+            if (!list.some((c) => c.id === saved.id)) list.push(saved);
+            if (pending.draftKey) writeCorrectionDraft(pending.draftKey, "");
+          }
+          // Otherwise its text is still the panel's draft, to send by hand.
+        }
         setComments(list);
         // Timed by this device's own clock from now, with a margin.
         setSession({ key: data.session, expiresAt: Date.now() + data.ttlMs - 30_000 });
@@ -125,12 +191,23 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
   );
 
   const create = useCallback(
-    async (photoId: string, body: string, x: number | null, y: number | null) => {
+    async (
+      photoId: string,
+      body: string,
+      x: number | null,
+      y: number | null,
+      draftKey?: string,
+    ): Promise<CreateResult> => {
       const response = await call("POST", { action: "create", photoId, body, x, y });
-      if (!response) return false;
+      if (response === "session") {
+        pendingCreate.current = { photoId, body, x, y, draftKey };
+        return "session";
+      }
+      if (!response) return "error";
       const { comment } = (await response.json()) as { comment: Correction };
       setComments((prev) => [...prev, comment]);
-      return true;
+      if (draftKey) writeCorrectionDraft(draftKey, "");
+      return "ok";
     },
     [call],
   );
@@ -138,7 +215,7 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
   const update = useCallback(
     async (id: string, patch: { body?: string; x?: number | null; y?: number | null }) => {
       const response = await call("PATCH", { id, ...patch });
-      if (!response) return false;
+      if (!response || response === "session") return false;
       const { comment } = (await response.json()) as { comment: Correction };
       setComments((prev) => prev.map((c) => (c.id === id ? comment : c)));
       return true;
@@ -149,7 +226,7 @@ export function useCorrections(token: string, available: boolean): CorrectionsSt
   const remove = useCallback(
     async (id: string) => {
       const response = await call("DELETE", { id });
-      if (!response) return false;
+      if (!response || response === "session") return false;
       setComments((prev) => prev.filter((c) => c.id !== id));
       return true;
     },

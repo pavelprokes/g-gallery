@@ -1,7 +1,8 @@
 "use client";
 
-import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useId, useRef } from "react";
 import { useFocusTrap } from "@/lib/use-focus-trap";
+import { useKeyboardInset } from "@/lib/use-keyboard-inset";
 
 /**
  * The one place a guest is asked their name (docs/GUEST-GALLERIES.md §6): before
@@ -170,26 +171,3 @@ export const SHEET_PRIMARY =
 /** The quiet way out — present, but plainly the lesser choice. */
 export const SHEET_SECONDARY =
   "text-body text-brand-ink/70 dark:text-brand-tint/70 relative flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg px-4 font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2";
-
-/** How many pixels of the layout viewport the on-screen keyboard covers. */
-function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    const update = () => {
-      // A pinch-zoomed page shrinks the visual viewport too. Only an
-      // unzoomed shrink is the keyboard.
-      if (viewport.scale > 1.01) return setInset(0);
-      setInset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)));
-    };
-    update();
-    viewport.addEventListener("resize", update);
-    viewport.addEventListener("scroll", update);
-    return () => {
-      viewport.removeEventListener("resize", update);
-      viewport.removeEventListener("scroll", update);
-    };
-  }, []);
-  return inset;
-}
