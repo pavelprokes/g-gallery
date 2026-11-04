@@ -15,6 +15,7 @@ import {
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 import { PROJECTION_FACES_SELECT, projectionAim } from "@/lib/projection-camera";
+import { blurOnLastPageOnly } from "@/lib/thumbhash";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -110,6 +111,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
         width: true,
         height: true,
         placeholder: true,
+        thumbhash: true,
         ...ORDER_KEY_SELECT,
         _count: { select: { favorites: true } },
         ...UPLOADER_SELECT,
@@ -127,24 +129,27 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const rows = hasMore ? photos.slice(0, take) : photos;
   // Cut by the same function as the pages a photo's link brings with the page
   // (src/lib/shared-gallery.ts), so a refetch lands on the same boundaries.
-  const pages = toPages(
-    order,
-    rows.map((photo) => ({
-      id: photo.id,
-      objectKey: photo.objectKey,
-      thumbObjectKey: photo.thumbObjectKey,
-      video: videoOf(photo),
-      fileName: photo.fileName,
-      width: photo.width,
-      height: photo.height,
-      placeholder: photo.placeholder,
-      favoriteCount: photo._count.favorites,
-      uploaderName: uploaderNameOf(photo),
-      orderKey: orderKeyOf(order, photo),
-      // For the projection's camera (src/lib/projection-camera.ts).
-      ...projectionAim(photo.faces, photo.faceTags),
-    })),
-    hasMore,
+  const pages = blurOnLastPageOnly(
+    toPages(
+      order,
+      rows.map((photo) => ({
+        id: photo.id,
+        objectKey: photo.objectKey,
+        thumbObjectKey: photo.thumbObjectKey,
+        video: videoOf(photo),
+        fileName: photo.fileName,
+        width: photo.width,
+        height: photo.height,
+        placeholder: photo.placeholder,
+        thumbhash: photo.thumbhash,
+        favoriteCount: photo._count.favorites,
+        uploaderName: uploaderNameOf(photo),
+        orderKey: orderKeyOf(order, photo),
+        // For the projection's camera (src/lib/projection-camera.ts).
+        ...projectionAim(photo.faces, photo.faceTags),
+      })),
+      hasMore,
+    ),
   );
 
   return NextResponse.json({

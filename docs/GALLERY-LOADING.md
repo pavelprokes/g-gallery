@@ -171,6 +171,43 @@ stop being fully mounted on a phone, which five e2e specs (and the promo/selecti
 cover) rely on. Revisit only with a measurement that shows the extra rows costing on-screen time
 now that the on-screen images are fetched first.
 
+- **The photo blurred before it arrives.** Every frame that is the photo's own shape — a grid
+  tile, a highlight, the frame the server draws for a photo's link, and the lightbox until it has
+  drawn anything at all — shows the photo blurred over its average colour instead of the colour
+  alone (`src/lib/thumbhash.ts`). The blur is a ThumbHash: ~21 bytes, 28 characters of base64 in
+  `Photo.thumbhash`, computed in the uploading browser next to the dimensions (one decode of the
+  file) and validated on confirm; the browser renders it to a ~32 px PNG in well under a
+  millisecond (measured 0.17 ms on a Mac), cached per hash. It adds ~2 kB to a 60-photo page — ~40
+  ms on a 3G-speed link, against ~1.2 s for one real thumbnail — and nothing arrives sooner; it
+  fills the 13–15 s (3G) or 3.5–4 s (Slow 4G) a phone otherwise showed flat tiles, and every fast
+  scroll. Rules:
+  - stretched to the frame, never letterboxed by its own shape: the hash keeps the aspect ratio
+    only approximately, and the frame already has the exact one. So not on the featured film's
+    card, which letterboxes a portrait clip in a box capped at 70 % of the screen; it keeps the
+    colour;
+  - what the server draws into the HTML — the highlights, a photo link's frame — gets the blur as a
+    data URL made on the server (`src/lib/thumbhash-server.ts`), deflated: ~860 characters, ~0.7
+    kB gzipped, where the browser's own uncompressed one is ~4.2 kB (~2.1 kB gzipped) and six
+    highlights would have added ~13 kB to the HTML read first. The grid is drawn in the browser and
+    decodes the 28-character hash there;
+  - several pages in one response — a photo's link (up to 10 pages in the HTML) or a jump's
+    `throughKey` — carry it on the last page only, where the viewer lands (`blurOnLastPageOnly`):
+    on 600 photos it would be ~20 kB read before the one photo being waited for. The pages pulled
+    later one by one bring theirs;
+  - the lightbox shows it only before its first pixels (an SVG letterboxing it at the photo's exact
+    shape). A step still holds the previous photo until the next one's thumbnail can be drawn —
+    blurring on every step is a change of that rule, to be measured before it is made;
+  - the colour under it is now the hash's own average. The 1×1 resize it came from before sampled
+    near the middle of the photo in Chromium (a castle came out green from the ivy by its door; on
+    Alice a Martin 46 of 60 colours were closer to the centre than to the average). The upload now
+    halves the decoded bitmap step by step to ≤100 px, each step an exact 2×2 average in every
+    engine;
+  - photos from before: `pnpm backfill:thumbhash` (`--dry-run` to count) fills the hash and the
+    corrected colour from the 512 px thumbnail in the bucket (no transformation billed), or from the
+    grid's smallest variant for a photo without one. It writes to the database `DIRECT_URL` names —
+    Pavel runs it. A replaced photo (docs/REPLACE-PHOTOS.md) or a new video poster gets a new hash or
+    none, never the old picture's.
+
 ## Link compatibility — the contract
 
 Every shape of guest link that exists today keeps doing exactly what it does today. Measured on
@@ -205,5 +242,5 @@ redirect carries the query now.
 ## Later, only if measurements call for it
 
 A 768 px phone thumbnail (−40 % per tile; 512 px
-would blur portraits on a 3× iPhone), ThumbHash placeholders, leaner page payloads (`faces`/`focus`
-are ~38 % of each item and only the projection uses them).
+would blur portraits on a 3× iPhone) — its backfill can share a run with `backfill:thumbhash`;
+leaner page payloads (`faces`/`focus` are ~38 % of each item and only the projection uses them).

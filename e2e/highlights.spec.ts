@@ -37,6 +37,21 @@ test.describe("gallery highlights", () => {
     await expect(strip.getByRole("button", { name: tileName(excludedFile) })).toHaveCount(0);
   });
 
+  test("a tile's blur comes in the HTML, compressed", async ({ page }) => {
+    // Before any script: the server drew it (docs/GALLERY-LOADING.md).
+    await page.route(/highlight-photo-\d+\.jpg/, () => {});
+    // The images never arrive, so the page never fires `load`.
+    await page.goto(`/g/${token}/${slug}`, { waitUntil: "domcontentloaded" });
+    const tile = page
+      .getByRole("region", { name: STRIP })
+      .getByRole("button", { name: tileName(pinnedFile) });
+    const background = await tile.evaluate(
+      (button) => (button as HTMLElement).style.backgroundImage,
+    );
+    expect(background).toMatch(/^url\("data:image\/png;base64,/);
+    expect(background.length).toBeLessThan(1500);
+  });
+
   test("a tile takes the viewer to the photo's place in the grid", async ({ page }) => {
     await page.goto(`/g/${token}/${slug}`);
     const strip = page.getByRole("region", { name: STRIP });

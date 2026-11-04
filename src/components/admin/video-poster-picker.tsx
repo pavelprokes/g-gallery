@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { commitVideoPoster, presignVideoPoster, type PutTarget } from "@/app/admin/video-actions";
 import { Button } from "@/components/ui/button";
 import { averageColorOf } from "@/lib/placeholder";
+import { thumbhashOfBlob } from "@/lib/thumbhash";
 import { makeThumbnail } from "@/lib/thumbnail";
 import { formatDuration, LOOP_BITS_PER_SECOND, LOOP_MAX_PX, LOOP_SECONDS } from "@/lib/video";
 import { drawPoster, loopRecorderType, recordLoop, seekTo } from "@/lib/video-prepare";
@@ -169,10 +170,12 @@ function PickerBody({
       const at = video.currentTime;
       setStatus("Připravuji náhled…");
       const poster = await drawPoster(video);
-      const [thumbnail, placeholder] = await Promise.all([
+      const [thumbnail, blur] = await Promise.all([
         makeThumbnail(poster, "owner"),
-        averageColorOf(poster),
+        thumbhashOfBlob(poster),
       ]);
+      // The blur's average is a true one; the 1×1 resize is the fallback.
+      const placeholder = blur?.average ?? (await averageColorOf(poster));
 
       let loop: Blob | null = null;
       if (withLoop && canLoop) {
@@ -201,6 +204,7 @@ function PickerBody({
         thumb: thumbOk && thumbnail ? thumbnail.format : null,
         loop: loopOk,
         placeholder,
+        thumbhash: blur?.thumbhash ?? null,
       });
       router.refresh();
       onDone();

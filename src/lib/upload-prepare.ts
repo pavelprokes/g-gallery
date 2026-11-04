@@ -3,6 +3,7 @@ import { stripGpsFromJpeg } from "@/lib/exif-gps";
 import { EXIF_SCAN_BYTES, readTakenAtFromJpeg } from "@/lib/exif-taken-at";
 import { readXmpPicksFromJpeg, type XmpPicks } from "@/lib/xmp-picks";
 import { averageColorOf } from "@/lib/placeholder";
+import { thumbhashOfImage } from "@/lib/thumbhash";
 
 /**
  * Everything the upload pipeline derives from a file before the PUT
@@ -24,6 +25,8 @@ export interface PreparedUpload {
   height: number | null;
   /** Average colour, painted before the image arrives. Cosmetic. */
   placeholder: string | null;
+  /** The blurred photo drawn over that colour (src/lib/thumbhash.ts). Cosmetic. */
+  thumbhash: string | null;
   /** The photographer's Lightroom marks, for the highlights (docs/HIGHLIGHTS.md). */
   picks: XmpPicks | null;
 }
@@ -48,9 +51,13 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
       ? new Date(file.lastModified)
       : null);
   const crc32 = await crc32HexOfBlob(body);
-  const dimensions = await readDimensions(body);
-  // Cosmetic, so a failure here never blocks the upload.
-  const placeholder = await averageColorOf(body);
+  // One decode for the dimensions and the blur. Both cosmetic or a hint, so a
+  // failure here never blocks the upload.
+  const decoded = await readDimensionsAndBlur(body);
+  const dimensions = decoded?.dimensions ?? null;
+  const thumbhash = decoded?.blur?.thumbhash ?? null;
+  // The blur's own average is a true one; the 1×1 resize is the fallback.
+  const placeholder = decoded?.blur?.average ?? (await averageColorOf(body));
   // Marks for the highlights (docs/HIGHLIGHTS.md) — a hint, never a reason
   // for an upload to fail.
   const picks = head ? orNull(() => readXmpPicksFromJpeg(head)) : null;
@@ -61,6 +68,7 @@ export async function prepareUpload(file: File): Promise<PreparedUpload> {
     width: dimensions?.width ?? null,
     height: dimensions?.height ?? null,
     placeholder,
+    thumbhash,
     picks,
   };
 }
@@ -74,15 +82,24 @@ function orNull<T>(read: () => T | null): T | null {
   }
 }
 
-/** Dimensions drive the justified gallery layout; failure is non-fatal. */
-async function readDimensions(blob: Blob): Promise<{ width: number; height: number } | null> {
+/**
+ * Dimensions drive the justified gallery layout; failure is non-fatal. The
+ * blur is drawn from the same decoded bitmap, so a 45 MB drone frame is not
+ * decoded twice.
+ */
+async function readDimensionsAndBlur(blob: Blob): Promise<{
+  dimensions: { width: number; height: number };
+  blur: ReturnType<typeof thumbhashOfImage>;
+} | null> {
   if (typeof createImageBitmap !== "function") return null;
+  let bitmap: ImageBitmap | undefined;
   try {
-    const bitmap = await createImageBitmap(blob);
-    const size = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return size;
+    bitmap = await createImageBitmap(blob);
+    const dimensions = { width: bitmap.width, height: bitmap.height };
+    return { dimensions, blur: thumbhashOfImage(bitmap, bitmap.width, bitmap.height) };
   } catch {
     return null;
+  } finally {
+    bitmap?.close();
   }
 }

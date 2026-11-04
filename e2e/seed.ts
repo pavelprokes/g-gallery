@@ -56,6 +56,9 @@ async function main() {
         width: Math.round(aspects[i]! * height),
         height,
         placeholder: "#a37c5c",
+        // Every other photo has its blur (src/lib/thumbhash.ts), the rest
+        // only the colour, as photos from before the column have.
+        thumbhash: i % 2 === 0 ? "V9YC1aL3CPeHeHiIh3h3eH+H+HiI" : null,
         status: "CONFIRMED",
         sizeBytes: 1_000_000,
         // Confirm always sets a capture time in production; a minute apart in
@@ -846,6 +849,8 @@ async function makeHighlightsGallery(ownerId: string) {
         width: 1200,
         height: 800,
         placeholder: "#6b8f71",
+        // The pinned photo's blur arrives in the HTML (src/lib/thumbhash-server.ts).
+        thumbhash: i === pinned ? "V9YC1aL3CPeHeHiIh3h3eH+H+HiI" : null,
         status: "CONFIRMED",
         sizeBytes: 900_000,
         takenAt: new Date(Date.UTC(2026, 7, 22, 10, minute)),

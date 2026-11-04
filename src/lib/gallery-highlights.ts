@@ -399,6 +399,9 @@ export interface GalleryHighlight {
   width: number | null;
   height: number | null;
   placeholder: string | null;
+  /** The photo blurred, drawn before it arrives — a data URL the server made
+   * (src/lib/thumbhash-server.ts): the strip is in the HTML. */
+  blurDataUrl: string | null;
   /** Its place in the gallery's order: a jump brings every page up to it in
    * one request (docs/GALLERY-LOADING.md). */
   orderKey: string;

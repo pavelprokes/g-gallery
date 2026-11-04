@@ -291,12 +291,12 @@ async function uploadOne(
   // The server decides what this file is: a target with a poster slot is a
   // video row. A video is stored as picked; its checks and poster come from
   // src/lib/video-prepare.ts. A photo gets GPS strip, capture time, CRC32,
-  // dimensions and placeholder colour — off the main thread where a worker
+  // dimensions, placeholder colour and blur — off the main thread where a worker
   // can run (src/lib/upload-prepare-client.ts).
   const video = target.posterTarget ? await prepareVideoOrRefuse(file) : null;
   const photo = video ? null : await prepareUploadOffMainThread(file);
   const body = photo?.body ?? file;
-  const { crc32, takenAt, width, height, placeholder } = (video ?? photo)!;
+  const { crc32, takenAt, width, height, placeholder, thumbhash } = (video ?? photo)!;
   const picks = photo?.picks ?? null;
   // Null on any device that cannot produce one — the grid then falls back to a
   // Cloudflare transformation of the original, exactly as before.
@@ -376,6 +376,7 @@ async function uploadOne(
           width: width ?? undefined,
           height: height ?? undefined,
           placeholder,
+          thumbhash,
           thumb: thumbStored,
           takenAt: takenAt?.toISOString(),
           // A packet without a rating is 0★; no packet at all stays unknown.

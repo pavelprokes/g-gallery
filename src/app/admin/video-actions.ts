@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { idSchema } from "@/lib/id-schema";
 import { deleteObject, headObject, presignedPutHeaders, presignPut } from "@/lib/r2";
 import { THUMB_CONTENT_TYPES, thumbKeyFor } from "@/lib/thumbnail";
+import { isThumbhash } from "@/lib/thumbhash";
 import { VIDEO_CONTENT_TYPE } from "@/lib/upload-content-types";
 import { loopKeyFor, POSTER_CONTENT_TYPE, POSTER_EXTENSION } from "@/lib/video";
 
@@ -84,6 +85,8 @@ const commitSchema = z.object({
     .string()
     .regex(/^#[0-9a-f]{6}$/)
     .nullable(),
+  /** The new poster's blur (src/lib/thumbhash.ts); optional for a page loaded before it existed. */
+  thumbhash: z.string().refine(isThumbhash).nullish(),
 });
 
 export async function commitVideoPoster(
@@ -91,7 +94,7 @@ export async function commitVideoPoster(
   input: z.input<typeof commitSchema>,
 ): Promise<void> {
   const photo = await ownedVideo(photoId);
-  const { name, thumb, loop, placeholder } = commitSchema.parse(input);
+  const { name, thumb, loop, placeholder, thumbhash } = commitSchema.parse(input);
   const keys = keysFor(photo.gallery.storagePrefix, name);
 
   // Only what actually landed is recorded — a row pointing at a missing
@@ -111,6 +114,8 @@ export async function commitVideoPoster(
       thumbObjectKey: thumbStored ? thumbKey : null,
       loopObjectKey: loopStored ? keys.loop : null,
       placeholder: placeholder ?? undefined,
+      // A new frame: the old poster's blur would draw a different picture.
+      thumbhash: thumbhash ?? null,
     },
   });
 

@@ -8,6 +8,7 @@ import type { SignedImageGrant } from "@/lib/image-signing";
 import { srcFor } from "@/lib/image-src";
 import { GRID_GAP } from "@/lib/justified-layout";
 import { placeholderStyle } from "@/lib/placeholder";
+import { blurStyleOf } from "@/lib/thumbhash";
 
 /** Photos uploaded before dimensions were captured fall back to 3:2, as in the grid. */
 const FALLBACK_ASPECT = 1.5;
@@ -143,7 +144,7 @@ function HighlightTile({
         className={`on-media relative block h-full w-full overflow-hidden ${
           busy ? "cursor-progress" : ""
         }`}
-        style={{ backgroundColor: placeholderStyle(photo.placeholder) }}
+        style={blurStyleOf(photo.blurDataUrl, placeholderStyle(photo.placeholder))}
       >
         {!imageHeld && (
           <Image

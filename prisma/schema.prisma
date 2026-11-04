@@ -351,9 +351,14 @@ model Photo {
   width              Int?
   height             Int?
   /// Average colour as "#rrggbb", computed in the browser at upload. Fills the
-  /// tile before any bytes arrive; 7 bytes per photo rather than the ~400 a
-  /// base64 blur placeholder would add to every page render.
+  /// tile before any bytes arrive — and where `thumbhash` is missing or cannot
+  /// be drawn. Since 2026-11-04 it is the ThumbHash's own average.
   placeholder        String?
+  /// The photo's ThumbHash (https://evanw.github.io/thumbhash/), base64 —
+  /// ~28 characters a blurred version of the photo is drawn from in the
+  /// browser before any of its bytes arrive (src/lib/thumbhash.ts,
+  /// docs/GALLERY-LOADING.md). Computed in the browser at upload; cosmetic.
+  thumbhash          String?
   status             PhotoStatus @default(PENDING)
   storageTier        StorageTier @default(STANDARD)
   /// A 512 px WebP the uploading browser produced, stored beside the original

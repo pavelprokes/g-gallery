@@ -48,6 +48,25 @@ test.describe("share gallery viewer", () => {
     expect(box!.height).toBeGreaterThan(0);
   });
 
+  test("a tile shows the photo blurred before it arrives, or its colour", async ({ page }) => {
+    // docs/GALLERY-LOADING.md: the seed gives every other photo a ThumbHash.
+    // Images are held back so the tiles stay on their placeholder.
+    await page.route(/\/photo-\d+\.jpg/, () => {});
+    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    const tiles = page
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]');
+    await expect.poll(async () => tiles.count()).toBe(seed.photoCount);
+    const backgrounds = await tiles.evaluateAll((buttons) =>
+      buttons.map((button) => (button as HTMLElement).style.backgroundImage),
+    );
+    expect(backgrounds[0]).toMatch(/^url\("data:image\/png;base64,/);
+    expect(backgrounds[1]).toBe("");
+    for (const tile of [tiles.nth(0), tiles.nth(1)]) {
+      await expect(tile).toHaveCSS("background-color", "rgb(163, 124, 92)");
+    }
+  });
+
   test("the first row is fetched first, and page one is not asked for again", async ({ page }) => {
     // docs/GALLERY-LOADING.md. This gallery has no film and no highlights,
     // so the page opens on the grid's first row: it alone is eager and high.
