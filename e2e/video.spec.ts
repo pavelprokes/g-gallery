@@ -140,13 +140,15 @@ test.describe("upload and playback", () => {
   }) => {
     test.setTimeout(120_000);
     const { galleryId, token, weddingToken, weddingSlug } = galleryFor(test.info().project.name);
-    const posterKey = async () => {
+    const poster = async () => {
       const photos = (await (await request.get(`/api/g/${token}/photos`)).json()) as {
-        items: { objectKey: string; video: { key: string } | null }[];
+        items: { objectKey: string; thumbhash: string | null; video: { key: string } | null }[];
       };
-      return photos.items.find((photo) => photo.video)!.objectKey;
+      return photos.items.find((photo) => photo.video)!;
     };
-    const before = await posterKey();
+    const before = await poster();
+    // Computed from the poster the browser drew when the film was uploaded.
+    expect(before.thumbhash).toMatch(/^[A-Za-z0-9+/]{18,36}={0,2}$/);
 
     await page.goto(`/admin/g/${galleryId}`);
     await page.getByRole("button", { name: "Vybrat náhled" }).click();
@@ -162,9 +164,12 @@ test.describe("upload and playback", () => {
 
     await dialog.getByRole("button", { name: "Použít tento snímek" }).click();
     await expect(dialog).toBeHidden({ timeout: 60_000 });
-    const after = await posterKey();
-    expect(after).not.toBe(before);
-    expect(after).toMatch(/\.jpg$/);
+    const after = await poster();
+    expect(after.objectKey).not.toBe(before.objectKey);
+    expect(after.objectKey).toMatch(/\.jpg$/);
+    // A new frame, a new blur: the old poster's would draw a different picture.
+    expect(after.thumbhash).toMatch(/^[A-Za-z0-9+/]{18,36}={0,2}$/);
+    expect(after.thumbhash).not.toBe(before.thumbhash);
 
     await page.goto(`/s/${weddingToken}/${weddingSlug}`);
     await expect(page.getByText(/2 fotky · 1 video/)).toBeVisible();

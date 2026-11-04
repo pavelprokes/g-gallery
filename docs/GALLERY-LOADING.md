@@ -188,25 +188,33 @@ now that the on-screen images are fetched first.
   - what the server draws into the HTML — the highlights, a photo link's frame — gets the blur as a
     data URL made on the server (`src/lib/thumbhash-server.ts`), deflated: ~860 characters, ~0.7
     kB gzipped, where the browser's own uncompressed one is ~4.2 kB (~2.1 kB gzipped) and six
-    highlights would have added ~13 kB to the HTML read first. The grid is drawn in the browser and
-    decodes the 28-character hash there;
+    highlights would have added ~13 kB to the HTML read first. Each goes out twice, in the tile's
+    `style` and in the client component's RSC props, as anything a component renders does: measured
+    on six, the second copies are 6.1 kB raw, 3.2 kB gzipped (further apart than gzip's 32 kB window)
+    and 37 bytes with the Brotli Vercel serves. The grid is drawn in the browser and decodes the
+    28-character hash there;
   - several pages in one response — a photo's link (up to 10 pages in the HTML) or a jump's
-    `throughKey` — carry it on the last page only, where the viewer lands (`blurOnLastPageOnly`):
-    on 600 photos it would be ~20 kB read before the one photo being waited for. The pages pulled
-    later one by one bring theirs;
+    `throughKey` — carry it on the last two pages only (`blurOnLastTwoPages`): the last is where the
+    viewer lands, and the rows above a target at the top of that page come from the one before. On
+    600 photos all of them would be ~20 kB read before the one photo being waited for. Scrolled back
+    to, the others show the colour until a refetch, as nothing pulls them again. A link whose photo
+    turns out not to be in those pages keeps the blur on every page: the viewer stays on the first;
   - the lightbox shows it only before its first pixels (an SVG letterboxing it at the photo's exact
     shape). A step still holds the previous photo until the next one's thumbnail can be drawn —
     blurring on every step is a change of that rule, to be measured before it is made;
   - the colour under it is now the hash's own average. The 1×1 resize it came from before sampled
     near the middle of the photo in Chromium (a castle came out green from the ivy by its door; on
     Alice a Martin 46 of 60 colours were closer to the centre than to the average). The upload now
-    halves the decoded bitmap step by step to ≤100 px, each step an exact 2×2 average in every
-    engine;
-  - photos from before: `pnpm backfill:thumbhash` (`--dry-run` to count) fills the hash and the
-    corrected colour from the 512 px thumbnail in the bucket (no transformation billed), or from the
-    grid's smallest variant for a photo without one. It writes to the database `DIRECT_URL` names —
-    Pavel runs it. A replaced photo (docs/REPLACE-PHOTOS.md) or a new video poster gets a new hash or
-    none, never the old picture's.
+    halves the decoded bitmap step by step to ≤100 px with bilinear sampling, each step an exact 2×2
+    average — checked in Chromium, WebKit and Firefox on a 4033 × 3025 checker of single pixels,
+    which came out grey in all three;
+  - photos from before: `pnpm backfill:thumbhash` (`--dry-run` only counts, and downloads nothing)
+    fills the hash and the corrected colour from the thumbnail in the bucket (512 px on a guest's
+    photo, 1024 px on the photographer's; no transformation billed), or from the grid's smallest
+    variant for a photo without one or whose thumbnail object is gone. It writes to the database
+    `DIRECT_URL` names — Pavel runs it — only if the row still holds the key it read, and exits 1 if
+    any photo failed, each with its reason. A replaced photo (docs/REPLACE-PHOTOS.md) or a new video
+    poster gets a new hash or none, never the old picture's.
 
 ## Link compatibility — the contract
 

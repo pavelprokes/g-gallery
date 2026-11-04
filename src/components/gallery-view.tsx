@@ -4201,7 +4201,8 @@ interface PhotoTileProps {
   height: number;
   index: number;
   priority: boolean;
-  /** A photo's link is loading or open: the tile shows its colour only. */
+  /** A photo's link is loading or open: the tile holds its image back, showing
+   * only the blur over its colour. */
   imageHeld?: boolean;
   /** In a row on screen, not in the overscan around it. */
   onScreen?: boolean;

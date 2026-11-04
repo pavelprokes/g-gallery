@@ -54,7 +54,7 @@ import {
 } from "@/lib/gallery-highlights";
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
-import { blurOnLastPageOnly } from "@/lib/thumbhash";
+import { blurOnLastTwoPages } from "@/lib/thumbhash";
 import { thumbhashPngDataUrl } from "@/lib/thumbhash-server";
 
 /** One photo as the guest's grid receives it, from the page or the photos route. */
@@ -318,6 +318,31 @@ export async function loadGalleryViewData(
     }),
   ]);
 
+  // Only when the photo really is in those pages: the count above reads the
+  // order's key with its fallbacks, the database sorts the raw column, and a
+  // row caught between two writes of it can land elsewhere. Then the client
+  // pulls on as it always did, rather than wait behind a placeholder.
+  const linkedInPages = linked && rows.some((row) => row.id === linked.photo.id) ? linked : null;
+  const pages = toPages(
+    order,
+    rows.map((photo) => ({
+      id: photo.id,
+      objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
+      video: videoOf(photo),
+      fileName: photo.fileName,
+      width: photo.width,
+      height: photo.height,
+      placeholder: photo.placeholder,
+      thumbhash: photo.thumbhash,
+      favoriteCount: photo._count.favorites,
+      uploaderName: uploaderNameOf(photo),
+      orderKey: orderKeyOf(order, photo),
+      ...projectionAim(photo.faces, photo.faceTags),
+    })),
+    hasMore,
+  );
+
   return {
     title: localizeField(gallery.title, titleTranslations, "title", locale),
     eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
@@ -332,32 +357,10 @@ export async function loadGalleryViewData(
         : null,
     photoCount: gallery._count.photos,
     videoCount,
-    initialPages: blurOnLastPageOnly(
-      toPages(
-        order,
-        rows.map((photo) => ({
-          id: photo.id,
-          objectKey: photo.objectKey,
-          thumbObjectKey: photo.thumbObjectKey,
-          video: videoOf(photo),
-          fileName: photo.fileName,
-          width: photo.width,
-          height: photo.height,
-          placeholder: photo.placeholder,
-          thumbhash: photo.thumbhash,
-          favoriteCount: photo._count.favorites,
-          uploaderName: uploaderNameOf(photo),
-          orderKey: orderKeyOf(order, photo),
-          ...projectionAim(photo.faces, photo.faceTags),
-        })),
-        hasMore,
-      ),
-    ),
-    // Only when the photo really is in those pages: the count above reads the
-    // order's key with its fallbacks, the database sorts the raw column, and a
-    // row caught between two writes of it can land elsewhere. Then the client
-    // pulls on as it always did, rather than wait behind a placeholder.
-    linkedPhoto: linked && rows.some((row) => row.id === linked.photo.id) ? linked.photo : null,
+    // On the linked photo's page set only: without a photo to land on, the
+    // viewer stays on the first page and must not find it stripped of its blur.
+    initialPages: linkedInPages ? blurOnLastTwoPages(pages) : pages,
+    linkedPhoto: linkedInPages?.photo ?? null,
     photoOrder: order,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),

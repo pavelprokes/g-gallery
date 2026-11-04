@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  blurOnLastPageOnly,
+  blurOnLastTwoPages,
   blurStyle,
   isThumbhash,
   thumbhashAverage,
   thumbhashDataUrl,
   thumbhashOfPixels,
-  thumbhashSize,
 } from "./thumbhash";
 
 /** A w×h image: left half one colour, right half another. */
@@ -52,6 +51,37 @@ describe("isThumbhash", () => {
     expect(isThumbhash("short")).toBe(false);
     expect(isThumbhash("A".repeat(80))).toBe(false);
   });
+
+  it("refuses what no encoder writes: wrong length, or a shape of 0 px", () => {
+    expect(isThumbhash("AAAAAAAA")).toBe(false);
+    expect(isThumbhash("A".repeat(16))).toBe(false);
+    expect(isThumbhash("A".repeat(40))).toBe(false);
+    // Long enough, but a zero in the header's coefficient count.
+    expect(isThumbhash("A".repeat(28))).toBe(false);
+  });
+
+  it("takes every shape the encoder can write, opaque or not", () => {
+    // A guest's confirm is refused when this fails, so its bounds must hold
+    // for the narrowest panorama as much as for a square with alpha.
+    for (const [w, h] of [
+      [1, 1],
+      [100, 1],
+      [1, 100],
+      [100, 2],
+      [100, 75],
+      [75, 100],
+      [100, 100],
+    ] as const) {
+      for (const alpha of [255, 128]) {
+        const rgba = new Uint8Array(w * h * 4);
+        for (let i = 0; i < rgba.length; i += 4) {
+          rgba.set([(i * 7) % 255, (i * 13) % 255, (i * 29) % 255, i ? alpha : 255], i);
+        }
+        const hash = thumbhashOfPixels(w, h, rgba);
+        expect(isThumbhash(hash), `${w}×${h}, alpha ${alpha}: ${hash}`).toBe(true);
+      }
+    }
+  });
 });
 
 describe("thumbhashDataUrl", () => {
@@ -77,28 +107,21 @@ describe("blurStyle", () => {
   });
 });
 
-describe("thumbhashSize", () => {
-  it("fits the long side into 100 px and keeps the shape", () => {
-    expect(thumbhashSize(6000, 4000)).toEqual({ width: 100, height: 67 });
-    expect(thumbhashSize(4000, 6000)).toEqual({ width: 67, height: 100 });
-    expect(thumbhashSize(80, 20)).toEqual({ width: 80, height: 20 });
-    expect(thumbhashSize(10_000, 10)).toEqual({ width: 100, height: 1 });
-  });
-});
-
-describe("blurOnLastPageOnly", () => {
+describe("blurOnLastTwoPages", () => {
   const page = (ids: string[]) => ({
     items: ids.map((id) => ({ id, thumbhash: `hash-${id}` })),
     nextCursor: null,
   });
 
-  it("leaves a single page alone", () => {
-    const pages = [page(["a", "b"])];
-    expect(blurOnLastPageOnly(pages)).toBe(pages);
+  it("leaves one or two pages alone", () => {
+    const one = [page(["a", "b"])];
+    expect(blurOnLastTwoPages(one)).toBe(one);
+    const two = [page(["a"]), page(["b"])];
+    expect(blurOnLastTwoPages(two)).toBe(two);
   });
 
-  it("keeps the blur only where the viewer lands", () => {
-    const result = blurOnLastPageOnly([page(["a"]), page(["b"]), page(["c"])]);
-    expect(result.map((p) => p.items[0]!.thumbhash)).toEqual([null, null, "hash-c"]);
+  it("keeps the blur where the viewer lands, and the rows above it", () => {
+    const result = blurOnLastTwoPages([page(["a"]), page(["b"]), page(["c"]), page(["d"])]);
+    expect(result.map((p) => p.items[0]!.thumbhash)).toEqual([null, null, "hash-c", "hash-d"]);
   });
 });

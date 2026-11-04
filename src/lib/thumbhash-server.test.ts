@@ -34,8 +34,28 @@ describe("thumbhashPngDataUrl", () => {
     expect(compact.length).toBeLessThan(thumbhashDataUrl(hash)!.length / 2);
   });
 
+  it("is a valid PNG or null for any value the check lets through", async () => {
+    // Guests can store any string that passes `isThumbhash`, and this goes
+    // straight into the HTML. A fixed seed: the same strings on every run.
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let seed = 42;
+    const next = () => (seed = (seed * 1664525 + 1013904223) >>> 0) >>> 24;
+    for (let run = 0; run < 400; run++) {
+      const length = 20 + 4 * (next() % 5);
+      const value = Array.from({ length }, () => alphabet[next() % 64]).join("");
+      const url = thumbhashPngDataUrl(value);
+      if (!url) continue;
+      const png = Buffer.from(url.replace(/^data:image\/png;base64,/, ""), "base64");
+      const { width, height } = await sharp(png).metadata();
+      expect(width, value).toBeGreaterThan(0);
+      expect(height, value).toBeGreaterThan(0);
+    }
+  });
+
   it("is null for nothing or junk", () => {
     expect(thumbhashPngDataUrl(null)).toBeNull();
     expect(thumbhashPngDataUrl('x")')).toBeNull();
+    // Passes for base64, but would decode to a 0 px image.
+    expect(thumbhashPngDataUrl("A".repeat(28))).toBeNull();
   });
 });

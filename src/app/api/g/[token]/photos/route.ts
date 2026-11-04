@@ -15,7 +15,7 @@ import {
 } from "@/lib/photo-order";
 import { UPLOADER_SELECT, uploaderNameOf } from "@/lib/photo-attribution";
 import { PROJECTION_FACES_SELECT, projectionAim } from "@/lib/projection-camera";
-import { blurOnLastPageOnly } from "@/lib/thumbhash";
+import { blurOnLastTwoPages } from "@/lib/thumbhash";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -129,7 +129,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/g/[token]/ph
   const rows = hasMore ? photos.slice(0, take) : photos;
   // Cut by the same function as the pages a photo's link brings with the page
   // (src/lib/shared-gallery.ts), so a refetch lands on the same boundaries.
-  const pages = blurOnLastPageOnly(
+  const pages = blurOnLastTwoPages(
     toPages(
       order,
       rows.map((photo) => ({

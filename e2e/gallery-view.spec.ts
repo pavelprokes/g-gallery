@@ -52,7 +52,8 @@ test.describe("share gallery viewer", () => {
     // docs/GALLERY-LOADING.md: the seed gives every other photo a ThumbHash.
     // Images are held back so the tiles stay on their placeholder.
     await page.route(/\/photo-\d+\.jpg/, () => {});
-    await page.goto(`/g/${seed.token}/${seed.slug}`);
+    // The images never arrive, so the page may never fire `load`.
+    await page.goto(`/g/${seed.token}/${seed.slug}`, { waitUntil: "domcontentloaded" });
     const tiles = page
       .getByRole("list", { name: "Fotky v galerii" })
       .locator('button[aria-label^="Otevřít"]');

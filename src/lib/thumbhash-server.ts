@@ -15,6 +15,12 @@ import { isThumbhash } from "@/lib/thumbhash";
  * smooth gradient: with each row stored as its difference from the one above
  * (PNG filter "Up") it deflates to a few hundred bytes. Same pixels, same
  * picture.
+ *
+ * Each goes out twice, in the tile's `style` and in the client component's RSC
+ * props, and it cannot be once: whatever a component renders is in both, a
+ * server-rendered `<style>` included. Measured on six highlights, the second
+ * copies are 6.1 kB raw, 3.2 kB with gzip (they lie further apart than its 32 kB
+ * window) and 37 bytes with the Brotli Vercel serves.
  */
 export function thumbhashPngDataUrl(value: string | null | undefined): string | null {
   if (!value || !isThumbhash(value)) return null;

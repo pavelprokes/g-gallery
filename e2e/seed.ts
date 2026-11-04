@@ -307,9 +307,15 @@ async function main() {
   // docs/ADMIN-FILTERS.md: read-only, so one for both projects.
   const filterGalleryId = await makeFilterGallery(user.id);
   // docs/REPLACE-PHOTOS.md: a corrected export replaces a delivered photo — mutated, so per project.
-  const replaceGalleryIds = {
-    chromium: await makeReplaceGallery(user.id, "chromium"),
-    "mobile-safari": await makeReplaceGallery(user.id, "mobile-safari"),
+  const replaceGalleries = {
+    chromium: {
+      replaced: await makeReplaceGallery(user.id, "chromium"),
+      noBlur: await makeReplaceGallery(user.id, "chromium-no-blur"),
+    },
+    "mobile-safari": {
+      replaced: await makeReplaceGallery(user.id, "mobile-safari"),
+      noBlur: await makeReplaceGallery(user.id, "mobile-safari-no-blur"),
+    },
   };
 
   // A password-gated link: the gate is the first screen such a guest sees, and
@@ -343,7 +349,7 @@ async function main() {
       photoCheckGalleryId,
       faceTagGalleryId,
       faceSeriesGalleryId,
-      replaceGalleryIds,
+      replaceGalleries,
       filterGalleryId,
       correctionGalleries,
       selectGalleryIds,
@@ -1271,6 +1277,8 @@ async function makeReplaceGallery(ownerId: string, project: string) {
       photoOrder: "FILE_NAME",
     },
   });
+  // The delivered photos' blur, which a replacement must not leave behind.
+  const oldThumbhash = "V9YC1aL3CPeHeHiIh3h3eH+H+HiI";
   const ids: string[] = [];
   for (const [i, name] of [
     "svatba_0001_PPR1001.jpg",
@@ -1285,6 +1293,7 @@ async function makeReplaceGallery(ownerId: string, project: string) {
         width: 1200,
         height: 800,
         placeholder: "#9a7b62",
+        thumbhash: oldThumbhash,
         status: "CONFIRMED",
         sizeBytes: 900_000,
         crc32: "00000000",
@@ -1298,7 +1307,16 @@ async function makeReplaceGallery(ownerId: string, project: string) {
     data: { galleryId: gallery.id, anonKey: `e2e-replace-${project}` },
   });
   await prisma.favorite.create({ data: { photoId: ids[1]!, viewerId: viewer.id } });
-  return gallery.id;
+  // The spec reads each row's blur from what a guest's grid reads.
+  const token = generateShareToken();
+  await prisma.shareLink.create({
+    data: {
+      galleryId: gallery.id,
+      tokenHash: hashShareToken(token),
+      slug: gallerySlug(gallery.title, null),
+    },
+  });
+  return { id: gallery.id, token, oldThumbhash };
 }
 
 async function makePhotoCheckGallery(ownerId: string) {

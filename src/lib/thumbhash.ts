@@ -1,6 +1,7 @@
 import { rgbaToThumbHash, thumbHashToAverageRGBA, thumbHashToDataURL } from "thumbhash";
 import type { CSSProperties } from "react";
 import { isPlaceholder } from "@/lib/placeholder";
+import { thumbSize } from "@/lib/thumbnail";
 
 /**
  * A blurred version of the photo, drawn before any of its bytes arrive
@@ -22,25 +23,25 @@ import { isPlaceholder } from "@/lib/placeholder";
 export const THUMBHASH_MAX_SIDE = 100;
 
 /**
- * A ThumbHash is 5 bytes of header plus at most ~20 of coefficients; base64
- * of that is 8–36 characters. Anything else did not come from the encoder.
+ * A ThumbHash is 5 bytes of header (6 with alpha) plus 8–19 of coefficients,
+ * whatever the photo: base64 of that is 20–36 characters. This is the only
+ * check on a value anonymous guests can write through confirm.
  */
-const BASE64 = /^[A-Za-z0-9+/]{8,48}={0,2}$/;
+const BASE64 = /^(?=.{20,36}$)[A-Za-z0-9+/]+={0,2}$/;
 
 export function isThumbhash(value: string): boolean {
-  return BASE64.test(value) && value.length % 4 === 0;
+  return bytesOf(value) !== null;
 }
 
 function bytesOf(value: string): Uint8Array | null {
-  if (!isThumbhash(value)) return null;
-  try {
-    const binary = atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  } catch {
-    return null;
-  }
+  if (!BASE64.test(value) || value.length % 4 !== 0) return null;
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  // The fourth byte's low three bits: coefficients on the photo's short side.
+  // The encoder writes at least one; the decoder takes the shape from them, so
+  // a zero would draw a 0 px image — an invalid PNG in the page.
+  return bytes[3]! & 7 ? bytes : null;
 }
 
 function base64Of(bytes: Uint8Array): string {
@@ -130,27 +131,24 @@ export function thumbhashOfPixels(width: number, height: number, rgba: ArrayLike
   return base64Of(rgbaToThumbHash(width, height, rgba));
 }
 
-/** The size the pixels are drawn at: the photo's shape, ≤100 px a side. */
-export function thumbhashSize(width: number, height: number): { width: number; height: number } {
-  const scale = THUMBHASH_MAX_SIDE / Math.max(width, height, 1);
-  if (scale >= 1) return { width: Math.max(1, width), height: Math.max(1, height) };
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
-  };
-}
-
 /**
  * A photo's ThumbHash and its true average colour, from an image already
  * decoded for something else (the upload reads its dimensions from the same
  * bitmap).
  *
- * The bitmap is halved step by step until it fits: each bilinear halving is
- * an exact 2×2 average in every browser, so every pixel counts towards the
- * result. The old 1×1 resize did not: Chromium sampled near the centre, so a
- * castle came out green from the ivy by its door. (A single high-quality
- * `drawImage` straight to 100 px is left to each engine's own idea of
- * "high".)
+ * The image is halved step by step until it fits, with plain bilinear sampling
+ * ("low"): at a scale of exactly ½ that is an exact 2×2 average, so every pixel
+ * counts towards the result — an odd last row or column is left out, or the
+ * scale would not be ½. The old 1×1 resize did not: Chromium sampled near the
+ * centre, so a castle came out green from the ivy by its door. ("high" is each
+ * engine's own idea of high.)
+ *
+ * Each canvas is released as soon as the next one is drawn: this runs for every
+ * file of a batch on a phone, and a canvas left to the garbage collector holds
+ * ~12 MB for a 12 MP photo until it runs. Measured over 80 such photos: in
+ * Chromium ~30 MB on top of the decoding's own peak, where unreleased canvases
+ * added ~150 MB; on a Mac's WebKit the decoding's peak covers either. One canvas
+ * drawn over itself was slower and no smaller.
  *
  * DOM-free — OffscreenCanvas only — so it runs in the upload worker.
  */
@@ -160,34 +158,44 @@ export function thumbhashOfImage(
   height: number,
 ): { thumbhash: string; average: string | null } | null {
   if (typeof OffscreenCanvas !== "function" || width < 1 || height < 1) return null;
+  const size = thumbSize(width, height, THUMBHASH_MAX_SIDE);
+  let held: OffscreenCanvas | null = null;
   try {
-    const size = thumbhashSize(width, height);
-    let source: CanvasImageSource = image;
     let w = width;
     let h = height;
-    while (w >= size.width * 2 && h >= size.height * 2) {
-      const next = new OffscreenCanvas(Math.ceil(w / 2), Math.ceil(h / 2));
-      const step = next.getContext("2d");
-      if (!step) return null;
-      step.imageSmoothingEnabled = true;
-      step.imageSmoothingQuality = "high";
-      step.drawImage(source, 0, 0, w, h, 0, 0, next.width, next.height);
-      source = next;
-      w = next.width;
-      h = next.height;
+    for (;;) {
+      const halving = w >= size.width * 2 && h >= size.height * 2;
+      const nextW = halving ? w >> 1 : size.width;
+      const nextH = halving ? h >> 1 : size.height;
+      const next: OffscreenCanvas = new OffscreenCanvas(nextW, nextH);
+      const context = next.getContext("2d");
+      if (!context) return null;
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "low";
+      const fromW = halving ? nextW * 2 : w;
+      const fromH = halving ? nextH * 2 : h;
+      context.drawImage(held ?? image, 0, 0, fromW, fromH, 0, 0, nextW, nextH);
+      release(held);
+      held = next;
+      if (!halving) {
+        const { data } = context.getImageData(0, 0, nextW, nextH);
+        const thumbhash = thumbhashOfPixels(nextW, nextH, data);
+        return { thumbhash, average: thumbhashAverage(thumbhash) };
+      }
+      w = nextW;
+      h = nextH;
     }
-    const canvas = new OffscreenCanvas(size.width, size.height);
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(source, 0, 0, w, h, 0, 0, size.width, size.height);
-    const { data } = context.getImageData(0, 0, size.width, size.height);
-    const thumbhash = thumbhashOfPixels(size.width, size.height, data);
-    return { thumbhash, average: thumbhashAverage(thumbhash) };
   } catch {
     return null;
+  } finally {
+    release(held);
   }
+}
+
+function release(canvas: OffscreenCanvas | null): void {
+  if (!canvas) return;
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
 /** The same, from a file: decodes it first. Null when it cannot be read. */
@@ -209,17 +217,19 @@ export async function thumbhashOfBlob(
 /**
  * Several pages of photos at once — a photo's link (the page carries every
  * page up to it) or a jump to a chapter or highlight (one request up to its
- * target) — keep the blur on the last page only: that is where the viewer
- * lands, and the grid passes every page before it in one instant scroll. A
- * blur on all of them would be up to ~20 kB on 600 photos, read before the one
- * photo being waited for. Pages pulled one by one later bring theirs back.
+ * target) — keep the blur only where the viewer lands: the last page, and the
+ * one before it, because the target can be the last page's first tile and the
+ * rows above it on screen come from the page before. The grid passes the rest
+ * in one instant scroll, and a blur on all of them would be up to ~20 kB on
+ * 600 photos, read before the one photo being waited for. Scrolled back to,
+ * those pages show the colour until a refetch: nothing pulls them again.
  */
-export function blurOnLastPageOnly<T extends { thumbhash: string | null }>(
+export function blurOnLastTwoPages<T extends { thumbhash: string | null }>(
   pages: { items: T[]; nextCursor: string | null }[],
 ): { items: T[]; nextCursor: string | null }[] {
-  if (pages.length < 2) return pages;
+  if (pages.length < 3) return pages;
   return pages.map((page, i) =>
-    i === pages.length - 1
+    i >= pages.length - 2
       ? page
       : { ...page, items: page.items.map((item) => ({ ...item, thumbhash: null })) },
   );

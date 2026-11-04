@@ -96,7 +96,9 @@ Cloudflare R2 (`jurisdiction=eu`) + Image Transformations · Tailwind 4 · Vites
    is the R2 object key, not a URL. The loader's transform backend is switchable via
    `NEXT_PUBLIC_IMAGE_TRANSFORM` (`cloudflare` | `imgproxy` | `none`) — never bypass it. This is
    about the _path_ bytes travel: the offline-galleries service worker (`public/sw.js`) caching
-   CDN-fetched images client-side in Cache Storage does not violate it.
+   CDN-fetched images client-side in Cache Storage does not violate it. Nor does the ThumbHash blur
+   the server draws into the HTML (`src/lib/thumbhash-server.ts`): under 1 kB generated from a value
+   in the row, no photo's bytes involved. It is not a precedent for anything read from a photo.
 2. **Uploads**: browser → R2 presigned PUT only (Vercel has a hard 4.5 MB body limit). Client
    computes CRC32 + strips EXIF GPS before PUT; server records `etag`, flips `Photo.status`.
 3. **Auth**: route gating lives in `src/proxy.ts` (Next 16 — `middleware.ts` is deprecated and
