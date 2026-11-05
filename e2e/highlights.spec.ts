@@ -37,6 +37,15 @@ test.describe("gallery highlights", () => {
     await expect(strip.getByRole("button", { name: tileName(excludedFile) })).toHaveCount(0);
   });
 
+  test("a tile's blur comes in the HTML, compressed", async ({ request }) => {
+    // The response itself, before any script: the server drew it
+    // (docs/GALLERY-LOADING.md). Only the pinned photo has a hash here.
+    const html = await (await request.get(`/g/${token}/${slug}`)).text();
+    const blurs = html.match(/url\(&quot;data:image\/png;base64,[A-Za-z0-9+/=]+&quot;\)/g) ?? [];
+    expect(blurs).toHaveLength(1);
+    expect(blurs[0]!.length).toBeLessThan(1500);
+  });
+
   test("a tile takes the viewer to the photo's place in the grid", async ({ page }) => {
     await page.goto(`/g/${token}/${slug}`);
     const strip = page.getByRole("region", { name: STRIP });

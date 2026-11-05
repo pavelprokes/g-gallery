@@ -77,7 +77,7 @@ function tileCount(page: Page): Promise<number> {
 }
 
 test.describe("guest uploads", () => {
-  test("a link with allowUpload adds a photo the grid then shows", async ({ page }) => {
+  test("a link with allowUpload adds a photo the grid then shows", async ({ page, request }) => {
     await page.goto(`/g/${seed.uploadToken}/${seed.uploadSlug}`);
 
     // A first-time guest gets a button that opens the name sheet; the file
@@ -94,6 +94,16 @@ test.describe("guest uploads", () => {
     // Greater-than, not exactly one more: both browser projects upload into
     // this same gallery in parallel, so an exact count is a race, not a fact.
     await expect.poll(() => tileCount(page), { timeout: 15_000 }).toBeGreaterThan(before);
+
+    // Its blur, computed in this browser's upload worker and stored on confirm
+    // (docs/GALLERY-LOADING.md). The other project's upload has the same name,
+    // and every one of them must have it.
+    const { items } = (await (await request.get(`/api/g/${seed.uploadToken}/photos`)).json()) as {
+      items: { fileName: string; thumbhash: string | null }[];
+    };
+    const uploaded = items.filter((item) => item.fileName === "svatba.jpg");
+    expect(uploaded.length).toBeGreaterThan(0);
+    for (const item of uploaded) expect(item.thumbhash).toMatch(/^[A-Za-z0-9+/]{18,36}={0,2}$/);
   });
 
   test("a guest can take back a photo they uploaded, and only that one", async ({

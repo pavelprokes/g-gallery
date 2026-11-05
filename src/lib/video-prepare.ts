@@ -3,6 +3,7 @@
 import { crc32HexOfBlob } from "@/lib/crc32";
 import { inspectMp4, isH264, type Mp4Facts } from "@/lib/mp4-inspect";
 import { averageColorOf } from "@/lib/placeholder";
+import { thumbhashOfBlob } from "@/lib/thumbhash";
 import { POSTER_CONTENT_TYPE, withinVideoResolution } from "@/lib/video";
 import { withTimeout } from "@/lib/with-timeout";
 
@@ -25,6 +26,8 @@ export interface PreparedVideo {
   height: number;
   durationMs: number;
   placeholder: string | null;
+  /** The poster's blur (src/lib/thumbhash.ts). Cosmetic. */
+  thumbhash: string | null;
 }
 
 /** Why a picked MP4 cannot go up — each one has its own sentence in the uploader. */
@@ -84,15 +87,15 @@ export async function prepareVideoUpload(file: File): Promise<PreparedVideo> {
   if (problem) throw new VideoNotUsable(problem);
 
   const frame = await posterFrame(file);
-  const [crc32, placeholder] = await Promise.all([
-    crc32HexOfBlob(file),
-    averageColorOf(frame.poster),
-  ]);
+  const [crc32, blur] = await Promise.all([crc32HexOfBlob(file), thumbhashOfBlob(frame.poster)]);
+  // The blur's average is a true one; the 1×1 resize is the fallback.
+  const placeholder = blur?.average ?? (await averageColorOf(frame.poster));
 
   return {
     ...frame,
     crc32,
     placeholder,
+    thumbhash: blur?.thumbhash ?? null,
     // The container's own creation time, else the file's mtime — the same
     // order of preference as a photo's EXIF. An editor's export usually
     // stamps the render time, which is why a delivered gallery is ordered by

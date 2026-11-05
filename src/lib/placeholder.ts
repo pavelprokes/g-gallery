@@ -6,10 +6,11 @@
  * so nothing reflows — but an empty grey rectangle still reads as "broken"
  * while 500 tiles fill in.
  *
- * A solid average colour rather than a blurred thumbnail: at grid size the
- * visual difference is slight, but a base64 blur placeholder is ~400 bytes per
- * photo embedded in the HTML, which is 200 kB added to a 500-photo page. Seven
- * bytes of hex is 1/50th of that for most of the benefit.
+ * Since 2026-11-04 a frame of the photo's own shape draws the photo blurred
+ * over this colour (src/lib/thumbhash.ts): a ThumbHash is ~28 characters, not
+ * the ~400 bytes of a base64 blur that once ruled it out, and a page carries
+ * 60 photos, not 500. The colour stays for everything else — and is now the
+ * hash's own true average where the upload could compute one.
  */
 
 /** Neutral grey, used when the browser could not read the pixels. */
@@ -29,7 +30,9 @@ export function placeholderStyle(value: string | null | undefined): string {
 
 /**
  * Averages an image down to one colour by drawing it into a 1×1 canvas and
- * letting the browser do the downsampling.
+ * letting the browser do the downsampling — only the fallback now, for an
+ * upload that could not compute a ThumbHash: Chromium samples near the middle
+ * rather than averaging, so this is the photo's centre more than its mean.
  *
  * Returns null rather than throwing: a missing placeholder is a cosmetic loss,
  * and upload must not fail because a canvas was unavailable or tainted.

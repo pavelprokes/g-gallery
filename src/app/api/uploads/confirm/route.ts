@@ -8,6 +8,7 @@ import { deleteObject, headObject } from "@/lib/r2";
 import { trackServerEvent } from "@/lib/umami";
 import { thumbKeyFor } from "@/lib/thumbnail";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
+import { isThumbhash } from "@/lib/thumbhash";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -20,6 +21,8 @@ const commonSchema = {
     .string()
     .regex(/^#[0-9a-f]{6}$/)
     .nullish(),
+  /** The blurred photo's ThumbHash, base64 (src/lib/thumbhash.ts); optional by design. */
+  thumbhash: z.string().refine(isThumbhash).nullish(),
   /** Lowercase hex CRC32 computed client-side — feeds the future ZIP writer. */
   crc32: z.string().regex(/^[0-9a-f]{8}$/),
   sizeBytes: z.number().int().positive(),
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
     width,
     height,
     placeholder,
+    thumbhash,
     thumb,
     takenAt,
     xmpRating,
@@ -193,6 +197,10 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
+      // Not kept like the colour: a corrected export can be a different crop,
+      // and the old blur would draw the wrong picture. The colour alone is
+      // what the grid shows without one.
+      thumbhash: thumbhash ?? null,
       thumbObjectKey: thumb ? thumbKeyFor(photo.objectKey, thumb) : null,
       xmpRating: xmpRating ?? undefined,
       xmpLabel: xmpLabel ?? undefined,
@@ -221,6 +229,7 @@ export async function POST(request: Request) {
       width,
       height,
       placeholder: placeholder ?? undefined,
+      thumbhash: thumbhash ?? null,
       takenAt: capturedAt,
       // A provisional place in the woven order (docs/PHOTO-ORDER.md), for the
       // same reason: the refresh below refines it, but a CONFIRMED photo must
@@ -269,6 +278,7 @@ async function replacePhotoBytes(
     | "width"
     | "height"
     | "placeholder"
+    | "thumbhash"
     | "thumbObjectKey"
     | "xmpRating"
     | "xmpLabel"

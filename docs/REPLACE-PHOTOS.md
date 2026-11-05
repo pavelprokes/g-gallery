@@ -34,7 +34,9 @@ file-name order and lose everything tied to its id.
   choice made now (turning the pair down clears it).
 - **Confirm** (`replacePhotoBytes`, `api/uploads/confirm`) moves the new key, thumbnail, size,
   CRC32, and — where the browser read them — dimensions, placeholder and Lightroom marks onto the
-  target row, then deletes the old objects. The target keeps its id, `fileName` and `takenAt`, so
+  target row, then deletes the old objects. The blur (`thumbhash`) is the opposite of those: the new
+  one, or null when the browser drew none — never kept, because a corrected export can be a
+  different crop and the old blur would draw the wrong picture (docs/GALLERY-LOADING.md). The target keeps its id, `fileName` and `takenAt`, so
   its place in every order (chapter starts included) — favourites, print marks, reactions, face
   names, chapters, cover all stay. `faces` and `checkKeptAt` are cleared: read from the old pixels.
 - The swap is guarded on the target's key, so two replacements racing each other cannot orphan an

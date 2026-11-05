@@ -54,6 +54,8 @@ import {
 } from "@/lib/gallery-highlights";
 import { formatDate } from "@/lib/format-date";
 import { inheritsEventVenue } from "@/lib/gallery-venue";
+import { blurOnLastTwoPages } from "@/lib/thumbhash";
+import { thumbhashPngDataUrl } from "@/lib/thumbhash-server";
 
 /** One photo as the guest's grid receives it, from the page or the photos route. */
 export interface GalleryViewPhoto {
@@ -65,6 +67,8 @@ export interface GalleryViewPhoto {
   width: number | null;
   height: number | null;
   placeholder: string | null;
+  /** The blurred photo drawn before it arrives (src/lib/thumbhash.ts). */
+  thumbhash: string | null;
   favoriteCount: number;
   /** A guest photo's volunteered credit (src/lib/photo-attribution.ts). */
   uploaderName: string | null;
@@ -81,6 +85,8 @@ export interface LinkedPhoto {
   objectKey: string;
   thumbObjectKey: string | null;
   placeholder: string | null;
+  /** The blur, as a data URL drawn by the server — the frame needs no script. */
+  blurDataUrl: string | null;
   width: number | null;
   height: number | null;
   /** A film opens on its poster in the lightbox, at a width of its own. */
@@ -222,6 +228,7 @@ export async function loadGalleryViewData(
           width: true,
           height: true,
           placeholder: true,
+          thumbhash: true,
           ...ORDER_KEY_SELECT,
           _count: { select: { favorites: true } },
           ...UPLOADER_SELECT,
@@ -311,6 +318,31 @@ export async function loadGalleryViewData(
     }),
   ]);
 
+  // Only when the photo really is in those pages: the count above reads the
+  // order's key with its fallbacks, the database sorts the raw column, and a
+  // row caught between two writes of it can land elsewhere. Then the client
+  // pulls on as it always did, rather than wait behind a placeholder.
+  const linkedInPages = linked && rows.some((row) => row.id === linked.photo.id) ? linked : null;
+  const pages = toPages(
+    order,
+    rows.map((photo) => ({
+      id: photo.id,
+      objectKey: photo.objectKey,
+      thumbObjectKey: photo.thumbObjectKey,
+      video: videoOf(photo),
+      fileName: photo.fileName,
+      width: photo.width,
+      height: photo.height,
+      placeholder: photo.placeholder,
+      thumbhash: photo.thumbhash,
+      favoriteCount: photo._count.favorites,
+      uploaderName: uploaderNameOf(photo),
+      orderKey: orderKeyOf(order, photo),
+      ...projectionAim(photo.faces, photo.faceTags),
+    })),
+    hasMore,
+  );
+
   return {
     title: localizeField(gallery.title, titleTranslations, "title", locale),
     eventDate: gallery.eventDate ? formatDate(gallery.eventDate, locale) : null,
@@ -325,29 +357,10 @@ export async function loadGalleryViewData(
         : null,
     photoCount: gallery._count.photos,
     videoCount,
-    initialPages: toPages(
-      order,
-      rows.map((photo) => ({
-        id: photo.id,
-        objectKey: photo.objectKey,
-        thumbObjectKey: photo.thumbObjectKey,
-        video: videoOf(photo),
-        fileName: photo.fileName,
-        width: photo.width,
-        height: photo.height,
-        placeholder: photo.placeholder,
-        favoriteCount: photo._count.favorites,
-        uploaderName: uploaderNameOf(photo),
-        orderKey: orderKeyOf(order, photo),
-        ...projectionAim(photo.faces, photo.faceTags),
-      })),
-      hasMore,
-    ),
-    // Only when the photo really is in those pages: the count above reads the
-    // order's key with its fallbacks, the database sorts the raw column, and a
-    // row caught between two writes of it can land elsewhere. Then the client
-    // pulls on as it always did, rather than wait behind a placeholder.
-    linkedPhoto: linked && rows.some((row) => row.id === linked.photo.id) ? linked.photo : null,
+    // On the linked photo's page set only: without a photo to land on, the
+    // viewer stays on the first page and must not find it stripped of its blur.
+    initialPages: linkedInPages ? blurOnLastTwoPages(pages) : pages,
+    linkedPhoto: linkedInPages?.photo ?? null,
     photoOrder: order,
     imageGrant,
     viewers: gallery.viewers.map((v) => ({ id: v.id, displayName: v.displayName ?? "" })),
@@ -429,6 +442,7 @@ async function findLinkedPhoto(
       objectKey: true,
       thumbObjectKey: true,
       placeholder: true,
+      thumbhash: true,
       width: true,
       height: true,
       videoObjectKey: true,
@@ -449,6 +463,7 @@ async function findLinkedPhoto(
       objectKey: photo.objectKey,
       thumbObjectKey: photo.thumbObjectKey,
       placeholder: photo.placeholder,
+      blurDataUrl: thumbhashPngDataUrl(photo.thumbhash),
       width: photo.width,
       height: photo.height,
       isVideo: photo.videoObjectKey !== null,
@@ -493,12 +508,18 @@ async function loadHighlights(
       width: true,
       height: true,
       placeholder: true,
+      thumbhash: true,
     },
   });
   const byId = new Map(photos.map((photo) => [photo.id, photo]));
   return picks.flatMap((pick) => {
     const photo = byId.get(pick.id);
-    return photo ? [{ ...photo, orderKey: keyOf.get(pick.id)! }] : [];
+    if (!photo) return [];
+    const { thumbhash, ...rest } = photo;
+    // Drawn here, compressed: the strip is in the HTML a slow phone reads first.
+    return [
+      { ...rest, blurDataUrl: thumbhashPngDataUrl(thumbhash), orderKey: keyOf.get(pick.id)! },
+    ];
   });
 }
 

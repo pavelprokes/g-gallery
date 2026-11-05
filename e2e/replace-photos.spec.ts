@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { APIRequestContext, Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
 /**
@@ -9,20 +10,14 @@ import { test, expect } from "./fixtures";
  */
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf8")) as {
   adminCookie: { name: string; value: string };
-  replaceGalleryIds: Record<string, string>;
+  replaceGalleries: Record<
+    string,
+    Record<"replaced" | "noBlur", { id: string; token: string; oldThumbhash: string }>
+  >;
 };
 
-test.beforeEach(async ({ context, baseURL }) => {
-  await context.addCookies([{ ...seed.adminCookie, url: baseURL! }]);
-});
-
-test("a corrected export replaces its photo and a new shot is filed by number", async ({
-  page,
-}) => {
-  test.setTimeout(60_000);
-  const galleryId = seed.replaceGalleryIds[test.info().project.name]!;
-  await page.goto(`/admin/g/${galleryId}`);
-
+/** A corrected export: a real JPEG the browser decodes, and a colour of its own. */
+async function correctedExport(page: Page) {
   const jpeg = await page.evaluate(async () => {
     const canvas = document.createElement("canvas");
     canvas.width = 900;
@@ -35,7 +30,30 @@ test("a corrected export replaces its photo and a new shot is filed by number", 
     );
     return Array.from(new Uint8Array(await blob.arrayBuffer()));
   });
-  const file = (name: string) => ({ name, mimeType: "image/jpeg", buffer: Buffer.from(jpeg) });
+  return (name: string) => ({ name, mimeType: "image/jpeg", buffer: Buffer.from(jpeg) });
+}
+
+/** The row's blur, from what any guest's grid reads. */
+async function thumbhashOf(request: APIRequestContext, token: string, fileName: string) {
+  const { items } = (await (await request.get(`/api/g/${token}/photos`)).json()) as {
+    items: { fileName: string; thumbhash: string | null }[];
+  };
+  return items.find((item) => item.fileName === fileName)!.thumbhash;
+}
+
+test.beforeEach(async ({ context, baseURL }) => {
+  await context.addCookies([{ ...seed.adminCookie, url: baseURL! }]);
+});
+
+test("a corrected export replaces its photo and a new shot is filed by number", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  const gallery = seed.replaceGalleries[test.info().project.name]!.replaced;
+  await page.goto(`/admin/g/${gallery.id}`);
+
+  const file = await correctedExport(page);
 
   await page
     .locator('input[type="file"][accept*="image/jpeg"]')
@@ -61,4 +79,43 @@ test("a corrected export replaces its photo and a new shot is filed by number", 
   await expect(page.getByRole("img", { name: "PPR1002.jpg", exact: true })).toHaveCount(0);
   // The new shot is stored under the delivered sequence, so it sorts in place.
   await expect(page.getByRole("img", { name: "svatba_0003_PPR1500.jpg" })).toHaveCount(1);
+
+  // A new picture, a new blur (docs/GALLERY-LOADING.md).
+  const blur = await thumbhashOf(request, gallery.token, "svatba_0002_PPR1002.jpg");
+  expect(blur).toMatch(/^[A-Za-z0-9+/]{18,36}={0,2}$/);
+  expect(blur).not.toBe(gallery.oldThumbhash);
+});
+
+test("a replacement whose browser drew no blur drops the old picture's", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  const gallery = seed.replaceGalleries[test.info().project.name]!.noBlur;
+  // A browser that could not compute one sends none; its colour is kept, its
+  // blur must not be: a corrected export can be a different crop. In the page,
+  // not `page.route`: with interception on, WebKit's signed PUT is refused.
+  await page.addInitScript(() => {
+    const realFetch = window.fetch;
+    window.fetch = (input, init) => {
+      if (String(input).includes("/api/uploads/confirm") && typeof init?.body === "string") {
+        const body = JSON.parse(init.body) as Record<string, unknown>;
+        delete body.thumbhash;
+        return realFetch(input, { ...init, body: JSON.stringify(body) });
+      }
+      return realFetch(input, init);
+    };
+  });
+  await page.goto(`/admin/g/${gallery.id}`);
+  const file = await correctedExport(page);
+  await page
+    .locator('input[type="file"][accept*="image/jpeg"]')
+    .setInputFiles([file("PPR1002.jpg")]);
+  await page.getByRole("button", { name: /^Nahradit/ }).click();
+  await expect(page.getByText("1/1 nahráno")).toBeVisible({ timeout: 45_000 });
+
+  expect(await thumbhashOf(request, gallery.token, "svatba_0001_PPR1001.jpg")).toBe(
+    gallery.oldThumbhash,
+  );
+  expect(await thumbhashOf(request, gallery.token, "svatba_0002_PPR1002.jpg")).toBeNull();
 });

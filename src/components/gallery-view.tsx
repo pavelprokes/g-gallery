@@ -54,6 +54,7 @@ import imageLoader from "@/lib/image-loader";
 import { DEVICE_SIZES, QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
 import { connectionSignals, isSlowConnection, slowLightboxSizes } from "@/lib/slow-connection";
 import { placeholderStyle } from "@/lib/placeholder";
+import { blurStyle, blurStyleOf, thumbhashDataUrl } from "@/lib/thumbhash";
 import { createScreenGate, type ScreenGate } from "@/lib/screen-gate";
 import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
@@ -183,6 +184,9 @@ export interface GalleryPhoto {
   width: number | null;
   height: number | null;
   placeholder: string | null;
+  /** The blurred photo drawn before it arrives (src/lib/thumbhash.ts); null on
+   * the pages a deep link passes over. */
+  thumbhash: string | null;
   favoriteCount: number;
   /** A guest photo's volunteered credit; null for the photographer's own. */
   uploaderName: string | null;
@@ -696,8 +700,8 @@ function widthFreeUrl(src: string): string | null {
 
 /**
  * A photo's link, drawn by the server before the page can open its lightbox
- * (docs/GALLERY-LOADING.md): the lightbox's black frame with the photo's
- * colour where it will be, and the very images the lightbox is about to ask
+ * (docs/GALLERY-LOADING.md): the lightbox's black frame with the photo
+ * blurred over its colour where it will be, and the very images the lightbox is about to ask
  * for — the full size at the lightbox's own `sizes` and, when it is served
  * untransformed, the grid thumbnail — so both are already downloading, at high
  * priority, while the page's script is. Nothing here can be used; the real
@@ -726,7 +730,7 @@ function LinkedPhotoPlaceholder({
           style={{
             width: `min(100%, calc(100dvh * ${aspect}))`,
             aspectRatio: aspect,
-            backgroundColor: placeholderStyle(photo.placeholder),
+            ...blurStyleOf(photo.blurDataUrl, placeholderStyle(photo.placeholder)),
           }}
         />
       </div>
@@ -893,6 +897,14 @@ function LightboxPhoto({
   const [previewShown, setPreviewShown] = useState<string | null>(null);
   const previewOnTop = previewShown === photo.id;
 
+  // Until this frame has drawn anything at all — opened from a link, or on a
+  // tile whose thumbnail never arrived — the photo blurred stands where it
+  // will be, instead of black (src/lib/thumbhash.ts). Only then: from the
+  // first pixels on, the frame holds the previous photo as before, and a
+  // step never shows a blur.
+  const [painted, setPainted] = useState(false);
+  const blur = painted ? null : thumbhashDataUrl(photo.thumbhash);
+
   return (
     <div
       // `touch-none` hands every gesture in here to the handlers above: the
@@ -905,6 +917,23 @@ function LightboxPhoto({
       {...handlers}
     >
       <div ref={frameRef} className="absolute inset-0">
+        {blur && (
+          // An SVG rather than a background: it letterboxes at the photo's
+          // exact shape, where the hash keeps only an approximate one.
+          <svg
+            aria-hidden
+            viewBox={`0 0 ${photo.width ?? 3} ${photo.height ?? 2}`}
+            preserveAspectRatio="xMidYMid meet"
+            className={`absolute inset-0 h-full w-full ${selected ? "scale-[0.93]" : ""}`}
+          >
+            <image
+              href={blur}
+              width={photo.width ?? 3}
+              height={photo.height ?? 2}
+              preserveAspectRatio="none"
+            />
+          </svg>
+        )}
         {/* The thumbnail the viewer just tapped, at the exact size the grid
             rendered it — already in the browser's cache, so it paints
             immediately and the full-size photo resolves on top of it. It only
@@ -926,6 +955,7 @@ function LightboxPhoto({
             // reports after decoding, by which time a fast click may have
             // moved the element on to the next one.
             onLoad={(event) => {
+              setPainted(true);
               if (drew(event.currentTarget, preview.src)) setPreviewShown(photo.id);
             }}
             className={`object-contain ${selected ? "scale-[0.93]" : ""} ${
@@ -944,6 +974,7 @@ function LightboxPhoto({
           // photo is current by the time next/image has decoded them, and not
           // the thumbnail standing in while the viewer hurries.
           onLoad={(event) => {
+            setPainted(true);
             if (drew(event.currentTarget, shown.src)) onLoad(shown.id);
           }}
           onError={(event) => {
@@ -4170,7 +4201,8 @@ interface PhotoTileProps {
   height: number;
   index: number;
   priority: boolean;
-  /** A photo's link is loading or open: the tile shows its colour only. */
+  /** A photo's link is loading or open: the tile holds its image back, showing
+   * only the blur over its colour. */
   imageHeld?: boolean;
   /** In a row on screen, not in the overscan around it. */
   onScreen?: boolean;
@@ -4367,16 +4399,19 @@ export const PhotoTile = memo(function PhotoTile({
         // Selected uses one fixed brand colour for every tile — matching the
         // checkbox's own `bg-brand-primary` — instead of each photo's own
         // placeholder colour showing through the frame the shrink leaves.
-        // Unselected keeps that placeholder as its background so the grid
-        // still fills in with the picture's own palette instead of grey
-        // holes while the photo is loading.
+        // Unselected keeps that placeholder as its background — the photo
+        // blurred, over its colour (src/lib/thumbhash.ts) — so the grid still
+        // fills in with the picture itself instead of grey holes while the
+        // photo is loading.
         //
         // `on-media` is the white focus ring: the default brown one is 1.9:1
         // against a photograph. The clip that used to live here moved to the
         // wrapper below, because the ring's dark outer halo is a box-shadow
         // drawn outside the border box and `overflow-hidden` would eat it.
         className={`on-media relative block h-full w-full ${selected ? "bg-brand-primary" : ""}`}
-        style={selected ? undefined : { backgroundColor: placeholderStyle(photo.placeholder) }}
+        style={
+          selected ? undefined : blurStyle(photo.thumbhash, placeholderStyle(photo.placeholder))
+        }
         aria-label={
           selectionActive
             ? t("selectPhoto", { fileName: photo.fileName })

@@ -24,6 +24,8 @@ interface Item {
   width: number | null;
   height: number | null;
   placeholder: string | null;
+  /** Absent from a live site older than the column. */
+  thumbhash?: string | null;
 }
 
 const PREFIX = "mirror/";
@@ -98,6 +100,7 @@ async function main() {
       width: item.width,
       height: item.height,
       placeholder: item.placeholder,
+      thumbhash: item.thumbhash ?? null,
       status: "CONFIRMED" as const,
       // In the live gallery's order: the timeline sorts by capture time.
       takenAt: new Date(eventDate.getTime() + 12 * 3_600_000 + index * 1000),
@@ -114,7 +117,10 @@ async function main() {
     Object.values(os.networkInterfaces())
       .flat()
       .find((address) => address?.family === "IPv4" && !address.internal)?.address ?? "127.0.0.1";
-  console.log(`${photos.length} photos → http://${host}:3000/g/${localToken}/${slug}`);
+  // Said out loud: a mirror without any blur measures flat tiles against flat tiles.
+  const blurred = photos.filter((item) => item.thumbhash).length;
+  console.log(`${photos.length} photos, ${blurred} with a blur`);
+  console.log(`http://${host}:3000/g/${localToken}/${slug}`);
 }
 
 main()

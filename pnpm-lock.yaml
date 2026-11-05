@@ -80,6 +80,9 @@ importers:
       server-only:
         specifier: ^0.0.1
         version: 0.0.1
+      thumbhash:
+        specifier: 0.1.1
+        version: 0.1.1
       vercel:
         specifier: ^59.1.4
         version: 59.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.11.3)(supports-color@7.2.0)
@@ -159,6 +162,9 @@ importers:
       prisma:
         specifier: ^7.9.1
         version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@20.19.43)
       tailwindcss:
         specifier: ^4
         version: 4.3.3
@@ -5158,6 +5164,9 @@ packages:
     resolution: {integrity: sha512-nt6AMGKW1p/70DF/hGBdJB57B8Tspmbp5gfJ8ilhLnt7kkr2ye7hzD6NVG8GGErk2HWF34igrL2CXmNIkzKqKw==}
     engines: {node: '>=18'}
 
+  thumbhash@0.1.1:
+    resolution: {integrity: sha512-kH5pKeIIBPQXAOni2AiY/Cu/NKdkFREdpH+TLdM0g6WA7RriCv0kPLgP731ady67MhTAqrVG/4mnEeibVuCJcg==}
+
   time-span@4.0.0:
     resolution: {integrity: sha512-MyqZCTGLDZ77u4k+jqg4UlrzPTPZ49NDlaekU6uuFaJLzPIN1woaRXCbGeqOfxwc3Y37ZROGAJ614Rdv7Olt+g==}
     engines: {node: '>=10'}
@@ -6095,8 +6104,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.3':
     optionalDependencies:
@@ -10216,7 +10224,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 20.19.43
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:
@@ -10432,6 +10439,8 @@ snapshots:
       - react-native-b4a
 
   throttleit@2.1.0: {}
+
+  thumbhash@0.1.1: {}
 
   time-span@4.0.0:
     dependencies:
