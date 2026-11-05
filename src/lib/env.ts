@@ -17,6 +17,8 @@ const schema = z.object({
   CRON_SECRET: z.string().min(1),
   // The wedding website's read API (docs/WEB-GALLERIES.md). Unset: it answers 404.
   WEB_API_SECRET: z.string().min(1).optional(),
+  // Where /admin/web reads the list of places. Unset: the production website.
+  WEBSITE_URL: z.url().optional(),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   // Background "download all" ZIP build (docs/TODO.md §7) — a free-tier

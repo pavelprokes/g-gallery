@@ -14,12 +14,15 @@ import { markGalleryPhotosChanged } from "@/lib/zip-build";
 export const WEB_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const WEB_SLUG_MAX = 120;
 
+/** A place on the website rather than a couple's page (src/lib/web-places.ts). */
+export const WEB_PLACE_PATTERN = /^misto-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 /** What one copy may take. R2 copies server side, four at a time, so this fits a Server Action. */
 export const WEB_COPY_MAX = 60;
 const COPY_CONCURRENCY = 4;
 
 /** Only the photographer's own finished photos: no guest uploads, no videos. */
-const PUBLIC_PHOTO = { status: "CONFIRMED", source: "OWNER", videoObjectKey: null } as const;
+export const PUBLIC_PHOTO = { status: "CONFIRMED", source: "OWNER", videoObjectKey: null } as const;
 
 /** Nothing about viewers, favourites or faces leaves through this API. */
 const PUBLIC_PHOTO_SELECT = {

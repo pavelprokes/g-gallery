@@ -24,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/admin/updates", label: "Aktivita", exact: false },
   { href: "/admin/promo", label: "Reklama", exact: false },
   { href: "/admin/reels", label: "Reels", exact: false },
+  { href: "/admin/web", label: "Web", exact: false },
 ];
 
 export function isNavActive(pathname: string, href: string, exact: boolean): boolean {
