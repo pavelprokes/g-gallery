@@ -25,6 +25,12 @@ import {
   updateEventFor,
   updateGalleryFor,
 } from "@/lib/gallery-admin";
+import {
+  WEB_COPY_MAX,
+  WEB_SLUG_MAX,
+  WEB_SLUG_PATTERN,
+  copyPhotosToWebGalleryFor,
+} from "@/lib/web-gallery";
 import { markGalleryPhotosChanged } from "@/lib/zip-build";
 
 // Server Actions are publicly reachable POST endpoints — every one of them
@@ -251,6 +257,14 @@ const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export async function trashGallery(galleryId: string) {
   const session = await requireAdmin();
+
+  // The website reads a web gallery live: trash would take its page down in 30
+  // days without a word. The admin hides the button; this is the real guard.
+  const inUse = await prisma.gallery.findFirst({
+    where: { id: galleryId, ownerId: session.user.id, webSlug: { not: null } },
+    select: { id: true },
+  });
+  if (inUse) throw new Error("WEB_GALLERY_IN_USE");
 
   const now = new Date();
   await prisma.$transaction([
@@ -545,6 +559,10 @@ const updateGallerySchema = z.object({
   title: z.string().min(1).max(200),
   eventDate: z.string().optional(),
   description: z.string().max(2000).optional(),
+  /** Absent leaves it alone, empty removes it. */
+  webSlug: z
+    .union([z.literal(""), z.string().max(WEB_SLUG_MAX).regex(WEB_SLUG_PATTERN)])
+    .optional(),
 });
 
 /**
@@ -563,18 +581,46 @@ export async function updateGallery(galleryId: string, formData: FormData) {
     title: formData.get("title"),
     eventDate: formData.get("eventDate") || undefined,
     description: formData.get("description") || undefined,
+    webSlug: formData.get("webSlug") ?? undefined,
   });
   // Same wholesale rule as updateEvent. Only the title: `description` is never
   // shown to a guest.
   const translations = readTranslationsFromForm(formData, { title: 200 });
   if (!parsed.success || !translations.success) throw new Error("INVALID_INPUT");
 
-  await updateGalleryFor(session.user.id, galleryId, {
-    title: parsed.data.title,
-    eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
-    description: parsed.data.description ?? null,
-    translations: translations.data as Prisma.InputJsonObject,
-  });
+  try {
+    await updateGalleryFor(session.user.id, galleryId, {
+      title: parsed.data.title,
+      eventDate: parsed.data.eventDate ? new Date(parsed.data.eventDate) : null,
+      description: parsed.data.description ?? null,
+      translations: translations.data as Prisma.InputJsonObject,
+      webSlug: parsed.data.webSlug === "" ? null : parsed.data.webSlug,
+    });
+  } catch (error) {
+    // Returned, not thrown: production hides a thrown message from the form.
+    if ((error as { code?: string }).code === "P2002") return { error: "WEB_SLUG_TAKEN" as const };
+    throw error;
+  }
+}
+
+const copyToWebSchema = z.object({
+  targetGalleryId: idSchema,
+  photoIds: z.array(idSchema).min(1).max(WEB_COPY_MAX),
+});
+
+/** Copies the selected photos into a web gallery (docs/WEB-GALLERIES.md). */
+export async function copyPhotosToWebGallery(targetGalleryId: string, photoIds: string[]) {
+  const session = await requireAdmin();
+  const parsed = copyToWebSchema.safeParse({ targetGalleryId, photoIds });
+  if (!parsed.success) throw new Error("INVALID_INPUT");
+
+  const result = await copyPhotosToWebGalleryFor(
+    session.user.id,
+    parsed.data.targetGalleryId,
+    parsed.data.photoIds,
+  );
+  revalidatePath(`/admin/g/${parsed.data.targetGalleryId}`);
+  return result;
 }
 
 const setGalleryCoverSchema = z.object({

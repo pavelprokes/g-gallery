@@ -92,7 +92,7 @@ export async function unpublishGalleryFor(ownerId: string, galleryId: string): P
 export async function updateGalleryFor(
   ownerId: string,
   galleryId: string,
-  fields: GalleryFields & { translations?: Prisma.InputJsonObject },
+  fields: GalleryFields & { translations?: Prisma.InputJsonObject; webSlug?: string | null },
 ): Promise<void> {
   const gallery = await prisma.gallery.findFirst({
     where: { id: galleryId, ownerId },
@@ -107,6 +107,7 @@ export async function updateGalleryFor(
       eventDate: fields.eventDate,
       description: fields.description ?? null,
       ...(fields.translations ? { translations: fields.translations } : {}),
+      ...(fields.webSlug !== undefined ? { webSlug: fields.webSlug } : {}),
     },
   });
 

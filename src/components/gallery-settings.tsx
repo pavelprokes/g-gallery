@@ -22,14 +22,17 @@ export function GallerySettings({
   eventDate,
   description,
   translations,
+  webSlug,
 }: {
   galleryId: string;
   title: string;
   eventDate: string | null;
   description: string | null;
   translations: ContentTranslations<"title">;
+  webSlug: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [slugTaken, setSlugTaken] = useState(false);
 
   if (!open) {
     return (
@@ -43,8 +46,9 @@ export function GallerySettings({
     <Card
       as="form"
       action={async (formData: FormData) => {
-        await updateGallery(galleryId, formData);
-        setOpen(false);
+        const result = await updateGallery(galleryId, formData);
+        setSlugTaken(result?.error === "WEB_SLUG_TAKEN");
+        if (!result) setOpen(false);
       }}
       className="flex flex-wrap items-end gap-3"
     >
@@ -65,6 +69,18 @@ export function GallerySettings({
           defaultValue={description ?? ""}
         />
       </div>
+      <div className="min-w-48 flex-1">
+        <Label htmlFor="gallery-web-slug">Adresa na webu</Label>
+        <Input
+          id="gallery-web-slug"
+          name="webSlug"
+          maxLength={120}
+          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          placeholder="eliska-a-martin-2026"
+          defaultValue={webSlug ?? ""}
+        />
+        {slugTaken && <Hint className="text-red-700">Tuhle adresu už má jiná galerie.</Hint>}
+      </div>
       <TranslationFields
         className="w-full"
         values={translations}
@@ -78,6 +94,7 @@ export function GallerySettings({
       </Button>
       <Hint className="w-full">
         Adresy odkazů se nezmění — jsou zamrazené od vytvoření, aby už rozeslané fungovaly dál.
+        Adresa na webu dělá z galerie webovou: publikovaná se ukáže v portfoliu pod touto adresou.
       </Hint>
     </Card>
   );

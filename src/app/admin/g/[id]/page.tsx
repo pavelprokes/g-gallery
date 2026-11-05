@@ -84,6 +84,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   // docs/CHAPTERS.md — the photos in the guests' order, where chapters are set.
   const timelineView = view.sort === "order";
 
+  const webGalleries = await prisma.gallery.findMany({
+    where: { ownerId: session.user.id, webSlug: { not: null }, trashedAt: null, id: { not: id } },
+    orderBy: { title: "asc" },
+    select: { id: true, title: true },
+  });
+
   const gallery = await prisma.gallery.findFirst({
     where: { id, ownerId: session.user.id },
     select: {
@@ -92,6 +98,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       eventDate: true,
       description: true,
       translations: true,
+      webSlug: true,
       status: true,
       trashedAt: true,
       eventId: true,
@@ -586,6 +593,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
               eventDate={gallery.eventDate?.toISOString().slice(0, 10) ?? null}
               description={gallery.description}
               translations={parseTranslations(gallery.translations, GALLERY_TRANSLATED_FIELDS)}
+              webSlug={gallery.webSlug}
             />
             {gallery.status === "DRAFT" && (
               <form action={publish}>
@@ -595,7 +603,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             {gallery.status === "PUBLISHED" && !gallery.trashedAt && (
               <UnpublishGalleryButton galleryId={gallery.id} />
             )}
-            {!gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />}
+            {gallery.webSlug ? (
+              <p className="text-admin-muted text-caption">
+                Na webu jako {gallery.webSlug}. Než ji smažete, adresu na webu odeberte.
+              </p>
+            ) : (
+              !gallery.trashedAt && <DeleteGalleryButton galleryId={gallery.id} />
+            )}
             {/* The page's one primary action, last so it sits top right. */}
             {guestUrl && <OpenGalleryLink href={guestUrl} />}
           </>
@@ -759,7 +773,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           <span className="pointer-coarse:hidden">, se Shiftem celý úsek</span>. Akce se objeví
           dole.
         </p>
-        <PhotoSelection galleryId={gallery.id} pinnedCount={pinnedCount} maxPinned={MAX_PINNED}>
+        <PhotoSelection
+          galleryId={gallery.id}
+          pinnedCount={pinnedCount}
+          maxPinned={MAX_PINNED}
+          webGalleries={webGalleries}
+        >
           <ul className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
             {timelineView
               ? segments.map((segment) => {
