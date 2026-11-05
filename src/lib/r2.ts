@@ -169,6 +169,22 @@ function decodeXmlText(value: string): string {
     .replaceAll("&amp;", "&");
 }
 
+/**
+ * Server-side copy within the bucket: no bytes through this process. Metadata,
+ * `Cache-Control` included, comes along. S3 can answer 200 with an error in the body.
+ */
+export async function copyObject(fromKey: string, toKey: string): Promise<void> {
+  const encodedFrom = fromKey.split("/").map(encodeURIComponent).join("/");
+  const response = await r2Client().fetch(objectUrl(toKey), {
+    method: "PUT",
+    headers: { "x-amz-copy-source": `/${serverEnv().R2_BUCKET}/${encodedFrom}` },
+  });
+  const body = await response.text();
+  if (!response.ok || body.includes("<Error>")) {
+    throw new Error(`R2 copy failed for ${fromKey}: ${response.status}`);
+  }
+}
+
 /** Delete an object (gallery cleanup / reconciliation of orphans). */
 export async function deleteObject(key: string): Promise<void> {
   const response = await r2Client().fetch(objectUrl(key), { method: "DELETE" });

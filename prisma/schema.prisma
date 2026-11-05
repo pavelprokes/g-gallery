@@ -221,6 +221,9 @@ model Gallery {
   /// it is the portrait. SetNull, never Cascade: deleting the chosen photo must
   /// leave the gallery alone and drop it back to the newest-first fallback,
   /// which is also why the dangling-id case cannot happen at all.
+  /// The website page this gallery feeds, the portfolio uid there
+  /// (docs/WEB-GALLERIES.md). Null for every client gallery.
+  webSlug           String?       @unique
   coverPhotoId      String?
   coverPhoto        Photo?        @relation("GalleryCover", fields: [coverPhotoId], references: [id], onDelete: SetNull)
   /// The film shown as a large card above the highlights (docs/VIDEO.md

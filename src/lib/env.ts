@@ -15,6 +15,8 @@ const schema = z.object({
   // "auto" for R2; the local MinIO stand-in signs against a real region name.
   S3_REGION: z.string().min(1).default("auto"),
   CRON_SECRET: z.string().min(1),
+  // The wedding website's read API (docs/WEB-GALLERIES.md). Unset: it answers 404.
+  WEB_API_SECRET: z.string().min(1).optional(),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   // Background "download all" ZIP build (docs/TODO.md §7) — a free-tier

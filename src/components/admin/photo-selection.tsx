@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { deletePhotos, setGalleryCover } from "@/app/admin/actions";
+import { copyPhotosToWebGallery, deletePhotos, setGalleryCover } from "@/app/admin/actions";
 import { setHighlightPin } from "@/app/admin/highlight-actions";
 import { Button } from "@/components/ui/button";
 import { FORMS, pluralize } from "@/lib/czech-plural";
+
+/** WEB_COPY_MAX in src/lib/web-gallery.ts, which is server-only. */
+const WEB_COPY_LIMIT = 60;
 
 /** What a tile's checkbox carries, so the bar can word its actions. */
 interface Picked {
@@ -41,11 +44,14 @@ export function PhotoSelection({
   galleryId,
   pinnedCount,
   maxPinned,
+  webGalleries = [],
   children,
 }: {
   galleryId: string;
   pinnedCount: number;
   maxPinned: number;
+  /** Where the selection can be copied (docs/WEB-GALLERIES.md). */
+  webGalleries?: { id: string; title: string }[];
   children: ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -53,6 +59,8 @@ export function PhotoSelection({
   const lastClicked = useRef<string | null>(null);
   const [picked, setPicked] = useState<Picked[]>([]);
   const [pending, startTransition] = useTransition();
+  const [webTarget, setWebTarget] = useState("");
+  const [copyResult, setCopyResult] = useState<string | null>(null);
 
   const sync = () => rootRef.current && setPicked(readPicked(rootRef.current));
   const clear = () => {
@@ -122,6 +130,11 @@ export function PhotoSelection({
       <p className="sr-only" aria-live="polite">
         {picked.length > 0 ? `Vybráno: ${pluralize(picked.length, FORMS.photo)}` : ""}
       </p>
+      {copyResult && picked.length === 0 && (
+        <p role="status" className="text-admin-muted text-caption mt-3">
+          {copyResult}
+        </p>
+      )}
 
       {picked.length > 0 && (
         <div
@@ -175,6 +188,48 @@ export function PhotoSelection({
                         : "Připnout do výběru"}
                 </Button>
               ))}
+            {webGalleries.length > 0 && (
+              <>
+                <select
+                  aria-label="Webová galerie"
+                  className="border-admin-border h-10 max-w-56 rounded border bg-white px-2 text-sm"
+                  value={webTarget}
+                  onChange={(event) => setWebTarget(event.target.value)}
+                >
+                  <option value="">Webová galerie…</option>
+                  {webGalleries.map((gallery) => (
+                    <option key={gallery.id} value={gallery.id}>
+                      {gallery.title}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  disabled={pending || !webTarget || picked.length > WEB_COPY_LIMIT}
+                  onClick={() =>
+                    run(async () => {
+                      const { copied, skipped, failed } = await copyPhotosToWebGallery(
+                        webTarget,
+                        picked.map((photo) => photo.id),
+                      );
+                      setCopyResult(
+                        `Zkopírováno na web: ${pluralize(copied, FORMS.photo)}` +
+                          (skipped > 0 ? `, přeskočeno: ${pluralize(skipped, FORMS.photo)}` : "") +
+                          (failed > 0 ? `, nepovedlo se: ${pluralize(failed, FORMS.photo)}` : ""),
+                      );
+                    })
+                  }
+                >
+                  Kopírovat na web
+                </Button>
+                {picked.length > WEB_COPY_LIMIT && (
+                  <p className="text-admin-muted text-xs">
+                    Najednou nejvýš {WEB_COPY_LIMIT} fotek.
+                  </p>
+                )}
+              </>
+            )}
             <Button
               variant="destructive"
               size="lg"

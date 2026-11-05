@@ -114,6 +114,7 @@ export default async function AdminPage() {
         id: true,
         title: true,
         status: true,
+        webSlug: true,
         eventDate: true,
         createdAt: true,
         event: { select: { eventDate: true } },
@@ -307,6 +308,7 @@ export default async function AdminPage() {
                   {gallery.status !== "PUBLISHED" && (
                     <Badge tone={status.tone}>{status.label}</Badge>
                   )}
+                  {gallery.webSlug && <Badge>Web</Badge>}
                   <span>
                     {[
                       pluralize(gallery._count.photos, FORMS.photo),
