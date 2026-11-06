@@ -14,6 +14,17 @@ in the website's CMS; this repo owns the photos, their order and the cover.
   `galleries/`, and the lifecycle pass only records it. A CDN miss then pays the IA read, on about
   12 MB a photo, and every cached transformation does not.
 
+## Places
+
+The same mechanism fills fixed places on the website: the homepage, the pricing pages, the shared
+page templates. A place's key is a `webSlug` starting with `misto-`, one gallery per place. The
+website owns the list and serves it at `/api/photo-places`; `/admin/web` reads it, so a new place
+needs no change here.
+
+Position decides what a photo does, and `coverFirst` gives the cover the first position: the
+homepage hero is the gallery's cover. A position with no usable photo, or with a portrait where only
+landscape works, keeps the website's old photo. `/admin/web` warns about both.
+
 ## API
 
 `GET /api/web/galleries` and `GET /api/web/galleries/{slug}`, with
