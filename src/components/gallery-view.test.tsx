@@ -199,7 +199,7 @@ describe("PhotoTile and the screen gate", () => {
     faces: null,
     focus: null,
   };
-  const tile = (gate: ScreenGate, onScreen: boolean, screenClear: boolean) => (
+  const tile = (gate: ScreenGate, onScreen: boolean, mayFetch: boolean) => (
     <PhotoTile
       photo={photo}
       // No browser-made thumbnail: the tile and its fallback are one image.
@@ -209,9 +209,10 @@ describe("PhotoTile and the screen gate", () => {
       height={120}
       index={0}
       priority={false}
+      row={0}
       onScreen={onScreen}
       screenGate={gate}
-      screenClear={screenClear}
+      mayFetch={mayFetch}
       tabbable
       selectionActive={false}
       selected={false}
@@ -236,22 +237,50 @@ describe("PhotoTile and the screen gate", () => {
 
   it("on screen, holds the gate until its image fails for good — once, with no thumbnail", () => {
     const gate = createScreenGate();
-    const { container } = render(tile(gate, true, false));
+    const { container } = render(tile(gate, true, true));
     gate.open();
-    expect(gate.isClear()).toBe(false);
+    expect(gate.turn()).toBe(0);
     // The same image is all there is to fall back to: one error is final.
     fireEvent.error(container.querySelector("img")!);
-    expect(gate.isClear()).toBe(true);
+    expect(gate.turn()).toBe(Infinity);
   });
 
-  it("on screen, lets the gate go after a while if its image never answers", () => {
+  it("on screen, waits for its turn before asking, and then the deadline starts", () => {
     vi.useFakeTimers();
     const gate = createScreenGate();
-    render(tile(gate, true, false));
+    const { container, rerender } = render(tile(gate, true, false));
     gate.open();
-    vi.advanceTimersByTime(15_000);
-    expect(gate.isClear()).toBe(true);
+    expect(container.querySelector("img")).toBeNull();
+    // Waiting its turn is not stalling: however long the rows above take…
+    vi.advanceTimersByTime(60_000);
+    expect(gate.turn()).toBe(0);
+    rerender(tile(gate, true, true));
+    expect(container.querySelector("img")).not.toBeNull();
+    vi.advanceTimersByTime(14_999);
+    expect(gate.turn()).toBe(0);
+    // …a request that never answers lets the rest go, and keeps trying.
+    vi.advanceTimersByTime(1);
+    expect(gate.turn()).toBe(Infinity);
+    rerender(tile(gate, true, false));
+    expect(container.querySelector("img")).not.toBeNull();
     vi.useRealTimers();
+  });
+
+  it("on screen, a download on its way stays when the gate shuts; off screen, it goes", () => {
+    const gate = createScreenGate();
+    gate.open();
+    // An overscan row fetching while the gate is clear…
+    const { container, rerender } = render(tile(gate, false, true));
+    expect(container.querySelector("img")).not.toBeNull();
+    // …scrolled into view keeps what has arrived, though it is not its turn…
+    rerender(tile(gate, true, false));
+    expect(container.querySelector("img")).not.toBeNull();
+    // …and, undrawn and scrolled away again with the gate shut, lets it go.
+    rerender(tile(gate, false, false));
+    expect(container.querySelector("img")).toBeNull();
+    // Back on screen it waits its turn like any other.
+    rerender(tile(gate, true, false));
+    expect(container.querySelector("img")).toBeNull();
   });
 
   it("off screen, fetches only while the gate is clear, and keeps what has drawn", () => {

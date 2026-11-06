@@ -1,3 +1,4 @@
+import type { Route } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
@@ -46,6 +47,56 @@ test.describe("share gallery viewer", () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThan(0);
     expect(box!.height).toBeGreaterThan(0);
+  });
+
+  test("the rows on screen fetch from the top, one once the row above has drawn", async ({
+    page,
+  }) => {
+    // docs/GALLERY-LOADING.md: every image is held until this test lets it go.
+    const pixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      "base64",
+    );
+    const held: Route[] = [];
+    await page.route(/\/photo-\d+\.jpg/, (route) => {
+      held.push(route);
+    });
+    await page.goto(`/g/${seed.token}/${seed.slug}`, { waitUntil: "domcontentloaded" });
+    const tiles = page
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]');
+    await expect.poll(async () => tiles.count()).toBe(seed.photoCount);
+
+    const positions = () =>
+      tiles.evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return {
+            top: Math.round(box.top),
+            onScreen: box.top < innerHeight && box.bottom > 0,
+            image: button.querySelector("img") !== null,
+          };
+        }),
+      );
+    const atStart = await positions();
+    const rows = [...new Set(atStart.filter((tile) => tile.onScreen).map((tile) => tile.top))].sort(
+      (a, b) => a - b,
+    );
+    expect(rows.length).toBeGreaterThan(1);
+
+    for (const [index, top] of rows.entries()) {
+      const inRow = atStart.filter((tile) => tile.top === top).length;
+      await expect.poll(() => held.length).toBe(inRow);
+      const now = await positions();
+      // This row is on its way, and no row below it has even asked.
+      expect(now.filter((tile) => tile.top === top).every((tile) => tile.image)).toBe(true);
+      expect(
+        now.filter((tile) => tile.top > top).some((tile) => tile.image),
+        `below row ${index + 1}`,
+      ).toBe(false);
+      for (const route of held.splice(0))
+        await route.fulfill({ contentType: "image/png", body: pixel });
+    }
   });
 
   test("a tile shows the photo blurred before it arrives, or its colour", async ({ page }) => {
