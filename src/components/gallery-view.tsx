@@ -2276,15 +2276,18 @@ function GalleryViewInner({
   const [screenGate] = useState(createScreenGate);
   // A row behind the chapter bar is not on screen: a chapter's link lands with
   // the chapter before's last row there, and it must not go ahead of the chapter.
-  const coveredTo = (rowVirtualizer.scrollOffset ?? 0) + (showChapters ? CHAPTER_BAR_HEIGHT : 0);
+  const coveredTo =
+    (rowVirtualizer.scrollOffset ?? 0) +
+    (showChapters && !selectionActive ? CHAPTER_BAR_HEIGHT : 0);
   // Opened after the first rows' effects have registered the tiles on screen
   // (children's effects run first), so no first render lets every tile through.
   // A row of photos, not the "loading more" placeholder the virtualizer also
-  // renders before the grid has its width.
+  // renders before the grid has its width. Not behind a photo's link: its clock
+  // would walk the turn down the screen with nothing asked for.
   const gridLaidOut = virtualRows.some((virtualRow) => rows[virtualRow.index] !== undefined);
   useEffect(() => {
-    if (gridLaidOut) screenGate.open();
-  }, [gridLaidOut, screenGate]);
+    if (gridLaidOut && !imagesHeld) screenGate.open();
+  }, [gridLaidOut, imagesHeld, screenGate]);
 
   /**
    * The chapter being read: the last header at or above the row under the

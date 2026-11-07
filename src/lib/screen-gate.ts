@@ -20,7 +20,7 @@ export interface ScreenGate {
 
 /** A row back this soon leaves no order to see: the rest of the screen goes with it. */
 const QUICK_ROW_MS = 1_000;
-/** Nothing drawn for this long is a stalled request: the next row goes beside it. */
+/** Nothing drawn for this long: the next row goes beside it. A real stall would leave rows blank, a false one on 3G only risks their order. */
 const STALLED_MS = 5_000;
 
 export function createScreenGate(): ScreenGate {

@@ -130,6 +130,32 @@ test.describe("photo links", () => {
     await expect.poll(() => log.filter((e) => e.file !== fileOf(far)).length).toBeGreaterThan(0);
   });
 
+  test("the screen behind a photo's link fetches from the top once it is closed", async ({
+    page,
+  }) => {
+    // docs/GALLERY-LOADING.md: the gate's 5 s clock must not run while nothing is asked for.
+    await page.route(/chapter-photo-\d+\.jpg/, () => {});
+    await page.goto(`${gallery}?foto=${near.id}`, { waitUntil: "domcontentloaded" });
+    await opened(page);
+    await page.waitForTimeout(5_500);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+
+    const onScreen = () =>
+      page.locator('main button[aria-label^="Otevřít"]').evaluateAll((tiles) => {
+        const shown = tiles
+          .map((tile) => ({ tile, box: tile.getBoundingClientRect() }))
+          .filter(({ box }) => box.top < innerHeight && box.bottom > 0);
+        const rowsOf = (of: typeof shown) => new Set(of.map(({ box }) => Math.round(box.top))).size;
+        return {
+          rows: rowsOf(shown),
+          asked: rowsOf(shown.filter(({ tile }) => tile.querySelector("img") !== null)),
+        };
+      });
+    await expect.poll(onScreen).toMatchObject({ asked: 1 });
+    expect((await onScreen()).rows).toBeGreaterThan(1);
+  });
+
   test("with another chapter's anchor, the photo wins and Back lands on it", async ({ page }) => {
     await page.goto(`${gallery}?foto=${far.id}#${anchors[1]}`);
     await opened(page);

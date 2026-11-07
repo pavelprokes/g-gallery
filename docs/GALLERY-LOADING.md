@@ -187,9 +187,13 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
     an order that takes under a second, and on a fast link each row would only add a round trip with
     the link idle. It also fires when a row scrolls off screen unfinished, so a fast scroll fetches
     the screen in parallel, as it did before;
-  - nothing drawn for 5 s (`STALLED_MS`) is a stalled request, not a slow link: the next row goes
-    beside it, and on down every 5 s. Any tile drawing counts as progress. A tile stops holding
-    anything back 15 s after asking for its image (`SCREEN_WAIT_MS`) and keeps its request;
+  - nothing drawn for 5 s (`STALLED_MS`): the next row goes beside it, and on down every 5 s. A real
+    stall leaves rows blank and a false one only risks the order, so it is short: 3G does go up to 8 s
+    between two draws on a desktop's first row, and the order still held (0 wrong-way pairs in eight
+    runs on the final code). Any tile joining, leaving or drawing restarts the clock, and the 15 s
+    bounds that: a tile stops holding anything back 15 s after asking for its image
+    (`SCREEN_WAIT_MS`) and keeps its request. Behind a photo's link the gate opens only when that
+    lightbox closes, so the clock has not walked down a screen nothing was asked for on;
   - a row wholly under the chapter bar is not on screen: a `#chapter` link lands with the row above
     the chapter behind the bar, and it must not go first;
   - tiles on screen are `loading="eager"`. The turn has already decided that they go, and a lazy image
@@ -197,9 +201,9 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   - the overscan is not ordered: nobody sees its order, and ordering it would only delay it;
   - a row, not a tile. One tile at a time, on the live link at 3G with the requests held back in the
     browser, took 31.7 → 38.7 s on a desktop's screen, a round trip per tile.
-  - ponytail: a highlight's jump centres its tile, which then waits for the rows above it on that
-    screen like any other. Giving the target its own turn is a second path through the gate; add it
-    if a jump on a slow link is seen waiting.
+  - ponytail: a highlight's jump and the arrow keys centre a tile, which then waits for the rows above
+    it on that screen like any other. Giving the target its own turn is a second path through the
+    gate; add it if a jump on a slow link is seen waiting.
 
   Measured with main against this, local builds of Alice a Martin, A-B-B-A, two runs per build (3G /
   Slow 4G). Of the pairs of tiles in different rows, those drawn the wrong way round: 2–50 % / 11–59
