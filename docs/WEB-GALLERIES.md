@@ -42,6 +42,15 @@ A real link would be a nullable column on the web gallery, if that happens in pr
 page in the website's portfolio (Prismic owns those), and a draft shows nothing there. Some galleries
 are not for the website; there is nothing to mark them with, so "Další návrhy" pages past them.
 
+## Visit numbers
+
+Beside each published portfolio gallery, `/admin/web` shows the website's own analytics for 90 days:
+visits of the album, visits that opened a photo, and views of its photos. The website owns them and
+answers `GET /api/photo-stats` with totals by uid, behind `PHOTO_STATS_TOKEN` there and
+`WEBSITE_STATS_TOKEN` here (the same value). Without a token, or if it does not answer, the page
+simply shows no numbers. **Places have none:** the website's analytics only cover portfolio pages,
+and a place's page has only Umami's views, which nothing here can read yet.
+
 ## API
 
 `GET /api/web/galleries` and `GET /api/web/galleries/{slug}`, with

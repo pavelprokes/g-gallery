@@ -19,6 +19,8 @@ const schema = z.object({
   WEB_API_SECRET: z.string().min(1).optional(),
   // Where /admin/web reads the list of places. Unset: the production website.
   WEBSITE_URL: z.url().optional(),
+  // Reads the website's visit numbers for /admin/web. Unset: no numbers shown.
+  WEBSITE_STATS_TOKEN: z.string().min(1).optional(),
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   // Background "download all" ZIP build (docs/TODO.md §7) — a free-tier

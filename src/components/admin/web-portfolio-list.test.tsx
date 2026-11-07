@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/admin/cover-thumb", () => ({ CoverThumb: () => null }));
 
+import type { WebStats } from "@/lib/web-places";
 import { WebPortfolioList } from "./web-portfolio-list";
 
 const gallery = (status: string) => ({
@@ -14,8 +15,14 @@ const gallery = (status: string) => ({
   photos: [],
   _count: { photos: 12 },
 });
-const list = (status: string) =>
-  render(<WebPortfolioList galleries={[gallery(status)]} websiteBase="https://web.example" />);
+const list = (status: string, stats: WebStats | null = null) =>
+  render(
+    <WebPortfolioList
+      galleries={[gallery(status)]}
+      websiteBase="https://web.example"
+      stats={stats}
+    />,
+  );
 
 describe("WebPortfolioList", () => {
   it("links a published gallery's title and a button to its page, the gallery as main", () => {
@@ -38,5 +45,20 @@ describe("WebPortfolioList", () => {
     expect(screen.queryByRole("link", { name: "Web: Eliška a Martin" })).toBeNull();
     expect(screen.getByText("Koncept")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Otevřít galerii" })).toBeInTheDocument();
+  });
+
+  it("shows the website's numbers beside a page, and nothing without them", () => {
+    const { unmount } = list("PUBLISHED", {
+      indexViews: 40,
+      galleries: [{ uid: "eliska-a-martin-2026", albumVisits: 12, photoOpens: 5, photoViews: 31 }],
+    });
+    expect(screen.getByText("12 návštěv alba")).toBeInTheDocument();
+    expect(screen.getByText(/fotku otevřelo 5/)).toBeInTheDocument();
+    expect(screen.getByText(/31 zobrazení fotek za 90 dní/)).toBeInTheDocument();
+    expect(screen.getByText(/40 zobrazení za 90 dní/)).toBeInTheDocument();
+    unmount();
+
+    list("PUBLISHED");
+    expect(screen.queryByText(/za 90 dní/)).toBeNull();
   });
 });

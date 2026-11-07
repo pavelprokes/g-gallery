@@ -60,6 +60,42 @@ export async function fetchWebPlaces(): Promise<WebPlace[] | null> {
   }
 }
 
+const statsSchema = z.object({
+  indexViews: z.number(),
+  galleries: z.array(
+    z.object({
+      uid: z.string(),
+      albumVisits: z.number(),
+      photoOpens: z.number(),
+      photoViews: z.number(),
+    }),
+  ),
+});
+
+export type WebStats = z.infer<typeof statsSchema>;
+
+/**
+ * How often each portfolio page's album and photos were opened in the last 90 days. The website
+ * owns these numbers (its own analytics). Null, and no numbers on the page, without a token or when
+ * it does not answer: they must not cost the page.
+ */
+export async function fetchWebStats(): Promise<WebStats | null> {
+  const token = serverEnv().WEBSITE_STATS_TOKEN;
+  if (!token) return null;
+  try {
+    const response = await fetch(`${websiteBase()}/api/photo-stats?range=90`, {
+      headers: { authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    return statsSchema.parse(await response.json());
+  } catch (error) {
+    console.error("[web-places] Cannot read the website's stats:", error);
+    return null;
+  }
+}
+
 /** The galleries filling these places, with the photos a place could use. */
 export async function placeGalleriesFor(
   ownerId: string,
