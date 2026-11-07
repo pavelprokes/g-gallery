@@ -74,6 +74,38 @@ test("gallery page: status in Czech, never the raw enum", async ({ page }) => {
   await expect(page.getByText("PUBLISHED")).toHaveCount(0);
 });
 
+test("the overview opens on tiles, and rows stay chosen for the session", async ({ page }) => {
+  await page.goto("/admin");
+  const tiles = page.getByRole("button", { name: "Dlaždice" });
+  const rows = page.getByRole("button", { name: "Řádky" });
+  const firstTitle = page.locator("main ul > li").first().locator("a[href^='/admin/']").first();
+  const widthOfCover = () =>
+    page
+      .locator("main ul > li")
+      .first()
+      .locator("div")
+      .first()
+      .evaluate((cover) => cover.getBoundingClientRect().width);
+  await expect(tiles).toHaveAttribute("aria-pressed", "true");
+  await expect(firstTitle).toBeVisible();
+  expect(await widthOfCover()).toBeGreaterThan(120);
+
+  await rows.click();
+  await expect(rows).toHaveAttribute("aria-pressed", "true");
+  expect(await widthOfCover()).toBe(64);
+  // A line between rows, none under the last.
+  const bottomBorder = (item: ReturnType<typeof page.locator>) =>
+    item.evaluate((li) => getComputedStyle(li).borderBottomWidth);
+  const items = page.locator("main ul").first().locator(":scope > li");
+  expect(await bottomBorder(items.first())).toBe("1px");
+  expect(await bottomBorder(items.last())).toBe("0px");
+
+  await page.reload();
+  await expect(rows).toHaveAttribute("aria-pressed", "true");
+  expect(await widthOfCover()).toBe(64);
+  await expect(firstTitle).toBeVisible();
+});
+
 test("copying to the web counts the photos, and says when it is done and where they went", async ({
   page,
 }) => {

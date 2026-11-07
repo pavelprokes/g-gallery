@@ -24,17 +24,29 @@ export interface AdminCover {
   placeholder: string | null;
 }
 
+const LAYOUTS = {
+  row: { box: "size-16 rounded-lg border", sizes: "64px" },
+  /** Fills its column, for judging the photo: the widths the admin grid already uses. */
+  tile: { box: "aspect-[3/2] w-full rounded-lg border", sizes: "(max-width: 640px) 50vw, 280px" },
+  /** The top of a tile, or a row's thumbnail under `rows:` (AdminListView). `sizes` cannot follow
+   * a CSS switch. 192px lands on the 384px variant at 2×: still no new billable width. */
+  switchable: {
+    box: "aspect-[3/2] w-full border-b rows:aspect-square rows:w-16 rows:rounded-lg rows:border",
+    sizes: "192px",
+  },
+} as const;
+
 export function CoverThumb({
   cover,
-  big = false,
+  layout = "row",
 }: {
   cover: AdminCover | null;
-  /** Fills its column, for a tile you judge the photo by: same widths as the admin grid. */
-  big?: boolean;
+  layout?: keyof typeof LAYOUTS;
 }) {
+  const { box, sizes } = LAYOUTS[layout];
   return (
     <div
-      className={`border-admin-border bg-admin-surface-muted relative shrink-0 overflow-hidden rounded-lg border ${big ? "aspect-[3/2] w-full" : "size-16"}`}
+      className={`border-admin-border bg-admin-surface-muted relative shrink-0 overflow-hidden ${box}`}
       style={cover?.placeholder ? { backgroundColor: cover.placeholder } : undefined}
     >
       {cover ? (
@@ -43,7 +55,7 @@ export function CoverThumb({
           alt=""
           objectKey={cover.objectKey}
           thumbObjectKey={cover.thumbObjectKey}
-          sizes={big ? "(max-width: 640px) 50vw, 280px" : "64px"}
+          sizes={sizes}
         />
       ) : (
         <svg

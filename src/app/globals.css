@@ -130,6 +130,9 @@
   }
 }
 
+/* The admin overview's lists shown as rows (AdminListView); tiles are the default. */
+@custom-variant rows (&:where([data-view="rows"] *));
+
 /*
  * Guest-facing brand font (Bitter, set via next/font in src/lib/fonts.ts). Intentionally NOT
  * wired into Tailwind's --font-sans — the admin portal keeps the system sans-serif stack. A
