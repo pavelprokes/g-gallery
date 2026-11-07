@@ -96,15 +96,39 @@ test("photos dropped anywhere on the gallery's page upload there", async ({ page
   }, ONE_PIXEL_JPEG_BASE64);
   const hint = page.getByText("Pusť fotky, nahraju je do téhle galerie");
   await expect(hint).toBeHidden();
-  await photos.dispatchEvent("dragenter", { dataTransfer });
-  await expect(hint).toBeVisible();
   await photos.dispatchEvent("dragover", { dataTransfer });
+  await expect(hint).toBeVisible();
   await photos.dispatchEvent("drop", { dataTransfer });
   await expect(hint).toBeHidden();
 
   await expect(page.getByRole("checkbox", { name: "Vybrat upustena.jpg" })).toBeAttached({
     timeout: 15_000,
   });
+});
+
+test("a drag that starts on the page is not an upload", async ({ page }) => {
+  // An image dragged off a tile carries "Files" too. Synthetic: Playwright's real
+  // mouse drag drops that type from its `dragover`, so it cannot show this.
+  await page.goto(`/admin/g/${seed.uploadGalleryIds[test.info().project.name]}`);
+  const photos = page.getByRole("heading", { name: /^Fotky/ });
+  await expect(photos).toBeVisible();
+  const dataTransfer = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["x"], "nahled.jpg", { type: "image/jpeg" }));
+    return transfer;
+  });
+  const hint = page.getByText("Pusť fotky, nahraju je do téhle galerie");
+
+  await photos.dispatchEvent("dragstart", { dataTransfer });
+  await photos.dispatchEvent("dragover", { dataTransfer });
+  await page.waitForTimeout(100);
+  // Now, not eventually: the hint goes by itself half a second after the last `dragover`.
+  expect(await hint.count()).toBe(0);
+
+  // That drag over, a file from outside counts again.
+  await photos.dispatchEvent("dragend", { dataTransfer });
+  await photos.dispatchEvent("dragover", { dataTransfer });
+  await expect(hint).toBeVisible();
 });
 
 test("the panels sit under the photos, a jump away", async ({ page }) => {

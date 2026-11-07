@@ -794,7 +794,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         )}
       </section>
 
-      <div id="odkazy" className="scroll-mt-4">
+      <div id="odkazy" className="scroll-mt-20">
         <ShareLinkPanel
           galleryId={gallery.id}
           shareLinks={shareLinks}
@@ -803,7 +803,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         />
       </div>
 
-      <div id="reklama" className="scroll-mt-4">
+      <div id="reklama" className="scroll-mt-20">
         <GalleryPromoPanel
           galleryId={gallery.id}
           photoCount={gallery.photos.length}
@@ -819,7 +819,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         />
       </div>
 
-      <div id="poradi" className="scroll-mt-4">
+      <div id="poradi" className="scroll-mt-20">
         <GalleryPhotoOrderPanel
           galleryId={gallery.id}
           order={order}
@@ -832,7 +832,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         />
       </div>
 
-      <div id="kapitoly" className="scroll-mt-4">
+      <div id="kapitoly" className="scroll-mt-20">
         <GalleryChapterPanel
           chapters={adminChapters}
           shareUrl={guestUrl}
@@ -841,7 +841,7 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         />
       </div>
 
-      <div id="vyber" className="scroll-mt-4">
+      <div id="vyber" className="scroll-mt-20">
         <GalleryHighlightPanel
           galleryId={gallery.id}
           enabled={gallery.highlightsEnabled}
