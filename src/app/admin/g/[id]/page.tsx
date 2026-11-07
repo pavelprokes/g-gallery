@@ -482,7 +482,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             )}
             {photo.videoObjectKey && (
               <span className="text-caption absolute right-9 bottom-1 rounded-full bg-black/60 px-2 py-0.5 font-semibold text-white tabular-nums pointer-coarse:right-12">
-                ▶ Video{photo.durationMs ? ` · ${formatDuration(photo.durationMs)}` : ""}
+                ▶<span className="pointer-coarse:hidden"> Video</span>
+                {photo.durationMs ? ` · ${formatDuration(photo.durationMs)}` : ""}
               </span>
             )}
             {inHighlights && (
@@ -694,14 +695,12 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
                   : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
               </p>
             )}
-            {arranging ? (
-              <a
-                href={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: "order" })}`}
-                className={buttonClasses("primary", "md")}
-              >
-                Hotovo
+            {arranging && order !== "MANUAL" && (
+              <a href={`/admin/g/${gallery.id}`} className={buttonClasses("secondary", "md")}>
+                Zpět na fotky
               </a>
-            ) : (
+            )}
+            {!arranging && gallery.photos.length > 0 && (
               <a
                 href={`/admin/g/${gallery.id}?arrange=1`}
                 className={buttonClasses("secondary", "md")}
@@ -715,8 +714,8 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           <div className="mt-3 space-y-3">
             <Alert tone="info">
               {gallery.manualOrderAt
-                ? "Galerie teď ukazuje jiné řazení. Ruční pořadí, které jsi tu dřív nastavil, je uložené — po přepnutí se k němu vrátíš a hosté ho hned uvidí."
-                : "Galerie se teď řadí automaticky. Po přepnutí na ruční pořadí začneš od toho současného a fotky přetáhneš, kam patří."}
+                ? "Galerie teď ukazuje jiné řazení. Ruční pořadí, které jsi tu dřív nastavil, je uložené — po přepnutí se vrátí, nové fotky budou na konci."
+                : "Galerie se teď řadí automaticky. Po přepnutí na ruční pořadí začneš od toho současného a fotky pak přetahuješ, kam patří. Nové fotky se přidají na konec."}
             </Alert>
             <form action={setPhotoOrder.bind(null, gallery.id, "MANUAL")}>
               <Button type="submit" size="lg">
@@ -725,12 +724,14 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
             </form>
           </div>
         )}
-        {arranging && order === "MANUAL" && (
+        {arranging && order === "MANUAL" && timeline.length === 0 && (
+          <Alert className="mt-3">Galerie zatím nemá žádné fotky.</Alert>
+        )}
+        {arranging && order === "MANUAL" && timeline.length > 0 && (
           <div className="mt-3">
-            {/* A new key after an upload: the board keeps its own copy of the order. */}
             <ManualOrderBoard
-              key={timeline.length}
               galleryId={gallery.id}
+              doneHref={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: "order" })}`}
               photos={timeline.map((photo) => ({
                 id: photo.id,
                 objectKey: photo.objectKey,

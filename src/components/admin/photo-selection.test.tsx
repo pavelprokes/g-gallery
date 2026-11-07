@@ -31,6 +31,21 @@ const pick = (index: number) => fireEvent.click(screen.getByLabelText(`fotka ${i
 
 beforeEach(() => vi.clearAllMocks());
 
+describe("Escape", () => {
+  it("clears the selection, but not while a dialog has it", () => {
+    setup();
+    pick(0);
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.setAttribute("open", "");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("toolbar")).toHaveTextContent("Vybráno: 1 fotka");
+
+    dialog.remove();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+});
+
 describe("copying the selection to a web gallery", () => {
   it("offers nothing when there is no web gallery", () => {
     setup(2, []);

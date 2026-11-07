@@ -153,8 +153,23 @@ test("a photo opens large and the others page on from it", async ({ page }) => {
   // Nothing before the first.
   await expect(dialog.getByRole("button", { name: "Předchozí fotka" })).toHaveCount(0);
 
+  // The ‹ went away under the pointer, so the focus left the dialog: the keys still page.
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByText("2 / 6")).toBeVisible();
+
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+
+  // Esc closes the photo and leaves a selection alone.
+  await page
+    .getByRole("checkbox", { name: /^Vybrat kopie_/ })
+    .first()
+    .dispatchEvent("click");
+  await open.first().dispatchEvent("click");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("toolbar")).toContainText("Vybráno: 1 fotka");
 });
 
 test("the panels sit under the photos, a jump away", async ({ page }) => {
