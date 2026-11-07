@@ -18,23 +18,44 @@ export interface ScreenGate {
   open: () => void;
 }
 
+/** A row back this soon leaves no order to see: the rest of the screen goes with it. */
+const QUICK_ROW_MS = 1_000;
+/** Nothing drawn for this long is a stalled request: the next row goes beside it. */
+const STALLED_MS = 5_000;
+
 export function createScreenGate(): ScreenGate {
   const waiting = new Map<string, number>();
   const listeners = new Set<() => void>();
   let opened = false;
   let turn = -1;
+  let turnedAt = 0;
+  let stall: ReturnType<typeof setTimeout> | undefined;
+
+  const moveTo = (next: number) => {
+    if (next === turn) return;
+    turn = next;
+    turnedAt = Date.now();
+    for (const listener of listeners) listener();
+  };
   const update = () => {
     if (!opened) return;
     const rows = [...waiting.values()];
-    let next = turn;
-    if (rows.length === 0) next = Infinity;
+    // Infinity with no row left.
+    const top = Math.min(...rows);
     // On only once nothing up to it is left. A row coming on screen above it
-    // (scrolling up) is within it and goes at once, and the turn does not move
-    // back: rows already let go keep what they have downloaded.
-    else if (turn === Infinity || !rows.some((row) => row <= turn)) next = Math.min(...rows);
-    if (next === turn) return;
-    turn = next;
-    for (const listener of listeners) listener();
+    // (scrolling up) is within it and goes at once, and rows let go keep what
+    // they have downloaded.
+    if (turn === Infinity || top > turn) {
+      const quick = turn >= 0 && turn !== Infinity && Date.now() - turnedAt < QUICK_ROW_MS;
+      moveTo(quick && rows.length > 0 ? Math.max(...rows) : top);
+    }
+    clearTimeout(stall);
+    if (rows.some((row) => row > turn)) {
+      stall = setTimeout(() => {
+        moveTo(Math.min(...[...waiting.values()].filter((row) => row > turn)));
+        update();
+      }, STALLED_MS);
+    }
   };
   return {
     subscribe: (listener) => {

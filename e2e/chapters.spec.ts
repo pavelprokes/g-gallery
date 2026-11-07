@@ -112,6 +112,21 @@ test.describe("gallery chapters", () => {
     expect([...photoIndices].filter((i) => i < lastChapterAt - 40)).toEqual([]);
   });
 
+  test("a link with a chapter fetches the chapter first, not the row left behind its bar", async ({
+    page,
+  }) => {
+    // docs/GALLERY-LOADING.md: the row before the chapter lands under the bar.
+    const asked: number[] = [];
+    await page.route(/chapter-photo-\d+\.jpg/, (route) => {
+      asked.push(Number(/chapter-photo-(\d+)\.jpg/.exec(route.request().url())![1]));
+    });
+    // The images never arrive, so the page may never fire `load`.
+    await page.goto(`/g/${token}/${slug}#${anchors.at(-1)}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { level: 2, name: titles.at(-1) })).toBeInViewport();
+    await expect.poll(() => asked.length).toBeGreaterThan(0);
+    expect(asked.filter((photo) => photo < lastChapterAt)).toEqual([]);
+  });
+
   for (const [what, hash] of [
     ["an unknown chapter", "#neexistuje"],
     ["a chapter left with no photos", "#prazdna"],

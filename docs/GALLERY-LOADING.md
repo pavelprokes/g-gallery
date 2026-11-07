@@ -135,6 +135,13 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   Save-Data, or Chromium's own effective type of 3G or worse; where there is no such API (Safari,
   Firefox — most guests are on an iPhone) the median time of the first grid-sized images (the
   thumbnails, never a lightbox photo) from the photo hosts over 1.5 s.
+  - What that median reads, on a local build of Alice a Martin (`pnpm mirror:gallery`), 4G / Slow 4G /
+    3G: Firefox 1.0 / 2.8 / 10 s, Playwright's WebKit on an iPhone 0.45 / 0.95 / 6.4 s. So an iPhone
+    on Slow 4G is not slow here, and no threshold can fix that without taking a desktop Firefox on 4G
+    for slow; both are left alone at 1.5 s. Fetching the screen row by row changed Firefox's reading
+    by under 15 %, because the first six images are about the first row. WebKit in Playwright reports
+    `duration` 0 for a `loading="lazy"` image, so before tiles on screen went eager its median was 0
+    on every link. A real iPhone was not checked.
   - `sizes` is `1080 / devicePixelRatio` px: exactly 1080 device pixels, which every selection rule
     lands on 1080 for — a width already in the variant list, so no new billed transformation. It
     saves where the screen alone asks for more (a 3× iPhone: 1920; a retina desktop: 2560); a 2.6×
@@ -154,10 +161,11 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   1250–2500 px of the viewport, the overscan included, at once. A tile that has drawn keeps its
   image; one off screen that has not lets its download go when the gate shuts for the next row
   coming on screen (keeping those running was measured: scrolling a screen in Firefox on Slow 4G
-  took 7.4 s instead of 2.4 s); a new `src` (a fresh grant, a replaced photo) waits its turn like
-  any other. A tile whose image fails for good — its fallback too, or at once when there is no
-  browser-made thumbnail and the fallback is the same image — counts as drawn, and none holds the
-  rest back for longer than 15 s from asking for its image (`SCREEN_WAIT_MS`, a stalled request).
+  took 7.4 s instead of 2.4 s). A new `src` (a fresh grant, a replaced photo) waits its turn off
+  screen; on screen it goes at once, in place of the image it replaces. A tile whose image fails for
+  good — its fallback too, or at once when there is no browser-made thumbnail and the fallback is the
+  same image — counts as drawn, and none holds the rest back for longer than 15 s from asking for its
+  image (`SCREEN_WAIT_MS`, a stalled request).
   Measured on a local build of Alice a Martin (`pnpm mirror:gallery`), Slow 4G, median of three:
   the first screen complete on Chrome at Windows' 125 % 14.3 → 8.1 s, a 1366×768 laptop 10.2 →
   7.8 s, Firefox 13.1 → 9.1 s, a Pixel 7 (CPU 4×) 7.3 → 6.0 s; images off screen requested before
@@ -171,23 +179,43 @@ photo alone is ~2.5 s). And every first image went out at **Low** priority — s
   packet-level link it sends them nearly one after another, in no order of ours: the screen filled in
   at random. **DevTools shows something else:** its throttling splits the bandwidth among requests,
   so there every tile fills at once, which no guest sees. Rules:
-  - the turn moves down only once nothing up to it is left, and never back. A row coming on screen
-    above it (scrolling up) is within it and goes at once, and a download on its way stays while its
-    tile is on screen: an overscan row scrolled into view keeps what has arrived. So a jump up while
-    a lower screen is still loading goes at once for that screen, as before;
+  - the turn moves down once nothing up to it is left. A row coming on screen above it (scrolling up
+    a little) is within it and goes at once, and a download on its way stays while its tile is on
+    screen: an overscan row scrolled into view keeps what has arrived. A jump that leaves nothing of
+    the old screen empties the gate, so the new screen starts again from its own top;
+  - a row back within a second (`QUICK_ROW_MS`) lets the rest of the screen go with it: nobody sees
+    an order that takes under a second, and on a fast link each row would only add a round trip with
+    the link idle. It also fires when a row scrolls off screen unfinished, so a fast scroll fetches
+    the screen in parallel, as it did before;
+  - nothing drawn for 5 s (`STALLED_MS`) is a stalled request, not a slow link: the next row goes
+    beside it, and on down every 5 s. Any tile drawing counts as progress. A tile stops holding
+    anything back 15 s after asking for its image (`SCREEN_WAIT_MS`) and keeps its request;
+  - a row wholly under the chapter bar is not on screen: a `#chapter` link lands with the row above
+    the chapter behind the bar, and it must not go first;
+  - tiles on screen are `loading="eager"`. The turn has already decided that they go, and a lazy image
+    in a hidden tab would never draw and hold the rows below it for 5 s each;
   - the overscan is not ordered: nobody sees its order, and ordering it would only delay it;
   - a row, not a tile. One tile at a time, on the live link at 3G with the requests held back in the
     browser, took 31.7 → 38.7 s on a desktop's screen, a round trip per tile.
+  - ponytail: a highlight's jump centres its tile, which then waits for the rows above it on that
+    screen like any other. Giving the target its own turn is a second path through the gate; add it
+    if a jump on a slow link is seen waiting.
 
   Measured with main against this, local builds of Alice a Martin, A-B-B-A, two runs per build (3G /
   Slow 4G). Of the pairs of tiles in different rows, those drawn the wrong way round: 2–50 % / 11–59
   % → 0. The first row: a phone 20.4–21.2 → 15.0–15.7 s / 5.3 → 4.0–4.5 s, Firefox 24.0 → 21.1 s / 6.8
   → 5.4 s, Chrome 22.3 → 22.1 s / 5.8 → 5.7 s. The whole screen: +0.6–1.1 s of 21–37 s / +0.4–0.6 s
   of 5–9 s, a round trip per row with the link idle. The average tile within ±6 %. Scrolling a screen
-  on Slow 4G: Chrome 6.3 → 6.3 s, Firefox 4.5 → 4.6 s, iPhone 2.3 → 2.3 s, a Moto G4 2.3 → 2.5 s. A
+  on Slow 4G: Chrome 6.2 → 6.3 s, Firefox 4.5 → 4.6 s, iPhone 2.3 → 2.3 s, a Moto G4 2.3 → 2.4 s. A
   photo's link unchanged. The first tile to draw comes later (phone: 3G ~10 → ~13 s, Slow 4G ~0.5 s):
   it used to be whichever file was smallest, and here the first row held the two largest of the
   screen (134 and 198 kB), which used to arrive last.
+
+  On a fast link (main, branch, main): Wi-Fi unchanged within noise (0.25–0.65 s). 4G, the whole
+  screen: Chrome 3.52 → 3.84 s, a Pixel 7 2.87 → 3.22 s, iPhone 2.46 → 2.84 s, Firefox 3.08 → 3.59 s;
+  wrong-way pairs 0, Firefox 2–4 %. That cost stayed: 4G's first row takes over a second, as long as
+  a phone's first row on Slow 4G, so the quick-row rule cannot tell them apart. At 400 ms the rule
+  never fired on 4G and cost up to 0.75 s.
 
 **Not changed: the grid's `overscan` (4 rows).** Lowering it to 2 was tried; small galleries then
 stop being fully mounted on a phone, which five e2e specs (and the promo/selection flows they

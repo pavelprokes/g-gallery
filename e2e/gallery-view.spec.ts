@@ -78,22 +78,25 @@ test.describe("share gallery viewer", () => {
           };
         }),
       );
+    // Tiles by index, not by position: a shifted layout must fail, not pass unchecked.
     const atStart = await positions();
-    const rows = [...new Set(atStart.filter((tile) => tile.onScreen).map((tile) => tile.top))].sort(
+    const tops = [...new Set(atStart.filter((tile) => tile.onScreen).map((tile) => tile.top))].sort(
       (a, b) => a - b,
     );
-    expect(rows.length).toBeGreaterThan(1);
+    expect(tops.length).toBeGreaterThan(1);
+    const rowOf = atStart.map((tile) => tops.indexOf(tile.top));
 
-    for (const [index, top] of rows.entries()) {
-      const inRow = atStart.filter((tile) => tile.top === top).length;
+    for (const [row] of tops.entries()) {
+      const inRow = rowOf.filter((of) => of === row).length;
       await expect.poll(() => held.length).toBe(inRow);
       const now = await positions();
       // This row is on its way, and no row below it has even asked.
-      expect(now.filter((tile) => tile.top === top).every((tile) => tile.image)).toBe(true);
-      expect(
-        now.filter((tile) => tile.top > top).some((tile) => tile.image),
-        `below row ${index + 1}`,
-      ).toBe(false);
+      rowOf.forEach((of, tile) => {
+        if (of === row) expect(now[tile]!.image, `tile ${tile}, row ${row}`).toBe(true);
+        if (of > row) expect(now[tile]!.image, `tile ${tile} below row ${row}`).toBe(false);
+      });
+      // A row answering within a second would let the rest of the screen go together.
+      await page.waitForTimeout(1_100);
       for (const route of held.splice(0))
         await route.fulfill({ contentType: "image/png", body: pixel });
     }
@@ -121,7 +124,8 @@ test.describe("share gallery viewer", () => {
 
   test("the first row is fetched first, and page one is not asked for again", async ({ page }) => {
     // docs/GALLERY-LOADING.md. This gallery has no film and no highlights,
-    // so the page opens on the grid's first row: it alone is eager and high.
+    // so the page opens on the grid's first row: it alone is high. Eager is every
+    // tile on screen, since the gate decides when those go; lazy is off screen.
     const photoPages: string[] = [];
     page.on("request", (request) => {
       if (/\/api\/g\/[^/]+\/photos/.test(request.url())) photoPages.push(request.url());
@@ -131,12 +135,23 @@ test.describe("share gallery viewer", () => {
     const images = page.getByRole("list", { name: "Fotky v galerii" }).locator("img");
     await expect(images.first()).toHaveAttribute("fetchpriority", "high");
     await expect(images.first()).toHaveAttribute("loading", "eager");
-    await expect(images.last()).toHaveAttribute("loading", "lazy");
-    await expect(images.last()).not.toHaveAttribute("fetchpriority", "high");
 
     // The seed is the server's own first page: hydrating must not refetch it.
     await page.waitForLoadState("networkidle");
     expect(photoPages).toEqual([]);
+
+    // Read in one go: the rows off screen mount their images as the screen draws.
+    const tiles = await images.evaluateAll((all) =>
+      all.map((image) => ({
+        top: image.getBoundingClientRect().top,
+        loading: image.getAttribute("loading"),
+        high: image.getAttribute("fetchpriority") === "high",
+      })),
+    );
+    for (const tile of tiles) {
+      expect(tile.loading).toBe(tile.top < page.viewportSize()!.height ? "eager" : "lazy");
+      expect(tile.high).toBe(tile.top === tiles[0]!.top);
+    }
   });
 
   test("previews in a chat with a resized cover, not the original", async ({ page }) => {
