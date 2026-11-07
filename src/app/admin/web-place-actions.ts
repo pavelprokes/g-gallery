@@ -5,8 +5,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth-guard";
 import { idSchema } from "@/lib/id-schema";
-import { WEB_PLACE_PATTERN } from "@/lib/web-gallery";
-import { assignWebPlaceFor, createWebPlaceGalleryFor } from "@/lib/web-places";
+import { WEB_COPY_MAX, WEB_PLACE_PATTERN, WEB_SLUG_MAX, WEB_SLUG_PATTERN } from "@/lib/web-gallery";
+import {
+  assignWebPlaceFor,
+  createPortfolioGalleryFor,
+  createWebPlaceGalleryFor,
+} from "@/lib/web-places";
 
 // Server Actions are publicly reachable POST endpoints (CLAUDE.md invariant #3).
 
@@ -43,6 +47,43 @@ export async function createWebPlaceGallery(placeKey: string, label: string) {
   if (!key.success || !title.success) throw new Error("INVALID_INPUT");
 
   const id = await createWebPlaceGalleryFor(session.user.id, key.data, title.data);
+  revalidatePath("/admin/web");
+  redirect(`/admin/g/${id}`);
+}
+
+const suggestionSchema = z.object({
+  // A place's key would put a couple's photos on the homepage.
+  webSlug: z
+    .string()
+    .max(WEB_SLUG_MAX)
+    .regex(WEB_SLUG_PATTERN)
+    .refine((slug) => !WEB_PLACE_PATTERN.test(slug)),
+  photoIds: z.array(idSchema).min(1).max(WEB_COPY_MAX),
+});
+
+/** A draft web gallery from a suggestion's chosen photos, and straight to it. */
+export async function addSuggestionToPortfolio(sourceId: string, formData: FormData) {
+  const session = await requireAdmin();
+  const source = idSchema.safeParse(sourceId);
+  const input = suggestionSchema.safeParse({
+    webSlug: formData.get("webSlug"),
+    photoIds: formData.getAll("photo"),
+  });
+  if (!source.success || !input.success) redirect("/admin/web?chyba=vstup");
+
+  let id: string;
+  try {
+    id = await createPortfolioGalleryFor(
+      session.user.id,
+      source.data,
+      input.data.webSlug,
+      input.data.photoIds,
+    );
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") redirect("/admin/web?chyba=adresa");
+    throw error;
+  }
+  revalidatePath("/admin");
   revalidatePath("/admin/web");
   redirect(`/admin/g/${id}`);
 }

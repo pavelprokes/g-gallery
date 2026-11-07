@@ -4,6 +4,7 @@ const requireAdmin = vi.hoisted(() => vi.fn());
 const places = vi.hoisted(() => ({
   assignWebPlaceFor: vi.fn(),
   createWebPlaceGalleryFor: vi.fn(),
+  createPortfolioGalleryFor: vi.fn(),
 }));
 const redirect = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth-guard", () => ({ requireAdmin }));
@@ -14,7 +15,12 @@ vi.mock("@/lib/zip-build", () => ({ markGalleryPhotosChanged: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { assignWebPlace, clearWebPlace, createWebPlaceGallery } from "./web-place-actions";
+import {
+  addSuggestionToPortfolio,
+  assignWebPlace,
+  clearWebPlace,
+  createWebPlaceGallery,
+} from "./web-place-actions";
 
 const ID = "cmuo9cuzl000004l9xri9fuyu";
 const form = (galleryId: string) => {
@@ -68,5 +74,56 @@ describe("web place actions", () => {
       "Homepage",
     );
     expect(redirect).toHaveBeenCalledWith("/admin/g/g1");
+  });
+});
+
+describe("addSuggestionToPortfolio", () => {
+  const suggestion = (webSlug: string, photos = [ID]) => {
+    const data = new FormData();
+    data.set("webSlug", webSlug);
+    for (const photo of photos) data.append("photo", photo);
+    return data;
+  };
+  // As in Next: a redirect ends the action.
+  beforeEach(() => {
+    redirect.mockImplementation((to: string) => {
+      throw new Error(`REDIRECT ${to}`);
+    });
+  });
+
+  it("needs a session", async () => {
+    requireAdmin.mockRejectedValue(new Error("UNAUTHORIZED"));
+    await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
+      "UNAUTHORIZED",
+    );
+    expect(places.createPortfolioGalleryFor).not.toHaveBeenCalled();
+  });
+
+  it("makes the draft for the owner and goes to it", async () => {
+    places.createPortfolioGalleryFor.mockResolvedValue("new");
+    await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
+      "REDIRECT /admin/g/new",
+    );
+    expect(places.createPortfolioGalleryFor).toHaveBeenCalledWith("owner", ID, "anna-a-petr", [ID]);
+  });
+
+  it.each([
+    ["a place's key", "misto-homepage", [ID]],
+    ["a malformed address", "Anna a Petr", [ID]],
+    ["no photo", "anna-a-petr", []],
+  ])("refuses %s", async (_what, slug, photos) => {
+    await expect(addSuggestionToPortfolio(ID, suggestion(slug, photos))).rejects.toThrow(
+      "REDIRECT /admin/web?chyba=vstup",
+    );
+    expect(places.createPortfolioGalleryFor).not.toHaveBeenCalled();
+  });
+
+  it("says so when the address is taken", async () => {
+    places.createPortfolioGalleryFor.mockRejectedValue(
+      Object.assign(new Error(), { code: "P2002" }),
+    );
+    await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
+      "REDIRECT /admin/web?chyba=adresa",
+    );
   });
 });

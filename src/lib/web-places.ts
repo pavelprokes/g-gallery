@@ -3,9 +3,25 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { createGalleryFor } from "@/lib/gallery-admin";
+import {
+  HIGHLIGHT_CANDIDATE_SELECT,
+  pickHighlights,
+  toHighlightCandidate,
+} from "@/lib/gallery-highlights";
 import { photoOrderBy } from "@/lib/photo-order";
-import { PUBLIC_PHOTO, WEB_PLACE_PATTERN } from "@/lib/web-gallery";
-import type { PlaceGallery, WebPlace } from "@/lib/web-place-view";
+import { generateStoragePrefix } from "@/lib/share-token";
+import {
+  copyPhotosToWebGalleryFor,
+  fileIdentity,
+  PUBLIC_PHOTO,
+  WEB_PLACE_PATTERN,
+} from "@/lib/web-gallery";
+import {
+  couplesToSuggest,
+  MIN_PHOTOS_TO_SUGGEST,
+  type PlaceGallery,
+  type WebPlace,
+} from "@/lib/web-place-view";
 
 // The places on the wedding website a web gallery can fill (docs/WEB-GALLERIES.md). The website
 // owns the list, so a new place appears here without a change in this repo. A place is filled by
@@ -26,11 +42,13 @@ const placesSchema = z.object({
   ),
 });
 
+/** Where the website lives, with no trailing slash. */
+export const websiteBase = () => (serverEnv().WEBSITE_URL ?? DEFAULT_WEBSITE).replace(/\/$/, "");
+
 /** Null when the website does not answer: the page says so instead of showing no places. */
 export async function fetchWebPlaces(): Promise<WebPlace[] | null> {
-  const base = (serverEnv().WEBSITE_URL ?? DEFAULT_WEBSITE).replace(/\/$/, "");
   try {
-    const response = await fetch(`${base}/api/photo-places`, {
+    const response = await fetch(`${websiteBase()}/api/photo-places`, {
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
@@ -124,5 +142,142 @@ export async function createWebPlaceGalleryFor(
 ): Promise<string> {
   const id = await createGalleryFor(ownerId, { title: `Web: ${label}`, eventDate: null });
   await assignWebPlaceFor(ownerId, placeKey, id);
+  return id;
+}
+
+/** The web galleries that are portfolio pages, not places, newest first. */
+export function portfolioGalleriesFor(ownerId: string) {
+  return prisma.gallery.findMany({
+    where: {
+      ownerId,
+      trashedAt: null,
+      webSlug: { not: null },
+      NOT: { webSlug: { startsWith: "misto-" } },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      webSlug: true,
+      coverPhoto: { select: { objectKey: true, thumbObjectKey: true, placeholder: true } },
+      photos: {
+        where: PUBLIC_PHOTO,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: { objectKey: true, thumbObjectKey: true, placeholder: true },
+      },
+      _count: { select: { photos: { where: PUBLIC_PHOTO } } },
+    },
+  });
+}
+
+/** How many photos a suggestion offers, and how many couples a page shows. */
+const SUGGESTED_PHOTOS = 8;
+export const SUGGESTIONS_PER_PAGE = 3;
+
+/**
+ * Couples with no web gallery yet, and the photos to start one with: the same pick as the guests'
+ * highlights, so pins and ratings from Lightroom count. `from` pages through them, because some
+ * galleries are not for the website and there is nothing to mark them with.
+ */
+export async function webSuggestionsFor(ownerId: string, from: number) {
+  const webPhotos = await prisma.photo.findMany({
+    where: { status: "CONFIRMED", gallery: { ownerId, webSlug: { not: null } } },
+    select: { fileName: true, crc32: true, etag: true },
+  });
+  const onWebsite = new Set(webPhotos.map(fileIdentity));
+  const sameName = await prisma.photo.findMany({
+    where: {
+      status: "CONFIRMED",
+      fileName: { in: [...new Set(webPhotos.map((photo) => photo.fileName))] },
+      gallery: { ownerId, webSlug: null, trashedAt: null },
+    },
+    select: { galleryId: true, fileName: true, crc32: true, etag: true },
+  });
+  const covered = new Set(
+    sameName.filter((photo) => onWebsite.has(fileIdentity(photo))).map((photo) => photo.galleryId),
+  );
+
+  const galleries = await prisma.gallery.findMany({
+    where: { ownerId, webSlug: null, trashedAt: null, status: "PUBLISHED" },
+    select: {
+      id: true,
+      title: true,
+      eventId: true,
+      eventDate: true,
+      createdAt: true,
+      photoOrder: true,
+      event: { select: { title: true, eventDate: true } },
+      _count: { select: { photos: { where: PUBLIC_PHOTO } } },
+    },
+  });
+  const couples = couplesToSuggest(
+    galleries.map((gallery) => ({
+      ...gallery,
+      day: gallery.eventDate ?? gallery.event?.eventDate ?? gallery.createdAt,
+      ownPhotos: gallery._count.photos,
+      onWebsite: covered.has(gallery.id),
+    })),
+  );
+
+  const suggestions = await Promise.all(
+    couples.slice(from, from + SUGGESTIONS_PER_PAGE).map(async (couple) => {
+      const photos = await prisma.photo.findMany({
+        where: { galleryId: couple.id, ...PUBLIC_PHOTO },
+        select: {
+          ...HIGHLIGHT_CANDIDATE_SELECT,
+          objectKey: true,
+          thumbObjectKey: true,
+          placeholder: true,
+          fileName: true,
+        },
+      });
+      const picks = pickHighlights(
+        photos.map((photo) => toHighlightCandidate(couple.photoOrder, photo)),
+        [],
+        SUGGESTED_PHOTOS,
+        { minPhotosForAuto: MIN_PHOTOS_TO_SUGGEST },
+      );
+      const byId = new Map(photos.map((photo) => [photo.id, photo]));
+      return {
+        id: couple.id,
+        name: couple.event?.title ?? couple.title,
+        day: couple.day,
+        ownPhotos: couple.ownPhotos,
+        photos: picks.flatMap((pick) => byId.get(pick.id) ?? []),
+      };
+    }),
+  );
+  return { suggestions, total: couples.length };
+}
+
+/**
+ * A draft web gallery for a couple, with the chosen photos copied in. A taken address throws
+ * (P2002) before anything is created. The website shows it once it is published and the portfolio
+ * has a page at the same address.
+ */
+export async function createPortfolioGalleryFor(
+  ownerId: string,
+  sourceId: string,
+  webSlug: string,
+  photoIds: string[],
+): Promise<string> {
+  const source = await prisma.gallery.findFirst({
+    where: { id: sourceId, ownerId, trashedAt: null },
+    select: { title: true, eventDate: true, event: { select: { title: true, eventDate: true } } },
+  });
+  if (!source) throw new Error("NOT_FOUND");
+  const { id } = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: `Web: ${source.event?.title ?? source.title}`,
+      eventDate: source.eventDate ?? source.event?.eventDate ?? null,
+      storagePrefix: generateStoragePrefix(),
+      webSlug,
+    },
+    select: { id: true },
+  });
+  await copyPhotosToWebGalleryFor(ownerId, id, photoIds);
   return id;
 }

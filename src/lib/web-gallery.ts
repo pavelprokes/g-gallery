@@ -159,8 +159,11 @@ export async function webGallerySummaries(): Promise<WebGallerySummary[]> {
 const extensionOf = (key: string) => key.slice(key.lastIndexOf("."));
 
 /** The same bytes under the same name. A name alone is not a photo: two cameras can share one. */
-const fileIdentity = (photo: { fileName: string; crc32: string | null; etag: string | null }) =>
-  `${photo.fileName}|${photo.crc32 ?? photo.etag ?? ""}`;
+export const fileIdentity = (photo: {
+  fileName: string;
+  crc32: string | null;
+  etag: string | null;
+}) => `${photo.fileName}|${photo.crc32 ?? photo.etag ?? ""}`;
 
 /**
  * Copies photos into a web gallery, so deleting or trashing the couple's gallery

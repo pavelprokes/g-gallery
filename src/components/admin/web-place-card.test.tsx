@@ -50,6 +50,7 @@ const gallery = (over: Partial<PlaceGallery> = {}): PlaceGallery => ({
 const setup = (g: PlaceGallery | null, options = [{ id: "g2", title: "Web: Jiná" }]) =>
   render(
     <WebPlaceCard
+      websiteBase="https://web.example"
       place={place}
       gallery={g}
       options={options}
@@ -77,10 +78,7 @@ describe("WebPlaceCard", () => {
       "k/a.jpg",
     ]);
     expect(screen.getByText(/Hero je titulní fotka galerie/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Web: Homepage" })).toHaveAttribute(
-      "href",
-      "/admin/g/g1",
-    );
+    expect(screen.getByText("Web: Homepage")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Založit galerii" })).toBeNull();
   });
 
@@ -100,5 +98,20 @@ describe("WebPlaceCard", () => {
   it("does not offer an empty list of galleries", () => {
     setup(gallery(), []);
     expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("links the place's title and a button to the website, and the gallery as the main button", () => {
+    setup(gallery());
+    const onWebsite = screen.getByRole("link", { name: /Na webu/ });
+    expect(onWebsite).toHaveAttribute("href", `https://web.example${place.where}`);
+    expect(onWebsite).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: place.label })).toHaveAttribute(
+      "href",
+      `https://web.example${place.where}`,
+    );
+    expect(screen.getByRole("link", { name: "Otevřít galerii" })).toHaveAttribute(
+      "href",
+      "/admin/g/g1",
+    );
   });
 });

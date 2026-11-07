@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CoverThumb } from "@/components/admin/cover-thumb";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import {
@@ -21,6 +21,7 @@ const STATE: Record<PlaceState, { tone: "muted" | "warning" | "success"; label: 
 /** One place on the website: what fills it, photo by photo, and how to change that. */
 export function WebPlaceCard({
   place,
+  websiteBase,
   gallery,
   options,
   assign,
@@ -28,6 +29,7 @@ export function WebPlaceCard({
   create,
 }: {
   place: WebPlace;
+  websiteBase: string;
   gallery: PlaceGallery | null;
   options: { id: string; title: string }[];
   assign: (formData: FormData) => void | Promise<void>;
@@ -37,11 +39,16 @@ export function WebPlaceCard({
   const view = describePlace(place, gallery);
   const state = STATE[view.state];
   const rejected = view.tiles.filter((tile) => tile.rejected).length;
+  const page = `${websiteBase}${place.where}`;
 
   return (
     <Card as="section" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="text-base font-bold">{place.label}</h2>
+        <h2 className="text-base font-bold">
+          <a href={page} target="_blank" rel="noopener noreferrer" className="hover:underline">
+            {place.label}
+          </a>
+        </h2>
         <Badge tone={state.tone}>{state.label}</Badge>
       </div>
       <p className="text-admin-muted text-caption">
@@ -84,9 +91,7 @@ export function WebPlaceCard({
       <div className="flex flex-wrap items-center gap-2">
         {gallery ? (
           <>
-            <Link href={`/admin/g/${gallery.id}`} className="text-sm font-semibold underline">
-              {gallery.title}
-            </Link>
+            <p className="text-sm font-semibold">{gallery.title}</p>
             <form action={clear}>
               <Button type="submit" variant="ghost">
                 Odebrat z místa
@@ -123,6 +128,22 @@ export function WebPlaceCard({
             </Button>
           </form>
         )}
+        {/* The row's main button, on the right: what this place is filled from. */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <a
+            href={page}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClasses("secondary", "md")}
+          >
+            Na webu ↗
+          </a>
+          {gallery && (
+            <Link href={`/admin/g/${gallery.id}`} className={buttonClasses("primary", "md")}>
+              Otevřít galerii
+            </Link>
+          )}
+        </div>
       </div>
     </Card>
   );
