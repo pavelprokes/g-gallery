@@ -635,57 +635,25 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
         )}
       </section>
 
+      {/* The photos are what this page is for; the panels sit under them, a jump away. */}
+      <nav aria-label="Pod fotkami" className="flex flex-wrap items-center gap-1 text-sm">
+        <span className="text-admin-muted mr-1 text-xs">Pod fotkami:</span>
+        {[
+          ["odkazy", "Sdílené odkazy"],
+          ["reklama", "Reklamní karta"],
+          ["poradi", "Pořadí fotek"],
+          ["kapitoly", "Kapitoly"],
+          ["vyber", "Výběr nejlepších"],
+        ].map(([anchor, label]) => (
+          <a key={anchor} href={`#${anchor}`} className={buttonClasses("ghost", "sm")}>
+            {label}
+          </a>
+        ))}
+      </nav>
+
       <Uploader galleryId={gallery.id} />
 
       <GalleryFaceScan galleryId={gallery.id} missing={facelessStills} />
-
-      <ShareLinkPanel
-        galleryId={gallery.id}
-        shareLinks={shareLinks}
-        published={gallery.status === "PUBLISHED"}
-        hostedByEvent={gallery.eventId !== null}
-      />
-
-      <GalleryPromoPanel
-        galleryId={gallery.id}
-        photoCount={gallery.photos.length}
-        placed={gallery.promos.map((placement) => ({
-          placementId: placement.id,
-          promoCardId: placement.promoCard.id,
-          name: placement.promoCard.name,
-          headline: placement.promoCard.headline,
-          slot: placement.slot,
-          enabled: placement.enabled,
-        }))}
-        available={promoCards}
-      />
-
-      <GalleryPhotoOrderPanel
-        galleryId={gallery.id}
-        order={order}
-        displaced={displacedByOrder(order, gallery.photos)}
-        arrangedBefore={gallery.manualOrderAt !== null}
-        takesGuestPhotos={
-          gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
-          gallery.photos.some((photo) => photo.source === "GUEST")
-        }
-      />
-
-      <GalleryChapterPanel
-        chapters={adminChapters}
-        shareUrl={guestUrl}
-        timelineHref={`/admin/g/${gallery.id}` + adminViewQuery({ ...view, sort: "order" })}
-        timelineActive={timelineView}
-      />
-
-      <GalleryHighlightPanel
-        galleryId={gallery.id}
-        enabled={gallery.highlightsEnabled}
-        highlights={adminHighlights}
-        excludedCount={gallery.photos.filter((photo) => photo.highlightPin === false).length}
-        pinnedCount={pinnedCount}
-        ownCount={gallery.photos.filter((photo) => photo.source === "OWNER").length}
-      />
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -825,6 +793,64 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
           </p>
         )}
       </section>
+
+      <div id="odkazy" className="scroll-mt-20">
+        <ShareLinkPanel
+          galleryId={gallery.id}
+          shareLinks={shareLinks}
+          published={gallery.status === "PUBLISHED"}
+          hostedByEvent={gallery.eventId !== null}
+        />
+      </div>
+
+      <div id="reklama" className="scroll-mt-20">
+        <GalleryPromoPanel
+          galleryId={gallery.id}
+          photoCount={gallery.photos.length}
+          placed={gallery.promos.map((placement) => ({
+            placementId: placement.id,
+            promoCardId: placement.promoCard.id,
+            name: placement.promoCard.name,
+            headline: placement.promoCard.headline,
+            slot: placement.slot,
+            enabled: placement.enabled,
+          }))}
+          available={promoCards}
+        />
+      </div>
+
+      <div id="poradi" className="scroll-mt-20">
+        <GalleryPhotoOrderPanel
+          galleryId={gallery.id}
+          order={order}
+          displaced={displacedByOrder(order, gallery.photos)}
+          arrangedBefore={gallery.manualOrderAt !== null}
+          takesGuestPhotos={
+            gallery.shareLinks.some((link) => link.allowUpload && !link.revokedAt) ||
+            gallery.photos.some((photo) => photo.source === "GUEST")
+          }
+        />
+      </div>
+
+      <div id="kapitoly" className="scroll-mt-20">
+        <GalleryChapterPanel
+          chapters={adminChapters}
+          shareUrl={guestUrl}
+          timelineHref={`/admin/g/${gallery.id}` + adminViewQuery({ ...view, sort: "order" })}
+          timelineActive={timelineView}
+        />
+      </div>
+
+      <div id="vyber" className="scroll-mt-20">
+        <GalleryHighlightPanel
+          galleryId={gallery.id}
+          enabled={gallery.highlightsEnabled}
+          highlights={adminHighlights}
+          excludedCount={gallery.photos.filter((photo) => photo.highlightPin === false).length}
+          pinnedCount={pinnedCount}
+          ownCount={gallery.photos.filter((photo) => photo.source === "OWNER").length}
+        />
+      </div>
     </div>
   );
 }

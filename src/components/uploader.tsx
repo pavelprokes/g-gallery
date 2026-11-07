@@ -64,6 +64,8 @@ const TICK_MS = 250;
 const SPEED_SAMPLE_MS = 1000;
 /** No speed or ETA before this — the first seconds are presign and worker warm-up. */
 const ETA_AFTER_MS = 5000;
+/** `dragover` fires at least every 350 ms over the page, Firefox's slowest. */
+const DRAG_ENDED_MS = 500;
 
 const isRetriable = (item: Item) =>
   item.state === "error" && !item.error?.startsWith("unsupported_type");
@@ -91,7 +93,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const bytesRef = useRef<number[]>([]);
   const statesRef = useRef<Item[]>([]);
   const abortRef = useRef<AbortController | null>(null);
-  const dragDepth = useRef(0);
+  const dragEnd = useRef<number | undefined>(undefined);
 
   // Rows left behind by an interrupted upload. Re-picking those exact files
   // reuses the rows instead of creating a second set (src/lib/upload-resume.ts).
@@ -181,7 +183,8 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       setNotice(
         ignored > 0 ? `Přeskočeno: ${ignored} × ne-fotka (.xmp, RAW, systémové soubory…).` : null,
       );
-      if (photos.length === 0 || running || preparing || review) return;
+      if (running || preparing || review) return;
+      if (photos.length === 0) return setPreparing(false);
       setPreparing(true);
       // A corrected export carries the shot's camera name after a new sequence
       // number; pairing it with the delivered photo is asked about, never
@@ -279,19 +282,58 @@ export function Uploader({ galleryId }: { galleryId: string }) {
     };
   }, [running]);
 
-  // The drop zone invites dragging from Finder; a file released anywhere else
-  // on the page would make the browser open it in this tab instead.
+  // The whole page is the drop zone: the photographer works down in the grid, not
+  // up here. Only files from outside count: an image dragged off a tile carries
+  // "Files" too, and an open dialog may have a file input of its own. A file
+  // released during a run is still swallowed, or the browser would open it here.
+  // The hint goes when the `dragover`s stop: an enter/leave count sticks when the
+  // element under the pointer is replaced, as a refresh does to the grid.
   useEffect(() => {
-    const swallowDrop = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    const busy = running || preparing || review !== null;
+    let fromThisPage = false;
+    const onStart = () => {
+      fromThisPage = true;
     };
-    window.addEventListener("dragover", swallowDrop);
-    window.addEventListener("drop", swallowDrop);
+    const onEnd = () => {
+      fromThisPage = false;
+    };
+    const hasFiles = (event: DragEvent) =>
+      !fromThisPage && (event.dataTransfer?.types.includes("Files") ?? false);
+    const onOwnInput = (event: DragEvent) =>
+      event.target instanceof HTMLInputElement && event.target.type === "file";
+    const dialogOpen = () => document.querySelector("dialog[open]") !== null;
+
+    const onOver = (event: DragEvent) => {
+      if (!hasFiles(event) || onOwnInput(event)) return;
+      event.preventDefault();
+      event.dataTransfer!.dropEffect = busy || dialogOpen() ? "none" : "copy";
+      if (dialogOpen()) return;
+      setDragging(true);
+      window.clearTimeout(dragEnd.current);
+      dragEnd.current = window.setTimeout(() => setDragging(false), DRAG_ENDED_MS);
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event) || onOwnInput(event)) return;
+      event.preventDefault();
+      window.clearTimeout(dragEnd.current);
+      setDragging(false);
+      if (busy || dialogOpen()) return;
+      // Said at once: a big folder takes a while to read. Entries must be read
+      // synchronously inside the drop handler — this call does that before its first await.
+      setPreparing(true);
+      void filesFromDrop(event.dataTransfer!).then(pick);
+    };
+    window.addEventListener("dragstart", onStart);
+    window.addEventListener("dragend", onEnd);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("drop", onDrop);
     return () => {
-      window.removeEventListener("dragover", swallowDrop);
-      window.removeEventListener("drop", swallowDrop);
+      window.removeEventListener("dragstart", onStart);
+      window.removeEventListener("dragend", onEnd);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("drop", onDrop);
     };
-  }, []);
+  }, [pick, preparing, review, running]);
 
   const done = items.filter((i) => i.state === "done").length;
   const failed = items.filter((i) => i.state === "error");
@@ -299,244 +341,260 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const cancelled = failed.filter((i) => i.error === CANCELLED).length;
   const percent = stats && stats.total > 0 ? Math.floor((stats.sent / stats.total) * 100) : 0;
   const eta = stats?.speed ? formatEta((stats.total - stats.sent) / stats.speed) : null;
-
-  const hasFiles = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
-  const dropHandlers = {
-    onDragEnter: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      dragDepth.current += 1;
-      setDragging(true);
-    },
-    onDragOver: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = running || preparing || review ? "none" : "copy";
-    },
-    onDragLeave: () => {
-      dragDepth.current = Math.max(dragDepth.current - 1, 0);
-      if (dragDepth.current === 0) setDragging(false);
-    },
-    onDrop: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      dragDepth.current = 0;
-      setDragging(false);
-      if (running || preparing || review) return;
-      // Entries must be read synchronously inside the drop handler — this call
-      // does that before its first await.
-      void filesFromDrop(event.dataTransfer).then(pick);
-    },
+  const speaking = running || preparing || !!review || !!fatal || !!notice || failed.length > 0;
+  const dismiss = () => {
+    setItems([]);
+    setFatal(null);
+    setNotice(null);
   };
 
   return (
-    <Card as="section" {...dropHandlers}>
-      <CardTitle>Nahrát fotky</CardTitle>
-
-      {fatal && (
-        <Alert tone="danger" className="mt-3">
-          {fatal}
-        </Alert>
-      )}
-
-      {pendingRows.length > 0 && !running && (
-        <Alert className="mt-3">
-          <p className="font-medium">{pluralize(pendingRows.length, FORMS.upload)}</p>
-          <p className="mt-1 text-xs">
-            Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené zbytky
-            se po 24 hodinách uklidí samy.
-          </p>
-          <ul className="text-admin-muted mt-2 max-h-24 overflow-y-auto text-xs dark:text-neutral-400">
-            {pendingRows.map((row) => (
-              <li key={row.id}>
-                {row.fileName}
-                {row.sizeBytes !== null && ` · ${(row.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
-              </li>
-            ))}
-          </ul>
-        </Alert>
-      )}
-
-      {review && !running && (
-        <ReplaceReview
-          review={review}
-          onConfirm={(replaceIds, uploadNames) =>
-            void start(
-              review.files,
-              replaceIds,
-              uploadNames,
-              review.plans.map((plan) => plan.resumeId),
-            )
-          }
-          // A resumed row filed under another name keeps it, or it is not resumed.
-          onAsNew={() =>
-            void start(
-              review.files,
-              [],
-              review.plans.map((plan) => plan.keepName),
-              review.plans.map((plan) => plan.resumeId),
-            )
-          }
-          onCancel={() => setReview(null)}
-        />
-      )}
-
-      {!running && !review && !preparing && (
+    <>
+      {dragging && (
         <div
-          className={`mt-3 flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
-            dragging
-              ? "border-brand-primary bg-admin-accent-soft dark:bg-neutral-800"
-              : "border-admin-border dark:border-neutral-700"
-          }`}
+          aria-hidden
+          // Not a drop target itself: the drag stays on the page beneath it.
+          className="bg-admin-accent-soft/85 pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-6"
         >
-          <p className="text-brand-ink font-medium dark:text-neutral-100 max-sm:pointer-coarse:hidden">
-            {dragging ? "Pusť — nahraju je" : "Přetáhni sem fotky nebo celou složku"}
+          <p className="border-brand-primary text-brand-ink rounded-xl border-2 border-dashed bg-white px-8 py-6 text-center text-lg font-semibold">
+            {running
+              ? "Počkej, nahrávání právě běží"
+              : preparing || review
+                ? "Nejdřív dokonči rozdělané nahrávání"
+                : "Pusť fotky, nahraju je do téhle galerie"}
           </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={() => filesRef.current?.click()}>Vybrat fotky</Button>
-            <Button variant="secondary" onClick={() => folderRef.current?.click()}>
-              Vybrat složku
-            </Button>
-          </div>
-          <p className="text-admin-muted text-xs dark:text-neutral-400">
-            JPEG, PNG, WebP · složky i s podsložkami, ostatní soubory se přeskočí
-          </p>
-          {/* The export spec lives here, at the point of upload, because nothing
-              downstream converts the file (docs/VIDEO.md): what is picked is
-              exactly what the couple streams and downloads. */}
-          <details className="text-admin-muted w-full max-w-md text-left text-xs dark:text-neutral-400">
-            <summary className="cursor-pointer text-center">
-              I video · MP4 (H.264), nejvýš 4K — jak ho exportovat
-            </summary>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-              <dt className="font-medium">Formát</dt>
-              <dd>MP4 (.mp4). MOV a HEVC (H.265) neprojdou.</dd>
-              <dt className="font-medium">Video</dt>
-              <dd>
-                H.264, nejvýš 4K (4096 px na delší straně, na šířku i na výšku). Doporučeno 1080p —
-                na telefonu v sále se rozjede rychleji. Snímková frekvence jako ve střihu.
-              </dd>
-              <dt className="font-medium">Datový tok</dt>
-              <dd>1080p 8–10 Mbit/s (3 min ≈ 200 MB) · 4K 35–45 Mbit/s (3 min ≈ 900 MB)</dd>
-              <dt className="font-medium">Zvuk</dt>
-              <dd>AAC, 48 kHz, stereo, 192–320 kbit/s</dd>
-              <dt className="font-medium">Limit</dt>
-              <dd>
-                Rozlišení do 4K. Velikost souboru hlídá jen technický strop 2 GB (≈ 6 min 4K při 45
-                Mbit/s, 30 min 1080p). Bez metadat o poloze.
-              </dd>
-              <dt className="font-medium">Resolve</dt>
-              <dd>
-                Deliver → Format MP4, Codec H.264, Quality 8–10 000 kb/s (4K: 35–45 000); „Network
-                Optimization“ zapnout, pokud ji verze nabízí (video se rozjede dřív)
-              </dd>
-              <dt className="font-medium">Pořadí</dt>
-              <dd>
-                Podle názvu souboru. Pojmenuj video číslem fotky, za kterou má stát, např.{" "}
-                <code>svatba_0412_tanec.mp4</code>
-              </dd>
-            </dl>
-            <p className="mt-2">
-              Nic se nepřevádí: hosté přehrávají i stahují přesně tenhle soubor. Náhledový snímek
-              (čtvrtina délky) udělá prohlížeč sám při nahrání.
-            </p>
-          </details>
-          <input
-            ref={filesRef}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp,video/mp4"
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden
-            onChange={(event) => {
-              pick(Array.from(event.target.files ?? []));
-              event.target.value = "";
-            }}
-          />
-          <input
-            ref={folderRef}
-            type="file"
-            multiple
-            // Non-standard but supported by every engine; React has no typed prop for it.
-            {...{ webkitdirectory: "" }}
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden
-            onChange={(event) => {
-              pick(Array.from(event.target.files ?? []));
-              event.target.value = "";
-            }}
-          />
         </div>
       )}
-
-      {notice && <p className="text-admin-muted mt-2 text-xs dark:text-neutral-400">{notice}</p>}
-
-      {items.length > 0 && (
-        <div className="mt-4 space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
-            <p className="text-brand-ink font-medium dark:text-neutral-100">
-              {done}/{items.length} nahráno
-              {failed.length > 0 && (
-                <span className="text-admin-danger"> · {failed.length} nenahráno</span>
-              )}
-            </p>
-            {stats && (
-              <p className="text-admin-muted tabular-nums dark:text-neutral-400">
-                {formatBytes(stats.sent)} z {formatBytes(stats.total)}
-                {running && stats.speed !== null && (
-                  <> · {(stats.speed / 1024 ** 2).toFixed(1).replace(".", ",")} MB/s</>
-                )}
-                {running && eta && <> · zbývá {eta}</>}
-              </p>
+      {/* Stuck under the top bar with anything to say: the photographer is down in the grid,
+          and a question or a failure up here would go unseen. A clean finish lets go. */}
+      <Card
+        as="section"
+        flush
+        className={`p-3 sm:px-4 ${
+          speaking
+            ? "sticky top-[4.5rem] z-10 max-h-[calc(100vh-5rem)] overflow-y-auto shadow-md"
+            : ""
+        }`}
+      >
+        {!running && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <CardTitle className="mb-0">Nahrát fotky</CardTitle>
+            {preparing && <p className="text-admin-muted text-xs">Čtu vybrané soubory…</p>}
+            {!review && !preparing && (
+              <>
+                <Button size="sm" onClick={() => filesRef.current?.click()}>
+                  Vybrat fotky
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => folderRef.current?.click()}>
+                  Vybrat složku
+                </Button>
+                <p className="text-admin-muted text-xs dark:text-neutral-400">
+                  <span className="max-sm:pointer-coarse:hidden">
+                    Nebo je přetáhni kamkoliv na stránku.{" "}
+                  </span>
+                  JPEG, PNG, WebP, složky i s podsložkami; ostatní soubory se přeskočí.
+                </p>
+              </>
             )}
           </div>
+        )}
 
-          <progress
-            aria-label="Průběh nahrávání"
-            max={stats?.total || 1}
-            value={stats?.sent ?? 0}
-            aria-valuetext={`${percent} %, ${done} z ${items.length} fotek${eta ? `, zbývá ${eta}` : ""}`}
-            className="bg-admin-accent-soft [&::-moz-progress-bar]:bg-brand-primary [&::-webkit-progress-bar]:bg-admin-accent-soft [&::-webkit-progress-value]:bg-brand-primary block h-2.5 w-full appearance-none overflow-hidden rounded-full dark:bg-neutral-800 [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-200"
-          />
-          <p role="status" aria-live="polite" className="sr-only">
-            {announcement}
-          </p>
+        {fatal && (
+          <Alert tone="danger" className="mt-3">
+            {fatal}
+          </Alert>
+        )}
 
-          {running && stats && stats.active.length > 0 && (
-            <ul className="space-y-1.5" aria-label="Právě se nahrává">
-              {stats.active.map(({ index, sent }) => {
-                const file = items[index]?.file;
-                if (!file) return null;
-                const filePercent = file.size > 0 ? Math.floor((sent / file.size) * 100) : 0;
-                return (
-                  <li key={index} className="flex items-center gap-3 text-xs">
-                    <span className="text-admin-muted w-40 truncate dark:text-neutral-400">
-                      {file.name}
-                    </span>
-                    <span className="bg-admin-accent-soft h-1 flex-1 overflow-hidden rounded-full dark:bg-neutral-800">
-                      <span
-                        className="bg-brand-primary block h-full rounded-full opacity-70"
-                        style={{ width: `${filePercent}%` }}
-                      />
-                    </span>
-                    <span className="text-admin-muted w-20 text-right tabular-nums dark:text-neutral-400">
-                      {/* The last percent waits on R2's response and the confirm call. */}
-                      {filePercent >= 99 ? "dokončuji" : `${filePercent} %`}
-                    </span>
-                  </li>
-                );
-              })}
+        {pendingRows.length > 0 && !running && (
+          <Alert className="mt-3">
+            <p className="font-medium">{pluralize(pendingRows.length, FORMS.upload)}</p>
+            <p className="mt-1 text-xs">
+              Vyber ty samé soubory znovu — naváže se na ně a nevzniknou duplicity. Neobnovené
+              zbytky se po 24 hodinách uklidí samy.
+            </p>
+            <ul className="text-admin-muted mt-2 max-h-24 overflow-y-auto text-xs dark:text-neutral-400">
+              {pendingRows.map((row) => (
+                <li key={row.id}>
+                  {row.fileName}
+                  {row.sizeBytes !== null && ` · ${(row.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
+                </li>
+              ))}
             </ul>
-          )}
+          </Alert>
+        )}
 
-          <div className="flex flex-wrap gap-2">
+        {review && !running && (
+          <ReplaceReview
+            review={review}
+            onConfirm={(replaceIds, uploadNames) =>
+              void start(
+                review.files,
+                replaceIds,
+                uploadNames,
+                review.plans.map((plan) => plan.resumeId),
+              )
+            }
+            // A resumed row filed under another name keeps it, or it is not resumed.
+            onAsNew={() =>
+              void start(
+                review.files,
+                [],
+                review.plans.map((plan) => plan.keepName),
+                review.plans.map((plan) => plan.resumeId),
+              )
+            }
+            onCancel={() => setReview(null)}
+          />
+        )}
+
+        {!running && !review && !preparing && (
+          <>
+            {/* The export spec lives here, at the point of upload, because nothing
+              downstream converts the file (docs/VIDEO.md): what is picked is
+              exactly what the couple streams and downloads. */}
+            <details className="text-admin-muted mt-2 max-w-xl text-xs dark:text-neutral-400">
+              <summary className="cursor-pointer">
+                I video · MP4 (H.264), nejvýš 4K — jak ho exportovat
+              </summary>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt className="font-medium">Formát</dt>
+                <dd>MP4 (.mp4). MOV a HEVC (H.265) neprojdou.</dd>
+                <dt className="font-medium">Video</dt>
+                <dd>
+                  H.264, nejvýš 4K (4096 px na delší straně, na šířku i na výšku). Doporučeno 1080p
+                  — na telefonu v sále se rozjede rychleji. Snímková frekvence jako ve střihu.
+                </dd>
+                <dt className="font-medium">Datový tok</dt>
+                <dd>1080p 8–10 Mbit/s (3 min ≈ 200 MB) · 4K 35–45 Mbit/s (3 min ≈ 900 MB)</dd>
+                <dt className="font-medium">Zvuk</dt>
+                <dd>AAC, 48 kHz, stereo, 192–320 kbit/s</dd>
+                <dt className="font-medium">Limit</dt>
+                <dd>
+                  Rozlišení do 4K. Velikost souboru hlídá jen technický strop 2 GB (≈ 6 min 4K při
+                  45 Mbit/s, 30 min 1080p). Bez metadat o poloze.
+                </dd>
+                <dt className="font-medium">Resolve</dt>
+                <dd>
+                  Deliver → Format MP4, Codec H.264, Quality 8–10 000 kb/s (4K: 35–45 000); „Network
+                  Optimization“ zapnout, pokud ji verze nabízí (video se rozjede dřív)
+                </dd>
+                <dt className="font-medium">Pořadí</dt>
+                <dd>
+                  Podle názvu souboru. Pojmenuj video číslem fotky, za kterou má stát, např.{" "}
+                  <code>svatba_0412_tanec.mp4</code>
+                </dd>
+              </dl>
+              <p className="mt-2">
+                Nic se nepřevádí: hosté přehrávají i stahují přesně tenhle soubor. Náhledový snímek
+                (čtvrtina délky) udělá prohlížeč sám při nahrání.
+              </p>
+            </details>
+            <input
+              ref={filesRef}
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,video/mp4"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(event) => {
+                pick(Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+            />
+            <input
+              ref={folderRef}
+              type="file"
+              multiple
+              // Non-standard but supported by every engine; React has no typed prop for it.
+              {...{ webkitdirectory: "" }}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              onChange={(event) => {
+                pick(Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+            />
+          </>
+        )}
+
+        {notice && <p className="text-admin-muted mt-2 text-xs dark:text-neutral-400">{notice}</p>}
+        {speaking && !running && !preparing && !review && (
+          <Button size="sm" variant="ghost" className="mt-2" onClick={dismiss}>
+            Zavřít
+          </Button>
+        )}
+
+        {items.length > 0 && (
+          <div className={`space-y-2 ${running ? "" : "mt-3"}`}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+              <p className="text-brand-ink font-medium dark:text-neutral-100">
+                {done}/{items.length} nahráno
+                {failed.length > 0 && (
+                  <span className="text-admin-danger"> · {failed.length} nenahráno</span>
+                )}
+              </p>
+              {stats && (
+                <p className="text-admin-muted tabular-nums dark:text-neutral-400">
+                  {formatBytes(stats.sent)} z {formatBytes(stats.total)}
+                  {running && stats.speed !== null && (
+                    <> · {(stats.speed / 1024 ** 2).toFixed(1).replace(".", ",")} MB/s</>
+                  )}
+                  {running && eta && <> · zbývá {eta}</>}
+                </p>
+              )}
+              {running && (
+                <Button variant="destructive" size="sm" onClick={() => abortRef.current?.abort()}>
+                  Zrušit nahrávání
+                </Button>
+              )}
+            </div>
+
+            <progress
+              aria-label="Průběh nahrávání"
+              max={stats?.total || 1}
+              value={stats?.sent ?? 0}
+              aria-valuetext={`${percent} %, ${done} z ${items.length} fotek${eta ? `, zbývá ${eta}` : ""}`}
+              className="bg-admin-accent-soft [&::-moz-progress-bar]:bg-brand-primary [&::-webkit-progress-bar]:bg-admin-accent-soft [&::-webkit-progress-value]:bg-brand-primary block h-2.5 w-full appearance-none overflow-hidden rounded-full dark:bg-neutral-800 [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-200"
+            />
+            <p role="status" aria-live="polite" className="sr-only">
+              {announcement}
+            </p>
+
+            {/* Stays mounted through a moment with nothing in flight, or it closes itself. */}
             {running && (
-              <Button variant="destructive" size="sm" onClick={() => abortRef.current?.abort()}>
-                Zrušit nahrávání
-              </Button>
+              <details className="text-admin-muted text-xs dark:text-neutral-400">
+                <summary className="cursor-pointer">
+                  Právě se nahrává: {stats?.active.length ?? 0}
+                </summary>
+                <ul className="mt-1 space-y-1.5" aria-label="Právě se nahrává">
+                  {stats?.active.map(({ index, sent }) => {
+                    const file = items[index]?.file;
+                    if (!file) return null;
+                    const filePercent = file.size > 0 ? Math.floor((sent / file.size) * 100) : 0;
+                    return (
+                      <li key={index} className="flex items-center gap-3 text-xs">
+                        <span className="text-admin-muted w-40 truncate dark:text-neutral-400">
+                          {file.name}
+                        </span>
+                        <span className="bg-admin-accent-soft h-1 flex-1 overflow-hidden rounded-full dark:bg-neutral-800">
+                          <span
+                            className="bg-brand-primary block h-full rounded-full opacity-70"
+                            style={{ width: `${filePercent}%` }}
+                          />
+                        </span>
+                        <span className="text-admin-muted w-20 text-right tabular-nums dark:text-neutral-400">
+                          {/* The last percent waits on R2's response and the confirm call. */}
+                          {filePercent >= 99 ? "dokončuji" : `${filePercent} %`}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
             )}
+
             {!running && retriable.length > 0 && (
               <Button
                 size="sm"
@@ -551,29 +609,29 @@ export function Uploader({ galleryId }: { galleryId: string }) {
                 Nahrát znovu {pluralize(retriable.length, FORMS.photoAccusative)}
               </Button>
             )}
+
+            {!running && cancelled > 0 && (
+              <p className="text-admin-muted text-xs dark:text-neutral-400">
+                Nahrávání zrušeno — zbylé fotky dohraješ tlačítkem výš.
+              </p>
+            )}
+
+            {failed.length > cancelled && (
+              <ul className="text-admin-danger max-h-32 overflow-y-auto text-xs">
+                {items
+                  .map((item, index) => ({ item, index }))
+                  .filter(({ item }) => item.state === "error" && item.error !== CANCELLED)
+                  .map(({ item, index }) => (
+                    <li key={index}>
+                      {item.file.name}: {itemErrorMessage(item.error)}
+                    </li>
+                  ))}
+              </ul>
+            )}
           </div>
-
-          {!running && cancelled > 0 && (
-            <p className="text-admin-muted text-xs dark:text-neutral-400">
-              Nahrávání zrušeno — zbylé fotky dohraješ tlačítkem výš.
-            </p>
-          )}
-
-          {failed.length > cancelled && (
-            <ul className="text-admin-danger max-h-32 overflow-y-auto text-xs">
-              {items
-                .map((item, index) => ({ item, index }))
-                .filter(({ item }) => item.state === "error" && item.error !== CANCELLED)
-                .map(({ item, index }) => (
-                  <li key={index}>
-                    {item.file.name}: {itemErrorMessage(item.error)}
-                  </li>
-                ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </Card>
+        )}
+      </Card>
+    </>
   );
 }
 
