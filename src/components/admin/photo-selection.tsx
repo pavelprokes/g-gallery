@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { copyPhotosToWebGallery, deletePhotos, setGalleryCover } from "@/app/admin/actions";
 import { setHighlightPin } from "@/app/admin/highlight-actions";
@@ -61,6 +62,7 @@ export function PhotoSelection({
   webGalleries?: { id: string; title: string }[];
   children: ReactNode;
 }) {
+  const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   // The photo, not its position: a refresh (an upload finishing) reorders the grid.
   const lastClicked = useRef<string | null>(null);
@@ -69,6 +71,8 @@ export function PhotoSelection({
   const [webTarget, setWebTarget] = useState("");
   const [copying, setCopying] = useState<{ done: number; total: number } | null>(null);
   const [copyResult, setCopyResult] = useState<CopyResult | null>(null);
+  const isCopying = copying !== null;
+  const busy = pending || isCopying;
 
   const sync = () => rootRef.current && setPicked(readPicked(rootRef.current));
   const clear = () => {
@@ -84,11 +88,19 @@ export function PhotoSelection({
   }, [children]);
 
   useEffect(() => {
-    if (picked.length === 0) return;
+    if (picked.length === 0 || busy) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && clear();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [picked.length]);
+  }, [picked.length, busy]);
+
+  // The copy runs from this page: closing it stops whatever has not gone yet.
+  useEffect(() => {
+    if (!isCopying) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isCopying]);
 
   const run = (action: () => Promise<unknown>) =>
     startTransition(async () => {
@@ -96,46 +108,50 @@ export function PhotoSelection({
       clear();
     });
 
-  // A failure keeps the selection: copying again is one click, and what has
-  // landed is skipped by its file identity (copyPhotosToWebGalleryFor).
-  const copyToWeb = () => {
+  // Not a transition: React would hold every other one, a click on a link
+  // included, until the whole copy has finished. A failure keeps the selection:
+  // copying again is one click, and what has landed is skipped by its file
+  // identity (copyPhotosToWebGalleryFor).
+  const copyToWeb = async () => {
     const ids = picked.map((photo) => photo.id);
     const galleryId = webTarget;
     const galleryTitle = webGalleries.find((gallery) => gallery.id === galleryId)?.title ?? "";
     setCopyResult(null);
     setCopying({ done: 0, total: ids.length });
-    startTransition(async () => {
-      let copied = 0;
-      let skipped = 0;
-      let failed = 0;
-      let stopped = false;
-      for (let start = 0; start < ids.length && !stopped; start += COPY_CHUNK) {
-        try {
-          const chunk = ids.slice(start, start + COPY_CHUNK);
-          const result = await copyPhotosToWebGallery(galleryId, chunk);
-          copied += result.copied;
-          skipped += result.skipped;
-          failed += result.failed;
-          setCopying({ done: start + chunk.length, total: ids.length });
-        } catch {
-          stopped = true;
-        }
+    let copied = 0;
+    let skipped = 0;
+    let failed = 0;
+    let stopped = false;
+    for (let start = 0; start < ids.length && !stopped; start += COPY_CHUNK) {
+      try {
+        const chunk = ids.slice(start, start + COPY_CHUNK);
+        const result = await copyPhotosToWebGallery(galleryId, chunk);
+        copied += result.copied;
+        skipped += result.skipped;
+        failed += result.failed;
+        setCopying({ done: start + chunk.length, total: ids.length });
+      } catch (error) {
+        console.error("[web-gallery] copy stopped:", error);
+        stopped = true;
       }
-      const summary =
-        `Zkopírováno na web: ${pluralize(copied, FORMS.photo)}` +
-        (skipped > 0 ? `, přeskočeno: ${pluralize(skipped, FORMS.photo)}` : "") +
-        (failed > 0 ? `, nepovedlo se: ${pluralize(failed, FORMS.photo)}` : "");
-      setCopyResult({
-        text:
-          stopped || failed > 0
-            ? `${summary}. ${stopped ? "Kopírování se přerušilo. " : ""}Zkus to znovu, hotové fotky se přeskočí.`
-            : summary,
-        galleryId,
-        galleryTitle,
-      });
-      setCopying(null);
-      if (!stopped && failed === 0) clear();
+    }
+    const summary =
+      `Zkopírováno na web: ${pluralize(copied, FORMS.photo)}` +
+      (skipped > 0 ? `, přeskočeno: ${pluralize(skipped, FORMS.photo)}` : "") +
+      (failed > 0 ? `, nepovedlo se: ${pluralize(failed, FORMS.photo)}` : "");
+    setCopyResult({
+      text: stopped
+        ? `${summary}. Kopírování se přerušilo. Zkus to znovu, hotové fotky se přeskočí. Když to nepomůže, obnov stránku.`
+        : failed > 0
+          ? `${summary}. Zkus to znovu, hotové fotky se přeskočí.`
+          : summary,
+      galleryId,
+      galleryTitle,
     });
+    setCopying(null);
+    if (!stopped && failed === 0) clear();
+    // Once, at the end: Back to the target would otherwise restore it without them.
+    if (copied > 0) router.refresh();
   };
 
   const single = picked.length === 1 ? picked[0]! : null;
@@ -172,17 +188,23 @@ export function PhotoSelection({
       }}
       // No text selection on a shift-click; the padding keeps the last row above the
       // bar, which wraps to five lines on a phone with a web gallery to copy to.
-      className={`select-none ${picked.length > 0 || copyResult ? "pb-72 sm:pb-28" : ""}`}
+      className={`select-none ${
+        picked.length > 0 && copyResult
+          ? "pb-96 sm:pb-44"
+          : picked.length > 0 || copyResult
+            ? "pb-72 sm:pb-28"
+            : ""
+      }`}
     >
       {/* Inert while an action runs: a selection made now would be cleared
           by it the moment it finishes. */}
-      <div inert={pending}>{children}</div>
+      <div inert={busy}>{children}</div>
 
+      <p className="sr-only" aria-live="polite">
+        {picked.length > 0 ? `Vybráno: ${pluralize(picked.length, FORMS.photo)}` : ""}
+      </p>
       <p role="status" className="sr-only">
-        {copying
-          ? `Kopíruji na web: ${pluralize(copying.total, FORMS.photo)}`
-          : (copyResult?.text ??
-            (picked.length > 0 ? `Vybráno: ${pluralize(picked.length, FORMS.photo)}` : ""))}
+        {copying ? `Kopíruji na web: ${pluralize(copying.total, FORMS.photo)}` : copyResult?.text}
       </p>
 
       {(picked.length > 0 || copyResult) && (
@@ -219,7 +241,7 @@ export function PhotoSelection({
                 <Button
                   variant="secondary"
                   size="lg"
-                  disabled={pending}
+                  disabled={busy}
                   onClick={() =>
                     run(() => setGalleryCover(galleryId, single.isCover ? null : single.id))
                   }
@@ -238,7 +260,7 @@ export function PhotoSelection({
                   <Button
                     variant="secondary"
                     size="lg"
-                    disabled={pending}
+                    disabled={busy}
                     onClick={() =>
                       run(() =>
                         setHighlightPin(
@@ -275,10 +297,10 @@ export function PhotoSelection({
                   <Button
                     variant="secondary"
                     size="lg"
-                    disabled={pending || !webTarget}
+                    disabled={busy || !webTarget}
                     // Working, not unavailable: greyed out, this is what looked dead.
                     className={copying ? "disabled:opacity-100!" : undefined}
-                    onClick={copyToWeb}
+                    onClick={() => void copyToWeb()}
                   >
                     {copying ? (
                       <>
@@ -299,7 +321,7 @@ export function PhotoSelection({
               <Button
                 variant="destructive"
                 size="lg"
-                disabled={pending}
+                disabled={busy}
                 onClick={() => {
                   const what =
                     picked.length === 1 ? "fotku" : pluralize(picked.length, FORMS.photo);
@@ -309,7 +331,7 @@ export function PhotoSelection({
               >
                 Smazat
               </Button>
-              <Button variant="ghost" size="lg" disabled={pending} onClick={clear}>
+              <Button variant="ghost" size="lg" disabled={busy} onClick={clear}>
                 Zrušit výběr
               </Button>
             </div>

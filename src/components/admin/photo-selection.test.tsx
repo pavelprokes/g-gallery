@@ -8,6 +8,8 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/app/admin/actions", () => actions);
 vi.mock("@/app/admin/highlight-actions", () => ({ setHighlightPin: vi.fn() }));
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { PhotoSelection } from "./photo-selection";
 
@@ -94,6 +96,25 @@ describe("copying the selection to a web gallery", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Zkopírováno na web: 61 fotek");
     expect(screen.queryByRole("progressbar")).toBeNull();
     expect(screen.queryByRole("toolbar")).toBeNull();
+    // Once, not per chunk: it renders the whole page.
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("while copying, Escape does not drop the selection and leaving the page asks", async () => {
+    const answers: ((value: ReturnType<typeof result>) => void)[] = [];
+    actions.copyPhotosToWebGallery.mockImplementation(
+      () => new Promise((resolve) => answers.push(resolve)),
+    );
+    startCopy(2);
+    await screen.findByRole("button", { name: "Kopíruji 0 / 2" });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("toolbar")).toHaveTextContent("Vybráno: 2 fotky");
+    expect(fireEvent(window, new Event("beforeunload", { cancelable: true }))).toBe(false);
+
+    act(() => answers[0]!(result(2)));
+    await screen.findByRole("link", { name: /Eliška a Martin/ });
+    expect(fireEvent(window, new Event("beforeunload", { cancelable: true }))).toBe(true);
   });
 
   it("stops on a failed call, says how far it got, and keeps the selection to try again", async () => {

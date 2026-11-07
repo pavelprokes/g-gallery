@@ -611,7 +611,7 @@ const copyToWebSchema = z.object({
 /**
  * Copies the selected photos into a web gallery (docs/WEB-GALLERIES.md). No
  * revalidatePath: it would render the page the bar is on, a whole gallery, for
- * each chunk, and the target is a dynamic page that renders fresh when opened.
+ * each chunk. The bar refreshes the router once when it has finished.
  */
 export async function copyPhotosToWebGallery(targetGalleryId: string, photoIds: string[]) {
   const session = await requireAdmin();
