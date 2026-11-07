@@ -92,6 +92,7 @@ describe("couplesToSuggest", () => {
     day: new Date("2026-06-01"),
     ownPhotos: 100,
     onWebsite: false,
+    offerable: true,
     ...fields,
   });
   const ids = (galleries: CoupleGallery[]) => couplesToSuggest(galleries).map(({ id }) => id);
@@ -117,6 +118,16 @@ describe("couplesToSuggest", () => {
         couple("day", { eventId: "w", ownPhotos: 400 }),
       ]),
     ).toEqual(["day"]);
+  });
+
+  it("offers nothing unofferable, which still covers its wedding", () => {
+    expect(
+      ids([
+        couple("draft", { offerable: false }),
+        couple("unpublished", { eventId: "w", offerable: false, onWebsite: true }),
+        couple("sibling", { eventId: "w" }),
+      ]),
+    ).toEqual([]);
   });
 
   it("counts a wedding as covered by any of its galleries", () => {

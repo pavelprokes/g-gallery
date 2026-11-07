@@ -39,7 +39,7 @@ export function WebPlaceCard({
   const view = describePlace(place, gallery);
   const state = STATE[view.state];
   const rejected = view.tiles.filter((tile) => tile.rejected).length;
-  const page = `${websiteBase}${place.where}`;
+  const page = new URL(place.where, websiteBase).href;
 
   return (
     <Card as="section" className="flex flex-col gap-3">

@@ -27,11 +27,11 @@ export default async function WebPlacesPage(props: PageProps<"/admin/web">) {
   if (!session) redirect("/sign-in?next=/admin/web");
 
   const search = await props.searchParams;
-  const from = Math.max(Number(search.doporuceni) || 0, 0);
+  const askedFrom = Math.max(Number(search.doporuceni) || 0, 0);
   const base = websiteBase();
-  const [places, { suggestions, total }, portfolio] = await Promise.all([
+  const [places, { suggestions, total, from }, portfolio] = await Promise.all([
     fetchWebPlaces(),
-    webSuggestionsFor(session.user.id, from),
+    webSuggestionsFor(session.user.id, askedFrom),
     portfolioGalleriesFor(session.user.id),
   ]);
   const [galleries, options] = places
@@ -50,6 +50,15 @@ export default async function WebPlacesPage(props: PageProps<"/admin/web">) {
       />
       {search.chyba === "adresa" && (
         <Alert tone="danger">Tahle adresa v portfoliu už je obsazená, vyber prosím jinou.</Alert>
+      )}
+      {search.chyba === "kopie" && (
+        <Alert tone="danger">Fotky se nepodařilo zkopírovat, nic nevzniklo. Zkus to znovu.</Alert>
+      )}
+      {search.chyba === "cast" && (
+        <Alert tone="danger">
+          Některé fotky se nepodařilo zkopírovat. Koncept je v Portfoliu, zbylé fotky doplníš
+          tlačítkem Kopírovat na web ve výběru fotek.
+        </Alert>
       )}
       {search.chyba === "vstup" && (
         <Alert tone="danger">
@@ -70,7 +79,7 @@ export default async function WebPlacesPage(props: PageProps<"/admin/web">) {
             )}
           </div>
           {suggestions.map((suggestion) => (
-            <WebSuggestionCard key={suggestion.id} suggestion={suggestion} />
+            <WebSuggestionCard key={suggestion.id} suggestion={suggestion} from={from} />
           ))}
         </section>
       )}

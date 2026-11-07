@@ -100,7 +100,7 @@ describe("addSuggestionToPortfolio", () => {
   });
 
   it("makes the draft for the owner and goes to it", async () => {
-    places.createPortfolioGalleryFor.mockResolvedValue("new");
+    places.createPortfolioGalleryFor.mockResolvedValue({ id: "new", copied: 1, failed: 0 });
     await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
       "REDIRECT /admin/g/new",
     );
@@ -113,17 +113,29 @@ describe("addSuggestionToPortfolio", () => {
     ["no photo", "anna-a-petr", []],
   ])("refuses %s", async (_what, slug, photos) => {
     await expect(addSuggestionToPortfolio(ID, suggestion(slug, photos))).rejects.toThrow(
-      "REDIRECT /admin/web?chyba=vstup",
+      "REDIRECT /admin/web?chyba=vstup&doporuceni=0",
     );
     expect(places.createPortfolioGalleryFor).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["none copied", { id: "new", copied: 0, failed: 2 }, "kopie"],
+    ["some copied", { id: "new", copied: 1, failed: 1 }, "cast"],
+  ])("says so when %s", async (_what, made, problem) => {
+    places.createPortfolioGalleryFor.mockResolvedValue(made);
+    await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
+      `REDIRECT /admin/web?chyba=${problem}&doporuceni=0`,
+    );
   });
 
   it("says so when the address is taken", async () => {
     places.createPortfolioGalleryFor.mockRejectedValue(
       Object.assign(new Error(), { code: "P2002" }),
     );
-    await expect(addSuggestionToPortfolio(ID, suggestion("anna-a-petr"))).rejects.toThrow(
-      "REDIRECT /admin/web?chyba=adresa",
+    const form = suggestion("anna-a-petr");
+    form.set("from", "3");
+    await expect(addSuggestionToPortfolio(ID, form)).rejects.toThrow(
+      "REDIRECT /admin/web?chyba=adresa&doporuceni=3",
     );
   });
 });

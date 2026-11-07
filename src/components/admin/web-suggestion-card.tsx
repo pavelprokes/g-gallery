@@ -10,7 +10,10 @@ import { slugify } from "@/lib/gallery-slug";
 /** A couple with no web gallery yet, and photos to start one with. Unticking leaves one out. */
 export function WebSuggestionCard({
   suggestion,
+  from,
 }: {
+  /** Which page of suggestions this is on, to come back to it after a problem. */
+  from: number;
   suggestion: {
     id: string;
     name: string;
@@ -47,6 +50,7 @@ export function WebSuggestionCard({
           </li>
         ))}
       </ul>
+      <input type="hidden" name="from" value={from} />
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-1 basis-56 text-xs font-semibold">
           Adresa v portfoliu

@@ -29,19 +29,25 @@ export function WebPortfolioList({
       <CardTitle className="mb-3">Portfolio</CardTitle>
       <Card as="ul" flush className="divide-admin-border divide-y">
         {galleries.map((gallery) => {
-          const page = `${websiteBase}/portfolio/${gallery.webSlug}`;
+          // A draft may have no page on the website yet.
+          const page =
+            gallery.status === "PUBLISHED" ? `${websiteBase}/portfolio/${gallery.webSlug}` : null;
           return (
             <li key={gallery.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3">
               <CoverThumb cover={gallery.coverPhoto ?? gallery.photos[0] ?? null} />
               <div className="min-w-0 flex-1 basis-48">
-                <a
-                  href={page}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
-                  {gallery.title}
-                </a>
+                {page ? (
+                  <a
+                    href={page}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:underline"
+                  >
+                    {gallery.title}
+                  </a>
+                ) : (
+                  <p className="font-medium">{gallery.title}</p>
+                )}
                 <p className="text-admin-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                   {gallery.status !== "PUBLISHED" && <Badge tone="warning">Koncept</Badge>}
                   <span>
@@ -50,14 +56,16 @@ export function WebPortfolioList({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={page}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonClasses("secondary", "md")}
-                >
-                  Na webu ↗
-                </a>
+                {page && (
+                  <a
+                    href={page}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClasses("secondary", "md")}
+                  >
+                    Na webu ↗
+                  </a>
+                )}
                 <Link href={`/admin/g/${gallery.id}`} className={buttonClasses("primary", "md")}>
                   Otevřít galerii
                 </Link>

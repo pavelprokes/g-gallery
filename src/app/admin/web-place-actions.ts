@@ -69,21 +69,26 @@ export async function addSuggestionToPortfolio(sourceId: string, formData: FormD
     webSlug: formData.get("webSlug"),
     photoIds: formData.getAll("photo"),
   });
-  if (!source.success || !input.success) redirect("/admin/web?chyba=vstup");
+  // Back to the suggestions it was on, saying what went wrong.
+  const page = Number(formData.get("from")) || 0;
+  const back = (problem: string) => redirect(`/admin/web?chyba=${problem}&doporuceni=${page}`);
+  if (!source.success || !input.success) return back("vstup");
 
-  let id: string;
+  let made;
   try {
-    id = await createPortfolioGalleryFor(
+    made = await createPortfolioGalleryFor(
       session.user.id,
       source.data,
       input.data.webSlug,
       input.data.photoIds,
     );
   } catch (error) {
-    if ((error as { code?: string }).code === "P2002") redirect("/admin/web?chyba=adresa");
+    if ((error as { code?: string }).code === "P2002") return back("adresa");
     throw error;
   }
   revalidatePath("/admin");
   revalidatePath("/admin/web");
-  redirect(`/admin/g/${id}`);
+  if (made.copied === 0) return back("kopie");
+  if (made.failed > 0) return back("cast");
+  redirect(`/admin/g/${made.id}`);
 }

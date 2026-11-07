@@ -181,9 +181,13 @@ export const SUGGESTIONS_PER_PAGE = 3;
  * highlights, so pins and ratings from Lightroom count. `from` pages through them, because some
  * galleries are not for the website and there is nothing to mark them with.
  */
-export async function webSuggestionsFor(ownerId: string, from: number) {
+export async function webSuggestionsFor(ownerId: string, askedFrom: number) {
+  // Portfolio galleries only: a place holds single photos from many weddings.
   const webPhotos = await prisma.photo.findMany({
-    where: { status: "CONFIRMED", gallery: { ownerId, webSlug: { not: null } } },
+    where: {
+      status: "CONFIRMED",
+      gallery: { ownerId, webSlug: { not: null }, NOT: { webSlug: { startsWith: "misto-" } } },
+    },
     select: { fileName: true, crc32: true, etag: true },
   });
   const onWebsite = new Set(webPhotos.map(fileIdentity));
@@ -191,7 +195,7 @@ export async function webSuggestionsFor(ownerId: string, from: number) {
     where: {
       status: "CONFIRMED",
       fileName: { in: [...new Set(webPhotos.map((photo) => photo.fileName))] },
-      gallery: { ownerId, webSlug: null, trashedAt: null },
+      gallery: { ownerId, webSlug: null },
     },
     select: { galleryId: true, fileName: true, crc32: true, etag: true },
   });
@@ -200,10 +204,12 @@ export async function webSuggestionsFor(ownerId: string, from: number) {
   );
 
   const galleries = await prisma.gallery.findMany({
-    where: { ownerId, webSlug: null, trashedAt: null, status: "PUBLISHED" },
+    where: { ownerId, webSlug: null },
     select: {
       id: true,
       title: true,
+      status: true,
+      trashedAt: true,
       eventId: true,
       eventDate: true,
       createdAt: true,
@@ -218,8 +224,13 @@ export async function webSuggestionsFor(ownerId: string, from: number) {
       day: gallery.eventDate ?? gallery.event?.eventDate ?? gallery.createdAt,
       ownPhotos: gallery._count.photos,
       onWebsite: covered.has(gallery.id),
+      // "Web:" is what this page names its galleries: one taken out of a place loses its slug.
+      offerable:
+        gallery.status === "PUBLISHED" && !gallery.trashedAt && !/^web[: ]/i.test(gallery.title),
     })),
   );
+  // Past the end, as after adding the only couple on the last page: from the start again.
+  const from = askedFrom < couples.length ? askedFrom : 0;
 
   const suggestions = await Promise.all(
     couples.slice(from, from + SUGGESTIONS_PER_PAGE).map(async (couple) => {
@@ -249,20 +260,21 @@ export async function webSuggestionsFor(ownerId: string, from: number) {
       };
     }),
   );
-  return { suggestions, total: couples.length };
+  return { suggestions, total: couples.length, from };
 }
 
 /**
  * A draft web gallery for a couple, with the chosen photos copied in. A taken address throws
- * (P2002) before anything is created. The website shows it once it is published and the portfolio
- * has a page at the same address.
+ * (P2002) before anything is created, and a draft none of whose photos copied is removed again, or
+ * it would hold the address. The website shows it once it is published and the portfolio has a page
+ * at the same address.
  */
 export async function createPortfolioGalleryFor(
   ownerId: string,
   sourceId: string,
   webSlug: string,
   photoIds: string[],
-): Promise<string> {
+): Promise<{ id: string; copied: number; failed: number }> {
   const source = await prisma.gallery.findFirst({
     where: { id: sourceId, ownerId, trashedAt: null },
     select: { title: true, eventDate: true, event: { select: { title: true, eventDate: true } } },
@@ -271,13 +283,15 @@ export async function createPortfolioGalleryFor(
   const { id } = await prisma.gallery.create({
     data: {
       ownerId,
-      title: `Web: ${source.event?.title ?? source.title}`,
+      // A gallery's title may be 200 characters; its settings would refuse a longer one.
+      title: `Web: ${source.event?.title ?? source.title}`.slice(0, 200),
       eventDate: source.eventDate ?? source.event?.eventDate ?? null,
       storagePrefix: generateStoragePrefix(),
       webSlug,
     },
     select: { id: true },
   });
-  await copyPhotosToWebGalleryFor(ownerId, id, photoIds);
-  return id;
+  const { copied, failed } = await copyPhotosToWebGalleryFor(ownerId, id, photoIds);
+  if (copied === 0) await prisma.gallery.delete({ where: { id } });
+  return { id, copied, failed };
 }

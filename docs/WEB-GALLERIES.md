@@ -32,8 +32,11 @@ landscape works, keeps the website's old photo. `/admin/web` warns about both.
 `/admin/web` offers couples with no web gallery yet, three at a time, newest first. A couple is one
 wedding's galleries, or a gallery on its own, with at least 20 own photos and published. There is no
 link from a web gallery to its source, because photos are copied, so **the copied files are the
-signal**: a couple is covered once any of its photos is in a web gallery, by file identity. The
-photos offered are the guests' highlight pick, at eight, so Lightroom's ratings and pins count.
+signal**: a couple is covered once any of its photos is in a portfolio gallery, by file identity,
+and not a place's, which holds single photos from many weddings. The photos offered are the guests'
+highlight pick, at eight, so Lightroom's ratings and pins count. Ceiling: replacing every copied file
+breaks the match, and the couple is offered again; the address is then taken, so nothing doubles.
+A real link would be a nullable column on the web gallery, if that happens in practice.
 
 "Přidat na web" makes a draft with the ticked photos, at the address given. The address must match a
 page in the website's portfolio (Prismic owns those), and a draft shows nothing there. Some galleries
