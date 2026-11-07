@@ -158,7 +158,9 @@ test("a photo opens large and the others page on from it", async ({ page }) => {
   await expect(dialog.getByText("2 / 6")).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
+  // Out of the page, not just closed, which is all a role sees: the `close` event comes a
+  // moment later, and pressing again before it (no person could) would not open it.
+  await expect(page.locator("dialog")).toHaveCount(0);
 
   // Esc closes the photo and leaves a selection alone.
   await page
@@ -170,6 +172,23 @@ test("a photo opens large and the others page on from it", async ({ page }) => {
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("toolbar")).toContainText("Vybráno: 1 fotka");
+});
+
+test("the website's page suggests couples, and links to each gallery and page", async ({
+  page,
+}) => {
+  await page.goto("/admin/web");
+  const suggestion = page.locator('form:has(input[name="webSlug"])').first();
+  await expect(suggestion.getByRole("button", { name: "Přidat na web" })).toBeVisible();
+  await expect(suggestion.locator('input[name="photo"]:checked')).not.toHaveCount(0);
+  await expect(suggestion.locator('input[name="webSlug"]')).toHaveValue(/^[a-z0-9-]+$/);
+
+  const portfolio = page.getByRole("listitem").filter({ hasText: /^E2E Web cíl chromium/ });
+  // A draft: it may have no page on the website yet.
+  await expect(portfolio.getByRole("link", { name: /Na webu/ })).toHaveCount(0);
+  await portfolio.getByRole("link", { name: "Otevřít galerii" }).click();
+  await expect(page).toHaveURL(/\/admin\/g\//);
+  await expect(page.getByRole("heading", { name: "E2E Web cíl chromium" })).toBeVisible();
 });
 
 test("the panels sit under the photos, a jump away", async ({ page }) => {

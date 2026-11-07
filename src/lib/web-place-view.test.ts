@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { describePlace, type PlaceGallery, type PlacePhoto, type WebPlace } from "./web-place-view";
+import {
+  couplesToSuggest,
+  describePlace,
+  type CoupleGallery,
+  type PlaceGallery,
+  type PlacePhoto,
+  type WebPlace,
+} from "./web-place-view";
 
 const place: WebPlace = {
   key: "misto-homepage",
@@ -75,5 +82,60 @@ describe("describePlace", () => {
   it("counts the photos no position uses, from the gallery's real total", () => {
     const g = gallery([photo("a"), photo("b"), photo("c"), photo("d")], { photoCount: 500 });
     expect(describePlace(place, g).unused).toBe(497);
+  });
+});
+
+describe("couplesToSuggest", () => {
+  const couple = (id: string, fields: Partial<CoupleGallery> = {}): CoupleGallery => ({
+    id,
+    eventId: null,
+    day: new Date("2026-06-01"),
+    ownPhotos: 100,
+    onWebsite: false,
+    offerable: true,
+    ...fields,
+  });
+  const ids = (galleries: CoupleGallery[]) => couplesToSuggest(galleries).map(({ id }) => id);
+
+  it("offers the newest first, and only what has enough photos", () => {
+    expect(
+      ids([
+        couple("old", { day: new Date("2025-06-01") }),
+        couple("new", { day: new Date("2026-09-01") }),
+        couple("few", { ownPhotos: 19 }),
+      ]),
+    ).toEqual(["new", "old"]);
+  });
+
+  it("skips a gallery already on the website", () => {
+    expect(ids([couple("a", { onWebsite: true }), couple("b")])).toEqual(["b"]);
+  });
+
+  it("takes a wedding as one couple, by its fullest gallery", () => {
+    expect(
+      ids([
+        couple("preparations", { eventId: "w", ownPhotos: 40 }),
+        couple("day", { eventId: "w", ownPhotos: 400 }),
+      ]),
+    ).toEqual(["day"]);
+  });
+
+  it("offers nothing unofferable, which still covers its wedding", () => {
+    expect(
+      ids([
+        couple("draft", { offerable: false }),
+        couple("unpublished", { eventId: "w", offerable: false, onWebsite: true }),
+        couple("sibling", { eventId: "w" }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("counts a wedding as covered by any of its galleries", () => {
+    expect(
+      ids([
+        couple("preparations", { eventId: "w", onWebsite: true }),
+        couple("day", { eventId: "w", ownPhotos: 400 }),
+      ]),
+    ).toEqual([]);
   });
 });

@@ -81,3 +81,40 @@ export function describePlace(place: WebPlace, gallery: PlaceGallery | null): Pl
     unused: Math.max(0, (gallery?.photoCount ?? 0) - place.positions.length),
   };
 }
+
+export interface CoupleGallery {
+  id: string;
+  /** The wedding it belongs to: its galleries count as one couple. */
+  eventId: string | null;
+  /** The wedding's day, or the gallery's own. */
+  day: Date;
+  ownPhotos: number;
+  /** One of its photos is already in a portfolio gallery, copied (by file identity). */
+  onWebsite: boolean;
+  /** Could be offered: published, say. Any gallery still counts towards covering its wedding. */
+  offerable: boolean;
+}
+
+/** Fewer own photos than this is not a wedding to show off. */
+export const MIN_PHOTOS_TO_SUGGEST = 20;
+
+/**
+ * Who is not on the website yet, newest first: one gallery per couple, the fullest. A couple with
+ * any of its galleries' photos in the portfolio is covered. There is no link from a web gallery to
+ * its source, because photos are copied (docs/WEB-GALLERIES.md), so the copied files are the signal.
+ */
+export function couplesToSuggest<T extends CoupleGallery>(galleries: readonly T[]): T[] {
+  const coveredWeddings = new Set(
+    galleries.filter((gallery) => gallery.onWebsite).flatMap((gallery) => gallery.eventId ?? []),
+  );
+  const fullest = new Map<string, T>();
+  for (const gallery of galleries) {
+    if (!gallery.offerable || gallery.onWebsite) continue;
+    if (gallery.ownPhotos < MIN_PHOTOS_TO_SUGGEST) continue;
+    if (gallery.eventId && coveredWeddings.has(gallery.eventId)) continue;
+    const couple = gallery.eventId ?? gallery.id;
+    const best = fullest.get(couple);
+    if (!best || gallery.ownPhotos > best.ownPhotos) fullest.set(couple, gallery);
+  }
+  return [...fullest.values()].sort((a, b) => b.day.getTime() - a.day.getTime());
+}
