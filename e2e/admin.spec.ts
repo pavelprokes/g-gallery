@@ -158,8 +158,9 @@ test("a photo opens large and the others page on from it", async ({ page }) => {
   await expect(dialog.getByText("2 / 6")).toBeVisible();
 
   await page.keyboard.press("Escape");
-  // Gone, not just closed: the `close` event comes a task later, faster than a person.
-  await expect(dialog).toHaveCount(0);
+  // Out of the page, not just closed, which is all a role sees: the `close` event comes a
+  // moment later, and pressing again before it (no person could) would not open it.
+  await expect(page.locator("dialog")).toHaveCount(0);
 
   // Esc closes the photo and leaves a selection alone.
   await page
