@@ -41,7 +41,6 @@ export function WebPortfolioList({
       </div>
       <Card as="ul" flush className="divide-admin-border divide-y">
         {galleries.map((gallery) => {
-          const visits = gallery.webSlug ? statsOf.get(gallery.webSlug) : undefined;
           // A draft may have no page on the website yet.
           const page =
             gallery.status === "PUBLISHED" ? `${websiteBase}/portfolio/${gallery.webSlug}` : null;
@@ -67,17 +66,7 @@ export function WebPortfolioList({
                     {gallery.webSlug} · {pluralize(gallery._count.photos, FORMS.photo)}
                   </span>
                 </p>
-                {stats && gallery.status === "PUBLISHED" && (
-                  <p className="text-admin-muted mt-1 text-xs tabular-nums">
-                    <span className="text-brand-ink font-semibold">
-                      {pluralize(visits?.albumVisits ?? 0, FORMS.visit)} alba
-                    </span>
-                    {" · "}
-                    fotku otevřelo {visits?.photoOpens ?? 0}
-                    {" · "}
-                    {visits?.photoViews ?? 0} zobrazení fotek za 90 dní
-                  </p>
-                )}
+                {stats && page && <WebsiteVisits visits={statsOf.get(gallery.webSlug ?? "")} />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {page && (
@@ -99,5 +88,25 @@ export function WebPortfolioList({
         })}
       </Card>
     </section>
+  );
+}
+
+function WebsiteVisits({ visits }: { visits: WebStats["galleries"][number] | undefined }) {
+  // The website lists only pages with visits, so this may also be an address that differs from it.
+  if (!visits) {
+    return (
+      <p className="text-admin-muted mt-1 text-xs">
+        Za 90 dní bez návštěv, nebo se adresa liší od stránky v portfoliu.
+      </p>
+    );
+  }
+  return (
+    <p className="text-admin-muted mt-1 text-xs tabular-nums">
+      <span className="text-brand-ink font-semibold">
+        {pluralize(visits.albumVisits, FORMS.visit)} alba
+      </span>
+      , z toho {visits.photoOpens} s otevřenou fotkou · {visits.photoViews} zobrazení fotek za 90
+      dní
+    </p>
   );
 }

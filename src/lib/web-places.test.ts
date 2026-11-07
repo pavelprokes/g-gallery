@@ -37,6 +37,7 @@ beforeEach(() => {
 
 describe("fetchWebStats", () => {
   const stats = {
+    range: "90",
     indexViews: 40,
     galleries: [{ uid: "a-2026", albumVisits: 12, photoOpens: 5, photoViews: 31 }],
   };
@@ -60,10 +61,14 @@ describe("fetchWebStats", () => {
 
   it("costs the page nothing when the website refuses, is down, or answers nonsense", async () => {
     env.WEBSITE_STATS_TOKEN = "secret";
-    answer({}, false);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 401 } as Response);
     await expect(fetchWebStats()).resolves.toBeNull();
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), 401);
     answer({ galleries: "nope" });
+    await expect(fetchWebStats()).resolves.toBeNull();
+    // Another period than the page's label says.
+    answer({ ...stats, range: "365" });
     await expect(fetchWebStats()).resolves.toBeNull();
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
     await expect(fetchWebStats()).resolves.toBeNull();

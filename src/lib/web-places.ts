@@ -61,6 +61,8 @@ export async function fetchWebPlaces(): Promise<WebPlace[] | null> {
 }
 
 const statsSchema = z.object({
+  // The page says "za 90 dní": if the website answers for another period, show no numbers.
+  range: z.literal("90"),
   indexViews: z.number(),
   galleries: z.array(
     z.object({
@@ -77,7 +79,7 @@ export type WebStats = z.infer<typeof statsSchema>;
 /**
  * How often each portfolio page's album and photos were opened in the last 90 days. The website
  * owns these numbers (its own analytics). Null, and no numbers on the page, without a token or when
- * it does not answer: they must not cost the page.
+ * it does not answer: they must not cost the page, so the wait is short.
  */
 export async function fetchWebStats(): Promise<WebStats | null> {
   const token = serverEnv().WEBSITE_STATS_TOKEN;
@@ -86,9 +88,13 @@ export async function fetchWebStats(): Promise<WebStats | null> {
     const response = await fetch(`${websiteBase()}/api/photo-stats?range=90`, {
       headers: { authorization: `Bearer ${token}` },
       cache: "no-store",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      // A token that does not match looks like none on the page; say so here.
+      console.error("[web-places] The website refused its stats:", response.status);
+      return null;
+    }
     return statsSchema.parse(await response.json());
   } catch (error) {
     console.error("[web-places] Cannot read the website's stats:", error);

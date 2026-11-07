@@ -47,18 +47,32 @@ describe("WebPortfolioList", () => {
     expect(screen.getByRole("link", { name: "Otevřít galerii" })).toBeInTheDocument();
   });
 
+  const stats = (uid: string): WebStats => ({
+    range: "90",
+    indexViews: 40,
+    galleries: [{ uid, albumVisits: 12, photoOpens: 5, photoViews: 31 }],
+  });
+
   it("shows the website's numbers beside a page, and nothing without them", () => {
-    const { unmount } = list("PUBLISHED", {
-      indexViews: 40,
-      galleries: [{ uid: "eliska-a-martin-2026", albumVisits: 12, photoOpens: 5, photoViews: 31 }],
-    });
+    const { unmount } = list("PUBLISHED", stats("eliska-a-martin-2026"));
     expect(screen.getByText("12 návštěv alba")).toBeInTheDocument();
-    expect(screen.getByText(/fotku otevřelo 5/)).toBeInTheDocument();
+    expect(screen.getByText(/z toho 5 s otevřenou fotkou/)).toBeInTheDocument();
     expect(screen.getByText(/31 zobrazení fotek za 90 dní/)).toBeInTheDocument();
     expect(screen.getByText(/40 zobrazení za 90 dní/)).toBeInTheDocument();
     unmount();
 
     list("PUBLISHED");
-    expect(screen.queryByText(/za 90 dní/)).toBeNull();
+    expect(screen.queryByText(/90 dní/)).toBeNull();
+  });
+
+  it("does not pass a page missing from the numbers off as zeros", () => {
+    list("PUBLISHED", stats("jina-adresa"));
+    expect(screen.getByText(/bez návštěv, nebo se adresa liší/)).toBeInTheDocument();
+    expect(screen.queryByText(/návštěv alba/)).toBeNull();
+  });
+
+  it("shows no numbers on a draft", () => {
+    list("DRAFT", stats("eliska-a-martin-2026"));
+    expect(screen.queryByText(/návštěv alba|bez návštěv/)).toBeNull();
   });
 });
