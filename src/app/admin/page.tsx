@@ -69,7 +69,7 @@ function ViewLine({ series }: { series: ViewSeries }) {
     <p className="text-admin-muted rows:sm:hidden mt-0.5 text-xs tabular-nums">
       <span className="text-brand-ink font-semibold">{pluralize(series.unique, FORMS.viewer)}</span>
       {" · "}
-      {pluralize(series.total, FORMS.visit)} · 14 dní
+      {pluralize(series.total, FORMS.visit)} za 14 dní
     </p>
   );
 }
@@ -82,12 +82,13 @@ const day = (date: Date) => formatDate(date, "cs").replaceAll(" ", "\u00a0");
 const ROW_LINK =
   "line-clamp-2 font-medium after:absolute after:inset-0 hover:underline rows:line-clamp-none";
 
-// Tiles by default, rows under `rows:` (AdminListView): one markup for both.
+// Tiles by default, rows under `rows:` (AdminListView): one markup for both. In rows the items'
+// bottom border is the line between them; `dark:` does not apply inside the admin shell.
 const LIST =
-  "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 rows:block rows:divide-y rows:divide-admin-border rows:rounded-xl rows:border rows:border-admin-border rows:bg-white dark:rows:divide-neutral-800 dark:rows:border-neutral-800 dark:rows:bg-neutral-900";
+  "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 rows:block rows:rounded-xl rows:border rows:border-admin-border rows:bg-white";
 const ITEM =
-  "relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-admin-border bg-white dark:border-neutral-800 dark:bg-neutral-900 rows:flex-row rows:flex-wrap rows:items-center rows:gap-x-4 rows:gap-y-3 rows:overflow-visible rows:rounded-none rows:border-0 rows:bg-transparent rows:p-4 dark:rows:bg-transparent";
-const ITEM_TEXT = "min-w-0 flex-1 p-3 rows:basis-48 rows:p-0";
+  "relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-admin-border bg-white rows:flex-row rows:flex-wrap rows:items-center rows:gap-x-4 rows:gap-y-3 rows:overflow-visible rows:rounded-none rows:border-x-0 rows:border-t-0 rows:bg-transparent rows:p-4 rows:last:border-b-0";
+const ITEM_TEXT = "min-w-0 flex-1 p-3 rows:basis-40 rows:p-0";
 const ITEM_ACTIONS =
   "relative z-10 mt-auto flex flex-wrap items-center gap-2 px-3 pb-3 rows:ml-auto rows:mt-0 rows:p-0";
 
@@ -260,13 +261,17 @@ export default async function AdminPage() {
                     </div>
                     <ViewStats series={series} max={eventMax} label={event.title} />
                     {token ? (
-                      <div className={`${ITEM_ACTIONS} rows:ml-0 rows:basis-full`}>
+                      <div className={`${ITEM_ACTIONS} rows:basis-full`}>
                         {/* The address takes a row's width; a tile has room for its button. */}
                         <div className="rows:block hidden min-w-0 flex-1 basis-56">
                           <CopyableLink href={`/s/${token}/${event.slug}`} />
                         </div>
                         <div className="rows:hidden">
-                          <CopyButton value={`/s/${token}/${event.slug}`} text="Odkaz" />
+                          <CopyButton
+                            value={`/s/${token}/${event.slug}`}
+                            text="Odkaz"
+                            label={`Kopírovat odkaz na svatbu ${event.title}`}
+                          />
                         </div>
                         {/* Right-aligned, as on every gallery row below — also when it wraps. */}
                         <div className="rows:ml-auto shrink-0">

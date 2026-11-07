@@ -93,6 +93,12 @@ test("the overview opens on tiles, and rows stay chosen for the session", async 
   await rows.click();
   await expect(rows).toHaveAttribute("aria-pressed", "true");
   expect(await widthOfCover()).toBe(64);
+  // A line between rows, none under the last.
+  const bottomBorder = (item: ReturnType<typeof page.locator>) =>
+    item.evaluate((li) => getComputedStyle(li).borderBottomWidth);
+  const items = page.locator("main ul").first().locator(":scope > li");
+  expect(await bottomBorder(items.first())).toBe("1px");
+  expect(await bottomBorder(items.last())).toBe("0px");
 
   await page.reload();
   await expect(rows).toHaveAttribute("aria-pressed", "true");

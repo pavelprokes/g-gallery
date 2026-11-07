@@ -20,16 +20,19 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Storage can throw where it is blocked; then the page simply stays on tiles. */
+/** Storage can throw where it is blocked: the switch then lasts as long as the page. */
+let unsaved: ListView = "tiles";
+
 function read(): ListView {
   try {
     return sessionStorage.getItem(KEY) === "rows" ? "rows" : "tiles";
   } catch {
-    return "tiles";
+    return unsaved;
   }
 }
 
 function choose(view: ListView) {
+  unsaved = view;
   try {
     sessionStorage.setItem(KEY, view);
   } catch {}
@@ -50,7 +53,8 @@ export function AdminListView({ children }: { children: ReactNode }) {
           <Button
             key={view}
             size="sm"
-            variant={view === current ? "primary" : "secondary"}
+            variant="secondary"
+            className="aria-pressed:border-brand-primary aria-pressed:bg-admin-accent-soft"
             aria-pressed={view === current}
             onClick={() => choose(view)}
           >

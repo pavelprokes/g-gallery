@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminListView } from "./admin-list-view";
 
 const shown = () => screen.getByText("seznam").parentElement!.getAttribute("data-view");
@@ -11,6 +11,7 @@ const setup = () =>
   );
 
 beforeEach(() => sessionStorage.clear());
+afterEach(() => vi.restoreAllMocks());
 
 describe("AdminListView", () => {
   it("opens on tiles", () => {
@@ -32,6 +33,19 @@ describe("AdminListView", () => {
     setup();
     expect(shown()).toBe("rows");
 
+    fireEvent.click(screen.getByRole("button", { name: "Dlaždice" }));
+    expect(shown()).toBe("tiles");
+  });
+
+  it("still switches where storage is blocked", () => {
+    const blocked = () => {
+      throw new DOMException("blocked", "SecurityError");
+    };
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(blocked);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Řádky" }));
+    expect(shown()).toBe("rows");
     fireEvent.click(screen.getByRole("button", { name: "Dlaždice" }));
     expect(shown()).toBe("tiles");
   });
