@@ -1,3 +1,4 @@
+import type { Route } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import fs from "node:fs";
 import path from "node:path";
@@ -48,6 +49,59 @@ test.describe("share gallery viewer", () => {
     expect(box!.height).toBeGreaterThan(0);
   });
 
+  test("the rows on screen fetch from the top, one once the row above has drawn", async ({
+    page,
+  }) => {
+    // docs/GALLERY-LOADING.md: every image is held until this test lets it go.
+    const pixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      "base64",
+    );
+    const held: Route[] = [];
+    await page.route(/\/photo-\d+\.jpg/, (route) => {
+      held.push(route);
+    });
+    await page.goto(`/g/${seed.token}/${seed.slug}`, { waitUntil: "domcontentloaded" });
+    const tiles = page
+      .getByRole("list", { name: "Fotky v galerii" })
+      .locator('button[aria-label^="Otevřít"]');
+    await expect.poll(async () => tiles.count()).toBe(seed.photoCount);
+
+    const positions = () =>
+      tiles.evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return {
+            top: Math.round(box.top),
+            onScreen: box.top < innerHeight && box.bottom > 0,
+            image: button.querySelector("img") !== null,
+          };
+        }),
+      );
+    // Tiles by index, not by position: a shifted layout must fail, not pass unchecked.
+    const atStart = await positions();
+    const tops = [...new Set(atStart.filter((tile) => tile.onScreen).map((tile) => tile.top))].sort(
+      (a, b) => a - b,
+    );
+    expect(tops.length).toBeGreaterThan(1);
+    const rowOf = atStart.map((tile) => tops.indexOf(tile.top));
+
+    for (const [row] of tops.entries()) {
+      const inRow = rowOf.filter((of) => of === row).length;
+      await expect.poll(() => held.length).toBe(inRow);
+      const now = await positions();
+      // This row is on its way, and no row below it has even asked.
+      rowOf.forEach((of, tile) => {
+        if (of === row) expect(now[tile]!.image, `tile ${tile}, row ${row}`).toBe(true);
+        if (of > row) expect(now[tile]!.image, `tile ${tile} below row ${row}`).toBe(false);
+      });
+      // A row answering within a second would let the rest of the screen go together.
+      await page.waitForTimeout(1_100);
+      for (const route of held.splice(0))
+        await route.fulfill({ contentType: "image/png", body: pixel });
+    }
+  });
+
   test("a tile shows the photo blurred before it arrives, or its colour", async ({ page }) => {
     // docs/GALLERY-LOADING.md: the seed gives every other photo a ThumbHash.
     // Images are held back so the tiles stay on their placeholder.
@@ -70,7 +124,8 @@ test.describe("share gallery viewer", () => {
 
   test("the first row is fetched first, and page one is not asked for again", async ({ page }) => {
     // docs/GALLERY-LOADING.md. This gallery has no film and no highlights,
-    // so the page opens on the grid's first row: it alone is eager and high.
+    // so the page opens on the grid's first row: it alone is high. Eager is every
+    // tile on screen, since the gate decides when those go; lazy is off screen.
     const photoPages: string[] = [];
     page.on("request", (request) => {
       if (/\/api\/g\/[^/]+\/photos/.test(request.url())) photoPages.push(request.url());
@@ -80,12 +135,23 @@ test.describe("share gallery viewer", () => {
     const images = page.getByRole("list", { name: "Fotky v galerii" }).locator("img");
     await expect(images.first()).toHaveAttribute("fetchpriority", "high");
     await expect(images.first()).toHaveAttribute("loading", "eager");
-    await expect(images.last()).toHaveAttribute("loading", "lazy");
-    await expect(images.last()).not.toHaveAttribute("fetchpriority", "high");
 
     // The seed is the server's own first page: hydrating must not refetch it.
     await page.waitForLoadState("networkidle");
     expect(photoPages).toEqual([]);
+
+    // Read in one go: the rows off screen mount their images as the screen draws.
+    const tiles = await images.evaluateAll((all) =>
+      all.map((image) => ({
+        top: image.getBoundingClientRect().top,
+        loading: image.getAttribute("loading"),
+        high: image.getAttribute("fetchpriority") === "high",
+      })),
+    );
+    for (const tile of tiles) {
+      expect(tile.loading).toBe(tile.top < page.viewportSize()!.height ? "eager" : "lazy");
+      expect(tile.high).toBe(tile.top === tiles[0]!.top);
+    }
   });
 
   test("previews in a chat with a resized cover, not the original", async ({ page }) => {

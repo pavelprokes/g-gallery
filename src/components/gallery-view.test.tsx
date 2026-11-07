@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // These controls carry no copy of their own beyond an aria-label; echoing the
@@ -131,6 +131,9 @@ describe("a long press on a tile", () => {
         height={120}
         index={0}
         priority={false}
+        row={0}
+        onScreen
+        screenGate={createScreenGate()}
         tabbable
         selectionActive={false}
         selected={false}
@@ -199,7 +202,7 @@ describe("PhotoTile and the screen gate", () => {
     faces: null,
     focus: null,
   };
-  const tile = (gate: ScreenGate, onScreen: boolean, screenClear: boolean) => (
+  const tile = (gate: ScreenGate, onScreen: boolean, row = 0, imageHeld = false) => (
     <PhotoTile
       photo={photo}
       // No browser-made thumbnail: the tile and its fallback are one image.
@@ -209,9 +212,10 @@ describe("PhotoTile and the screen gate", () => {
       height={120}
       index={0}
       priority={false}
+      row={row}
       onScreen={onScreen}
       screenGate={gate}
-      screenClear={screenClear}
+      imageHeld={imageHeld}
       tabbable
       selectionActive={false}
       selected={false}
@@ -234,39 +238,74 @@ describe("PhotoTile and the screen gate", () => {
     />
   );
 
+  const image = (container: HTMLElement) => container.querySelector("img");
+
+  afterEach(() => vi.useRealTimers());
+
   it("on screen, holds the gate until its image fails for good — once, with no thumbnail", () => {
     const gate = createScreenGate();
-    const { container } = render(tile(gate, true, false));
-    gate.open();
-    expect(gate.isClear()).toBe(false);
+    const { container } = render(tile(gate, true));
+    act(() => gate.open());
+    expect(gate.turn()).toBe(0);
     // The same image is all there is to fall back to: one error is final.
-    fireEvent.error(container.querySelector("img")!);
-    expect(gate.isClear()).toBe(true);
+    fireEvent.error(image(container)!);
+    expect(gate.turn()).toBe(Infinity);
   });
 
-  it("on screen, lets the gate go after a while if its image never answers", () => {
+  it("on screen, waits for the row above, then gives up on holding but keeps trying", () => {
     vi.useFakeTimers();
     const gate = createScreenGate();
-    render(tile(gate, true, false));
-    gate.open();
-    vi.advanceTimersByTime(15_000);
-    expect(gate.isClear()).toBe(true);
-    vi.useRealTimers();
+    gate.wait("above", 0);
+    const { container, rerender } = render(tile(gate, true, 1));
+    act(() => gate.open());
+    expect(image(container)).toBeNull();
+    // Only a row above that stops drawing lets this one go beside it.
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(image(container)).not.toBeNull();
+    // Its own deadline counts from asking, and nothing below it has to wait for it now.
+    act(() => vi.advanceTimersByTime(15_000));
+    act(() => gate.done("above"));
+    expect(gate.turn()).toBe(Infinity);
+    expect(image(container)).not.toBeNull();
+    // A hold (a chapter jump) passing over it does not leave it blank for good.
+    rerender(tile(gate, true, 1, true));
+    expect(image(container)).toBeNull();
+    rerender(tile(gate, true, 1));
+    expect(image(container)).not.toBeNull();
+  });
+
+  it("on screen, a download on its way stays; off screen with the gate shut, it goes", () => {
+    const gate = createScreenGate();
+    act(() => gate.open());
+    // An overscan row fetching while the gate is clear…
+    const { container, rerender } = render(tile(gate, false, 3));
+    expect(image(container)).not.toBeNull();
+    // …scrolled into view keeps what has arrived…
+    rerender(tile(gate, true, 3));
+    expect(image(container)).not.toBeNull();
+    // …and, undrawn and scrolled away with the next screen loading, lets it go.
+    act(() => gate.wait("next-screen", 2));
+    rerender(tile(gate, false, 3));
+    expect(image(container)).toBeNull();
+    // Back on screen, below the turn, it waits its turn like any other.
+    rerender(tile(gate, true, 5));
+    expect(image(container)).toBeNull();
   });
 
   it("off screen, fetches only while the gate is clear, and keeps what has drawn", () => {
     const gate = createScreenGate();
-    const { container, rerender } = render(tile(gate, false, false));
-    expect(container.querySelector("img")).toBeNull();
-    rerender(tile(gate, false, true));
-    expect(container.querySelector("img")).not.toBeNull();
+    const { container } = render(tile(gate, false));
+    expect(image(container)).toBeNull();
+    act(() => gate.open());
+    expect(image(container)).not.toBeNull();
     // The next row coming on screen shuts the gate: a download not yet drawn goes…
-    rerender(tile(gate, false, false));
-    expect(container.querySelector("img")).toBeNull();
+    act(() => gate.wait("on-screen", 0));
+    expect(image(container)).toBeNull();
+    act(() => gate.done("on-screen"));
+    expect(image(container)).not.toBeNull();
     // …one that has drawn stays.
-    rerender(tile(gate, false, true));
-    fireEvent.load(container.querySelector("img")!);
-    rerender(tile(gate, false, false));
-    expect(container.querySelector("img")).not.toBeNull();
+    fireEvent.load(image(container)!);
+    act(() => gate.wait("on-screen", 0));
+    expect(image(container)).not.toBeNull();
   });
 });

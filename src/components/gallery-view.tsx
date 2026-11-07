@@ -55,7 +55,7 @@ import { DEVICE_SIZES, QUALITY, fullWidthSrcSet } from "@/lib/image-sizes";
 import { connectionSignals, isSlowConnection, slowLightboxSizes } from "@/lib/slow-connection";
 import { placeholderStyle } from "@/lib/placeholder";
 import { blurStyle, blurStyleOf, thumbhashDataUrl } from "@/lib/thumbhash";
-import { createScreenGate, type ScreenGate } from "@/lib/screen-gate";
+import { createScreenGate, rowMayFetch, type ScreenGate } from "@/lib/screen-gate";
 import { GRID_GAP, justifyRows, type JustifiedRow } from "@/lib/justified-layout";
 import {
   buildGridEntries,
@@ -334,10 +334,11 @@ const LIGHTBOX_WARM_MS = 250;
 /** Appends the signed access grant (docs/PLAN.md §4.1) to an object key, if
  * one was minted — the loader parses it back off (src/lib/image-loader.ts).
  * Without a grant this is the object key untouched, today's behaviour. */
-/** The longest a tile on screen holds the rows around it back while its own
- * image neither loads nor fails (a stalled request): after this, they load
- * anyway. ponytail: one fixed bound; a 3G screen can take longer to fill,
- * and then shares the link again for its last seconds. */
+/** The longest a tile on screen holds back the rows below and around it, from
+ * the moment its own image was asked for, while that image neither loads nor
+ * fails (a stalled request): after this, they load anyway. ponytail: one fixed
+ * bound; a row on a link slower than 3G can take longer to arrive, and then
+ * shares the link with the next row for its last seconds. */
 const SCREEN_WAIT_MS = 15_000;
 
 /** Movement under this is still a tap, not a drag — fingers are never still. */
@@ -2269,18 +2270,24 @@ function GalleryViewInner({
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   // The rows on screen, without the overscan around them (computed by the
-  // call above): their images go first, the overscan's once they have drawn.
+  // call above): their images go first, from the top, the overscan's once they
+  // have drawn.
   const onScreenRows = rowVirtualizer.range;
   const [screenGate] = useState(createScreenGate);
-  const screenClear = useSyncExternalStore(screenGate.subscribe, screenGate.isClear, () => false);
+  // A row behind the chapter bar is not on screen: a chapter's link lands with
+  // the chapter before's last row there, and it must not go ahead of the chapter.
+  const coveredTo =
+    (rowVirtualizer.scrollOffset ?? 0) +
+    (showChapters && !selectionActive ? CHAPTER_BAR_HEIGHT : 0);
   // Opened after the first rows' effects have registered the tiles on screen
   // (children's effects run first), so no first render lets every tile through.
   // A row of photos, not the "loading more" placeholder the virtualizer also
-  // renders before the grid has its width.
+  // renders before the grid has its width. Not behind a photo's link: its clock
+  // would walk the turn down the screen with nothing asked for.
   const gridLaidOut = virtualRows.some((virtualRow) => rows[virtualRow.index] !== undefined);
   useEffect(() => {
-    if (gridLaidOut) screenGate.open();
-  }, [gridLaidOut, screenGate]);
+    if (gridLaidOut && !imagesHeld) screenGate.open();
+  }, [gridLaidOut, imagesHeld, screenGate]);
 
   /**
    * The chapter being read: the last header at or above the row under the
@@ -3655,7 +3662,8 @@ function GalleryViewInner({
           const rowOnScreen =
             onScreenRows !== null &&
             virtualRow.index >= onScreenRows.startIndex &&
-            virtualRow.index <= onScreenRows.endIndex;
+            virtualRow.index <= onScreenRows.endIndex &&
+            virtualRow.end > coveredTo;
           return (
             <li
               key={first ? gridEntryKey(first, photoIdOf) : virtualRow.index}
@@ -3711,11 +3719,9 @@ function GalleryViewInner({
                     index={index}
                     priority={virtualRow.index === firstPhotoRow}
                     imageHeld={imagesHeld || landingHeld}
+                    row={virtualRow.index}
                     onScreen={rowOnScreen}
                     screenGate={screenGate}
-                    // Constant on screen, so the gate flipping re-renders only
-                    // the tiles off it.
-                    screenClear={rowOnScreen || screenClear}
                     tabbable={index === rovingIndex}
                     selectionActive={selectionActive}
                     selected={selection.ids.has(photo.id)}
@@ -4204,12 +4210,12 @@ interface PhotoTileProps {
   /** A photo's link is loading or open: the tile holds its image back, showing
    * only the blur over its colour. */
   imageHeld?: boolean;
+  /** The tile's row in the grid: on screen, the rows go from the top. */
+  row: number;
   /** In a row on screen, not in the overscan around it. */
-  onScreen?: boolean;
-  /** Where a tile on screen waits until its image has drawn (src/lib/screen-gate.ts). */
-  screenGate?: ScreenGate;
-  /** Nothing on screen still loading: a tile off screen may fetch its image. */
-  screenClear?: boolean;
+  onScreen: boolean;
+  /** Says when this tile may fetch, and on screen waits until it has drawn (src/lib/screen-gate.ts). */
+  screenGate: ScreenGate;
   tabbable: boolean;
   selectionActive: boolean;
   selected: boolean;
@@ -4254,9 +4260,9 @@ export const PhotoTile = memo(function PhotoTile({
   index,
   priority,
   imageHeld = false,
-  onScreen = true,
+  row,
+  onScreen,
   screenGate,
-  screenClear = true,
   tabbable,
   selectionActive,
   selected,
@@ -4295,27 +4301,41 @@ export const PhotoTile = memo(function PhotoTile({
   // original is right there and every other surface can render it.
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
-  // The screen first (docs/GALLERY-LOADING.md): on screen, the tile holds the
-  // gate shut until its image has drawn — or failed for good, or for at most
-  // SCREEN_WAIT_MS: a tile that never draws must not hold the rest back. Off
-  // screen, it fetches its image only once the gate is clear. A tile that has
-  // drawn keeps its image; one off screen that has not lets its download go
-  // when the gate shuts for the next row coming on screen — measured, keeping
-  // those running made scrolling a screen in Firefox on Slow 4G 7.4 s instead
-  // of 2.4 s. Drawn is for this `src`: a new one (a fresh grant, a replaced
-  // photo) waits its turn like any other.
+  // The screen first, from the top (docs/GALLERY-LOADING.md): on screen, the tile
+  // holds the rows below and off screen back until its image has drawn — or
+  // failed for good, or for at most SCREEN_WAIT_MS from asking for it: a tile
+  // that never draws must not hold the rest back. It fetches its image when the
+  // gate says so. A tile that has drawn keeps its image; so does one on screen
+  // that is on its way (an overscan row scrolled into view, a row above coming
+  // on screen, a new `src` replacing a photo on show): those bytes have arrived.
+  // One off screen that has not drawn lets its download go when the gate shuts
+  // for the next row coming on screen — measured, keeping those running made
+  // scrolling a screen in Firefox on Slow 4G 7.4 s instead of 2.4 s. Drawn is for
+  // this `src`: off screen, a new one (a fresh grant, a replaced photo) waits its
+  // turn like any other.
+  const mayFetch = useSyncExternalStore(
+    screenGate.subscribe,
+    () => rowMayFetch(screenGate.turn(), row, onScreen),
+    () => false,
+  );
   const [settledSrc, setSettledSrc] = useState<string | null>(null);
   const settled = settledSrc === src;
-  const showImage = !imageHeld && (settled || onScreen || screenClear);
+  const [fetching, setFetching] = useState(false);
+  const showImage = !imageHeld && (settled || mayFetch || (onScreen && fetching));
+  if (showImage !== fetching) setFetching(showImage);
   useEffect(() => {
-    if (!onScreen || settled || !screenGate) return;
-    screenGate.wait(photo.id);
-    const deadline = setTimeout(() => screenGate.done(photo.id), SCREEN_WAIT_MS);
-    return () => {
-      clearTimeout(deadline);
-      screenGate.done(photo.id);
-    };
-  }, [onScreen, settled, screenGate, photo.id]);
+    if (!onScreen || settled) return;
+    screenGate.wait(photo.id, row);
+    return () => screenGate.done(photo.id);
+  }, [onScreen, settled, screenGate, photo.id, row]);
+  // Apart from the wait above: asked for only when its turn comes, and leaving
+  // the gate and joining it again would let the next row through. Giving up
+  // counts as settled, so the tile keeps trying without the gate holding for it.
+  useEffect(() => {
+    if (!onScreen || settled || !showImage) return;
+    const deadline = setTimeout(() => setSettledSrc(src), SCREEN_WAIT_MS);
+    return () => clearTimeout(deadline);
+  }, [onScreen, settled, showImage, src]);
 
   // Local to this tile, not shared — a touch gesture and the synthetic click
   // that follows it always target the same DOM node, so there is no reason
@@ -4446,8 +4466,10 @@ export const PhotoTile = memo(function PhotoTile({
               // Not next/image's `priority`: since Next 16 that is only a
               // `<link rel=preload>`, which Chrome still fetches at Low, level
               // with every lazy tile. What gets the row on screen first is the
-              // fetch priority itself.
-              loading={priority ? "eager" : undefined}
+              // fetch priority itself. Eager on screen: the gate already said
+              // when, and a hidden tab never runs what starts a lazy image, so a
+              // guest switching apps would come back to the next row not asked for.
+              loading={priority || onScreen ? "eager" : undefined}
               fetchPriority={priority ? "high" : undefined}
               // A real justified layout — object-contain would letterbox a tile
               // sized to the photo's own aspect ratio, so `fill` + the exact
