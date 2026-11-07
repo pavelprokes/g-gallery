@@ -24,10 +24,17 @@ export interface AdminCover {
   placeholder: string | null;
 }
 
-export function CoverThumb({ cover }: { cover: AdminCover | null }) {
+export function CoverThumb({
+  cover,
+  big = false,
+}: {
+  cover: AdminCover | null;
+  /** Fills its column, for a tile you judge the photo by: same widths as the admin grid. */
+  big?: boolean;
+}) {
   return (
     <div
-      className="border-admin-border bg-admin-surface-muted relative size-16 shrink-0 overflow-hidden rounded-lg border"
+      className={`border-admin-border bg-admin-surface-muted relative shrink-0 overflow-hidden rounded-lg border ${big ? "aspect-[3/2] w-full" : "size-16"}`}
       style={cover?.placeholder ? { backgroundColor: cover.placeholder } : undefined}
     >
       {cover ? (
@@ -36,7 +43,7 @@ export function CoverThumb({ cover }: { cover: AdminCover | null }) {
           alt=""
           objectKey={cover.objectKey}
           thumbObjectKey={cover.thumbObjectKey}
-          sizes="64px"
+          sizes={big ? "(max-width: 640px) 50vw, 280px" : "64px"}
         />
       ) : (
         <svg

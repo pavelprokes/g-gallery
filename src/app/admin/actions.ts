@@ -608,19 +608,21 @@ const copyToWebSchema = z.object({
   photoIds: z.array(idSchema).min(1).max(WEB_COPY_MAX),
 });
 
-/** Copies the selected photos into a web gallery (docs/WEB-GALLERIES.md). */
+/**
+ * Copies the selected photos into a web gallery (docs/WEB-GALLERIES.md). No
+ * revalidatePath: it would render the page the bar is on, a whole gallery, for
+ * each chunk. The bar refreshes the router once when it has finished.
+ */
 export async function copyPhotosToWebGallery(targetGalleryId: string, photoIds: string[]) {
   const session = await requireAdmin();
   const parsed = copyToWebSchema.safeParse({ targetGalleryId, photoIds });
   if (!parsed.success) throw new Error("INVALID_INPUT");
 
-  const result = await copyPhotosToWebGalleryFor(
+  return copyPhotosToWebGalleryFor(
     session.user.id,
     parsed.data.targetGalleryId,
     parsed.data.photoIds,
   );
-  revalidatePath(`/admin/g/${parsed.data.targetGalleryId}`);
-  return result;
 }
 
 const setGalleryCoverSchema = z.object({

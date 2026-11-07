@@ -17,7 +17,7 @@ export const WEB_SLUG_MAX = 120;
 /** A place on the website rather than a couple's page (src/lib/web-places.ts). */
 export const WEB_PLACE_PATTERN = /^misto-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** What one copy may take. R2 copies server side, four at a time, so this fits a Server Action. */
+/** What one call may take. R2 copies server side, four at a time, so this fits a Server Action. */
 export const WEB_COPY_MAX = 60;
 const COPY_CONCURRENCY = 4;
 

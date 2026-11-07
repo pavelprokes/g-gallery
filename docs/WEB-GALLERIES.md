@@ -9,6 +9,8 @@ in the website's CMS; this repo owns the photos, their order and the cover.
   back to its previous source for that gallery alone.
 - **Photos are copied, not referenced** (`copyPhotosToWebGalleryFor`). The couple's gallery can be
   deleted without touching the website, and no client storage prefix appears on it.
+- **The selection copies four photos at a time**, a Server Action each, so the bar can count them.
+  A failure keeps the selection: copying again skips what has landed, by file identity.
 - **A web gallery cannot be trashed** while it has a slug (`trashGallery`). Remove the slug first.
 - **Its originals still age into Infrequent Access** after 180 days: the bucket rule covers all of
   `galleries/`, and the lifecycle pass only records it. A CDN miss then pays the IA read, on about

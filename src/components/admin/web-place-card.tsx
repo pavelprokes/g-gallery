@@ -50,10 +50,10 @@ export function WebPlaceCard({
         {place.coverFirst ? ` · ${place.positions[0]} je titulní fotka galerie` : ""}
       </p>
 
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {view.tiles.map((tile) => (
           <li key={tile.position} className="min-w-0">
-            <CoverThumb cover={tile.photo} />
+            <CoverThumb cover={tile.photo} big />
             <p className="text-admin-muted mt-1 text-xs [overflow-wrap:anywhere]">
               {tile.position}
             </p>

@@ -12,6 +12,7 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   galleryId: string;
   photoCount: number;
   selectGalleryIds: Record<string, string>;
+  webCopyGalleryIds: Record<string, string>;
   weddingId: string;
 };
 
@@ -71,6 +72,38 @@ test("gallery page: status in Czech, never the raw enum", async ({ page }) => {
   await page.goto(`/admin/g/${seed.galleryId}`);
   await expect(page.getByText(`Publikováno · ${seed.photoCount} fotek`)).toBeVisible();
   await expect(page.getByText("PUBLISHED")).toHaveCount(0);
+});
+
+test("copying to the web counts the photos, and says when it is done and where they went", async ({
+  page,
+}) => {
+  const project = test.info().project.name;
+  const source = `/admin/g/${seed.webCopyGalleryIds[project]}`;
+  // Slow enough to read the count; it passes in a moment on a local bucket.
+  await page.route(`**${source}`, async (route) => {
+    if (route.request().method() === "POST") await new Promise((done) => setTimeout(done, 400));
+    await route.continue();
+  });
+  await page.goto(source);
+  const boxes = page.getByRole("checkbox", { name: /^Vybrat kopie_/ });
+  await expect(boxes).toHaveCount(6);
+  // Not a click at coordinates: the bar that appears covers the lower tiles on a phone.
+  for (let n = 0; n < 6; n += 1) await boxes.nth(n).dispatchEvent("click");
+
+  const bar = page.getByRole("toolbar", { name: "Akce s vybranými fotkami" });
+  await bar.getByLabel("Webová galerie").selectOption({ label: `E2E Web cíl ${project}` });
+  await bar.getByRole("button", { name: "Kopírovat na web" }).click();
+
+  await expect(bar.getByRole("button", { name: "Kopíruji 4 / 6" })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Průběh kopírování na web" })).toBeVisible();
+  await expect(
+    page.getByRole("paragraph").filter({ hasText: "Zkopírováno na web: 6 fotek" }),
+  ).toBeVisible();
+  await expect(bar).toBeHidden();
+
+  await page.getByRole("link", { name: `Otevřít E2E Web cíl ${project}` }).click();
+  await expect(page.getByRole("heading", { name: `E2E Web cíl ${project}` })).toBeVisible();
+  await expect(boxes).toHaveCount(6);
 });
 
 test.describe("photo selection", () => {

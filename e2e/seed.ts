@@ -14,6 +14,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "../src/lib/db";
+import { presignPut, presignedPutHeaders } from "../src/lib/r2";
 import { generateShareToken, hashPassword, hashShareToken } from "../src/lib/share-token";
 import { gallerySlug } from "../src/lib/gallery-slug";
 import { encryptToken } from "../src/lib/token-cipher";
@@ -281,6 +282,10 @@ async function main() {
     chromium: await makeSelectGallery(user.id),
     "mobile-safari": await makeSelectGallery(user.id),
   };
+  const webCopyGalleryIds = {
+    chromium: await makeWebCopyGalleries(user.id, "chromium"),
+    "mobile-safari": await makeWebCopyGalleries(user.id, "mobile-safari"),
+  };
 
   // docs/VIDEO.md: the spec uploads a real MP4 through the admin, so each
   // browser project gets an empty gallery of its own to put it in.
@@ -353,6 +358,7 @@ async function main() {
       filterGalleryId,
       correctionGalleries,
       selectGalleryIds,
+      webCopyGalleryIds,
       galleryId: gallery.id,
       token,
       slug,
@@ -935,6 +941,57 @@ async function makeSelectGallery(ownerId: string) {
     });
   }
   return gallery.id;
+}
+
+/** Six photos with real files behind them, and a web gallery to copy them into. */
+async function makeWebCopyGalleries(ownerId: string, project: string) {
+  const jpeg = Buffer.from(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a" +
+      "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAACAAIBAREA/8QAFAABAAAAAAAA" +
+      "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
+    "base64",
+  );
+  const stamp = Date.now();
+  const source = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: "E2E Svatba ke kopii",
+      storagePrefix: `galleries/e2e-copy-${project}-${stamp}`,
+    },
+  });
+  const target = await prisma.gallery.create({
+    data: {
+      ownerId,
+      title: `E2E Web cíl ${project}`,
+      storagePrefix: `galleries/e2e-copy-target-${project}-${stamp}`,
+      webSlug: `e2e-web-copy-${project}-${stamp}`,
+    },
+  });
+  for (let n = 1; n <= 6; n += 1) {
+    const objectKey = `${source.storagePrefix}/copy-${n}.jpg`;
+    const put = await fetch(await presignPut(objectKey, "image/jpeg"), {
+      method: "PUT",
+      headers: presignedPutHeaders("image/jpeg"),
+      body: jpeg,
+    });
+    if (!put.ok) throw new Error(`Cannot seed ${objectKey}: ${put.status}`);
+    await prisma.photo.create({
+      data: {
+        galleryId: source.id,
+        objectKey,
+        fileName: `kopie_${n}.jpg`,
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 800,
+        placeholder: "#9a7b62",
+        status: "CONFIRMED",
+        sizeBytes: jpeg.length,
+        crc32: `e2e${n}`,
+        takenAt: new Date(Date.UTC(2026, 8, 5, 10, n)),
+      },
+    });
+  }
+  return source.id;
 }
 
 /**
