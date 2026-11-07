@@ -23,7 +23,7 @@ const ORDERS: { value: PhotoOrder; label: string; hint: string }[] = [
   {
     value: "MANUAL",
     label: "Ručně",
-    hint: "Fotky seřadíš přetažením na stránce Pořadí fotek. Nově nahrané fotky se přidají na konec.",
+    hint: "Fotky seřadíš přetažením přímo u fotek na téhle stránce. Nově nahrané fotky se přidají na konec.",
   },
 ];
 
@@ -73,7 +73,7 @@ export function GalleryPhotoOrderPanel({
       <p className="text-admin-muted text-sm dark:text-neutral-400">{current.hint}</p>
       {order === "MANUAL" && (
         <a
-          href={`/admin/g/${galleryId}/order`}
+          href={`/admin/g/${galleryId}?arrange=1`}
           className={`${buttonClasses("primary", "md")} mt-3`}
         >
           Upravit pořadí

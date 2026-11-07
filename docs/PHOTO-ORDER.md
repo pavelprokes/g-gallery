@@ -143,8 +143,8 @@ woven order is computed on the spot for that, so the number is right before the 
 ## Manual order
 
 Adopted 2026-10-18, **opt-in only** (Pavel: "drag & drop pro změnu pořadí" in the gallery). The
-photographer picks "Ručně" in "Pořadí fotek" and drags the photos into place on
-`/admin/g/[id]/order` — a mouse anywhere on a tile, a finger by its ⠿ handle (so the page still
+photographer presses "Změnit pořadí přetažením" above the photos (`/admin/g/[id]?arrange=1`, where
+the grid becomes the board; `/order` redirects there) and drags them into place — a mouse anywhere on a tile, a finger by its ⠿ handle (so the page still
 scrolls), the keyboard with the arrows, Home and End; the page scrolls itself near the window's
 edge (`src/components/admin/sortable-list.tsx`).
 

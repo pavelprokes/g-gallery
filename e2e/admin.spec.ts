@@ -131,6 +131,47 @@ test("a drag that starts on the page is not an upload", async ({ page }) => {
   await expect(hint).toBeVisible();
 });
 
+test("a photo opens large and the others page on from it", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.webCopyGalleryIds[test.info().project.name]}`);
+  const open = page.getByRole("button", { name: /^Zvětšit kopie_/ });
+  await expect(open).toHaveCount(6);
+  await open.nth(1).dispatchEvent("click");
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("2 / 6")).toBeVisible();
+  // It opened, it did not select: a tile's own click selects.
+  await expect(page.getByRole("toolbar")).toHaveCount(0);
+
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByText("3 / 6")).toBeVisible();
+  await dialog.getByRole("button", { name: "Předchozí fotka" }).click();
+  await expect(dialog.getByText("2 / 6")).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Předchozí fotka" }).click();
+  await expect(dialog.getByText("1 / 6")).toBeVisible();
+  // Nothing before the first.
+  await expect(dialog.getByRole("button", { name: "Předchozí fotka" })).toHaveCount(0);
+
+  // The ‹ went away under the pointer, so the focus left the dialog: the keys still page.
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByText("2 / 6")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Esc closes the photo and leaves a selection alone.
+  await page
+    .getByRole("checkbox", { name: /^Vybrat kopie_/ })
+    .first()
+    .dispatchEvent("click");
+  await open.first().dispatchEvent("click");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("toolbar")).toContainText("Vybráno: 1 fotka");
+});
+
 test("the panels sit under the photos, a jump away", async ({ page }) => {
   await page.goto(`/admin/g/${seed.uploadGalleryIds[test.info().project.name]}`);
   const nav = page.getByRole("navigation", { name: "Pod fotkami" });

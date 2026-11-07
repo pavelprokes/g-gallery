@@ -89,7 +89,10 @@ export function PhotoSelection({
 
   useEffect(() => {
     if (picked.length === 0 || busy) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && clear();
+    // An open dialog (the photo large) takes its Escape for itself.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.querySelector("dialog[open]")) clear();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [picked.length, busy]);

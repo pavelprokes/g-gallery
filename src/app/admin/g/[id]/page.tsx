@@ -68,6 +68,9 @@ import {
 } from "@/lib/admin-photo-filters";
 import { parseSocialVideoDraft } from "@/lib/social-video/draft";
 import { AdminFilterBar } from "@/components/admin/admin-filter-bar";
+import { AdminPhotoBrowser } from "@/components/admin/admin-photo-browser";
+import { ManualOrderBoard } from "@/components/admin/manual-order-board";
+import { setPhotoOrder } from "@/app/admin/photo-order-actions";
 import { PhotoCorrections } from "@/components/admin/photo-corrections";
 import { cameraName } from "@/lib/upload-resume";
 
@@ -78,8 +81,11 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
   if (!session) redirect("/sign-in");
 
   const { id } = await props.params;
+  const search = await props.searchParams;
   // docs/ADMIN-FILTERS.md — filters and sort live in the URL.
-  const view = parseAdminView(await props.searchParams);
+  const view = parseAdminView(search);
+  // docs/PHOTO-ORDER.md §Manual order — the grid becomes the board that drags them.
+  const arranging = search.arrange === "1";
   const printOnly = view.filters.includes("print");
   // docs/CHAPTERS.md — the photos in the guests' order, where chapters are set.
   const timelineView = view.sort === "order";
@@ -344,6 +350,13 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       : [];
   });
 
+  // Each chapter's title on the photo it begins at, for the board.
+  const chapterStarts: Record<string, string[]> = {};
+  for (const segment of segments) {
+    const first = photosOf(segment.entries)[0];
+    if (segment.chapter && first) (chapterStarts[first.id] ??= []).push(segment.chapter.title);
+  }
+
   // docs/ADMIN-FILTERS.md — what each photo is, for the filters and sorts.
   const chapterOf = new Map(
     segments.flatMap((segment) =>
@@ -424,59 +437,75 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       >
         {/* The whole tile toggles the checkbox — the bar below holds the actions
             (src/components/admin/photo-selection.tsx). */}
-        <label className="group has-focus-visible:outline-brand-primary bg-brand-tint relative block aspect-square cursor-pointer overflow-hidden rounded has-focus-visible:outline-2 has-focus-visible:-outline-offset-2">
-          {/* Shrinks when selected, like Google Photos — the tint shows around it. */}
-          <span
-            className="absolute inset-0 overflow-hidden transition-transform duration-150 group-has-checked:scale-[0.86] group-has-checked:rounded"
-            style={
-              photo.placeholder
-                ? { backgroundColor: placeholderStyle(photo.placeholder) }
-                : undefined
-            }
-          >
-            <AdminPhotoImage
-              objectKey={photo.objectKey}
-              thumbObjectKey={photo.thumbObjectKey}
-              alt={photo.fileName}
-              // Three columns on a phone, six on a desktop.
-              sizes="(max-width: 640px) 33vw, 200px"
+        <div className="group/tile relative">
+          <label className="group has-focus-visible:outline-brand-primary bg-brand-tint relative block aspect-square cursor-pointer overflow-hidden rounded has-focus-visible:outline-2 has-focus-visible:-outline-offset-2">
+            {/* Shrinks when selected, like Google Photos — the tint shows around it. */}
+            <span
+              className="absolute inset-0 overflow-hidden transition-transform duration-150 group-has-checked:scale-[0.86] group-has-checked:rounded"
+              style={
+                photo.placeholder
+                  ? { backgroundColor: placeholderStyle(photo.placeholder) }
+                  : undefined
+              }
+            >
+              <AdminPhotoImage
+                objectKey={photo.objectKey}
+                thumbObjectKey={photo.thumbObjectKey}
+                alt={photo.fileName}
+                // Three columns on a phone, six on a desktop.
+                sizes="(max-width: 640px) 33vw, 200px"
+              />
+            </span>
+            {/* Drawn inside the tile: content-visibility clips anything outside it. */}
+            <span
+              aria-hidden
+              className={`group-has-checked:ring-brand-primary pointer-events-none absolute inset-0 rounded ring-inset group-has-checked:ring-4 ${
+                isCover ? "ring-brand-primary ring-2" : ""
+              }`}
             />
-          </span>
-          {/* Drawn inside the tile: content-visibility clips anything outside it. */}
-          <span
-            aria-hidden
-            className={`group-has-checked:ring-brand-primary pointer-events-none absolute inset-0 rounded ring-inset group-has-checked:ring-4 ${
-              isCover ? "ring-brand-primary ring-2" : ""
-            }`}
-          />
-          <input
-            type="checkbox"
-            name="photo"
-            value={photo.id}
-            data-cover={isCover ? "1" : undefined}
-            data-pin={String(photo.highlightPin)}
-            data-highlight={inHighlights ? "1" : undefined}
-            aria-label={`Vybrat ${photo.fileName}`}
-            // Shown on hover, on touch screens, and on every tile once
-            // anything is selected — then a tap anywhere reads as "select".
-            className="accent-brand-primary absolute top-2 left-2 size-5 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100 checked:opacity-100 focus-visible:opacity-100 in-data-selecting:opacity-100 pointer-coarse:opacity-100"
-          />
-          {isCover && (
-            <span className="bg-brand-primary text-caption absolute bottom-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
-              Titulní
-            </span>
-          )}
-          {photo.videoObjectKey && (
-            <span className="text-caption absolute right-1 bottom-1 rounded-full bg-black/60 px-2 py-0.5 font-semibold text-white tabular-nums">
-              ▶ Video{photo.durationMs ? ` · ${formatDuration(photo.durationMs)}` : ""}
-            </span>
-          )}
-          {inHighlights && (
-            <span className="text-caption absolute top-1 right-1 rounded-full bg-white/90 px-2 py-0.5 font-semibold text-neutral-800">
-              ★ Výběr
-            </span>
-          )}
-        </label>
+            <input
+              type="checkbox"
+              name="photo"
+              value={photo.id}
+              data-cover={isCover ? "1" : undefined}
+              data-pin={String(photo.highlightPin)}
+              data-highlight={inHighlights ? "1" : undefined}
+              aria-label={`Vybrat ${photo.fileName}`}
+              // Shown on hover, on touch screens, and on every tile once
+              // anything is selected — then a tap anywhere reads as "select".
+              className="accent-brand-primary absolute top-2 left-2 size-5 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100 checked:opacity-100 focus-visible:opacity-100 in-data-selecting:opacity-100 pointer-coarse:opacity-100"
+            />
+            {isCover && (
+              <span className="bg-brand-primary text-caption absolute bottom-1 left-1 rounded-full px-2 py-0.5 font-semibold text-white">
+                Titulní
+              </span>
+            )}
+            {photo.videoObjectKey && (
+              <span className="text-caption absolute right-9 bottom-1 rounded-full bg-black/60 px-2 py-0.5 font-semibold text-white tabular-nums pointer-coarse:right-12">
+                ▶<span className="pointer-coarse:hidden"> Video</span>
+                {photo.durationMs ? ` · ${formatDuration(photo.durationMs)}` : ""}
+              </span>
+            )}
+            {inHighlights && (
+              <span className="text-caption absolute top-1 right-1 rounded-full bg-white/90 px-2 py-0.5 font-semibold text-neutral-800">
+                ★ Výběr
+              </span>
+            )}
+          </label>
+          {/* Beside the label, not in it: a click there selects (AdminPhotoBrowser). */}
+          <button
+            type="button"
+            data-open-photo
+            data-photo-key={photo.objectKey}
+            data-photo-thumb={photo.thumbObjectKey ?? undefined}
+            data-photo-name={photo.fileName}
+            data-photo-video={photo.videoObjectKey ? videoSrc(photo.videoObjectKey) : undefined}
+            aria-label={`Zvětšit ${photo.fileName}`}
+            className="absolute right-1 bottom-1 grid size-7 place-items-center rounded-full bg-black/60 text-sm text-white opacity-0 transition-opacity group-hover/tile:opacity-100 focus-visible:opacity-100 pointer-coarse:size-11 pointer-coarse:opacity-100"
+          >
+            <span aria-hidden>⤢</span>
+          </button>
+        </div>
         {photo.videoObjectKey && (
           <form action={toggleFeaturedVideo.bind(null, photo.id)}>
             <button
@@ -658,139 +687,197 @@ export default async function GalleryDetailPage(props: PageProps<"/admin/g/[id]"
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="mb-0">Fotky — zobrazení a unikátní diváci</CardTitle>
-          {!printOnly && (
-            <p className="text-admin-muted text-caption dark:text-neutral-400">
-              {gallery.coverPhotoId
-                ? "Titulní fotka je vybraná ručně."
-                : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
-            </p>
-          )}
-        </div>
-        <AdminFilterBar
-          key={adminViewQuery(view)}
-          view={view}
-          counts={filterCounts(view, [...facts.values()])}
-          shown={visiblePhotos.length}
-          total={gallery.photos.length}
-          people={gallery.people}
-          chapters={adminChapters.map((chapter) => ({ id: chapter.id, title: chapter.title }))}
-        />
-        {view.filters.includes("comments") && visiblePhotos.length > 0 && (
-          <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
-            <p>
-              Fotky s otevřenou připomínkou: <strong>{visiblePhotos.length}</strong>. Po nahrání
-              opravené fotky se její připomínky vyřídí samy.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Camera numbers, for finding the shots in Lightroom's text filter. */}
-              <CopyButton
-                value={visiblePhotos.map((photo) => cameraName(photo.fileName)).join(" ")}
-                label="Kopírovat čísla z fotoaparátu"
-                text="Čísla pro Lightroom"
-              />
-              <CopyButton
-                value={visiblePhotos
-                  .flatMap((photo) =>
-                    photo.comments
-                      .filter((comment) => comment.resolvedAt === null)
-                      .map((comment) => `${photo.fileName}: ${comment.body}`),
-                  )
-                  .join("\n")}
-                label="Kopírovat připomínky jako text"
-                text="Připomínky jako text"
-              />
-            </div>
-          </div>
-        )}
-        {printOnly && printItems.length > 0 && (
-          <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
-            <p>
-              Fotky k tisku: <strong>{printMarkedPhotos.length}</strong>, kusů celkem:{" "}
-              <strong>{printPieces}</strong>.
-            </p>
-            {/* Totals add up every guest's marks; this says whose they are. */}
-            <ul className="text-caption">
-              {!printScoped &&
-                printByViewer.map((row) => (
-                  <li key={row.viewerId}>
-                    {row.displayName ?? "Bez jména"}: fotky {row.photos} · {row.pieces} ks
-                  </li>
-                ))}
-            </ul>
-            <div className="flex flex-wrap items-center gap-2">
-              <PrintDownloadButton
-                galleryId={gallery.id}
-                count={printMarkedPhotos.length}
-                photoIds={printScoped ? printMarkedPhotos.map((photo) => photo.id) : undefined}
-              />
-              <CopyButton
-                value={printList(printItems)}
-                label="Kopírovat seznam souborů s počty kusů"
-                text="Seznam"
-              />
-            </div>
-            <p className="text-admin-muted text-caption dark:text-neutral-400">
-              Originály se stáhnou jeden po druhém do Stažených souborů, u více kusů s počtem v
-              názvu (<code>5x_…</code>). Prohlížeč se napoprvé zeptá, jestli povolit stažení více
-              souborů — povol.
-            </p>
-          </div>
-        )}
-        <p className="text-admin-muted text-caption mt-1 dark:text-neutral-400">
-          Klepnutím fotku vyberete
-          <span className="pointer-coarse:hidden">, se Shiftem celý úsek</span>. Akce se objeví
-          dole.
-        </p>
-        <PhotoSelection
-          galleryId={gallery.id}
-          pinnedCount={pinnedCount}
-          maxPinned={MAX_PINNED}
-          webGalleries={webGalleries}
-        >
-          <ul className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
-            {timelineView
-              ? segments.map((segment) => {
-                  const segmentPhotos = photosOf(segment.entries).filter(shows);
-                  // A filtered view hides a chapter with nothing left in it.
-                  if (segmentPhotos.length === 0 && isFiltered(view)) return [];
-                  return [
-                    segment.chapter && (
-                      <li
-                        key={`chapter:${segment.chapter.id}`}
-                        className="border-brand-border col-span-full mt-3 flex items-baseline justify-between gap-3 border-b pb-1 first:mt-0 dark:border-neutral-700"
-                      >
-                        <h3 className="text-brand-ink text-lg font-semibold dark:text-neutral-100">
-                          {segment.chapter.title}
-                        </h3>
-                        <span className="text-admin-muted text-xs dark:text-neutral-400">
-                          {segmentPhotos.length} fotek
-                        </span>
-                      </li>
-                    ),
-                    ...segmentPhotos.map((photo, i) =>
-                      renderPhoto(photo, segment.chapter && i === 0 ? segment.chapter.title : null),
-                    ),
-                  ];
-                })
-              : visiblePhotos.map((photo) => renderPhoto(photo))}
-          </ul>
-        </PhotoSelection>
-        {visiblePhotos.length === 0 && (
-          <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">
-            {gallery.photos.length === 0 ? (
-              "Zatím žádné potvrzené fotky."
-            ) : (
-              <>
-                Žádná fotka neodpovídá filtrům.{" "}
-                <a
-                  href={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}`}
-                  className="underline"
-                >
-                  Zrušit filtry
-                </a>
-              </>
+          <div className="flex flex-wrap items-center gap-3">
+            {!printOnly && !arranging && (
+              <p className="text-admin-muted text-caption dark:text-neutral-400">
+                {gallery.coverPhotoId
+                  ? "Titulní fotka je vybraná ručně."
+                  : "Bez vybrané titulní fotky se použije ta naposledy nahraná."}
+              </p>
             )}
-          </p>
+            {arranging && order !== "MANUAL" && (
+              <a href={`/admin/g/${gallery.id}`} className={buttonClasses("secondary", "md")}>
+                Zpět na fotky
+              </a>
+            )}
+            {!arranging && gallery.photos.length > 0 && (
+              <a
+                href={`/admin/g/${gallery.id}?arrange=1`}
+                className={buttonClasses("secondary", "md")}
+              >
+                Změnit pořadí přetažením
+              </a>
+            )}
+          </div>
+        </div>
+        {arranging && order !== "MANUAL" && (
+          <div className="mt-3 space-y-3">
+            <Alert tone="info">
+              {gallery.manualOrderAt
+                ? "Galerie teď ukazuje jiné řazení. Ruční pořadí, které jsi tu dřív nastavil, je uložené — po přepnutí se vrátí, nové fotky budou na konci."
+                : "Galerie se teď řadí automaticky. Po přepnutí na ruční pořadí začneš od toho současného a fotky pak přetahuješ, kam patří. Nové fotky se přidají na konec."}
+            </Alert>
+            <form action={setPhotoOrder.bind(null, gallery.id, "MANUAL")}>
+              <Button type="submit" size="lg">
+                Řadit ručně
+              </Button>
+            </form>
+          </div>
+        )}
+        {arranging && order === "MANUAL" && timeline.length === 0 && (
+          <Alert className="mt-3">Galerie zatím nemá žádné fotky.</Alert>
+        )}
+        {arranging && order === "MANUAL" && timeline.length > 0 && (
+          <div className="mt-3">
+            <ManualOrderBoard
+              galleryId={gallery.id}
+              doneHref={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: "order" })}`}
+              photos={timeline.map((photo) => ({
+                id: photo.id,
+                objectKey: photo.objectKey,
+                thumbObjectKey: photo.thumbObjectKey,
+                fileName: photo.fileName,
+                placeholder: photo.placeholder,
+                isVideo: photo.videoObjectKey !== null,
+              }))}
+              chapterStarts={chapterStarts}
+            />
+          </div>
+        )}
+        {!arranging && (
+          <>
+            <AdminFilterBar
+              key={adminViewQuery(view)}
+              view={view}
+              counts={filterCounts(view, [...facts.values()])}
+              shown={visiblePhotos.length}
+              total={gallery.photos.length}
+              people={gallery.people}
+              chapters={adminChapters.map((chapter) => ({ id: chapter.id, title: chapter.title }))}
+            />
+            {view.filters.includes("comments") && visiblePhotos.length > 0 && (
+              <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
+                <p>
+                  Fotky s otevřenou připomínkou: <strong>{visiblePhotos.length}</strong>. Po nahrání
+                  opravené fotky se její připomínky vyřídí samy.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Camera numbers, for finding the shots in Lightroom's text filter. */}
+                  <CopyButton
+                    value={visiblePhotos.map((photo) => cameraName(photo.fileName)).join(" ")}
+                    label="Kopírovat čísla z fotoaparátu"
+                    text="Čísla pro Lightroom"
+                  />
+                  <CopyButton
+                    value={visiblePhotos
+                      .flatMap((photo) =>
+                        photo.comments
+                          .filter((comment) => comment.resolvedAt === null)
+                          .map((comment) => `${photo.fileName}: ${comment.body}`),
+                      )
+                      .join("\n")}
+                    label="Kopírovat připomínky jako text"
+                    text="Připomínky jako text"
+                  />
+                </div>
+              </div>
+            )}
+            {printOnly && printItems.length > 0 && (
+              <div className="border-admin-border text-body mt-3 space-y-2 rounded-lg border p-3 dark:border-neutral-800">
+                <p>
+                  Fotky k tisku: <strong>{printMarkedPhotos.length}</strong>, kusů celkem:{" "}
+                  <strong>{printPieces}</strong>.
+                </p>
+                {/* Totals add up every guest's marks; this says whose they are. */}
+                <ul className="text-caption">
+                  {!printScoped &&
+                    printByViewer.map((row) => (
+                      <li key={row.viewerId}>
+                        {row.displayName ?? "Bez jména"}: fotky {row.photos} · {row.pieces} ks
+                      </li>
+                    ))}
+                </ul>
+                <div className="flex flex-wrap items-center gap-2">
+                  <PrintDownloadButton
+                    galleryId={gallery.id}
+                    count={printMarkedPhotos.length}
+                    photoIds={printScoped ? printMarkedPhotos.map((photo) => photo.id) : undefined}
+                  />
+                  <CopyButton
+                    value={printList(printItems)}
+                    label="Kopírovat seznam souborů s počty kusů"
+                    text="Seznam"
+                  />
+                </div>
+                <p className="text-admin-muted text-caption dark:text-neutral-400">
+                  Originály se stáhnou jeden po druhém do Stažených souborů, u více kusů s počtem v
+                  názvu (<code>5x_…</code>). Prohlížeč se napoprvé zeptá, jestli povolit stažení
+                  více souborů — povol.
+                </p>
+              </div>
+            )}
+            <p className="text-admin-muted text-caption mt-1 dark:text-neutral-400">
+              Klepnutím fotku vyberete
+              <span className="pointer-coarse:hidden">, se Shiftem celý úsek</span>; ⤢ ji zvětší.
+              Akce se objeví dole.
+            </p>
+            <PhotoSelection
+              galleryId={gallery.id}
+              pinnedCount={pinnedCount}
+              maxPinned={MAX_PINNED}
+              webGalleries={webGalleries}
+            >
+              <AdminPhotoBrowser>
+                <ul className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-3 lg:grid-cols-6">
+                  {timelineView
+                    ? segments.map((segment) => {
+                        const segmentPhotos = photosOf(segment.entries).filter(shows);
+                        // A filtered view hides a chapter with nothing left in it.
+                        if (segmentPhotos.length === 0 && isFiltered(view)) return [];
+                        return [
+                          segment.chapter && (
+                            <li
+                              key={`chapter:${segment.chapter.id}`}
+                              className="border-brand-border col-span-full mt-3 flex items-baseline justify-between gap-3 border-b pb-1 first:mt-0 dark:border-neutral-700"
+                            >
+                              <h3 className="text-brand-ink text-lg font-semibold dark:text-neutral-100">
+                                {segment.chapter.title}
+                              </h3>
+                              <span className="text-admin-muted text-xs dark:text-neutral-400">
+                                {segmentPhotos.length} fotek
+                              </span>
+                            </li>
+                          ),
+                          ...segmentPhotos.map((photo, i) =>
+                            renderPhoto(
+                              photo,
+                              segment.chapter && i === 0 ? segment.chapter.title : null,
+                            ),
+                          ),
+                        ];
+                      })
+                    : visiblePhotos.map((photo) => renderPhoto(photo))}
+                </ul>
+              </AdminPhotoBrowser>
+            </PhotoSelection>
+            {visiblePhotos.length === 0 && (
+              <p className="text-admin-muted text-body mt-3 dark:text-neutral-400">
+                {gallery.photos.length === 0 ? (
+                  "Zatím žádné potvrzené fotky."
+                ) : (
+                  <>
+                    Žádná fotka neodpovídá filtrům.{" "}
+                    <a
+                      href={`/admin/g/${gallery.id}${adminViewQuery({ ...DEFAULT_VIEW, sort: view.sort })}`}
+                      className="underline"
+                    >
+                      Zrušit filtry
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+          </>
         )}
       </section>
 
