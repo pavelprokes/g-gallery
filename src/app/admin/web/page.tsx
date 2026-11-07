@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getAdminSession } from "@/lib/auth-guard";
 import {
   fetchWebPlaces,
+  fetchWebStats,
   placeGalleriesFor,
   portfolioGalleriesFor,
   selectableGalleriesFor,
@@ -29,10 +30,11 @@ export default async function WebPlacesPage(props: PageProps<"/admin/web">) {
   const search = await props.searchParams;
   const askedFrom = Math.max(Number(search.doporuceni) || 0, 0);
   const base = websiteBase();
-  const [places, { suggestions, total, from }, portfolio] = await Promise.all([
+  const [places, { suggestions, total, from }, portfolio, stats] = await Promise.all([
     fetchWebPlaces(),
     webSuggestionsFor(session.user.id, askedFrom),
     portfolioGalleriesFor(session.user.id),
+    fetchWebStats(),
   ]);
   const [galleries, options] = places
     ? await Promise.all([
@@ -83,7 +85,7 @@ export default async function WebPlacesPage(props: PageProps<"/admin/web">) {
           ))}
         </section>
       )}
-      <WebPortfolioList galleries={portfolio} websiteBase={base} />
+      <WebPortfolioList galleries={portfolio} websiteBase={base} stats={stats} />
       <CardTitle className="mt-2 mb-0">Místa na webu</CardTitle>
       {!places && (
         <p role="alert" className="text-admin-muted text-sm">

@@ -5,14 +5,17 @@ const db = vi.hoisted(() => ({
   photo: { findMany: vi.fn() },
   $transaction: vi.fn(),
 }));
-const env = vi.hoisted(() => ({ WEBSITE_URL: undefined as string | undefined }));
+const env = vi.hoisted(() => ({
+  WEBSITE_URL: undefined as string | undefined,
+  WEBSITE_STATS_TOKEN: undefined as string | undefined,
+}));
 vi.mock("@/lib/db", () => ({ prisma: db }));
 vi.mock("@/lib/env", () => ({ serverEnv: () => env }));
 vi.mock("@/lib/r2", () => ({ copyObject: vi.fn() }));
 vi.mock("@/lib/zip-build", () => ({ markGalleryPhotosChanged: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { assignWebPlaceFor, fetchWebPlaces } from "./web-places";
+import { assignWebPlaceFor, fetchWebPlaces, fetchWebStats } from "./web-places";
 
 const place = {
   key: "misto-homepage",
@@ -27,8 +30,49 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
   env.WEBSITE_URL = undefined;
+  env.WEBSITE_STATS_TOKEN = undefined;
   db.$transaction.mockImplementation(async (run: (tx: typeof db) => Promise<void>) => run(db));
   db.gallery.updateMany.mockResolvedValue({ count: 1 });
+});
+
+describe("fetchWebStats", () => {
+  const stats = {
+    range: "90",
+    indexViews: 40,
+    galleries: [{ uid: "a-2026", albumVisits: 12, photoOpens: 5, photoViews: 31 }],
+  };
+  const answer = (body: unknown, ok = true) =>
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok, json: async () => body } as Response);
+
+  it("asks nothing without a token", async () => {
+    const fetchMock = answer(stats);
+    await expect(fetchWebStats()).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the token, and reads the numbers", async () => {
+    env.WEBSITE_STATS_TOKEN = "secret";
+    const fetchMock = answer(stats);
+    await expect(fetchWebStats()).resolves.toEqual(stats);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://svatebni-fotograf-cechy.cz/api/photo-stats?range=90");
+    expect(init?.headers).toEqual({ authorization: "Bearer secret" });
+  });
+
+  it("costs the page nothing when the website refuses, is down, or answers nonsense", async () => {
+    env.WEBSITE_STATS_TOKEN = "secret";
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 401 } as Response);
+    await expect(fetchWebStats()).resolves.toBeNull();
+    expect(logged).toHaveBeenCalledWith(expect.any(String), 401);
+    answer({ galleries: "nope" });
+    await expect(fetchWebStats()).resolves.toBeNull();
+    // Another period than the page's label says.
+    answer({ ...stats, range: "365" });
+    await expect(fetchWebStats()).resolves.toBeNull();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
+    await expect(fetchWebStats()).resolves.toBeNull();
+  });
 });
 
 describe("fetchWebPlaces", () => {
