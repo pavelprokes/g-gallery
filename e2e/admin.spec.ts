@@ -13,8 +13,12 @@ const seed = JSON.parse(fs.readFileSync(path.join(__dirname, ".seed.json"), "utf
   photoCount: number;
   selectGalleryIds: Record<string, string>;
   webCopyGalleryIds: Record<string, string>;
+  uploadGalleryIds: Record<string, string>;
   weddingId: string;
 };
+
+const ONE_PIXEL_JPEG_BASE64 =
+  "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigD//2Q==";
 
 test.beforeEach(async ({ context, baseURL }) => {
   await context.addCookies([{ ...seed.adminCookie, url: baseURL! }]);
@@ -72,6 +76,43 @@ test("gallery page: status in Czech, never the raw enum", async ({ page }) => {
   await page.goto(`/admin/g/${seed.galleryId}`);
   await expect(page.getByText(`Publikováno · ${seed.photoCount} fotek`)).toBeVisible();
   await expect(page.getByText("PUBLISHED")).toHaveCount(0);
+});
+
+test("photos dropped anywhere on the gallery's page upload there", async ({ page }) => {
+  // WebKit cannot read a synthetic drop's file entry (NotFoundError); a real one reads fine.
+  test.skip(test.info().project.name !== "chromium");
+  await page.goto(`/admin/g/${seed.uploadGalleryIds[test.info().project.name]}`);
+  const photos = page.getByRole("heading", { name: /^Fotky/ });
+  await expect(photos).toBeVisible();
+  // Far from the upload panel, on purpose.
+  const panel = await page.getByRole("heading", { name: "Nahrát fotky" }).boundingBox();
+  expect(panel!.y).toBeLessThan((await photos.boundingBox())!.y);
+
+  const dataTransfer = await page.evaluateHandle((jpeg) => {
+    const bytes = Uint8Array.from(atob(jpeg), (char) => char.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], "upustena.jpg", { type: "image/jpeg" }));
+    return transfer;
+  }, ONE_PIXEL_JPEG_BASE64);
+  const hint = page.getByText("Pusť fotky, nahraju je do téhle galerie");
+  await expect(hint).toBeHidden();
+  await photos.dispatchEvent("dragenter", { dataTransfer });
+  await expect(hint).toBeVisible();
+  await photos.dispatchEvent("dragover", { dataTransfer });
+  await photos.dispatchEvent("drop", { dataTransfer });
+  await expect(hint).toBeHidden();
+
+  await expect(page.getByRole("checkbox", { name: "Vybrat upustena.jpg" })).toBeAttached({
+    timeout: 15_000,
+  });
+});
+
+test("the panels sit under the photos, a jump away", async ({ page }) => {
+  await page.goto(`/admin/g/${seed.uploadGalleryIds[test.info().project.name]}`);
+  const nav = page.getByRole("navigation", { name: "Pod fotkami" });
+  await nav.getByRole("link", { name: "Sdílené odkazy" }).click();
+  await expect(page).toHaveURL(/#odkazy$/);
+  await expect(page.locator("#odkazy")).toBeInViewport();
 });
 
 test("the overview opens on tiles, and rows stay chosen for the session", async ({ page }) => {
@@ -242,7 +283,7 @@ test("on a phone: thumb-sized targets, no drag-and-drop or chart talk", async ({
     );
 
   await page.goto(`/admin/g/${seed.galleryId}`);
-  await expect(page.getByText("Přetáhni sem fotky nebo celou složku")).toBeHidden();
+  await expect(page.getByText("Nebo je přetáhni kamkoliv na stránku.")).toBeHidden();
   expect(await tooSmall()).toEqual([]);
 
   // The wedding page: three galleries, so the move-up/down arrows show.

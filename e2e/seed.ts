@@ -282,6 +282,20 @@ async function main() {
     chromium: await makeSelectGallery(user.id),
     "mobile-safari": await makeSelectGallery(user.id),
   };
+  const uploadGalleryIds = Object.fromEntries(
+    await Promise.all(
+      ["chromium", "mobile-safari"].map(async (project) => {
+        const gallery = await prisma.gallery.create({
+          data: {
+            ownerId: user.id,
+            title: `E2E Nahrávání ${project}`,
+            storagePrefix: `galleries/e2e-upload-${project}-${Date.now()}`,
+          },
+        });
+        return [project, gallery.id];
+      }),
+    ),
+  );
   const webCopyGalleryIds = {
     chromium: await makeWebCopyGalleries(user.id, "chromium"),
     "mobile-safari": await makeWebCopyGalleries(user.id, "mobile-safari"),
@@ -359,6 +373,7 @@ async function main() {
       correctionGalleries,
       selectGalleryIds,
       webCopyGalleryIds,
+      uploadGalleryIds,
       galleryId: gallery.id,
       token,
       slug,

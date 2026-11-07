@@ -279,19 +279,49 @@ export function Uploader({ galleryId }: { galleryId: string }) {
     };
   }, [running]);
 
-  // The drop zone invites dragging from Finder; a file released anywhere else
-  // on the page would make the browser open it in this tab instead.
+  // The whole page is the drop zone: the photographer works down in the grid,
+  // not up here. Anything but files (a tile being dragged) is left alone. A file
+  // released during a run is still swallowed, or the browser would open it here.
   useEffect(() => {
-    const swallowDrop = (event: DragEvent) => {
-      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    const busy = running || preparing || review !== null;
+    const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes("Files") ?? false;
+    const onEnter = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dragDepth.current += 1;
+      setDragging(true);
     };
-    window.addEventListener("dragover", swallowDrop);
-    window.addEventListener("drop", swallowDrop);
+    const onOver = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      event.dataTransfer!.dropEffect = busy ? "none" : "copy";
+    };
+    const onLeave = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      dragDepth.current = Math.max(dragDepth.current - 1, 0);
+      if (dragDepth.current === 0) setDragging(false);
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dragDepth.current = 0;
+      setDragging(false);
+      if (busy) return;
+      // Entries must be read synchronously inside the drop handler — this call
+      // does that before its first await.
+      void filesFromDrop(event.dataTransfer!).then(pick);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
     return () => {
-      window.removeEventListener("dragover", swallowDrop);
-      window.removeEventListener("drop", swallowDrop);
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
     };
-  }, []);
+  }, [pick, preparing, review, running]);
 
   const done = items.filter((i) => i.state === "done").length;
   const failed = items.filter((i) => i.state === "error");
@@ -300,38 +330,49 @@ export function Uploader({ galleryId }: { galleryId: string }) {
   const percent = stats && stats.total > 0 ? Math.floor((stats.sent / stats.total) * 100) : 0;
   const eta = stats?.speed ? formatEta((stats.total - stats.sent) / stats.speed) : null;
 
-  const hasFiles = (event: React.DragEvent) => event.dataTransfer.types.includes("Files");
-  const dropHandlers = {
-    onDragEnter: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      dragDepth.current += 1;
-      setDragging(true);
-    },
-    onDragOver: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = running || preparing || review ? "none" : "copy";
-    },
-    onDragLeave: () => {
-      dragDepth.current = Math.max(dragDepth.current - 1, 0);
-      if (dragDepth.current === 0) setDragging(false);
-    },
-    onDrop: (event: React.DragEvent) => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      dragDepth.current = 0;
-      setDragging(false);
-      if (running || preparing || review) return;
-      // Entries must be read synchronously inside the drop handler — this call
-      // does that before its first await.
-      void filesFromDrop(event.dataTransfer).then(pick);
-    },
-  };
-
   return (
-    <Card as="section" {...dropHandlers}>
-      <CardTitle>Nahrát fotky</CardTitle>
+    // Stuck to the top during a run: the photographer goes on working in the grid below.
+    <Card
+      as="section"
+      flush
+      className={`p-3 sm:px-4 ${running ? "sticky top-2 z-20 shadow-md" : ""}`}
+    >
+      {dragging && (
+        <div
+          aria-hidden
+          // Not a drop target itself: the drag's enter and leave still pair up on the page.
+          className="bg-admin-accent-soft/85 pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-6"
+        >
+          <p className="border-brand-primary text-brand-ink rounded-xl border-2 border-dashed bg-white px-8 py-6 text-center text-lg font-semibold">
+            {running || preparing || review
+              ? "Počkej, nahrávání právě běží"
+              : "Pusť fotky, nahraju je do téhle galerie"}
+          </p>
+        </div>
+      )}
+
+      {!running && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <CardTitle className="mb-0">Nahrát fotky</CardTitle>
+          {preparing && <p className="text-admin-muted text-xs">Čtu vybrané soubory…</p>}
+          {!review && !preparing && (
+            <>
+              <Button size="sm" onClick={() => filesRef.current?.click()}>
+                Vybrat fotky
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => folderRef.current?.click()}>
+                Vybrat složku
+              </Button>
+              <p className="text-admin-muted text-xs dark:text-neutral-400">
+                <span className="max-sm:pointer-coarse:hidden">
+                  Nebo je přetáhni kamkoliv na stránku.{" "}
+                </span>
+                JPEG, PNG, WebP, složky i s podsložkami; ostatní soubory se přeskočí.
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {fatal && (
         <Alert tone="danger" className="mt-3">
@@ -382,30 +423,12 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       )}
 
       {!running && !review && !preparing && (
-        <div
-          className={`mt-3 flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
-            dragging
-              ? "border-brand-primary bg-admin-accent-soft dark:bg-neutral-800"
-              : "border-admin-border dark:border-neutral-700"
-          }`}
-        >
-          <p className="text-brand-ink font-medium dark:text-neutral-100 max-sm:pointer-coarse:hidden">
-            {dragging ? "Pusť — nahraju je" : "Přetáhni sem fotky nebo celou složku"}
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={() => filesRef.current?.click()}>Vybrat fotky</Button>
-            <Button variant="secondary" onClick={() => folderRef.current?.click()}>
-              Vybrat složku
-            </Button>
-          </div>
-          <p className="text-admin-muted text-xs dark:text-neutral-400">
-            JPEG, PNG, WebP · složky i s podsložkami, ostatní soubory se přeskočí
-          </p>
+        <>
           {/* The export spec lives here, at the point of upload, because nothing
               downstream converts the file (docs/VIDEO.md): what is picked is
               exactly what the couple streams and downloads. */}
-          <details className="text-admin-muted w-full max-w-md text-left text-xs dark:text-neutral-400">
-            <summary className="cursor-pointer text-center">
+          <details className="text-admin-muted mt-2 max-w-xl text-xs dark:text-neutral-400">
+            <summary className="cursor-pointer">
               I video · MP4 (H.264), nejvýš 4K — jak ho exportovat
             </summary>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
@@ -468,14 +491,14 @@ export function Uploader({ galleryId }: { galleryId: string }) {
               event.target.value = "";
             }}
           />
-        </div>
+        </>
       )}
 
       {notice && <p className="text-admin-muted mt-2 text-xs dark:text-neutral-400">{notice}</p>}
 
       {items.length > 0 && (
-        <div className="mt-4 space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+        <div className={`space-y-2 ${running ? "" : "mt-3"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
             <p className="text-brand-ink font-medium dark:text-neutral-100">
               {done}/{items.length} nahráno
               {failed.length > 0 && (
@@ -491,6 +514,11 @@ export function Uploader({ galleryId }: { galleryId: string }) {
                 {running && eta && <> · zbývá {eta}</>}
               </p>
             )}
+            {running && (
+              <Button variant="destructive" size="sm" onClick={() => abortRef.current?.abort()}>
+                Zrušit nahrávání
+              </Button>
+            )}
           </div>
 
           <progress
@@ -505,53 +533,49 @@ export function Uploader({ galleryId }: { galleryId: string }) {
           </p>
 
           {running && stats && stats.active.length > 0 && (
-            <ul className="space-y-1.5" aria-label="Právě se nahrává">
-              {stats.active.map(({ index, sent }) => {
-                const file = items[index]?.file;
-                if (!file) return null;
-                const filePercent = file.size > 0 ? Math.floor((sent / file.size) * 100) : 0;
-                return (
-                  <li key={index} className="flex items-center gap-3 text-xs">
-                    <span className="text-admin-muted w-40 truncate dark:text-neutral-400">
-                      {file.name}
-                    </span>
-                    <span className="bg-admin-accent-soft h-1 flex-1 overflow-hidden rounded-full dark:bg-neutral-800">
-                      <span
-                        className="bg-brand-primary block h-full rounded-full opacity-70"
-                        style={{ width: `${filePercent}%` }}
-                      />
-                    </span>
-                    <span className="text-admin-muted w-20 text-right tabular-nums dark:text-neutral-400">
-                      {/* The last percent waits on R2's response and the confirm call. */}
-                      {filePercent >= 99 ? "dokončuji" : `${filePercent} %`}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <details className="text-admin-muted text-xs dark:text-neutral-400">
+              <summary className="cursor-pointer">Právě se nahrává: {stats.active.length}</summary>
+              <ul className="mt-1 space-y-1.5" aria-label="Právě se nahrává">
+                {stats.active.map(({ index, sent }) => {
+                  const file = items[index]?.file;
+                  if (!file) return null;
+                  const filePercent = file.size > 0 ? Math.floor((sent / file.size) * 100) : 0;
+                  return (
+                    <li key={index} className="flex items-center gap-3 text-xs">
+                      <span className="text-admin-muted w-40 truncate dark:text-neutral-400">
+                        {file.name}
+                      </span>
+                      <span className="bg-admin-accent-soft h-1 flex-1 overflow-hidden rounded-full dark:bg-neutral-800">
+                        <span
+                          className="bg-brand-primary block h-full rounded-full opacity-70"
+                          style={{ width: `${filePercent}%` }}
+                        />
+                      </span>
+                      <span className="text-admin-muted w-20 text-right tabular-nums dark:text-neutral-400">
+                        {/* The last percent waits on R2's response and the confirm call. */}
+                        {filePercent >= 99 ? "dokončuji" : `${filePercent} %`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            {running && (
-              <Button variant="destructive" size="sm" onClick={() => abortRef.current?.abort()}>
-                Zrušit nahrávání
-              </Button>
-            )}
-            {!running && retriable.length > 0 && (
-              <Button
-                size="sm"
-                onClick={() =>
-                  void start(
-                    retriable.map((item) => item.file),
-                    retriable.map((item) => item.replaceId),
-                    retriable.map((item) => item.uploadName),
-                  )
-                }
-              >
-                Nahrát znovu {pluralize(retriable.length, FORMS.photoAccusative)}
-              </Button>
-            )}
-          </div>
+          {!running && retriable.length > 0 && (
+            <Button
+              size="sm"
+              onClick={() =>
+                void start(
+                  retriable.map((item) => item.file),
+                  retriable.map((item) => item.replaceId),
+                  retriable.map((item) => item.uploadName),
+                )
+              }
+            >
+              Nahrát znovu {pluralize(retriable.length, FORMS.photoAccusative)}
+            </Button>
+          )}
 
           {!running && cancelled > 0 && (
             <p className="text-admin-muted text-xs dark:text-neutral-400">
