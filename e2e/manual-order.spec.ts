@@ -52,7 +52,9 @@ test("the photographer arranges the gallery by hand and guests see it", async ({
   request,
 }) => {
   test.setTimeout(120_000);
-  await page.goto(`/admin/g/${galleryId}/order`);
+  await page.goto(`/admin/g/${galleryId}`);
+  await page.getByRole("link", { name: "Změnit pořadí přetažením" }).click();
+  await expect(page).toHaveURL(/\?arrange=1$/);
   await page.getByRole("button", { name: "Řadit ručně" }).click();
 
   // Starts from the order it showed: file names.

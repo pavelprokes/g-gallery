@@ -54,6 +54,5 @@ export async function setPhotoOrder(galleryId: string, order: PhotoOrder) {
   // Once more after the switch: a photo confirmed between the two writes was
   // skipped by its own refresh (the order was not woven yet when it ran).
   if (input.data.order === "FILE_NAME_GUESTS_BY_TIME") await refreshWovenOrder(owned.id);
-  // "layout": the order page under it (/order) shows the switch too.
-  revalidatePath(`/admin/g/${input.data.galleryId}`, "layout");
+  revalidatePath(`/admin/g/${input.data.galleryId}`);
 }

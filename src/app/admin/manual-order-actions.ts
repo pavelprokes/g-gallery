@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth-guard";
@@ -37,6 +36,7 @@ export async function moveGalleryPhoto(galleryId: string, photoId: string, after
   // nothing a guest sees and only surprise the photographer later.
   if (gallery.photoOrder !== "MANUAL") throw new Error("NOT_MANUAL");
 
+  // No revalidatePath: it would render the whole gallery's page for each drop. The
+  // board shows the move already, and "Hotovo" is a full load.
   await movePhoto(input.data.galleryId, input.data.photoId, input.data.afterId);
-  revalidatePath(`/admin/g/${input.data.galleryId}`);
 }
