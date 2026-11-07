@@ -53,7 +53,7 @@ export function WebPlaceCard({
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {view.tiles.map((tile) => (
           <li key={tile.position} className="min-w-0">
-            <CoverThumb cover={tile.photo} big />
+            <CoverThumb cover={tile.photo} layout="tile" />
             <p className="text-admin-muted mt-1 text-xs [overflow-wrap:anywhere]">
               {tile.position}
             </p>

@@ -9,7 +9,8 @@ import { getAdminSession } from "@/lib/auth-guard";
 import { FORMS, pluralize } from "@/lib/czech-plural";
 import { createGallery, restoreGallery, restoreEvent } from "./actions";
 import { AdminCreateBar } from "@/components/admin-create-bar";
-import { CopyableLink, UnrecoverableLink } from "@/components/copy-button";
+import { AdminListView } from "@/components/admin/admin-list-view";
+import { CopyButton, CopyableLink, UnrecoverableLink } from "@/components/copy-button";
 import { CoverThumb, type AdminCover } from "@/components/admin/cover-thumb";
 import { OpenGalleryLink } from "@/components/admin/open-gallery-link";
 import { newestLiveShareUrl } from "@/lib/live-share-url";
@@ -47,12 +48,12 @@ function daysUntilPurge(purgeAt: Date): number {
 }
 
 /** The chart plus the two numbers it splits — the numbers are the accessible
- *  twin of the columns, never a caption for them. From `sm` up only: on a
- *  phone the row has no room beside the title, see {@link ViewLine}. */
+ *  twin of the columns, never a caption for them. In a row from `sm` up only: on
+ *  a phone and in a tile there is no room beside the title, see {@link ViewLine}. */
 function ViewStats({ series, max, label }: { series: ViewSeries; max: number; label: string }) {
   return (
     // Above the row's stretched link, so the columns' day tooltips still show.
-    <div className="relative z-10 hidden items-center gap-3 sm:flex">
+    <div className="rows:sm:flex relative z-10 hidden items-center gap-3">
       <ViewSparkline series={series} max={max} label={label} />
       <div className="w-24 text-xs tabular-nums">
         <p className="font-semibold">{pluralize(series.unique, FORMS.viewer)}</p>
@@ -62,13 +63,13 @@ function ViewStats({ series, max, label }: { series: ViewSeries; max: number; la
   );
 }
 
-/** The same two numbers as one line under the title, for phones. */
+/** The same two numbers as one line under the title, for tiles and phones. */
 function ViewLine({ series }: { series: ViewSeries }) {
   return (
-    <p className="text-admin-muted mt-0.5 text-xs tabular-nums sm:hidden">
+    <p className="text-admin-muted rows:sm:hidden mt-0.5 text-xs tabular-nums">
       <span className="text-brand-ink font-semibold">{pluralize(series.unique, FORMS.viewer)}</span>
       {" · "}
-      {pluralize(series.total, FORMS.visit)} za 14 dní
+      {pluralize(series.total, FORMS.visit)} · 14 dní
     </p>
   );
 }
@@ -76,9 +77,19 @@ function ViewLine({ series }: { series: ViewSeries }) {
 /** A date that never breaks across lines ("12. 8." / "2026"). */
 const day = (date: Date) => formatDate(date, "cs").replaceAll(" ", "\u00a0");
 
-/** The title link covers the whole row, so a thumb anywhere opens it; controls
- *  in the row sit above it with `relative z-10`. */
-const ROW_LINK = "font-medium after:absolute after:inset-0 hover:underline";
+/** The title link covers the whole tile or row, so a thumb anywhere opens it;
+ *  controls in it sit above with `relative z-10`. */
+const ROW_LINK =
+  "line-clamp-2 font-medium after:absolute after:inset-0 hover:underline rows:line-clamp-none";
+
+// Tiles by default, rows under `rows:` (AdminListView): one markup for both.
+const LIST =
+  "mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 rows:block rows:divide-y rows:divide-admin-border rows:rounded-xl rows:border rows:border-admin-border rows:bg-white dark:rows:divide-neutral-800 dark:rows:border-neutral-800 dark:rows:bg-neutral-900";
+const ITEM =
+  "relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-admin-border bg-white dark:border-neutral-800 dark:bg-neutral-900 rows:flex-row rows:flex-wrap rows:items-center rows:gap-x-4 rows:gap-y-3 rows:overflow-visible rows:rounded-none rows:border-0 rows:bg-transparent rows:p-4 dark:rows:bg-transparent";
+const ITEM_TEXT = "min-w-0 flex-1 p-3 rows:basis-48 rows:p-0";
+const ITEM_ACTIONS =
+  "relative z-10 mt-auto flex flex-wrap items-center gap-2 px-3 pb-3 rows:ml-auto rows:mt-0 rows:p-0";
 
 export default async function AdminPage() {
   const session = await getAdminSession();
@@ -212,25 +223,27 @@ export default async function AdminPage() {
 
       <AdminCreateBar createGalleryAction={create} />
 
-      {events.length > 0 && (
-        <>
-          <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <CardTitle className="mb-0">Svatby</CardTitle>
-            <ViewSparklineLegend />
-          </div>
-          <Card as="ul" flush className="divide-admin-border mt-3 divide-y dark:divide-neutral-800">
-            {events.map((event) => {
-              const token = decryptToken(event.tokenCipher);
-              const cover = coverOf(
-                event.galleries.find((gallery) => gallery.coverPhoto)?.coverPhoto ?? null,
-                event.galleries.flatMap((gallery) => gallery.photos),
-              );
-              const series = eventSeries.get(event.id) ?? emptySeries(days);
-              return (
-                <li key={event.id} className="relative space-y-3 p-4">
-                  <div className="flex items-center gap-x-4 gap-y-3">
-                    <CoverThumb cover={cover} />
-                    <div className="min-w-0 flex-1 basis-48">
+      <AdminListView>
+        {events.length > 0 && (
+          <>
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <CardTitle className="mb-0">Svatby</CardTitle>
+              <div className="rows:block hidden">
+                <ViewSparklineLegend />
+              </div>
+            </div>
+            <ul className={LIST}>
+              {events.map((event) => {
+                const token = decryptToken(event.tokenCipher);
+                const cover = coverOf(
+                  event.galleries.find((gallery) => gallery.coverPhoto)?.coverPhoto ?? null,
+                  event.galleries.flatMap((gallery) => gallery.photos),
+                );
+                const series = eventSeries.get(event.id) ?? emptySeries(days);
+                return (
+                  <li key={event.id} className={ITEM}>
+                    <CoverThumb cover={cover} layout="switchable" />
+                    <div className={ITEM_TEXT}>
                       <Link href={`/admin/e/${event.id}`} className={ROW_LINK}>
                         {event.title}
                       </Link>
@@ -246,90 +259,100 @@ export default async function AdminPage() {
                       <ViewLine series={series} />
                     </div>
                     <ViewStats series={series} max={eventMax} label={event.title} />
-                  </div>
-                  {token ? (
-                    <div className="relative z-10 flex flex-wrap items-center gap-2">
-                      <div className="min-w-0 flex-1 basis-56">
-                        <CopyableLink href={`/s/${token}/${event.slug}`} />
+                    {token ? (
+                      <div className={`${ITEM_ACTIONS} rows:ml-0 rows:basis-full`}>
+                        {/* The address takes a row's width; a tile has room for its button. */}
+                        <div className="rows:block hidden min-w-0 flex-1 basis-56">
+                          <CopyableLink href={`/s/${token}/${event.slug}`} />
+                        </div>
+                        <div className="rows:hidden">
+                          <CopyButton value={`/s/${token}/${event.slug}`} text="Odkaz" />
+                        </div>
+                        {/* Right-aligned, as on every gallery row below — also when it wraps. */}
+                        <div className="rows:ml-auto shrink-0">
+                          <OpenGalleryLink
+                            href={`/s/${token}/${event.slug}`}
+                            size="sm"
+                            variant="secondary"
+                            label="Otevřít svatbu"
+                          />
+                        </div>
                       </div>
-                      {/* Right-aligned, as on every gallery row below — also when it wraps. */}
-                      <div className="ml-auto shrink-0">
-                        <OpenGalleryLink
-                          href={`/s/${token}/${event.slug}`}
-                          size="sm"
-                          variant="secondary"
-                          label="Otevřít svatbu"
-                        />
+                    ) : (
+                      <div className="rows:basis-full rows:p-0 px-3 pb-3">
+                        <UnrecoverableLink reason="Adresu už nelze zobrazit — svatba vznikla dřív, než se odkazy ukládaly čitelně." />
                       </div>
-                    </div>
-                  ) : (
-                    <UnrecoverableLink reason="Adresu už nelze zobrazit — svatba vznikla dřív, než se odkazy ukládaly čitelně." />
-                  )}
-                </li>
-              );
-            })}
-          </Card>
-        </>
-      )}
-
-      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <CardTitle className="mb-0">Galerie</CardTitle>
-        {galleries.length > 0 && <ViewSparklineLegend />}
-      </div>
-      <Card as="ul" flush className="divide-admin-border mt-3 divide-y dark:divide-neutral-800">
-        {galleries.length === 0 && (
-          <li className="text-admin-muted p-4 text-sm dark:text-neutral-400">
-            Zatím žádná galerie.
-          </li>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
-        {galleries.map((gallery) => {
-          const status = GALLERY_STATUS[gallery.status];
-          const series = gallerySeries.get(gallery.id) ?? emptySeries(days);
-          const openUrl = newestLiveShareUrl(
-            gallery.shareLinks.map((link) => {
-              const token = decryptToken(link.tokenCipher);
-              return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
-            }),
-            gallery.status === "PUBLISHED",
-            now,
-          );
-          return (
-            <li
-              key={gallery.id}
-              className="relative flex flex-wrap items-center gap-x-4 gap-y-3 p-4"
-            >
-              <CoverThumb cover={coverOf(gallery.coverPhoto, gallery.photos)} />
-              <div className="min-w-0 flex-1 basis-48">
-                <Link href={`/admin/g/${gallery.id}`} className={ROW_LINK}>
-                  {gallery.title}
-                </Link>
-                <p className="text-admin-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs dark:text-neutral-400">
-                  {/* Published is the normal state; only the exceptions get a label. */}
-                  {gallery.status !== "PUBLISHED" && (
-                    <Badge tone={status.tone}>{status.label}</Badge>
-                  )}
-                  {gallery.webSlug && <Badge>Web</Badge>}
-                  <span>
-                    {[
-                      pluralize(gallery._count.photos, FORMS.photo),
-                      gallery.eventDate ? day(gallery.eventDate) : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </p>
-                <ViewLine series={series} />
-              </div>
-              <ViewStats series={series} max={galleryMax} label={gallery.title} />
-              {openUrl && (
-                <div className="relative z-10 ml-auto shrink-0">
-                  <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />
-                </div>
-              )}
+
+        <div className="mt-8 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <CardTitle className="mb-0">Galerie</CardTitle>
+          {galleries.length > 0 && (
+            <div className="rows:block hidden">
+              <ViewSparklineLegend />
+            </div>
+          )}
+        </div>
+        <ul className={LIST}>
+          {galleries.length === 0 && (
+            <li className="text-admin-muted col-span-full p-4 text-sm dark:text-neutral-400">
+              Zatím žádná galerie.
             </li>
-          );
-        })}
-      </Card>
+          )}
+          {galleries.map((gallery) => {
+            const status = GALLERY_STATUS[gallery.status];
+            const series = gallerySeries.get(gallery.id) ?? emptySeries(days);
+            const openUrl = newestLiveShareUrl(
+              gallery.shareLinks.map((link) => {
+                const token = decryptToken(link.tokenCipher);
+                return { ...link, url: token ? `/g/${token}/${link.slug ?? ""}` : null };
+              }),
+              gallery.status === "PUBLISHED",
+              now,
+            );
+            return (
+              <li key={gallery.id} className={ITEM}>
+                <CoverThumb
+                  cover={coverOf(gallery.coverPhoto, gallery.photos)}
+                  layout="switchable"
+                />
+                <div className={ITEM_TEXT}>
+                  <Link href={`/admin/g/${gallery.id}`} className={ROW_LINK}>
+                    {gallery.title}
+                  </Link>
+                  <p className="text-admin-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs dark:text-neutral-400">
+                    {/* Published is the normal state; only the exceptions get a label. */}
+                    {gallery.status !== "PUBLISHED" && (
+                      <Badge tone={status.tone}>{status.label}</Badge>
+                    )}
+                    {gallery.webSlug && <Badge>Web</Badge>}
+                    <span>
+                      {[
+                        pluralize(gallery._count.photos, FORMS.photo),
+                        gallery.eventDate ? day(gallery.eventDate) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </p>
+                  <ViewLine series={series} />
+                </div>
+                <ViewStats series={series} max={galleryMax} label={gallery.title} />
+                {openUrl && (
+                  <div className={ITEM_ACTIONS}>
+                    <OpenGalleryLink href={openUrl} size="sm" variant="secondary" />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </AdminListView>
 
       {trashedEvents.length > 0 && (
         <Card as="details" flush className="mt-6">
